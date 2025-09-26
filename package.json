@@ -1,0 +1,87 @@
+{
+  "scripts": {
+    "build": "nest build",
+    "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
+    "start": "nest start",
+    "start:dev": "nest start --watch",
+    "start:debug": "nest start --debug --watch",
+    "start:prod": "node dist/main.js",
+    "lint": "eslint \"{src,apps,libs,test}/**/*.ts\" --fix",
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "test:cov": "jest --coverage",
+    "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
+    "test:e2e": "jest --config ./test/jest-e2e.json",
+    "dev:sync": "prisma db pull && prisma generate && nest start --watch",
+    "db:seed": "ts-node prisma/seed.ts",
+    "docker:dev": "docker-compose -f docker-compose.dev.yml up -d",
+    "docker:dev:down": "docker-compose -f docker-compose.dev.yml down",
+    "docker:prod": "docker-compose up --build",
+    "docker:prod:down": "docker-compose down",
+    "docker:remote": "docker-compose -f docker-compose.remote-db.yml up --build",
+    "docker:remote:down": "docker-compose -f docker-compose.remote-db.yml down",
+    "docker:production": "docker-compose -f docker-compose.production.yml up -d --build",
+    "docker:production:down": "docker-compose -f docker-compose.production.yml down",
+    "docker:production:logs": "docker-compose -f docker-compose.production.yml logs -f app",
+    "docker:logs": "docker-compose logs -f app"
+  },
+  "jest": {
+    "moduleFileExtensions": [
+      "js",
+      "json",
+      "ts"
+    ],
+    "rootDir": "src",
+    "testRegex": ".*\\.spec\\.ts$",
+    "transform": {
+      "^.+\\.(t|j)s$": "ts-jest"
+    },
+    "collectCoverageFrom": [
+      "**/*.(t|j)s"
+    ],
+    "coverageDirectory": "../coverage",
+    "testEnvironment": "node",
+    "moduleNameMapper": {
+      "^src/(.*)$": "<rootDir>/$1"
+    },
+    "transformIgnorePatterns": [
+      "node_modules/(?!(nanoid)/)"
+    ]
+  },
+  "devDependencies": {
+    "@nestjs/cli": "^11.0.0",
+    "@nestjs/testing": "^11.1.6",
+    "@types/bcryptjs": "^2.4.6",
+    "@types/jest": "^30.0.0",
+    "@types/mocha": "^10.0.10",
+    "@types/node": "^24.2.1",
+    "@types/passport-jwt": "^4.0.1",
+    "@types/supertest": "^6.0.3",
+    "jest": "^30.0.5",
+    "prisma": "^6.14.0",
+    "supertest": "^7.1.4",
+    "ts-jest": "^29.4.1",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.9.2"
+  },
+  "dependencies": {
+    "@nestjs/config": "^4.0.2",
+    "@nestjs/jwt": "^11.0.0",
+    "@nestjs/passport": "^11.0.5",
+    "@nestjs/platform-express": "^11.1.6",
+    "@nestjs/swagger": "^11.2.0",
+    "@prisma/client": "^6.14.0",
+    "@types/multer": "^2.0.0",
+    "bcryptjs": "^3.0.2",
+    "class-transformer": "^0.5.1",
+    "class-validator": "^0.14.2",
+    "compression": "^1.8.1",
+    "cors": "^2.8.5",
+    "helmet": "^8.1.0",
+    "nanoid": "^5.1.5",
+    "passport": "^0.7.0",
+    "passport-jwt": "^4.0.1",
+    "reflect-metadata": "^0.2.2",
+    "rxjs": "^7.8.2"
+  }
+}

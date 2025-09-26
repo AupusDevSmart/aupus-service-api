@@ -1,0 +1,56 @@
+# Docker Compose para PRODUÇÃO
+# Aplicação containerizada + banco remoto
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: aupus-api-production
+    restart: unless-stopped
+    ports:
+      - "80:3000"  # Mapeia porta 80 para a aplicação
+    environment:
+      # Configurações de produção
+      NODE_ENV: production
+      DATABASE_URL: "postgresql://admin:password@45.55.122.87:5432/aupus?schema=public"
+      PORT: 3000
+
+      # Configurações de segurança (ALTERE ESTES VALORES!)
+      JWT_SECRET: "${JWT_SECRET:-change-this-in-production-very-secure-key-here}"
+
+      # CORS para frontend (ajuste conforme necessário)
+      CORS_ORIGIN: "${CORS_ORIGIN:-https://your-frontend-domain.com}"
+
+      # Outras configurações opcionais
+      LOG_LEVEL: "${LOG_LEVEL:-info}"
+
+    # Configurações de recursos (opcional)
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 1G
+        reservations:
+          cpus: '0.5'
+          memory: 512M
+
+    # Health check
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/api/v1/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+    # Volumes para logs persistentes
+    volumes:
+      - ./logs:/app/logs
+
+    # Configurações de rede
+    networks:
+      - production-network
+
+networks:
+  production-network:
+    driver: bridge

@@ -1,0 +1,23 @@
+# Docker Compose usando seu banco REMOTO atual
+# Apenas containeriza a aplicação, mantém o banco externo
+
+services:
+  # Aplicação NestJS usando banco remoto
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: aupus-api-remote
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      # Usar as mesmas configurações do seu .env atual
+      NODE_ENV: production
+      DATABASE_URL: "postgresql://admin:password@45.55.122.87:5432/aupus?schema=public"
+      PORT: 3000
+      JWT_SECRET: your-super-secret-jwt-key-change-in-production
+      CORS_ORIGIN: http://localhost:3001
+    volumes:
+      # Para logs persistentes (opcional)
+      - ./logs:/app/logs

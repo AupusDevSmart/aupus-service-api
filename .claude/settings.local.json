@@ -1,0 +1,26 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm run build:*)",
+      "Bash(npm start)",
+      "Bash(node:*)",
+      "Bash(del test-role-mapping.js)",
+      "mcp__ide__getDiagnostics",
+      "Bash(npx prisma generate:*)",
+      "Bash(npx ts-node:*)",
+      "Bash(npx tsc:*)",
+      "Bash(findstr:*)",
+      "Bash(tree:*)",
+      "Bash(npx prisma:*)",
+      "Bash(npm run start:dev:*)",
+      "Bash(curl:*)",
+      "Bash(mkdir:*)",
+      "Bash(npm run test:*)",
+      "Bash(tasklist)",
+      "Bash(netstat:*)",
+      "Bash(npm install)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}
