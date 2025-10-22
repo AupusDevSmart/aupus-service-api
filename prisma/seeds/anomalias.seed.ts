@@ -189,13 +189,17 @@ export async function seedAnomalias() {
         select: { id: true, nome: true }
       }),
       prisma.equipamentos.findMany({
-        select: { 
-          id: true, 
-          nome: true, 
-          planta_id: true, 
+        select: {
+          id: true,
+          nome: true,
           classificacao: true,
           localizacao: true,
-          localizacao_especifica: true
+          localizacao_especifica: true,
+          unidade: {
+            select: {
+              planta_id: true
+            }
+          }
         }
       }),
       prisma.usuarios.findMany({
@@ -322,8 +326,8 @@ export async function seedAnomalias() {
           continue;
         }
 
-        // Buscar planta do equipamento
-        const planta = plantas.find(p => p.id === equipamento.planta_id);
+        // Buscar planta do equipamento através da unidade
+        const planta = plantas.find(p => p.id === equipamento.unidade?.planta_id);
         if (!planta) {
           console.log(`❌ Planta não encontrada para equipamento: ${equipamento.nome}`);
           errors++;
@@ -401,7 +405,7 @@ export async function seedAnomalias() {
         try {
           const equipamentoAleatorio = equipamentos[Math.floor(Math.random() * equipamentos.length)];
           const usuarioAleatorio = usuarios[Math.floor(Math.random() * usuarios.length)];
-          const plantaAleatorio = plantas.find(p => p.id === equipamentoAleatorio.planta_id);
+          const plantaAleatorio = plantas.find(p => p.id === equipamentoAleatorio.unidade?.planta_id);
 
           if (!plantaAleatorio) continue;
 

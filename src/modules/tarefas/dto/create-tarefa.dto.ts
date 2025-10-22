@@ -123,10 +123,6 @@ export class CreateTarefaDto {
   @IsOptional()
   equipamento_id?: string;
 
-  @IsString()
-  @IsOptional()
-  planta_id?: string;
-
   // Sub-estruturas
   @IsArray()
   @ValidateNested({ each: true })

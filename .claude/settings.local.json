@@ -18,7 +18,9 @@
       "Bash(npm run test:*)",
       "Bash(tasklist)",
       "Bash(netstat:*)",
-      "Bash(npm install)"
+      "Bash(npm install)",
+      "Bash(taskkill:*)",
+      "Bash(cmd //c:*)"
     ],
     "deny": [],
     "ask": []

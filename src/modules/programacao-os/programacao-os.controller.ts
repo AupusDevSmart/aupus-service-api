@@ -66,12 +66,7 @@ export class ProgramacaoOSController {
   @ApiQuery({ name: 'data_fim', required: false, description: 'Data fim (YYYY-MM-DD)' })
   @ApiQuery({ name: 'criado_por_id', required: false, description: 'Filtrar por criador' })
   async listar(@Query() filters: ProgramacaoFiltersDto): Promise<ListarProgramacoesResponseDto> {
-    this.logger.log('=== LISTAR PROGRAMAÇÕES ===');
-    this.logger.log('Filtros recebidos:', JSON.stringify(filters, null, 2));
-
-    const result = await this.programacaoOSService.listar(filters);
-    this.logger.log(`Retornando ${result.data.length} programações`);
-    return result;
+    return this.programacaoOSService.listar(filters);
   }
 
   @Post()
@@ -90,15 +85,36 @@ export class ProgramacaoOSController {
   })
   
   async criar(@Body() createDto: CreateProgramacaoDto): Promise<ProgramacaoResponseDto> {
-    this.logger.log('=== CRIAR PROGRAMAÇÃO ===');
-    this.logger.log('Dados recebidos:', JSON.stringify(createDto, null, 2));
-
     // TODO: Obter usuarioId da sessão quando implementar autenticação
     const usuarioId = undefined;
+    return this.programacaoOSService.criar(createDto, usuarioId);
+  }
 
-    const result = await this.programacaoOSService.criar(createDto, usuarioId);
-    this.logger.log(`Programação criada com ID: ${result.id}`);
-    return result;
+  @Get('por-unidade/:unidadeId')
+  @ApiOperation({
+    summary: 'Buscar programações por unidade',
+    description: 'Lista programações filtradas por unidade específica',
+  })
+  @ApiParam({ name: 'unidadeId', description: 'ID da unidade' })
+  @ApiQuery({ name: 'page', required: false, description: 'Página (default: 1)' })
+  @ApiQuery({ name: 'limit', required: false, description: 'Items por página (default: 10)' })
+  @ApiQuery({ name: 'status', required: false, description: 'Filtrar por status' })
+  @ApiQuery({ name: 'tipo', required: false, description: 'Filtrar por tipo' })
+  @ApiQuery({ name: 'prioridade', required: false, description: 'Filtrar por prioridade' })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Programações da unidade encontradas',
+    type: ListarProgramacoesResponseDto,
+  })
+  @ApiResponse({
+    status: HttpStatus.NOT_FOUND,
+    description: 'Unidade não encontrada',
+  })
+  async buscarPorUnidade(
+    @Param('unidadeId') unidadeId: string,
+    @Query() filters?: Partial<ProgramacaoFiltersDto>
+  ): Promise<ListarProgramacoesResponseDto> {
+    return this.programacaoOSService.buscarPorUnidade(unidadeId, filters);
   }
 
   @Get(':id')
@@ -117,11 +133,7 @@ export class ProgramacaoOSController {
     description: 'Programação não encontrada',
   })
   async buscarPorId(@Param('id', ParseULIDPipe) id: string): Promise<ProgramacaoDetalhesResponseDto> {
-    this.logger.log(`=== BUSCAR PROGRAMAÇÃO POR ID: ${id} ===`);
-
-    const result = await this.programacaoOSService.buscarPorId(id);
-    this.logger.log(`Programação encontrada: ${result.descricao}`);
-    return result;
+    return this.programacaoOSService.buscarPorId(id);
   }
 
 

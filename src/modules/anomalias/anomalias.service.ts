@@ -17,9 +17,6 @@ export class AnomaliasService {
       ativo: localizacao.ativo,
       status: 'AGUARDANDO',
       criado_por: userId ? `Usuário ${userId}` : 'Sistema',
-      ...(localizacao.plantaId && {
-        planta: { connect: { id: localizacao.plantaId } }
-      }),
       ...(localizacao.equipamentoId && {
         equipamento: { connect: { id: localizacao.equipamentoId } }
       }),
@@ -49,7 +46,7 @@ export class AnomaliasService {
   }
 
   async findAll(filters: AnomaliaFiltersDto) {
-    const { search, periodo, status, prioridade, origem, planta, page = 1, limit = 10 } = filters;
+    const { search, periodo, status, prioridade, origem, planta, unidade, page = 1, limit = 10 } = filters;
 
     const where: Prisma.anomaliasWhereInput = {
       deleted_at: null,
@@ -66,6 +63,11 @@ export class AnomaliasService {
       ...(prioridade && { prioridade: prioridade as any }),
       ...(origem && { origem: origem as any }),
       ...(planta && { planta_id: planta }),
+      ...(unidade && {
+        equipamento: {
+          unidade_id: unidade
+        }
+      }),
       ...(periodo && this.buildPeriodoFilter(periodo))
     };
 
@@ -124,9 +126,6 @@ export class AnomaliasService {
       ...(localizacao && {
         local: localizacao.local,
         ativo: localizacao.ativo,
-        ...(localizacao.plantaId && {
-          planta: { connect: { id: localizacao.plantaId } }
-        }),
         ...(localizacao.equipamentoId && {
           equipamento: { connect: { id: localizacao.equipamentoId } }
         })
@@ -334,11 +333,36 @@ export class AnomaliasService {
     });
   }
 
-  async getEquipamentosSelect(plantaId?: string) {
+  async getUnidadesSelect(plantaId?: string) {
     const where: any = { deleted_at: null };
-    
+
     if (plantaId) {
       where.planta_id = plantaId;
+    }
+
+    return this.prisma.unidades.findMany({
+      where,
+      select: {
+        id: true,
+        nome: true,
+        planta: {
+          select: {
+            id: true,
+            nome: true
+          }
+        }
+      },
+      orderBy: { nome: 'asc' }
+    });
+  }
+
+  async getEquipamentosSelect(plantaId?: string) {
+    const where: any = { deleted_at: null };
+
+    if (plantaId) {
+      where.unidade = {
+        planta_id: plantaId
+      };
     }
 
     return this.prisma.equipamentos.findMany({
@@ -346,23 +370,26 @@ export class AnomaliasService {
       select: {
         id: true,
         nome: true,
-        planta_id: true,
-        planta: {
+        unidade: {
           select: {
-            nome: true
+            planta: {
+              select: {
+                id: true,
+                nome: true
+              }
+            }
           }
         }
       },
       orderBy: [
-        { planta: { nome: 'asc' } },
         { nome: 'asc' }
       ]
-    }).then(equipamentos => 
+    }).then(equipamentos =>
       equipamentos.map(eq => ({
         id: eq.id,
         nome: eq.nome,
-        planta_id: eq.planta_id,
-        planta_nome: eq.planta?.nome || 'Sem planta'
+        planta_id: eq.unidade?.planta?.id || null,
+        planta_nome: eq.unidade?.planta?.nome || 'Sem planta'
       }))
     );
   }

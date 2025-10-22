@@ -31,17 +31,6 @@ export class PlantaBasica {
   nome: string;
 }
 
-export class ProprietarioBasico {
-  @ApiProperty({ example: 'usr_01234567890123456789012345' })
-  id: string;
-
-  @ApiProperty({ example: 'Empresa ABC Ltda' })
-  nome: string;
-
-  @ApiProperty({ example: '12.345.678/0001-90' })
-  cpf_cnpj: string;
-}
-
 export class EquipamentoPai {
   @ApiProperty({ example: 'eqp_01234567890123456789012345' })
   id: string;
@@ -77,11 +66,8 @@ export class Equipamento {
   @ApiProperty({ example: 'UC', enum: ['UC', 'UAR'] })
   classificacao: string;
 
-  @ApiPropertyOptional({ example: 'plt_01234567890123456789012345' })
-  planta_id?: string;
-
-  @ApiPropertyOptional({ example: 'usr_01234567890123456789012345' })
-  proprietario_id?: string;
+  @ApiPropertyOptional({ example: 'uni_01234567890123456789012345' })
+  unidade_id?: string;
 
   @ApiPropertyOptional({ example: 'eqp_01234567890123456789012345' })
   equipamento_pai_id?: string;
@@ -177,17 +163,11 @@ export class Equipamento {
   deleted_at?: Date;
 
   // Relacionamentos
-  @ApiPropertyOptional({ type: PlantaBasica })
-  planta?: PlantaBasica;
-
-  @ApiPropertyOptional({ type: ProprietarioBasico })
-  proprietario?: ProprietarioBasico;
-
   @ApiPropertyOptional({ type: EquipamentoPai })
   equipamento_pai?: EquipamentoPai;
 
   @ApiPropertyOptional({ type: [ComponenteUAR] })
-  componentes_uar?: ComponenteUAR[];
+  equipamentos_filhos?: ComponenteUAR[];
 
   @ApiPropertyOptional({ type: [DadoTecnico] })
   dados_tecnicos?: DadoTecnico[];

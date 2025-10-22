@@ -414,17 +414,16 @@ describe('ProgramacaoOSService', () => {
     it('deve validar relacionamentos antes de criar', async () => {
       const createDtoComRelacionamentos: CreateProgramacaoDto = {
         ...createDto,
-        planta_id: 'clrx1234567890123456789012',
         equipamento_id: 'clrx9876543210987654321098',
       };
 
-      mockPrismaService.plantas.findFirst.mockResolvedValue(null);
+      mockPrismaService.equipamentos.findFirst.mockResolvedValue(null);
 
       await expect(service.criar(createDtoComRelacionamentos, 'user123'))
         .rejects.toThrow(NotFoundException);
 
-      expect(mockPrismaService.plantas.findFirst).toHaveBeenCalledWith({
-        where: { id: 'clrx1234567890123456789012', deleted_at: null },
+      expect(mockPrismaService.equipamentos.findFirst).toHaveBeenCalledWith({
+        where: { id: 'clrx9876543210987654321098', deleted_at: null },
       });
     });
   });

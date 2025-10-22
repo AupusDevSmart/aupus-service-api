@@ -22,10 +22,6 @@ export class QueryTarefasDto {
   equipamento_id?: string;
 
   @IsOptional()
-  @IsString()
-  planta_id?: string;
-
-  @IsOptional()
   @IsEnum(StatusTarefa)
   status?: StatusTarefa;
 

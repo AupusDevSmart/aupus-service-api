@@ -25,8 +25,6 @@ export class ProgramacaoOSService {
   constructor(private readonly prisma: PrismaService) { }
 
   async listar(filters: ProgramacaoFiltersDto): Promise<ListarProgramacoesResponseDto> {
-    this.logger.log('=== SERVICE: LISTAR PROGRAMAÇÕES ===');
-    this.logger.log('Filtros:', JSON.stringify(filters, null, 2));
 
     const {
       page = 1,
@@ -37,6 +35,7 @@ export class ProgramacaoOSService {
       prioridade,
       origem,
       planta_id,
+      unidade_id,
       data_inicio,
       data_fim,
       criado_por_id,
@@ -74,6 +73,12 @@ export class ProgramacaoOSService {
 
     if (planta_id) {
       where.planta_id = planta_id;
+    }
+
+    if (unidade_id) {
+      where.equipamento = {
+        unidade_id: unidade_id
+      };
     }
 
     if (criado_por_id) {
@@ -170,12 +175,23 @@ export class ProgramacaoOSService {
     return this.mapearParaDetalhes(programacao);
   }
 
-  async criar(createDto: CreateProgramacaoDto, usuarioId?: string): Promise<ProgramacaoResponseDto> {
-    this.logger.log('=== SERVICE: CRIAR PROGRAMAÇÃO ===');
-    this.logger.log('Dados recebidos:', JSON.stringify(createDto, null, 2));
+  async buscarPorUnidade(unidadeId: string, filters?: Partial<ProgramacaoFiltersDto>): Promise<ListarProgramacoesResponseDto> {
+    // Verificar se unidade existe
+    await this.verificarUnidadeExiste(unidadeId);
 
+    // Construir filtros com unidade_id
+    const filtersComUnidade: ProgramacaoFiltersDto = {
+      ...filters,
+      unidade_id: unidadeId,
+      page: filters?.page || 1,
+      limit: filters?.limit || 10,
+    };
+
+    return this.listar(filtersComUnidade);
+  }
+
+  async criar(createDto: CreateProgramacaoDto, usuarioId?: string): Promise<ProgramacaoResponseDto> {
     // Validar relacionamentos
-    this.logger.log('Iniciando validação de relacionamentos...');
     await this.validarRelacionamentos(createDto);
 
     // Gerar código único
@@ -196,7 +212,6 @@ export class ProgramacaoOSService {
           tipo: createDto.tipo,
           prioridade: createDto.prioridade,
           origem: createDto.origem,
-          planta_id: createDto.planta_id,
           equipamento_id: createDto.equipamento_id,
           anomalia_id: createDto.anomalia_id,
           plano_manutencao_id: createDto.plano_manutencao_id,
@@ -284,7 +299,7 @@ export class ProgramacaoOSService {
     }
 
     // Validar relacionamentos se alterados
-    if (updateDto.planta_id || updateDto.equipamento_id || updateDto.anomalia_id || updateDto.plano_manutencao_id) {
+    if (updateDto.equipamento_id || updateDto.anomalia_id || updateDto.plano_manutencao_id) {
       await this.validarRelacionamentos(updateDto);
     }
 
@@ -483,7 +498,6 @@ export class ProgramacaoOSService {
       tipo: 'CORRETIVA',
       prioridade: dto.ajustes?.prioridade as any || anomalia.prioridade,
       origem: 'ANOMALIA',
-      planta_id: anomalia.planta_id,
       equipamento_id: anomalia.equipamento_id,
       anomalia_id: anomalia.id,
       tempo_estimado: dto.ajustes?.tempo_estimado || 2,
@@ -507,7 +521,13 @@ export class ProgramacaoOSService {
       },
       include: {
         equipamento: {
-          include: { planta: true },
+          include: {
+            unidade: {
+              include: {
+                planta: true
+              }
+            }
+          }
         },
       },
     });
@@ -521,13 +541,13 @@ export class ProgramacaoOSService {
     const duracaoTotal = tarefas.reduce((acc, tarefa) => acc + Number(tarefa.duracao_estimada), 0);
 
     // Determinar planta e equipamento principal
-    const plantas = [...new Set(tarefas.map(t => t.equipamento?.planta?.id).filter(Boolean))];
+    const plantas = [...new Set(tarefas.map(t => t.equipamento?.unidade?.planta?.id).filter(Boolean))];
     const equipamentos = [...new Set(tarefas.map(t => t.equipamento_id).filter(Boolean))];
 
     const createDto: CreateProgramacaoDto = {
       descricao: dto.descricao || `Execução de ${tarefas.length} tarefa(s) de manutenção`,
       local: dto.agrupar_por === 'planta' && plantas.length === 1
-        ? tarefas[0].equipamento?.planta?.nome || 'Local não definido'
+        ? tarefas[0].equipamento?.unidade?.planta?.nome || 'Local não definido'
         : 'Múltiplos locais',
       ativo: equipamentos.length === 1
         ? tarefas[0].equipamento?.nome || 'Equipamento não definido'
@@ -536,7 +556,6 @@ export class ProgramacaoOSService {
       tipo: tarefas[0].tipo_manutencao as any || 'PREVENTIVA',
       prioridade: dto.prioridade as any || 'MEDIA',
       origem: 'TAREFA',
-      planta_id: plantas.length === 1 ? plantas[0] : null,
       equipamento_id: equipamentos.length === 1 ? equipamentos[0] : null,
       tempo_estimado: tempoTotal,
       duracao_estimada: duracaoTotal,
@@ -663,16 +682,20 @@ export class ProgramacaoOSService {
 
   // Métodos auxiliares privados
 
-  private async validarRelacionamentos(dto: Partial<CreateProgramacaoDto>): Promise<void> {
-    if (dto.planta_id) {
-      const planta = await this.prisma.plantas.findFirst({
-        where: { id: dto.planta_id, deleted_at: null },
-      });
-      if (!planta) {
-        throw new NotFoundException('Planta não encontrada');
+  private async verificarUnidadeExiste(unidadeId: string): Promise<void> {
+    const unidade = await this.prisma.unidades.findFirst({
+      where: {
+        id: unidadeId,
+        deleted_at: null
       }
-    }
+    });
 
+    if (!unidade) {
+      throw new NotFoundException('Unidade não encontrada');
+    }
+  }
+
+  private async validarRelacionamentos(dto: Partial<CreateProgramacaoDto>): Promise<void> {
     if (dto.equipamento_id) {
       const equipamento = await this.prisma.equipamentos.findFirst({
         where: { id: dto.equipamento_id, deleted_at: null },

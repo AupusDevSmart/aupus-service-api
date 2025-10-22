@@ -35,6 +35,11 @@ export class AnomaliaFiltersDto {
   @IsString()
   planta?: string;
 
+  @ApiProperty({ required: false, description: 'ID da unidade' })
+  @IsOptional()
+  @IsString()
+  unidade?: string;
+
   @ApiProperty({ required: false, description: 'Número da página', default: 1 })
   @IsOptional()
   @Transform(({ value }) => parseInt(value))

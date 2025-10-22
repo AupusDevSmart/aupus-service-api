@@ -2,6 +2,8 @@ import { ValidationPipe } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { AppModule } from './app.module';
+import { ResponseInterceptor } from './common/interceptors/response.interceptor';
+import { HttpExceptionFilter } from './common/filters/http-exception.filter';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule, {
@@ -10,9 +12,17 @@ async function bootstrap() {
 
   // ✅ CORS para integração com frontend
   app.enableCors({
-    origin: ['http://localhost:5173', 'http://localhost:3000'],
-    methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'],
+    origin: [
+      'http://localhost:5175',
+      'http://localhost:5173',
+      'http://localhost:3000',
+      'https://aupus-service.aupusenergia.com.br',
+      'https://aupus-service-api.aupusenergia.com.br'
+    ],
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization', 'x-xsrf-token'],
+    preflightContinue: false, // Importante: deixa o NestJS lidar com o preflight
+    optionsSuccessStatus: 204, // Alguns browsers antigos (IE11) tem problema com 200
     credentials: true,
   });
 
@@ -29,6 +39,12 @@ async function bootstrap() {
       },
     }),
   );
+
+  // ✅ Aplicar interceptor de resposta padrão
+  app.useGlobalInterceptors(new ResponseInterceptor());
+
+  // ✅ Aplicar filtro de exceções global
+  app.useGlobalFilters(new HttpExceptionFilter());
 
   const config = new DocumentBuilder()
     .setTitle('Sistema de Manutenção Industrial API')

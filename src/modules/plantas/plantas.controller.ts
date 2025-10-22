@@ -137,27 +137,27 @@ export class PlantasController {
 
   // ✅ ROTA: GET /api/v1/plantas/:id (Buscar planta específica)
   @Get(':id')
-  @ApiOperation({ 
+  @ApiOperation({
     summary: 'Buscar planta por ID',
     description: 'Retorna os detalhes de uma planta específica'
   })
-  @ApiParam({ 
-    name: 'id', 
-    description: 'ID da planta', 
+  @ApiParam({
+    name: 'id',
+    description: 'ID da planta',
     example: 'plt_01234567890123456789012345'
   })
-  @ApiResponse({ 
-    status: HttpStatus.OK, 
+  @ApiResponse({
+    status: HttpStatus.OK,
     description: 'Planta encontrada com sucesso',
-    type: Planta 
+    type: Planta
   })
-  @ApiResponse({ 
-    status: HttpStatus.NOT_FOUND, 
-    description: 'Planta não encontrada' 
+  @ApiResponse({
+    status: HttpStatus.NOT_FOUND,
+    description: 'Planta não encontrada'
   })
-  @ApiResponse({ 
-    status: HttpStatus.BAD_REQUEST, 
-    description: 'ID inválido' 
+  @ApiResponse({
+    status: HttpStatus.BAD_REQUEST,
+    description: 'ID inválido'
   })
   async findOne(
     @Param('id') id: string
@@ -166,12 +166,60 @@ export class PlantasController {
 
     try {
       const planta = await this.plantasService.findOne(id);
-      
+
       this.logger.log(`✅ [GET PLANTA] Planta encontrada: ${planta.nome}`);
       return planta;
-      
+
     } catch (error) {
       this.logger.error(`❌ [GET PLANTA] Erro ao buscar planta ${id}:`, error.message);
+      throw error;
+    }
+  }
+
+  // ✅ ROTA: GET /api/v1/plantas/:plantaId/unidades (Listar unidades da planta)
+  @Get(':plantaId/unidades')
+  @ApiOperation({
+    summary: 'Listar unidades de uma planta',
+    description: 'Retorna lista de unidades de uma planta com informações de diagramas'
+  })
+  @ApiParam({
+    name: 'plantaId',
+    description: 'ID da planta',
+    example: 'plt_01234567890123456789012345'
+  })
+  @ApiQuery({ name: 'tipo', required: false, type: String, description: 'Filtrar por tipo (UFV, SUBESTACAO, etc.)' })
+  @ApiQuery({ name: 'status', required: false, type: String, description: 'Filtrar por status' })
+  @ApiQuery({ name: 'comDiagrama', required: false, type: Boolean, description: 'Filtrar apenas unidades com diagrama' })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Lista de unidades retornada com sucesso'
+  })
+  @ApiResponse({
+    status: HttpStatus.NOT_FOUND,
+    description: 'Planta não encontrada'
+  })
+  async findUnidadesByPlanta(
+    @Param('plantaId') plantaId: string,
+    @Query('tipo') tipo?: string,
+    @Query('status') status?: string,
+    @Query('comDiagrama') comDiagrama?: boolean
+  ) {
+    this.logger.log(`🏢 [GET UNIDADES] Buscando unidades da planta ${plantaId}`);
+    this.logger.log(`📝 [GET UNIDADES] Filtros - tipo: ${tipo}, status: ${status}, comDiagrama: ${comDiagrama}`);
+
+    try {
+      const result = await this.plantasService.findUnidadesByPlanta(
+        plantaId,
+        tipo,
+        status,
+        comDiagrama
+      );
+
+      this.logger.log(`✅ [GET UNIDADES] Encontradas ${result.data.length} unidades`);
+      return result;
+
+    } catch (error) {
+      this.logger.error(`❌ [GET UNIDADES] Erro ao buscar unidades da planta ${plantaId}:`, error.message);
       throw error;
     }
   }

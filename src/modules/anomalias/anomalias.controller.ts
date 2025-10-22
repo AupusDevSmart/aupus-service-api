@@ -165,8 +165,8 @@ export class AnomaliasController {
 
   @Get('selects/plantas')
   @ApiOperation({ summary: 'Listar plantas para select' })
-  @ApiResponse({ 
-    status: HttpStatus.OK, 
+  @ApiResponse({
+    status: HttpStatus.OK,
     description: 'Lista de plantas para select',
     schema: {
       type: 'array',
@@ -181,6 +181,34 @@ export class AnomaliasController {
   })
   async getPlantasSelect() {
     return this.anomaliasService.getPlantasSelect();
+  }
+
+  @Get('selects/unidades')
+  @ApiOperation({ summary: 'Listar unidades para select' })
+  @ApiQuery({ name: 'plantaId', required: false, description: 'Filtrar unidades por planta' })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Lista de unidades para select',
+    schema: {
+      type: 'array',
+      items: {
+        type: 'object',
+        properties: {
+          id: { type: 'string' },
+          nome: { type: 'string' },
+          planta: {
+            type: 'object',
+            properties: {
+              id: { type: 'string' },
+              nome: { type: 'string' }
+            }
+          }
+        }
+      }
+    }
+  })
+  async getUnidadesSelect(@Query('plantaId') plantaId?: string) {
+    return this.anomaliasService.getUnidadesSelect(plantaId);
   }
 
   @Get('selects/equipamentos')

@@ -49,6 +49,12 @@ export class ProgramacaoFiltersDto {
   @Length(26, 26)
   planta_id?: string;
 
+  @ApiPropertyOptional({ description: 'ID da unidade' })
+  @IsOptional()
+  @IsString()
+  @Length(26, 26)
+  unidade_id?: string;
+
   @ApiPropertyOptional({ description: 'Data de início do filtro', example: '2025-01-01' })
   @IsOptional()
   @IsDateString()

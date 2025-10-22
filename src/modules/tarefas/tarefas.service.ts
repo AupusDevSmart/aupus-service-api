@@ -41,7 +41,7 @@ export class TarefasService {
         data: {
           plano_manutencao_id: createDto.plano_manutencao_id,
           equipamento_id: plano.equipamento_id,
-          planta_id: plano.equipamento.planta_id,
+          planta_id: plano.equipamento.unidade?.planta_id,
           tag: createDto.tag,
           nome: createDto.nome,
           descricao: createDto.descricao,
@@ -204,7 +204,6 @@ export class TarefasService {
     if (updateDto.plano_manutencao_id && updateDto.plano_manutencao_id !== tarefaExistente.plano_manutencao_id) {
       const novoPlano = await this.verificarPlanoExiste(updateDto.plano_manutencao_id);
       dadosAtualizacao.equipamento_id = novoPlano.equipamento_id;
-      dadosAtualizacao.planta_id = novoPlano.equipamento.planta_id;
     }
 
     // Validar frequência personalizada se alterada
@@ -442,7 +441,11 @@ export class TarefasService {
         equipamento: {
           select: {
             id: true,
-            planta_id: true
+            unidade: {
+              select: {
+                planta_id: true
+              }
+            }
           }
         }
       }
@@ -646,10 +649,6 @@ export class TarefasService {
 
     if (filters.equipamento_id) {
       where.equipamento_id = filters.equipamento_id;
-    }
-
-    if (filters.planta_id) {
-      where.planta_id = filters.planta_id;
     }
 
     if (filters.status) {

@@ -31,11 +31,6 @@ export enum OrigemAnomalia {
 }
 
 class LocalizacaoDto {
-  @ApiProperty({ description: 'ID da planta' })
-  @IsOptional()
-  @IsString()
-  plantaId?: string;
-
   @ApiProperty({ description: 'ID do equipamento' })
   @IsOptional()
   @IsString()

@@ -1,5 +1,5 @@
-import { IsOptional, IsString, IsInt, Min, Max, IsIn } from 'class-validator';
-import { Type } from 'class-transformer';
+import { IsOptional, IsString, IsInt, Min, Max, IsIn, IsBoolean } from 'class-validator';
+import { Type, Transform } from 'class-transformer';
 import { ApiPropertyOptional } from '@nestjs/swagger';
 
 export class EquipamentoQueryDto {
@@ -23,21 +23,38 @@ export class EquipamentoQueryDto {
   @IsString()
   search?: string;
 
-  @ApiPropertyOptional({ example: 'plt_01234567890123456789012345' })
+  @ApiPropertyOptional({ example: 'uni_01234567890123456789012345' })
   @IsOptional()
   @IsString()
-  planta_id?: string;
-
-  @ApiPropertyOptional({ example: 'usr_01234567890123456789012345' })
-  @IsOptional()
-  @IsString()
-  proprietario_id?: string;
+  unidade_id?: string;
 
   @ApiPropertyOptional({ example: 'UC', enum: ['UC', 'UAR'] })
   @IsOptional()
   @IsString()
   @IsIn(['UC', 'UAR'])
   classificacao?: string;
+
+  @ApiPropertyOptional({
+    example: false,
+    description: 'Filtrar apenas equipamentos não posicionados em diagramas',
+    type: Boolean
+  })
+  @IsOptional()
+  @Transform(({ value }) => {
+    if (value === 'true') return true;
+    if (value === 'false') return false;
+    return value;
+  })
+  @IsBoolean()
+  semDiagrama?: boolean;
+
+  @ApiPropertyOptional({
+    example: 'tipo_01234567890123456789012345',
+    description: 'Filtrar por tipo de equipamento'
+  })
+  @IsOptional()
+  @IsString()
+  tipo?: string;
 
   @ApiPropertyOptional({ example: '5', enum: ['1', '2', '3', '4', '5'] })
   @IsOptional()

@@ -404,9 +404,142 @@ export class PlantasService {
     };
   }
 
+  async findUnidadesByPlanta(
+    plantaId: string,
+    tipo?: string,
+    status?: string,
+    comDiagrama?: boolean
+  ) {
+    try {
+      // 1. Verificar se a planta existe
+      const planta = await this.prisma.plantas.findFirst({
+        where: {
+          id: plantaId,
+          deleted_at: null
+        }
+      });
+
+      if (!planta) {
+        throw new NotFoundException(`Planta com ID ${plantaId} não encontrada`);
+      }
+
+      // 2. Construir filtros
+      const whereClause: any = {
+        planta_id: plantaId,
+        deleted_at: null
+      };
+
+      if (tipo) {
+        whereClause.tipo = tipo;
+      }
+
+      if (status) {
+        whereClause.status = status;
+      }
+
+      // 3. Buscar unidades com diagramas
+      const unidades = await this.prisma.unidades.findMany({
+        where: whereClause,
+        include: {
+          equipamentos: {
+            where: { deleted_at: null },
+            select: { id: true, diagrama_id: true }
+          },
+          _count: {
+            select: {
+              equipamentos: {
+                where: { deleted_at: null }
+              }
+            }
+          }
+        },
+        orderBy: {
+          nome: 'asc'
+        }
+      });
+
+      // 4. Para cada unidade, buscar diagramas
+      const unidadesComDiagramas = await Promise.all(
+        unidades.map(async (unidade) => {
+          const diagramas = await this.prisma.diagramas_unitarios.findMany({
+            where: {
+              unidade_id: unidade.id,
+              deleted_at: null
+            },
+            select: {
+              id: true,
+              nome: true,
+              versao: true,
+              ativo: true,
+              thumbnail_url: true,
+              updated_at: true
+            },
+            orderBy: {
+              updated_at: 'desc'
+            }
+          });
+
+          // Contar equipamentos no diagrama
+          const totalEquipamentosNoDiagrama = unidade.equipamentos.filter(
+            e => e.diagrama_id !== null
+          ).length;
+
+          return {
+            id: unidade.id,
+            nome: unidade.nome,
+            tipo: unidade.tipo,
+            estado: unidade.estado,
+            cidade: unidade.cidade,
+            latitude: unidade.latitude.toString(),
+            longitude: unidade.longitude.toString(),
+            potencia: unidade.potencia.toString(),
+            status: unidade.status,
+            totalEquipamentos: unidade._count.equipamentos,
+            totalEquipamentosNoDiagrama,
+            diagramas: diagramas.map(d => ({
+              id: d.id,
+              nome: d.nome,
+              versao: d.versao,
+              ativo: d.ativo,
+              thumbnailUrl: d.thumbnail_url,
+              updatedAt: d.updated_at
+            })),
+            createdAt: unidade.created_at,
+            updatedAt: unidade.updated_at
+          };
+        })
+      );
+
+      // 5. Filtrar por comDiagrama se necessário
+      let resultado = unidadesComDiagramas;
+      if (comDiagrama !== undefined) {
+        resultado = unidadesComDiagramas.filter(
+          u => comDiagrama ? u.diagramas.length > 0 : u.diagramas.length === 0
+        );
+      }
+
+      return {
+        data: resultado,
+        meta: {
+          total: resultado.length,
+          timestamp: new Date().toISOString()
+        }
+      };
+
+    } catch (error) {
+      console.error('❌ [PLANTAS SERVICE] Erro ao buscar unidades:', error);
+
+      if (error instanceof NotFoundException) {
+        throw error;
+      }
+
+      throw new BadRequestException('Erro interno ao buscar unidades da planta');
+    }
+  }
+
   private getTipoProprietario(cpfCnpj: string | null): 'pessoa_fisica' | 'pessoa_juridica' {
     if (!cpfCnpj) return 'pessoa_juridica';
-    
+
     const digits = cpfCnpj.replace(/\D/g, '');
     return digits.length === 11 ? 'pessoa_fisica' : 'pessoa_juridica';
   }

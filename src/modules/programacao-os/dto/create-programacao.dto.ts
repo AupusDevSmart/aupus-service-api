@@ -122,12 +122,6 @@ export class CreateProgramacaoDto {
   origem: OrigemOS;
 
   // Relacionamentos
-  @ApiPropertyOptional({ description: 'ID da planta', example: 'clrx1234567890123456789012' })
-  @IsOptional()
-  @IsString()
-  @Length(26, 26)
-  planta_id?: string;
-
   @ApiPropertyOptional({ description: 'ID do equipamento', example: 'clrx1234567890123456789012' })
   @IsOptional()
   @IsString()

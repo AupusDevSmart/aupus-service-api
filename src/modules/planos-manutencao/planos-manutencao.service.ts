@@ -82,11 +82,15 @@ export class PlanosManutencaoService {
               nome: true,
               tipo_equipamento: true,
               classificacao: true,
-              planta: {
+              unidade: {
                 select: {
-                  id: true,
-                  nome: true,
-                  localizacao: true
+                  planta: {
+                    select: {
+                      id: true,
+                      nome: true,
+                      localizacao: true
+                    }
+                  }
                 }
               }
             }
@@ -188,13 +192,15 @@ export class PlanosManutencaoService {
     const { page, limit, status, incluir_tarefas } = queryDto;
     const skip = (page - 1) * limit;
 
-    // Construir filtros - JOIN entre planos_manutencao e equipamentos
+    // Construir filtros - JOIN entre planos_manutencao e equipamentos através de unidade
     const where: Prisma.planos_manutencaoWhereInput = {
       deleted_at: null,
       status: status,
       equipamento: {
-        planta_id: plantaId,
-        deleted_at: null
+        deleted_at: null,
+        unidade: {
+          planta_id: plantaId
+        }
       }
     };
 
@@ -206,11 +212,114 @@ export class PlanosManutencaoService {
           nome: true,
           tipo_equipamento: true,
           classificacao: true,
-          planta: {
+          unidade: {
+            select: {
+              planta: {
+                select: {
+                  id: true,
+                  nome: true,
+                  localizacao: true
+                }
+              }
+            }
+          }
+        }
+      },
+      usuario_criador: {
+        select: {
+          id: true,
+          nome: true,
+          email: true
+        }
+      },
+      _count: {
+        select: {
+          tarefas: {
+            where: { deleted_at: null }
+          }
+        }
+      }
+    };
+
+    // Incluir tarefas se solicitado
+    if (incluir_tarefas) {
+      includeOptions.tarefas = {
+        where: { deleted_at: null },
+        include: {
+          _count: {
+            select: {
+              sub_tarefas: true,
+              recursos: true,
+              anexos: true
+            }
+          }
+        },
+        orderBy: { ordem: 'asc' }
+      };
+    }
+
+    const [planos, total] = await Promise.all([
+      this.prisma.planos_manutencao.findMany({
+        where,
+        include: includeOptions,
+        orderBy: { created_at: 'desc' },
+        skip,
+        take: limit
+      }),
+      this.prisma.planos_manutencao.count({ where })
+    ]);
+
+    return {
+      data: planos.map(plano => this.mapearParaResponse(plano)),
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit)
+    };
+  }
+
+  async buscarPorUnidade(unidadeId: string, queryDto: QueryPlanosPorPlantaDto): Promise<{
+    data: PlanoManutencaoResponseDto[];
+    total: number;
+    page: number;
+    limit: number;
+    totalPages: number;
+  }> {
+    // Verificar se unidade existe
+    await this.verificarUnidadeExiste(unidadeId);
+
+    const { page, limit, status, incluir_tarefas } = queryDto;
+    const skip = (page - 1) * limit;
+
+    // Construir filtros - JOIN entre planos_manutencao e equipamentos através de unidade_id
+    const where: Prisma.planos_manutencaoWhereInput = {
+      deleted_at: null,
+      status: status,
+      equipamento: {
+        deleted_at: null,
+        unidade_id: unidadeId
+      }
+    };
+
+    // Construir include com base nos parâmetros
+    const includeOptions: any = {
+      equipamento: {
+        select: {
+          id: true,
+          nome: true,
+          tipo_equipamento: true,
+          classificacao: true,
+          unidade: {
             select: {
               id: true,
               nome: true,
-              localizacao: true
+              planta: {
+                select: {
+                  id: true,
+                  nome: true,
+                  localizacao: true
+                }
+              }
             }
           }
         }
@@ -501,7 +610,16 @@ export class PlanosManutencaoService {
       include: {
         equipamento: {
           include: {
-            planta: true
+            unidade: {
+              select: {
+                planta: {
+                  select: {
+                    id: true,
+                    nome: true
+                  }
+                }
+              }
+            }
           }
         },
         tarefas: {
@@ -541,7 +659,7 @@ export class PlanosManutencaoService {
       status: plano.status,
       equipamento_nome: plano.equipamento.nome,
       equipamento_tipo: plano.equipamento.tipo_equipamento,
-      planta_nome: plano.equipamento.planta?.nome,
+      planta_nome: plano.equipamento.unidade?.planta?.nome,
       total_tarefas: totalTarefas,
       tarefas_ativas: tarefasAtivas,
       tarefas_em_revisao: tarefasEmRevisao,
@@ -668,6 +786,19 @@ export class PlanosManutencaoService {
     }
   }
 
+  private async verificarUnidadeExiste(unidadeId: string): Promise<void> {
+    const unidade = await this.prisma.unidades.findFirst({
+      where: {
+        id: unidadeId,
+        deleted_at: null
+      }
+    });
+
+    if (!unidade) {
+      throw new NotFoundException('Unidade não encontrada');
+    }
+  }
+
   private async verificarPlanoExiste(id: string): Promise<void> {
     const plano = await this.prisma.planos_manutencao.findFirst({
       where: {
@@ -689,11 +820,15 @@ export class PlanosManutencaoService {
           nome: true,
           tipo_equipamento: true,
           classificacao: true,
-          planta: {
+          unidade: {
             select: {
-              id: true,
-              nome: true,
-              localizacao: true
+              planta: {
+                select: {
+                  id: true,
+                  nome: true,
+                  localizacao: true
+                }
+              }
             }
           }
         }
@@ -730,10 +865,19 @@ export class PlanosManutencaoService {
       where.ativo = filters.ativo;
     }
 
-    if (filters.planta_id) {
-      where.equipamento = {
-        planta_id: filters.planta_id
-      };
+    // Handle planta_id and unidade_id filters together
+    if (filters.planta_id || filters.unidade_id) {
+      where.equipamento = {} as any;
+
+      if (filters.unidade_id) {
+        where.equipamento.unidade_id = filters.unidade_id;
+      }
+
+      if (filters.planta_id) {
+        where.equipamento.unidade = {
+          planta_id: filters.planta_id
+        };
+      }
     }
 
     if (search) {

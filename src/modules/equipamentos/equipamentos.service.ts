@@ -1,30 +1,35 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../../shared/prisma/prisma.service';
+import { MqttService } from '../../shared/mqtt/mqtt.service';
 import { CreateEquipamentoDto } from './dto/create-equipamento.dto';
 import { UpdateEquipamentoDto } from './dto/update-equipamento.dto';
 import { EquipamentoQueryDto } from './dto/equipamento-query.dto';
 import { CreateComponenteUARDto } from './dto/componente-uar.dto';
+import { ConfigurarMqttDto } from './dto/configurar-mqtt.dto';
 
 @Injectable()
 export class EquipamentosService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private mqttService: MqttService,
+  ) {}
 
   async create(createDto: CreateEquipamentoDto) {
-    // Validar se planta existe (para UC) ou equipamento pai existe (para UAR)
-    if (createDto.classificacao === 'UC' && !createDto.planta_id) {
-      throw new BadRequestException('Equipamento UC deve ter uma planta');
+    // Validar se unidade existe (para UC) ou equipamento pai existe (para UAR)
+    if (createDto.classificacao === 'UC' && !createDto.unidade_id) {
+      throw new BadRequestException('Equipamento UC deve ter uma unidade');
     }
 
     if (createDto.classificacao === 'UAR' && !createDto.equipamento_pai_id) {
       throw new BadRequestException('Componente UAR deve ter um equipamento pai');
     }
 
-    if (createDto.planta_id) {
-      const plantaExists = await this.prisma.plantas.findFirst({
-        where: { id: createDto.planta_id, deleted_at: null }
+    if (createDto.unidade_id) {
+      const unidadeExists = await this.prisma.unidades.findFirst({
+        where: { id: createDto.unidade_id, deleted_at: null }
       });
-      if (!plantaExists) {
-        throw new NotFoundException('Planta não encontrada');
+      if (!unidadeExists) {
+        throw new NotFoundException('Unidade não encontrada');
       }
     }
 
@@ -43,19 +48,18 @@ export class EquipamentosService {
     return await this.prisma.$transaction(async (prisma) => {
       // Criar equipamento
       const equipamento = await prisma.equipamentos.create({
-        data: equipamentoData,
+        data: equipamentoData as any,
         include: {
-          planta: {
+          unidade: {
             select: {
               id: true,
               nome: true,
-            },
-          },
-          proprietario: {
-            select: {
-              id: true,
-              nome: true,
-              cpf_cnpj: true,
+              planta: {
+                select: {
+                  id: true,
+                  nome: true,
+                },
+              },
             },
           },
           equipamento_pai: {
@@ -84,7 +88,19 @@ export class EquipamentosService {
   }
 
   async findAll(query: EquipamentoQueryDto) {
-    const { page = 1, limit = 10, search, planta_id, proprietario_id, classificacao, criticidade, equipamento_pai_id, orderBy = 'created_at', orderDirection = 'desc' } = query;
+    const {
+      page = 1,
+      limit = 10,
+      search,
+      unidade_id,
+      classificacao,
+      criticidade,
+      equipamento_pai_id,
+      semDiagrama,
+      tipo,
+      orderBy = 'created_at',
+      orderDirection = 'desc'
+    } = query;
     const skip = (page - 1) * limit;
 
     // Construir filtros
@@ -95,6 +111,7 @@ export class EquipamentosService {
     if (search) {
       where.OR = [
         { nome: { contains: search, mode: 'insensitive' } },
+        { tag: { contains: search, mode: 'insensitive' } },
         { fabricante: { contains: search, mode: 'insensitive' } },
         { modelo: { contains: search, mode: 'insensitive' } },
         { numero_serie: { contains: search, mode: 'insensitive' } },
@@ -102,11 +119,24 @@ export class EquipamentosService {
       ];
     }
 
-    if (planta_id) where.planta_id = planta_id;
-    if (proprietario_id) where.proprietario_id = proprietario_id;
+    if (unidade_id) where.unidade_id = unidade_id;
     if (classificacao) where.classificacao = classificacao;
     if (criticidade) where.criticidade = criticidade;
     if (equipamento_pai_id) where.equipamento_pai_id = equipamento_pai_id;
+
+    // Filtro semDiagrama - equipamentos não posicionados em diagramas
+    if (semDiagrama !== undefined) {
+      if (semDiagrama === true) {
+        where.diagrama_id = null;
+      } else {
+        where.diagrama_id = { not: null };
+      }
+    }
+
+    // Filtro por tipo de equipamento
+    if (tipo) {
+      where.tipo_equipamento_id = tipo;
+    }
 
     const [data, total] = await Promise.all([
       this.prisma.equipamentos.findMany({
@@ -115,17 +145,27 @@ export class EquipamentosService {
         take: limit,
         orderBy: { [orderBy]: orderDirection },
         include: {
-          planta: {
+          unidade: {
             select: {
               id: true,
               nome: true,
+              planta: {
+                select: {
+                  id: true,
+                  nome: true,
+                },
+              },
             },
           },
-          proprietario: {
+          tipo_equipamento_rel: {
             select: {
               id: true,
+              codigo: true,
               nome: true,
-              cpf_cnpj: true,
+              categoria: true,
+              largura_padrao: true,
+              altura_padrao: true,
+              icone_svg: true,
             },
           },
           equipamento_pai: {
@@ -136,7 +176,7 @@ export class EquipamentosService {
               criticidade: true,
             },
           },
-          componentes_uar: {
+          equipamentos_filhos: {
             select: {
               id: true,
               nome: true,
@@ -151,10 +191,23 @@ export class EquipamentosService {
       this.prisma.equipamentos.count({ where }),
     ]);
 
-    // Adicionar contagem de componentes
+    // Calcular total de equipamentos sem diagrama (para meta)
+    const totalSemDiagrama = unidade_id
+      ? await this.prisma.equipamentos.count({
+          where: {
+            ...where,
+            diagrama_id: null,
+          },
+        })
+      : undefined;
+
+    // Adicionar contagem de componentes e informações de diagrama
     const dataWithCounts = data.map((equipamento) => ({
       ...equipamento,
-      totalComponentes: equipamento.componentes_uar?.length || 0,
+      totalComponentes: equipamento.equipamentos_filhos?.length || 0,
+      noDiagrama: equipamento.diagrama_id !== null,
+      diagramaId: equipamento.diagrama_id,
+      tipoEquipamento: equipamento.tipo_equipamento_rel,
     }));
 
     return {
@@ -165,6 +218,7 @@ export class EquipamentosService {
         total,
         pages: Math.ceil(total / limit),
       },
+      meta: totalSemDiagrama !== undefined ? { totalSemDiagrama } : undefined,
     };
   }
 
@@ -172,12 +226,9 @@ export class EquipamentosService {
     const equipamento = await this.prisma.equipamentos.findFirst({
       where: { id, deleted_at: null },
       include: {
-        planta: true,
-        proprietario: {
-          select: {
-            id: true,
-            nome: true,
-            cpf_cnpj: true,
+        unidade: {
+          include: {
+            planta: true,
           },
         },
         equipamento_pai: {
@@ -188,7 +239,7 @@ export class EquipamentosService {
             criticidade: true,
           },
         },
-        componentes_uar: {
+        equipamentos_filhos: {
           where: { deleted_at: null },
           include: {
             dados_tecnicos: true,
@@ -206,7 +257,7 @@ export class EquipamentosService {
 
     return {
       ...equipamento,
-      totalComponentes: equipamento.componentes_uar?.length || 0,
+      totalComponentes: equipamento.equipamentos_filhos?.length || 0,
     };
   }
 
@@ -228,17 +279,16 @@ export class EquipamentosService {
         where: { id },
         data: equipamentoData,
         include: {
-          planta: {
+          unidade: {
             select: {
               id: true,
               nome: true,
-            },
-          },
-          proprietario: {
-            select: {
-              id: true,
-              nome: true,
-              cpf_cnpj: true,
+              planta: {
+                select: {
+                  id: true,
+                  nome: true,
+                },
+              },
             },
           },
           equipamento_pai: {
@@ -278,7 +328,7 @@ export class EquipamentosService {
     const equipamento = await this.prisma.equipamentos.findFirst({
       where: { id, deleted_at: null },
       include: {
-        componentes_uar: {
+        equipamentos_filhos: {
           where: { deleted_at: null },
         },
       },
@@ -289,7 +339,7 @@ export class EquipamentosService {
     }
 
     // Se for UC e tiver componentes, impedir exclusão
-    if (equipamento.classificacao === 'UC' && equipamento.componentes_uar.length > 0) {
+    if (equipamento.classificacao === 'UC' && equipamento.equipamentos_filhos.length > 0) {
       throw new BadRequestException('Não é possível excluir equipamento que possui componentes UAR');
     }
 
@@ -334,10 +384,16 @@ export class EquipamentosService {
         nome: true,
         fabricante: true,
         modelo: true,
-        planta: {
+        unidade: {
           select: {
             id: true,
             nome: true,
+            planta: {
+              select: {
+                id: true,
+                nome: true,
+              },
+            },
           },
         },
       },
@@ -347,24 +403,23 @@ export class EquipamentosService {
 
   async findUARDetalhes(uarId: string) {
     const uar = await this.prisma.equipamentos.findFirst({
-      where: { 
-        id: uarId, 
-        deleted_at: null, 
-        classificacao: 'UAR' 
+      where: {
+        id: uarId,
+        deleted_at: null,
+        classificacao: 'UAR'
       },
       include: {
-        planta: {
+        unidade: {
           select: {
             id: true,
             nome: true,
-            localizacao: true,
-          },
-        },
-        proprietario: {
-          select: {
-            id: true,
-            nome: true,
-            cpf_cnpj: true,
+            planta: {
+              select: {
+                id: true,
+                nome: true,
+                localizacao: true,
+              },
+            },
           },
         },
         equipamento_pai: {
@@ -400,11 +455,14 @@ export class EquipamentosService {
         nome: true,
         fabricante: true,
         modelo: true,
-        planta: {
-          select: { id: true, nome: true }
-        },
-        proprietario: {
-          select: { id: true, nome: true }
+        unidade: {
+          select: {
+            id: true,
+            nome: true,
+            planta: {
+              select: { id: true, nome: true }
+            }
+          }
         }
       }
     });
@@ -458,8 +516,7 @@ export class EquipamentosService {
         localizacao_especifica: componente.localizacao_especifica,
         classificacao: 'UAR' as const,
         equipamento_pai_id: ucId,
-        planta_id: equipamentoUC.planta_id,
-        proprietario_id: equipamentoUC.proprietario_id,
+        unidade_id: equipamentoUC.unidade_id,
       };
 
       if (componenteId) {
@@ -472,7 +529,7 @@ export class EquipamentosService {
       } else {
         // Criar
         const criado = await this.prisma.equipamentos.create({
-          data: baseData,
+          data: baseData as any,
         });
         resultados.push(criado);
       }
@@ -484,42 +541,84 @@ export class EquipamentosService {
     };
   }
 
-  async findByPlanta(plantaId: string, query: EquipamentoQueryDto) {
-    // Verificar se planta existe
-    const plantaExists = await this.prisma.plantas.findFirst({
-      where: { id: plantaId, deleted_at: null }
+  async findByUnidade(unidadeId: string, query: EquipamentoQueryDto) {
+    console.log('🔍 [findByUnidade] Iniciando busca de equipamentos');
+    console.log('   📋 UnidadeId:', unidadeId);
+    console.log('   📋 Query params:', JSON.stringify(query, null, 2));
+
+    // Verificar se unidade existe
+    const unidadeExists = await this.prisma.unidades.findFirst({
+      where: { id: unidadeId, deleted_at: null },
+      include: {
+        planta: {
+          select: {
+            id: true,
+            nome: true,
+            localizacao: true,
+          }
+        }
+      }
     });
 
-    if (!plantaExists) {
-      throw new NotFoundException('Planta não encontrada');
+    if (!unidadeExists) {
+      console.log('   ❌ Unidade não encontrada:', unidadeId);
+      throw new NotFoundException('Unidade não encontrada');
     }
 
-    // Usar o método findAll existente com filtro de planta
-    const queryComPlanta = {
+    console.log('   ✅ Unidade encontrada:', unidadeExists.nome);
+
+    // Usar o método findAll existente com filtro de unidade
+    const queryComUnidade = {
       ...query,
-      planta_id: plantaId
+      unidade_id: unidadeId
     };
 
-    const resultado = await this.findAll(queryComPlanta);
+    console.log('   📋 Query final:', JSON.stringify(queryComUnidade, null, 2));
+
+    const resultado = await this.findAll(queryComUnidade);
+
+    console.log('   📊 Resultado:');
+    console.log('      Total de equipamentos:', resultado.pagination.total);
+    console.log('      Equipamentos retornados:', resultado.data.length);
+    console.log('      Total sem diagrama:', resultado.meta?.totalSemDiagrama);
+
+    // Log detalhado dos equipamentos UC
+    const equipamentosUC = resultado.data.filter(e => e.classificacao === 'UC');
+    console.log('      Equipamentos UC:', equipamentosUC.length);
+    equipamentosUC.forEach((eq, idx) => {
+      console.log(`         [${idx + 1}] ${eq.nome}`);
+      console.log(`             - Tipo: ${eq.tipoEquipamento?.codigo || 'SEM TIPO'}`);
+      console.log(`             - ID: ${eq.id.trim()}`);
+      console.log(`             - No diagrama: ${eq.noDiagrama ? 'Sim' : 'Não'}`);
+    });
 
     return {
       ...resultado,
-      planta: {
-        id: plantaExists.id,
-        nome: plantaExists.nome,
-        localizacao: plantaExists.localizacao,
+      unidade: {
+        id: unidadeExists.id,
+        nome: unidadeExists.nome,
+        planta: unidadeExists.planta,
       }
     };
   }
 
-  async getEstatisticasPlanta(plantaId: string) {
-    // Verificar se planta existe
-    const planta = await this.prisma.plantas.findFirst({
-      where: { id: plantaId, deleted_at: null }
+  async getEstatisticasUnidade(unidadeId: string) {
+    // Verificar se unidade existe
+    const unidade = await this.prisma.unidades.findFirst({
+      where: { id: unidadeId, deleted_at: null },
+      include: {
+        planta: {
+          select: {
+            id: true,
+            nome: true,
+            localizacao: true,
+          }
+        }
+      }
     });
 
-    if (!planta) {
-      throw new NotFoundException('Planta não encontrada');
+    if (!unidade) {
+      throw new NotFoundException('Unidade não encontrada');
     }
 
     const [
@@ -532,27 +631,27 @@ export class EquipamentosService {
     ] = await Promise.all([
       // Total de equipamentos
       this.prisma.equipamentos.count({
-        where: { planta_id: plantaId, deleted_at: null }
+        where: { unidade_id: unidadeId, deleted_at: null }
       }),
 
       // Por tipo
       this.prisma.equipamentos.groupBy({
         by: ['classificacao'],
-        where: { planta_id: plantaId, deleted_at: null },
+        where: { unidade_id: unidadeId, deleted_at: null },
         _count: { id: true }
       }),
 
       // Por criticidade
       this.prisma.equipamentos.groupBy({
         by: ['criticidade'],
-        where: { planta_id: plantaId, deleted_at: null },
+        where: { unidade_id: unidadeId, deleted_at: null },
         _count: { id: true }
       }),
 
       // Valor total
       this.prisma.equipamentos.aggregate({
-        where: { 
-          planta_id: plantaId, 
+        where: {
+          unidade_id: unidadeId,
           deleted_at: null,
           valor_contabil: { not: null }
         },
@@ -561,19 +660,19 @@ export class EquipamentosService {
 
       // Contagem UCs
       this.prisma.equipamentos.count({
-        where: { 
-          planta_id: plantaId, 
-          deleted_at: null, 
-          classificacao: 'UC' 
+        where: {
+          unidade_id: unidadeId,
+          deleted_at: null,
+          classificacao: 'UC'
         }
       }),
 
       // Contagem UARs
       this.prisma.equipamentos.count({
-        where: { 
-          planta_id: plantaId, 
-          deleted_at: null, 
-          classificacao: 'UAR' 
+        where: {
+          unidade_id: unidadeId,
+          deleted_at: null,
+          classificacao: 'UAR'
         }
       })
     ]);
@@ -585,10 +684,10 @@ export class EquipamentosService {
     }, {} as Record<string, number>);
 
     return {
-      planta: {
-        id: planta.id,
-        nome: planta.nome,
-        localizacao: planta.localizacao,
+      unidade: {
+        id: unidade.id,
+        nome: unidade.nome,
+        planta: unidade.planta,
       },
       totais: {
         equipamentos: totalEquipamentos,
@@ -605,6 +704,87 @@ export class EquipamentosService {
       financeiro: {
         valorTotalContabil: Number(valorTotal._sum.valor_contabil || 0),
       }
+    };
+  }
+
+  /**
+   * Cria um componente visual (BARRAMENTO ou PONTO) para uso em diagramas
+   */
+  async criarComponenteVisual(unidadeId: string, tipo: 'BARRAMENTO' | 'PONTO', nome?: string) {
+    // Verificar se unidade existe
+    const unidade = await this.prisma.unidades.findFirst({
+      where: { id: unidadeId, deleted_at: null }
+    });
+
+    if (!unidade) {
+      throw new NotFoundException('Unidade não encontrada');
+    }
+
+    // Criar equipamento virtual
+    const equipamento = await this.prisma.equipamentos.create({
+      data: {
+        nome: nome || `${tipo} ${Date.now()}`,
+        classificacao: 'UAR', // Componentes virtuais são UAR
+        unidade_id: unidadeId,
+        criticidade: '1', // Criticidade mínima (não representa equipamento real)
+        tipo_equipamento: tipo, // BARRAMENTO ou PONTO
+        localizacao: 'VIRTUAL', // Marca como componente virtual
+      },
+      select: {
+        id: true,
+        nome: true,
+        tipo_equipamento: true,
+        unidade_id: true,
+      }
+    });
+
+    // IMPORTANTE: Fazer trim de todos os campos porque o banco pode ter CHAR() em vez de VARCHAR()
+    return {
+      id: equipamento.id?.trim(),
+      nome: equipamento.nome?.trim(),
+      tipo_equipamento: equipamento.tipo_equipamento?.trim(),
+      unidade_id: equipamento.unidade_id?.trim(),
+    };
+  }
+
+  /**
+   * Configura ou atualiza o tópico MQTT de um equipamento
+   */
+  async configurarMqtt(id: string, dto: ConfigurarMqttDto) {
+    // Verificar se o equipamento existe
+    const equipamentoAtual = await this.prisma.equipamentos.findFirst({
+      where: { id, deleted_at: null },
+    });
+
+    if (!equipamentoAtual) {
+      throw new NotFoundException('Equipamento não encontrado');
+    }
+
+    // Se estava habilitado e mudou o tópico, desinscrever do antigo
+    if (equipamentoAtual.mqtt_habilitado && equipamentoAtual.topico_mqtt) {
+      this.mqttService.removerTopico(id, equipamentoAtual.topico_mqtt);
+    }
+
+    // Atualizar no banco
+    const equipamento = await this.prisma.equipamentos.update({
+      where: { id },
+      data: {
+        topico_mqtt: dto.topico_mqtt,
+        mqtt_habilitado: dto.mqtt_habilitado,
+      },
+    });
+
+    // Se habilitou, subscrever ao novo tópico
+    if (dto.mqtt_habilitado && dto.topico_mqtt) {
+      this.mqttService.adicionarTopico(id, dto.topico_mqtt);
+    }
+
+    return {
+      id: equipamento.id,
+      nome: equipamento.nome,
+      topico_mqtt: equipamento.topico_mqtt,
+      mqtt_habilitado: equipamento.mqtt_habilitado,
+      updatedAt: equipamento.updated_at,
     };
   }
 }

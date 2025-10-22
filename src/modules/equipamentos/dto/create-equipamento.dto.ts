@@ -45,15 +45,10 @@ export class CreateEquipamentoDto {
   @IsEnum(ClassificacaoEquipamento)
   classificacao: ClassificacaoEquipamento;
 
-  @ApiPropertyOptional({ example: 'plt_01234567890123456789012345' })
+  @ApiPropertyOptional({ example: 'uni_01234567890123456789012345' })
   @IsOptional()
   @IsString()
-  planta_id?: string;
-
-  @ApiPropertyOptional({ example: 'usr_01234567890123456789012345' })
-  @IsOptional()
-  @IsString()
-  proprietario_id?: string;
+  unidade_id?: string;
 
   @ApiPropertyOptional({ example: 'eqp_01234567890123456789012345' })
   @IsOptional()
@@ -83,6 +78,11 @@ export class CreateEquipamentoDto {
   @IsOptional()
   @IsString()
   tipo_equipamento?: string;
+
+  @ApiPropertyOptional({ example: '01JAQTE1MOTOR000000000017' })
+  @IsOptional()
+  @IsString()
+  tipo_equipamento_id?: string;
 
   @ApiPropertyOptional({ example: 'sim' })
   @IsOptional()
