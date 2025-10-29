@@ -232,6 +232,32 @@ export class DiagramasController {
     };
   }
 
+  @Delete(':diagramaId/equipamentos')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Remover todos os equipamentos de um diagrama' })
+  @ApiParam({ name: 'diagramaId', description: 'ID do diagrama' })
+  @ApiResponse({
+    status: 200,
+    description: 'Todos os equipamentos foram removidos',
+  })
+  async removeAllEquipamentos(@Param('diagramaId') diagramaId: string) {
+    console.log('🗑️ [DiagramasController] REMOVE_ALL_EQUIPAMENTOS - Removendo todos os equipamentos');
+    console.log('   📋 Diagrama ID:', diagramaId);
+
+    const resultado = await this.equipamentosDiagramaService.removeAll(diagramaId);
+
+    console.log('   ✅ Total removido:', resultado.totalRemovidos);
+
+    return {
+      success: true,
+      message: resultado.message,
+      data: resultado,
+      meta: {
+        timestamp: new Date().toISOString(),
+      },
+    };
+  }
+
   @Post(':diagramaId/equipamentos/bulk')
   @ApiOperation({ summary: 'Adicionar múltiplos equipamentos de uma vez' })
   @ApiParam({ name: 'diagramaId', description: 'ID do diagrama' })

@@ -15,6 +15,7 @@ async function bootstrap() {
     origin: [
       'http://localhost:5175',
       'http://localhost:5173',
+      'http://localhost:5174',
       'http://localhost:3000',
       'https://aupus-service.aupusenergia.com.br',
       'https://aupus-service-api.aupusenergia.com.br'

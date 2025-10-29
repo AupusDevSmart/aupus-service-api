@@ -23,10 +23,15 @@ export class EquipamentoQueryDto {
   @IsString()
   search?: string;
 
-  @ApiPropertyOptional({ example: 'uni_01234567890123456789012345' })
+  @ApiPropertyOptional({ example: 'uni_01234567890123456789012345', description: 'Filtrar por unidade' })
   @IsOptional()
   @IsString()
   unidade_id?: string;
+
+  @ApiPropertyOptional({ example: 'plt_01234567890123456789012345', description: 'Filtrar por planta (busca em unidades da planta)' })
+  @IsOptional()
+  @IsString()
+  planta_id?: string;
 
   @ApiPropertyOptional({ example: 'UC', enum: ['UC', 'UAR'] })
   @IsOptional()

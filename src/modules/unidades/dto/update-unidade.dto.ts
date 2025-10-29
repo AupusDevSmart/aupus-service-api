@@ -1,12 +1,7 @@
 import { PartialType } from '@nestjs/swagger';
-import { CreateUnidadeDto } from './create-unidade.dto';
+import { CreateUnidadeDto, StatusUnidade } from './create-unidade.dto';
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { IsEnum, IsOptional } from 'class-validator';
-
-export enum StatusUnidade {
-  ativo = 'ativo',
-  inativo = 'inativo',
-}
 
 export class UpdateUnidadeDto extends PartialType(CreateUnidadeDto) {
   @ApiPropertyOptional({

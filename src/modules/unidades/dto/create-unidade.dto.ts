@@ -1,6 +1,11 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { IsString, IsNotEmpty, IsEnum, IsNumber, IsOptional, IsJSON, Min, Max, Matches } from 'class-validator';
 
+export enum StatusUnidade {
+  ativo = 'ativo',
+  inativo = 'inativo',
+}
+
 export enum TipoUnidade {
   UFV = 'UFV',
   Carga = 'Carga',
@@ -92,4 +97,15 @@ export class CreateUnidadeDto {
   })
   @IsOptional()
   pontos_medicao?: string[];
+
+  @ApiProperty({
+    description: 'Status da unidade',
+    enum: StatusUnidade,
+    example: StatusUnidade.ativo,
+    required: false,
+    default: 'ativo',
+  })
+  @IsEnum(StatusUnidade, { message: 'Status inválido. Use: ativo ou inativo' })
+  @IsOptional()
+  status?: StatusUnidade;
 }

@@ -249,6 +249,71 @@ export class EquipamentosDiagramaService {
   }
 
   /**
+   * Remove todos os equipamentos de um diagrama
+   */
+  async removeAll(diagramaId: string) {
+    // 1. Verificar se o diagrama existe
+    const diagrama = await this.prisma.diagramas_unitarios.findFirst({
+      where: { id: diagramaId, deleted_at: null },
+    });
+
+    if (!diagrama) {
+      throw new NotFoundException('Diagrama não encontrado');
+    }
+
+    // 2. Remover todos os equipamentos em uma transação
+    const resultado = await this.prisma.$transaction(async (tx) => {
+      // Contar equipamentos que serão removidos
+      const totalEquipamentos = await tx.equipamentos.count({
+        where: {
+          diagrama_id: diagramaId,
+          deleted_at: null,
+        },
+      });
+
+      // Contar conexões que serão removidas
+      const totalConexoes = await tx.equipamentos_conexoes.count({
+        where: {
+          diagrama_id: diagramaId,
+          deleted_at: null,
+        },
+      });
+
+      // Soft delete de todas as conexões do diagrama
+      await tx.equipamentos_conexoes.updateMany({
+        where: {
+          diagrama_id: diagramaId,
+          deleted_at: null,
+        },
+        data: { deleted_at: new Date() },
+      });
+
+      // Limpar posicionamento de todos os equipamentos do diagrama
+      await tx.equipamentos.updateMany({
+        where: {
+          diagrama_id: diagramaId,
+          deleted_at: null,
+        },
+        data: {
+          diagrama_id: null,
+          posicao_x: null,
+          posicao_y: null,
+          rotacao: null,
+        },
+      });
+
+      return { totalEquipamentos, totalConexoes };
+    });
+
+    return {
+      diagramaId,
+      message: 'Todos os equipamentos foram removidos do diagrama',
+      totalRemovidos: resultado.totalEquipamentos,
+      conexoesRemovidas: resultado.totalConexoes,
+    };
+  }
+
+  /**
    * Adiciona múltiplos equipamentos de uma vez
    */
   async addEquipamentosBulk(

@@ -41,7 +41,7 @@ export class UsuarioQueryDto {
   @IsEnum(UsuarioStatus)
   status?: UsuarioStatus;
 
-  @ApiPropertyOptional({ 
+  @ApiPropertyOptional({
     description: 'Filtrar por role (coluna legacy)',
     example: 'admin'
   })
@@ -49,7 +49,15 @@ export class UsuarioQueryDto {
   @IsString()
   role?: string;
 
-  @ApiPropertyOptional({ 
+  @ApiPropertyOptional({
+    description: 'Filtrar por múltiplas roles (coluna legacy) - comma-separated',
+    example: 'admin,gerente,proprietario'
+  })
+  @IsOptional()
+  @IsString()
+  roles?: string;
+
+  @ApiPropertyOptional({
     description: 'Filtrar por ID da role (sistema Spatie)',
     example: 2
   })

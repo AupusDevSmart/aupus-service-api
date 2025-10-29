@@ -43,6 +43,7 @@ export class UsuariosService {
       search,
       status,
       role,
+      roles,
       cidade,
       estado,
       concessionariaId,
@@ -60,13 +61,28 @@ export class UsuariosService {
       where.deleted_at = null;
       where.is_active = true;
     }
-    
+
     if (status) {
       where.status = status;
     }
-    
+
+    // Filtrar por role (singular) - case-insensitive
     if (role) {
-      where.role = role;
+      where.role = {
+        equals: role,
+        mode: 'insensitive'
+      };
+    }
+
+    // Filtrar por múltiplas roles (plural) - case-insensitive - tem prioridade sobre singular
+    if (roles) {
+      const roleArray = roles.split(',').map(r => r.trim());
+      where.OR = roleArray.map(r => ({
+        role: {
+          equals: r,
+          mode: 'insensitive'
+        }
+      }));
     }
     
     if (cidade) {
