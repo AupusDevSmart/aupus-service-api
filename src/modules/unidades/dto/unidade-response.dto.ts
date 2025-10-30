@@ -1,6 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { TipoUnidade } from './create-unidade.dto';
-import { StatusUnidade } from './update-unidade.dto';
+import { TipoUnidade, StatusUnidade } from './create-unidade.dto';
 
 export class PlantaBasica {
   @ApiProperty({ example: 'plt_01234567890123456789012345' })

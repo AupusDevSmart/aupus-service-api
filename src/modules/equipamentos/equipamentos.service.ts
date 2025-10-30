@@ -45,6 +45,7 @@ export class EquipamentosService {
     // Extrair dados técnicos separadamente
     const { dados_tecnicos, ...equipamentoData } = createDto;
 
+    // ✅ Aumentar timeout da transação para 15 segundos
     return await this.prisma.$transaction(async (prisma) => {
       // Criar equipamento
       const equipamento = await prisma.equipamentos.create({
@@ -58,6 +59,13 @@ export class EquipamentosService {
                 select: {
                   id: true,
                   nome: true,
+                  proprietario: {
+                    select: {
+                      id: true,
+                      nome: true,
+                      cpf_cnpj: true,
+                    },
+                  },
                 },
               },
             },
@@ -84,6 +92,9 @@ export class EquipamentosService {
       }
 
       return equipamento;
+    }, {
+      maxWait: 15000, // Aguarda até 15s para começar a transação
+      timeout: 15000,  // Timeout de 15s para completar a transação
     });
   }
 
@@ -93,6 +104,7 @@ export class EquipamentosService {
       limit = 10,
       search,
       unidade_id,
+      planta_id,
       classificacao,
       criticidade,
       equipamento_pai_id,
@@ -120,6 +132,14 @@ export class EquipamentosService {
     }
 
     if (unidade_id) where.unidade_id = unidade_id;
+
+    // Filtrar por planta (via relação com unidade)
+    if (planta_id && !unidade_id) {
+      where.unidade = {
+        planta_id: planta_id
+      };
+    }
+
     if (classificacao) where.classificacao = classificacao;
     if (criticidade) where.criticidade = criticidade;
     if (equipamento_pai_id) where.equipamento_pai_id = equipamento_pai_id;
@@ -153,6 +173,13 @@ export class EquipamentosService {
                 select: {
                   id: true,
                   nome: true,
+                  proprietario: {
+                    select: {
+                      id: true,
+                      nome: true,
+                      cpf_cnpj: true,
+                    },
+                  },
                 },
               },
             },
@@ -202,7 +229,7 @@ export class EquipamentosService {
       : undefined;
 
     // Adicionar contagem de componentes e informações de diagrama
-    const dataWithCounts = data.map((equipamento) => ({
+    const dataWithCounts = data.map((equipamento: any) => ({
       ...equipamento,
       totalComponentes: equipamento.equipamentos_filhos?.length || 0,
       noDiagrama: equipamento.diagrama_id !== null,
@@ -273,6 +300,7 @@ export class EquipamentosService {
     // Extrair dados técnicos separadamente
     const { dados_tecnicos, ...equipamentoData } = updateDto;
 
+    // ✅ CORRIGIDO: Aumentar timeout da transação para 15 segundos (suficiente para processar dados técnicos)
     return await this.prisma.$transaction(async (prisma) => {
       // Atualizar equipamento
       const equipamento = await prisma.equipamentos.update({
@@ -287,6 +315,13 @@ export class EquipamentosService {
                 select: {
                   id: true,
                   nome: true,
+                  proprietario: {
+                    select: {
+                      id: true,
+                      nome: true,
+                      cpf_cnpj: true,
+                    },
+                  },
                 },
               },
             },
@@ -321,6 +356,9 @@ export class EquipamentosService {
       }
 
       return equipamento;
+    }, {
+      maxWait: 15000, // Aguarda até 15s para começar a transação
+      timeout: 15000,  // Timeout de 15s para completar a transação
     });
   }
 
@@ -568,8 +606,10 @@ export class EquipamentosService {
     console.log('   ✅ Unidade encontrada:', unidadeExists.nome);
 
     // Usar o método findAll existente com filtro de unidade
+    // Remove planta_id se existir, pois quando temos unidade_id não precisamos de planta_id
+    const { planta_id, ...queryRestante } = query;
     const queryComUnidade = {
-      ...query,
+      ...queryRestante,
       unidade_id: unidadeId
     };
 

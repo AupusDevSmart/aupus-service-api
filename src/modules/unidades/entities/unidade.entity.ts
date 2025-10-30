@@ -1,5 +1,4 @@
-import { TipoUnidade } from '../dto/create-unidade.dto';
-import { StatusUnidade } from '../dto/update-unidade.dto';
+import { TipoUnidade, StatusUnidade } from '../dto/create-unidade.dto';
 
 export class Unidade {
   id: string;

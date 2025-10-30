@@ -1,8 +1,7 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import { IsOptional, IsInt, Min, IsString, IsEnum } from 'class-validator';
-import { TipoUnidade } from './create-unidade.dto';
-import { StatusUnidade } from './update-unidade.dto';
+import { TipoUnidade, StatusUnidade } from './create-unidade.dto';
 
 export class FindAllUnidadesDto {
   @ApiPropertyOptional({
