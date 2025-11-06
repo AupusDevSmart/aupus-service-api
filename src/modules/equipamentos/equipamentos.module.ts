@@ -6,7 +6,10 @@ import { PrismaModule } from '../../shared/prisma/prisma.module';
 import { MqttModule } from '../../shared/mqtt/mqtt.module';
 
 @Module({
-  imports: [PrismaModule, MqttModule],
+  imports: [
+    PrismaModule, 
+    MqttModule
+  ],
   controllers: [EquipamentosController],
   providers: [EquipamentosService, EquipamentosDataService],
   exports: [EquipamentosService, EquipamentosDataService],

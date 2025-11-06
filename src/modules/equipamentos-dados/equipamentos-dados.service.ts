@@ -180,7 +180,9 @@ export class EquipamentosDadosService {
    * Retorna dados agregados de 1 minuto para o dia especificado
    */
   async getGraficoDia(equipamentoId: string, data?: string) {
-    this.logger.log(`Buscando gráfico do dia para equipamento ${equipamentoId} - data: ${data || 'hoje'}`);
+    console.log(`\n📊 [GRÁFICO DIA] ========================================`);
+    console.log(`📊 [GRÁFICO DIA] Equipamento: ${equipamentoId}`);
+    console.log(`📊 [GRÁFICO DIA] Data solicitada: ${data || 'hoje'}`);
 
     // Definir a data (hoje se não especificada)
     const dataConsulta = data ? new Date(data) : new Date();
@@ -188,6 +190,10 @@ export class EquipamentosDadosService {
 
     const dataFim = new Date(dataConsulta);
     dataFim.setDate(dataFim.getDate() + 1);
+
+    console.log(`📊 [GRÁFICO DIA] Período de busca:`);
+    console.log(`📊 [GRÁFICO DIA]   De: ${dataConsulta.toISOString()}`);
+    console.log(`📊 [GRÁFICO DIA]   Até: ${dataFim.toISOString()}`);
 
     // Buscar dados agregados do dia
     const dados = await this.prisma.equipamentos_dados.findMany({
@@ -211,6 +217,16 @@ export class EquipamentosDadosService {
       },
     });
 
+    console.log(`📊 [GRÁFICO DIA] Registros encontrados: ${dados.length}`);
+
+    if (dados.length > 0) {
+      console.log(`📊 [GRÁFICO DIA] Amostra do primeiro registro:`);
+      console.log(`📊 [GRÁFICO DIA]   Timestamp: ${dados[0].timestamp_dados}`);
+      console.log(`📊 [GRÁFICO DIA]   Num leituras: ${dados[0].num_leituras}`);
+      console.log(`📊 [GRÁFICO DIA]   Estrutura power:`, (dados[0].dados as any).power);
+      console.log(`📊 [GRÁFICO DIA]   Estrutura energy:`, (dados[0].dados as any).energy);
+    }
+
     // Transformar para formato do gráfico
     const pontos = dados.map((d: any) => {
       // Suportar tanto estrutura nova (aninhada) quanto legada (achatada)
@@ -229,6 +245,12 @@ export class EquipamentosDadosService {
       };
     });
 
+    console.log(`📊 [GRÁFICO DIA] Total de pontos processados: ${pontos.length}`);
+    if (pontos.length > 0) {
+      console.log(`📊 [GRÁFICO DIA] Primeiro ponto:`, pontos[0]);
+    }
+    console.log(`📊 [GRÁFICO DIA] ========================================\n`);
+
     return {
       data: dataConsulta.toISOString().split('T')[0],
       total_pontos: pontos.length,
@@ -241,7 +263,9 @@ export class EquipamentosDadosService {
    * Soma a energia de todos os minutos de cada dia
    */
   async getGraficoMes(equipamentoId: string, mes?: string) {
-    this.logger.log(`Buscando gráfico do mês para equipamento ${equipamentoId} - mês: ${mes || 'atual'}`);
+    console.log(`\n📊 [GRÁFICO MÊS] ========================================`);
+    console.log(`📊 [GRÁFICO MÊS] Equipamento: ${equipamentoId}`);
+    console.log(`📊 [GRÁFICO MÊS] Mês solicitado: ${mes || 'atual'}`);
 
     // Definir o mês (atual se não especificado)
     const now = new Date();
@@ -250,6 +274,10 @@ export class EquipamentosDadosService {
 
     const dataInicio = new Date(ano, mesNum - 1, 1);
     const dataFim = new Date(ano, mesNum, 1);
+
+    console.log(`📊 [GRÁFICO MÊS] Período de busca:`);
+    console.log(`📊 [GRÁFICO MÊS]   De: ${dataInicio.toISOString()}`);
+    console.log(`📊 [GRÁFICO MÊS]   Até: ${dataFim.toISOString()}`);
 
     // Buscar dados agregados do mês e somar por dia
     // Suporta tanto estrutura nova (energy.period_energy_kwh) quanto legada (energia_kwh)
@@ -282,6 +310,16 @@ export class EquipamentosDadosService {
       ORDER BY data ASC
     `;
 
+    console.log(`📊 [GRÁFICO MÊS] Dias com dados: ${dados.length}`);
+    if (dados.length > 0) {
+      console.log(`📊 [GRÁFICO MÊS] Primeiro dia:`, {
+        data: dados[0].data,
+        energia_kwh: dados[0].energia_kwh,
+        num_registros: dados[0].num_registros,
+        potencia_media_kw: dados[0].potencia_media_kw,
+      });
+    }
+
     // Transformar para formato do gráfico
     const pontos = dados.map((d: any) => ({
       data: d.data.toISOString().split('T')[0],
@@ -292,6 +330,10 @@ export class EquipamentosDadosService {
     }));
 
     const energiaTotal = pontos.reduce((sum, p) => sum + p.energia_kwh, 0);
+
+    console.log(`📊 [GRÁFICO MÊS] Total de pontos: ${pontos.length}`);
+    console.log(`📊 [GRÁFICO MÊS] Energia total: ${energiaTotal} kWh`);
+    console.log(`📊 [GRÁFICO MÊS] ========================================\n`);
 
     return {
       mes: `${ano}-${String(mesNum).padStart(2, '0')}`,
@@ -306,13 +348,19 @@ export class EquipamentosDadosService {
    * Soma a energia de todos os minutos de cada mês
    */
   async getGraficoAno(equipamentoId: string, ano?: string) {
-    this.logger.log(`Buscando gráfico do ano para equipamento ${equipamentoId} - ano: ${ano || 'atual'}`);
+    console.log(`\n📊 [GRÁFICO ANO] ========================================`);
+    console.log(`📊 [GRÁFICO ANO] Equipamento: ${equipamentoId}`);
+    console.log(`📊 [GRÁFICO ANO] Ano solicitado: ${ano || 'atual'}`);
 
     // Definir o ano (atual se não especificado)
     const anoConsulta = ano ? parseInt(ano) : new Date().getFullYear();
 
     const dataInicio = new Date(anoConsulta, 0, 1);
     const dataFim = new Date(anoConsulta + 1, 0, 1);
+
+    console.log(`📊 [GRÁFICO ANO] Período de busca:`);
+    console.log(`📊 [GRÁFICO ANO]   De: ${dataInicio.toISOString()}`);
+    console.log(`📊 [GRÁFICO ANO]   Até: ${dataFim.toISOString()}`);
 
     // Buscar dados agregados do ano e somar por mês
     // Suporta tanto estrutura nova (energy.period_energy_kwh) quanto legada (energia_kwh)
@@ -347,6 +395,16 @@ export class EquipamentosDadosService {
       ORDER BY mes ASC
     `;
 
+    console.log(`📊 [GRÁFICO ANO] Meses com dados: ${dados.length}`);
+    if (dados.length > 0) {
+      console.log(`📊 [GRÁFICO ANO] Primeiro mês:`, {
+        mes: dados[0].mes_formatado,
+        energia_kwh: dados[0].energia_kwh,
+        num_registros: dados[0].num_registros,
+        potencia_media_kw: dados[0].potencia_media_kw,
+      });
+    }
+
     // Nomes dos meses em português
     const mesesPt = [
       'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
@@ -367,6 +425,10 @@ export class EquipamentosDadosService {
     });
 
     const energiaTotal = pontos.reduce((sum, p) => sum + p.energia_kwh, 0);
+
+    console.log(`📊 [GRÁFICO ANO] Total de pontos: ${pontos.length}`);
+    console.log(`📊 [GRÁFICO ANO] Energia total: ${energiaTotal} kWh`);
+    console.log(`📊 [GRÁFICO ANO] ========================================\n`);
 
     return {
       ano: anoConsulta,

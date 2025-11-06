@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException, Optional } from '@nestjs/common';
 import { PrismaService } from '../../shared/prisma/prisma.service';
 import { MqttService } from '../../shared/mqtt/mqtt.service';
 import { CreateEquipamentoDto } from './dto/create-equipamento.dto';
@@ -11,7 +11,7 @@ import { ConfigurarMqttDto } from './dto/configurar-mqtt.dto';
 export class EquipamentosService {
   constructor(
     private prisma: PrismaService,
-    private mqttService: MqttService,
+    @Optional() private mqttService?: MqttService,
   ) {}
 
   async create(createDto: CreateEquipamentoDto) {
@@ -798,6 +798,11 @@ export class EquipamentosService {
 
     if (!equipamentoAtual) {
       throw new NotFoundException('Equipamento não encontrado');
+    }
+
+    // ⚠️ Verificar se MqttService está disponível
+    if (!this.mqttService) {
+      throw new BadRequestException('Serviço MQTT não está disponível. O módulo MQTT está desabilitado.');
     }
 
     // Se estava habilitado e mudou o tópico, desinscrever do antigo
