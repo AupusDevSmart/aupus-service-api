@@ -22,6 +22,8 @@ import { ProgramacaoOSModule } from './modules/programacao-os/programacao-os.mod
 import { ExecucaoOSModule } from './modules/execucao-os/execucao-os.module';
 import { DiagramasModule } from './modules/diagramas/diagramas.module';
 import { TiposEquipamentosModule } from './modules/tipos-equipamentos/tipos-equipamentos.module';
+import { ConcessionariasModule } from './modules/concessionarias/concessionarias.module';
+import { EquipamentosDadosModule } from './modules/equipamentos-dados/equipamentos-dados.module';
 
 @Module({
   imports: [
@@ -54,7 +56,9 @@ import { TiposEquipamentosModule } from './modules/tipos-equipamentos/tipos-equi
     VeiculosModule,
     ReservasModule,
     ProgramacaoOSModule,
-    ExecucaoOSModule
+    ExecucaoOSModule,
+    ConcessionariasModule,
+    EquipamentosDadosModule,
   ],
   controllers: [AppController],
   providers: [AppService],

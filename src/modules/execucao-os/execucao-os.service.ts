@@ -270,6 +270,192 @@ export class ExecucaoOSService {
     });
   }
 
+  /**
+   * ✅ Cria uma ordem de serviço (execução) a partir de uma programação APROVADA
+   * @param programacaoId - ID da programação aprovada
+   * @param dto - Dados para iniciar a execução
+   * @param usuarioId - ID do usuário que está iniciando
+   * @returns ID da ordem de serviço criada
+   */
+  async iniciarDeProgramacao(programacaoId: string, dto: IniciarExecucaoDto, usuarioId?: string): Promise<{ os_id: string }> {
+    // 1️⃣ Buscar programação com todos os dados
+    const programacao = await this.prisma.programacoes_os.findFirst({
+      where: {
+        id: programacaoId,
+        deletado_em: null,
+      },
+      include: {
+        materiais: true,
+        ferramentas: true,
+        tecnicos: true,
+        tarefas_programacao: {
+          include: {
+            tarefa: true,
+          },
+        },
+      },
+    });
+
+    if (!programacao) {
+      throw new NotFoundException('Programação não encontrada');
+    }
+
+    if (programacao.status !== 'APROVADA') {
+      throw new ConflictException('Apenas programações aprovadas podem ser iniciadas');
+    }
+
+    // 2️⃣ Verificar se já existe uma OS para esta programação
+    const osExistente = await this.prisma.ordens_servico.findFirst({
+      where: {
+        programacao_id: programacaoId,
+        deletado_em: null,
+      },
+    });
+
+    if (osExistente) {
+      throw new ConflictException('Já existe uma ordem de serviço para esta programação');
+    }
+
+    const dataHoraInicio = dto.data_hora_inicio_real ? new Date(dto.data_hora_inicio_real) : new Date();
+
+    // 3️⃣ Criar ordem de serviço e copiar dados da programação
+    let osId: string;
+
+    await this.prisma.$transaction(async (prisma) => {
+      // Gerar número da OS
+      const numeroOS = await this.gerarNumeroOS(prisma);
+
+      // Criar ordem de serviço
+      const os = await prisma.ordens_servico.create({
+        data: {
+          programacao_id: programacaoId,
+          numero_os: numeroOS,
+          descricao: programacao.descricao,
+          local: programacao.local || '',
+          ativo: programacao.ativo || '',
+          condicoes: programacao.condicoes,
+          status: StatusOS.EM_EXECUCAO,
+          tipo: programacao.tipo,
+          prioridade: programacao.prioridade,
+          origem: programacao.origem,
+          planta_id: programacao.planta_id,
+          equipamento_id: programacao.equipamento_id,
+          anomalia_id: programacao.anomalia_id,
+          plano_manutencao_id: programacao.plano_manutencao_id,
+          dados_origem: programacao.dados_origem as any,
+          tempo_estimado: programacao.tempo_estimado,
+          duracao_estimada: programacao.duracao_estimada,
+          responsavel: dto.responsavel_execucao || programacao.responsavel,
+          responsavel_id: programacao.responsavel_id,
+          time_equipe: programacao.time_equipe,
+          data_hora_programada: programacao.data_hora_programada,
+          data_hora_inicio_real: dataHoraInicio,
+          equipe_presente: dto.equipe_presente as any,
+          orcamento_previsto: programacao.orcamento_previsto,
+          observacoes: programacao.observacoes,
+          observacoes_programacao: programacao.observacoes_programacao,
+          observacoes_execucao: dto.observacoes_inicio,
+          criado_por: programacao.criado_por,
+          criado_por_id: programacao.criado_por_id,
+        },
+      });
+
+      osId = os.id;
+
+      // Copiar materiais
+      if (programacao.materiais.length > 0) {
+        await prisma.materiais_os.createMany({
+          data: programacao.materiais.map(m => ({
+            os_id: osId,
+            descricao: m.descricao,
+            quantidade_planejada: m.quantidade_planejada,
+            unidade: m.unidade,
+            custo_unitario: m.custo_unitario,
+            custo_total: m.custo_total,
+            confirmado: m.confirmado,
+            disponivel: m.disponivel,
+            observacoes: m.observacoes,
+          })),
+        });
+      }
+
+      // Copiar ferramentas
+      if (programacao.ferramentas.length > 0) {
+        await prisma.ferramentas_os.createMany({
+          data: programacao.ferramentas.map(f => ({
+            os_id: osId,
+            descricao: f.descricao,
+            quantidade: f.quantidade,
+            confirmada: f.confirmada,
+            disponivel: f.disponivel,
+            observacoes: f.observacoes,
+          })),
+        });
+      }
+
+      // Copiar técnicos
+      if (programacao.tecnicos.length > 0) {
+        await prisma.tecnicos_os.createMany({
+          data: programacao.tecnicos.map(t => ({
+            os_id: osId,
+            nome: t.nome,
+            especialidade: t.especialidade,
+            horas_estimadas: t.horas_estimadas,
+            custo_hora: t.custo_hora,
+            custo_total: t.custo_total,
+            disponivel: t.disponivel,
+            tecnico_id: t.tecnico_id,
+          })),
+        });
+      }
+
+      // Copiar tarefas
+      if (programacao.tarefas_programacao.length > 0) {
+        await prisma.tarefas_os.createMany({
+          data: programacao.tarefas_programacao.map(tp => ({
+            os_id: osId,
+            tarefa_id: tp.tarefa_id,
+            ordem: tp.ordem,
+            status: 'PENDENTE',
+            observacoes: tp.observacoes,
+          })),
+        });
+      }
+
+      // Gerar checklist padrão
+      await this.gerarChecklistPadrao(prisma, osId);
+
+      // Criar registro de tempo inicial
+      await prisma.registros_tempo_os.create({
+        data: {
+          os_id: osId,
+          tecnico_nome: dto.responsavel_execucao,
+          data_hora_inicio: dataHoraInicio,
+          atividade: 'Início da execução',
+          observacoes: dto.observacoes_inicio,
+        },
+      });
+
+      // Registrar histórico
+      await this.registrarHistorico(
+        prisma,
+        osId,
+        'INICIO_EXECUCAO',
+        dto.responsavel_execucao,
+        usuarioId,
+        `Execução iniciada a partir da programação ${programacao.codigo}. Equipe: ${dto.equipe_presente.join(', ')}`,
+        undefined,
+        StatusOS.EM_EXECUCAO,
+      );
+    });
+
+    return { os_id: osId! };
+  }
+
+  /**
+   * ⚠️ DEPRECATED - Use iniciarDeProgramacao para criar OS a partir de programação
+   * Este método só atualiza uma OS já existente
+   */
   async iniciar(id: string, dto: IniciarExecucaoDto, usuarioId?: string): Promise<void> {
     const os = await this.buscarPorId(id);
 
@@ -286,7 +472,7 @@ export class ExecucaoOSService {
         data: {
           status: StatusOS.EM_EXECUCAO,
           data_hora_inicio_real: dataHoraInicio,
-          equipe_presente: dto.equipe_presente,
+          equipe_presente: dto.equipe_presente as any,
           observacoes_execucao: dto.observacoes_inicio,
         },
       });
@@ -296,7 +482,7 @@ export class ExecucaoOSService {
         data: {
           os_id: id,
           tecnico_nome: dto.responsavel_execucao,
-          data_hora_inicio: new Date(),
+          data_hora_inicio: dataHoraInicio,
           atividade: 'Início da execução',
           observacoes: dto.observacoes_inicio,
         },
@@ -314,6 +500,29 @@ export class ExecucaoOSService {
         StatusOS.EM_EXECUCAO,
       );
     });
+  }
+
+  /**
+   * Gera um número sequencial único para a OS
+   */
+  private async gerarNumeroOS(prisma: any): Promise<string> {
+    const ano = new Date().getFullYear();
+    const ultimaOS = await prisma.ordens_servico.findFirst({
+      where: {
+        numero_os: { startsWith: `OS-${ano}-` },
+      },
+      orderBy: { numero_os: 'desc' },
+    });
+
+    let proximoNumero = 1;
+    if (ultimaOS) {
+      const match = ultimaOS.numero_os.match(/OS-\d{4}-(\d+)/);
+      if (match) {
+        proximoNumero = parseInt(match[1], 10) + 1;
+      }
+    }
+
+    return `OS-${ano}-${String(proximoNumero).padStart(5, '0')}`;
   }
 
   async pausar(id: string, dto: PausarExecucaoDto, usuarioId?: string): Promise<void> {

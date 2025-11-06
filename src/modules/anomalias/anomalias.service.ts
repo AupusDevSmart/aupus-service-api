@@ -1,5 +1,5 @@
 // src/anomalias/anomalias.service.ts
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../../shared/prisma/prisma.service';
 import { CreateAnomaliaDto, UpdateAnomaliaDto, AnomaliaFiltersDto, AnomaliaStatsDto } from './dto';
 import { Prisma } from '@prisma/client';
@@ -62,7 +62,15 @@ export class AnomaliasService {
       ...(status && { status: status as any }),
       ...(prioridade && { prioridade: prioridade as any }),
       ...(origem && { origem: origem as any }),
-      ...(planta && { planta_id: planta }),
+      // ✅ CORRIGIDO: Filtrar por planta através da relação equipamento → unidade → planta
+      ...(planta && !unidade && {
+        equipamento: {
+          unidade: {
+            planta_id: planta
+          }
+        }
+      }),
+      // ✅ Filtrar por unidade (já filtra por planta implicitamente)
       ...(unidade && {
         equipamento: {
           unidade_id: unidade
@@ -119,6 +127,14 @@ export class AnomaliasService {
 
   async update(id: string, updateAnomaliaDto: UpdateAnomaliaDto, userId?: string) {
     const anomalia = await this.findOne(id);
+
+    // ✅ VALIDAÇÃO: Bloquear edição de anomalias já analisadas
+    if (anomalia.status !== 'AGUARDANDO' && anomalia.status !== 'EM_ANALISE') {
+      throw new BadRequestException(
+        `Não é possível editar uma anomalia com status "${anomalia.status}". Apenas anomalias com status "AGUARDANDO" ou "EM_ANALISE" podem ser editadas.`
+      );
+    }
+
     const { localizacao, anexos, ...updateData } = updateAnomaliaDto;
 
     const data: Prisma.anomaliasUpdateInput = {

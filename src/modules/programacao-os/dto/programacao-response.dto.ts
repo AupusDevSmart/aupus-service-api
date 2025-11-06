@@ -270,6 +270,24 @@ export class ProgramacaoResponseDto {
   @ApiProperty({ description: 'Necessita veículo' })
   necessita_veiculo: boolean;
 
+  @ApiPropertyOptional({ description: 'ID do veículo reservado' })
+  veiculo_id?: string;
+
+  @ApiPropertyOptional({ description: 'Data de início da reserva' })
+  reserva_data_inicio?: string;
+
+  @ApiPropertyOptional({ description: 'Data de fim da reserva' })
+  reserva_data_fim?: string;
+
+  @ApiPropertyOptional({ description: 'Hora de início da reserva (HH:mm)' })
+  reserva_hora_inicio?: string;
+
+  @ApiPropertyOptional({ description: 'Hora de fim da reserva (HH:mm)' })
+  reserva_hora_fim?: string;
+
+  @ApiPropertyOptional({ description: 'Finalidade da reserva' })
+  reserva_finalidade?: string;
+
   @ApiPropertyOptional({ description: 'Assentos necessários' })
   assentos_necessarios?: number;
 
@@ -309,6 +327,9 @@ export class ProgramacaoResponseDto {
   @ApiPropertyOptional({ description: 'Motivo da rejeição' })
   motivo_rejeicao?: string;
 
+  @ApiPropertyOptional({ description: 'Sugestões de melhoria quando rejeitada' })
+  sugestoes_melhoria?: string;
+
   @ApiPropertyOptional({ description: 'Motivo do cancelamento' })
   motivo_cancelamento?: string;
 
@@ -332,6 +353,9 @@ export class ProgramacaoResponseDto {
   @ApiPropertyOptional({ description: 'Data da análise' })
   data_analise?: string;
 
+  @ApiPropertyOptional({ description: 'Observações da análise' })
+  observacoes_analise?: string;
+
   @ApiPropertyOptional({ description: 'Aprovado por' })
   aprovado_por?: string;
 
@@ -340,6 +364,18 @@ export class ProgramacaoResponseDto {
 
   @ApiPropertyOptional({ description: 'Data da aprovação' })
   data_aprovacao?: string;
+
+  @ApiPropertyOptional({ description: 'Observações da aprovação' })
+  observacoes_aprovacao?: string;
+
+  @ApiPropertyOptional({ description: 'Ajustes no orçamento' })
+  ajustes_orcamento?: number;
+
+  @ApiPropertyOptional({ description: 'Data sugerida para programação' })
+  data_programada_sugerida?: string;
+
+  @ApiPropertyOptional({ description: 'Hora sugerida para programação (HH:mm)' })
+  hora_programada_sugerida?: string;
 }
 
 export class ProgramacaoDetalhesResponseDto extends ProgramacaoResponseDto {

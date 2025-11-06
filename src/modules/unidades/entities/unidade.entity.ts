@@ -1,4 +1,4 @@
-import { TipoUnidade, StatusUnidade } from '../dto/create-unidade.dto';
+import { TipoUnidade, StatusUnidade, GrupoUnidade, SubgrupoUnidade, TipoUnidadeEnergia } from '../dto/create-unidade.dto';
 
 export class Unidade {
   id: string;
@@ -12,6 +12,13 @@ export class Unidade {
   potencia: number;
   status: StatusUnidade;
   pontosMedicao?: string[];
+  irrigante?: boolean;
+  grupo?: GrupoUnidade;
+  subgrupo?: SubgrupoUnidade;
+  tipoUnidade?: TipoUnidadeEnergia;
+  demandaCarga?: number;
+  demandaGeracao?: number;
+  concessionariaId?: string;
   criadoEm: Date;
   atualizadoEm: Date;
   deletadoEm?: Date | null;

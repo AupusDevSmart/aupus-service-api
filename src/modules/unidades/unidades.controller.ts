@@ -65,10 +65,13 @@ export class UnidadesController {
   async create(@Body() createDto: CreateUnidadeDto): Promise<UnidadeResponse> {
     this.logger.log(`🏗️  [CREATE UNIDADE] Iniciando criação de unidade`);
     this.logger.log(`📝 [CREATE UNIDADE] Dados:`, JSON.stringify(createDto, null, 2));
+    this.logger.log(`🔑 [CREATE UNIDADE - CONTROLLER] concessionaria_id recebido:`, createDto.concessionaria_id);
+    this.logger.log(`🔍 [CREATE UNIDADE - CONTROLLER] Tipo:`, typeof createDto.concessionaria_id);
 
     try {
       const unidade = await this.unidadesService.create(createDto);
       this.logger.log(`✅ [CREATE UNIDADE] Unidade criada - ID: ${unidade.id}`);
+      this.logger.log(`🔑 [CREATE UNIDADE - CONTROLLER] concessionaria_id na resposta:`, unidade.concessionariaId);
       return unidade;
     } catch (error) {
       this.logger.error(`❌ [CREATE UNIDADE] Erro:`, error.message);
@@ -237,10 +240,13 @@ export class UnidadesController {
   ): Promise<UnidadeResponse> {
     this.logger.log(`🔄 [UPDATE UNIDADE] Atualizando: ${id}`);
     this.logger.log(`📝 [UPDATE UNIDADE] Dados:`, JSON.stringify(updateDto, null, 2));
+    this.logger.log(`🔑 [UPDATE UNIDADE - CONTROLLER] concessionaria_id recebido:`, updateDto.concessionaria_id);
+    this.logger.log(`🔍 [UPDATE UNIDADE - CONTROLLER] Tipo:`, typeof updateDto.concessionaria_id);
 
     try {
       const unidade = await this.unidadesService.update(id, updateDto);
       this.logger.log(`✅ [UPDATE UNIDADE] Unidade atualizada: ${unidade.nome}`);
+      this.logger.log(`🔑 [UPDATE UNIDADE - CONTROLLER] concessionaria_id na resposta:`, unidade.concessionariaId);
       return unidade;
     } catch (error) {
       this.logger.error(`❌ [UPDATE UNIDADE] Erro:`, error.message);

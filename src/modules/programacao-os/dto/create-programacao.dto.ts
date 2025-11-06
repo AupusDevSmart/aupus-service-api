@@ -122,22 +122,34 @@ export class CreateProgramacaoDto {
   origem: OrigemOS;
 
   // Relacionamentos
+  @ApiPropertyOptional({ description: 'ID da planta', example: 'clrx1234567890123456789012' })
+  @IsOptional()
+  @IsString()
+  @Length(25, 26) // Aceitar 25 ou 26 por causa de IDs com espaços
+  planta_id?: string;
+
+  @ApiPropertyOptional({ description: 'ID da unidade', example: 'clrx1234567890123456789012' })
+  @IsOptional()
+  @IsString()
+  @Length(25, 26) // Aceitar 25 ou 26 por causa de IDs com espaços
+  unidade_id?: string;
+
   @ApiPropertyOptional({ description: 'ID do equipamento', example: 'clrx1234567890123456789012' })
   @IsOptional()
   @IsString()
-  @Length(26, 26)
+  @Length(25, 26) // Aceitar 25 ou 26 por causa de IDs com espaços
   equipamento_id?: string;
 
   @ApiPropertyOptional({ description: 'ID da anomalia', example: 'clrx1234567890123456789012' })
   @IsOptional()
   @IsString()
-  @Length(26, 26)
+  @Length(25, 26) // Aceitar 25 ou 26 por causa de IDs com espaços
   anomalia_id?: string;
 
   @ApiPropertyOptional({ description: 'ID do plano de manutenção', example: 'clrx1234567890123456789012' })
   @IsOptional()
   @IsString()
-  @Length(26, 26)
+  @Length(25, 26) // Aceitar 25 ou 26 por causa de IDs com espaços
   plano_manutencao_id?: string;
 
   @ApiPropertyOptional({ description: 'Dados extras da origem' })
@@ -152,7 +164,6 @@ export class CreateProgramacaoDto {
   @IsOptional()
   @IsArray()
   @IsString({ each: true })
-  @Length(26, 26, { each: true })
   tarefas_ids?: string[];
 
   // Planejamento
@@ -205,6 +216,37 @@ export class CreateProgramacaoDto {
   @IsOptional()
   @IsBoolean()
   necessita_veiculo?: boolean;
+
+  @ApiPropertyOptional({ description: 'ID do veículo reservado', example: 'clrx1234567890123456789012' })
+  @IsOptional()
+  @IsString()
+  @Length(25, 26)
+  veiculo_id?: string;
+
+  @ApiPropertyOptional({ description: 'Data de início da reserva', example: '2025-02-15' })
+  @IsOptional()
+  @IsDateString()
+  reserva_data_inicio?: string;
+
+  @ApiPropertyOptional({ description: 'Data de fim da reserva', example: '2025-02-15' })
+  @IsOptional()
+  @IsDateString()
+  reserva_data_fim?: string;
+
+  @ApiPropertyOptional({ description: 'Hora de início da reserva (HH:mm)', example: '08:00' })
+  @IsOptional()
+  @IsString()
+  reserva_hora_inicio?: string;
+
+  @ApiPropertyOptional({ description: 'Hora de fim da reserva (HH:mm)', example: '18:00' })
+  @IsOptional()
+  @IsString()
+  reserva_hora_fim?: string;
+
+  @ApiPropertyOptional({ description: 'Finalidade da reserva', example: 'Manutenção em planta remota' })
+  @IsOptional()
+  @IsString()
+  reserva_finalidade?: string;
 
   @ApiPropertyOptional({ description: 'Assentos necessários', example: 2 })
   @IsOptional()

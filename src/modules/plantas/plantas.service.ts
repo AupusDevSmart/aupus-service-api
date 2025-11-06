@@ -380,7 +380,7 @@ export class PlantasService {
 
   private formatPlantaResponse(plantaDb: any): Planta {
     return {
-      id: plantaDb.id,
+      id: plantaDb.id?.trim() || plantaDb.id, // ✅ TRIM para remover espaços extras
       nome: plantaDb.nome,
       cnpj: plantaDb.cnpj,
       localizacao: plantaDb.localizacao,
@@ -392,9 +392,9 @@ export class PlantasService {
         uf: plantaDb.uf,
         cep: plantaDb.cep,
       },
-      proprietarioId: plantaDb.proprietario_id,
+      proprietarioId: plantaDb.proprietario_id?.trim() || plantaDb.proprietario_id, // ✅ TRIM
       proprietario: plantaDb.proprietario ? {
-        id: plantaDb.proprietario.id,
+        id: plantaDb.proprietario.id?.trim() || plantaDb.proprietario.id, // ✅ TRIM
         nome: plantaDb.proprietario.nome,
         cpf_cnpj: plantaDb.proprietario.cpf_cnpj,
         tipo: this.getTipoProprietario(plantaDb.proprietario.cpf_cnpj),
@@ -485,7 +485,7 @@ export class PlantasService {
           ).length;
 
           return {
-            id: unidade.id,
+            id: unidade.id?.trim() || unidade.id, // ✅ TRIM
             nome: unidade.nome,
             tipo: unidade.tipo,
             estado: unidade.estado,
@@ -497,7 +497,7 @@ export class PlantasService {
             totalEquipamentos: unidade._count.equipamentos,
             totalEquipamentosNoDiagrama,
             diagramas: diagramas.map(d => ({
-              id: d.id,
+              id: d.id?.trim() || d.id, // ✅ TRIM
               nome: d.nome,
               versao: d.versao,
               ativo: d.ativo,

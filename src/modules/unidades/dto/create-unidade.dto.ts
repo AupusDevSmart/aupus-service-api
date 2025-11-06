@@ -1,5 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsString, IsNotEmpty, IsEnum, IsNumber, IsOptional, IsJSON, Min, Max, Matches } from 'class-validator';
+import { IsString, IsNotEmpty, IsEnum, IsNumber, IsOptional, IsJSON, Min, Max, Matches, IsBoolean } from 'class-validator';
 
 export enum StatusUnidade {
   ativo = 'ativo',
@@ -12,6 +12,22 @@ export enum TipoUnidade {
   Motor = 'Motor',
   Inversor = 'Inversor',
   Transformador = 'Transformador',
+}
+
+export enum GrupoUnidade {
+  A = 'A',
+  B = 'B',
+}
+
+export enum SubgrupoUnidade {
+  A4_VERDE = 'A4_VERDE',
+  A3a_VERDE = 'A3a_VERDE',
+  B = 'B',
+}
+
+export enum TipoUnidadeEnergia {
+  CARGA = 'Carga',
+  GERACAO = 'Geração',
 }
 
 export class CreateUnidadeDto {
@@ -108,4 +124,75 @@ export class CreateUnidadeDto {
   @IsEnum(StatusUnidade, { message: 'Status inválido. Use: ativo ou inativo' })
   @IsOptional()
   status?: StatusUnidade;
+
+  @ApiProperty({
+    description: 'Indica se a unidade é irrigante',
+    example: false,
+    required: false,
+    default: false,
+  })
+  @IsBoolean({ message: 'Irrigante deve ser um booleano' })
+  @IsOptional()
+  irrigante?: boolean;
+
+  @ApiProperty({
+    description: 'Grupo tarifário (A ou B)',
+    enum: GrupoUnidade,
+    example: GrupoUnidade.A,
+    required: false,
+  })
+  @IsEnum(GrupoUnidade, { message: 'Grupo inválido. Use: A ou B' })
+  @IsOptional()
+  grupo?: GrupoUnidade;
+
+  @ApiProperty({
+    description: 'Subgrupo tarifário',
+    enum: SubgrupoUnidade,
+    example: SubgrupoUnidade.A4_VERDE,
+    required: false,
+  })
+  @IsEnum(SubgrupoUnidade, { message: 'Subgrupo inválido' })
+  @IsOptional()
+  subgrupo?: SubgrupoUnidade;
+
+  @ApiProperty({
+    description: 'Tipo da unidade de energia (Carga ou Geração)',
+    enum: TipoUnidadeEnergia,
+    example: TipoUnidadeEnergia.CARGA,
+    required: false,
+  })
+  @IsEnum(TipoUnidadeEnergia, { message: 'Tipo de unidade inválido. Use: Carga ou Geração' })
+  @IsOptional()
+  tipo_unidade?: TipoUnidadeEnergia;
+
+  @ApiProperty({
+    description: 'Demanda de carga em kW (obrigatório se tipo_unidade for Carga)',
+    example: 150.5,
+    minimum: 0,
+    required: false,
+  })
+  @IsNumber({}, { message: 'Demanda de carga deve ser um número' })
+  @Min(0, { message: 'Demanda de carga não pode ser negativa' })
+  @IsOptional()
+  demanda_carga?: number;
+
+  @ApiProperty({
+    description: 'Demanda de geração em kW (obrigatório se tipo_unidade for Geração)',
+    example: 200.0,
+    minimum: 0,
+    required: false,
+  })
+  @IsNumber({}, { message: 'Demanda de geração deve ser um número' })
+  @Min(0, { message: 'Demanda de geração não pode ser negativa' })
+  @IsOptional()
+  demanda_geracao?: number;
+
+  @ApiProperty({
+    description: 'ID da concessionária de energia',
+    example: 'con_01234567890123456789012345',
+    required: false,
+  })
+  @IsString()
+  @IsOptional()
+  concessionaria_id?: string;
 }

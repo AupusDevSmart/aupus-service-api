@@ -212,6 +212,7 @@ export class ProgramacaoOSService {
           tipo: createDto.tipo,
           prioridade: createDto.prioridade,
           origem: createDto.origem,
+          planta_id: createDto.planta_id, // ✅ NOVO: Salvar planta_id
           equipamento_id: createDto.equipamento_id,
           anomalia_id: createDto.anomalia_id,
           plano_manutencao_id: createDto.plano_manutencao_id,
@@ -221,6 +222,12 @@ export class ProgramacaoOSService {
           data_previsao_inicio: createDto.data_previsao_inicio ? new Date(createDto.data_previsao_inicio) : null,
           data_previsao_fim: createDto.data_previsao_fim ? new Date(createDto.data_previsao_fim) : null,
           necessita_veiculo: createDto.necessita_veiculo || false,
+          veiculo_id: createDto.veiculo_id,
+          reserva_data_inicio: createDto.reserva_data_inicio ? new Date(createDto.reserva_data_inicio) : null,
+          reserva_data_fim: createDto.reserva_data_fim ? new Date(createDto.reserva_data_fim) : null,
+          reserva_hora_inicio: createDto.reserva_hora_inicio,
+          reserva_hora_fim: createDto.reserva_hora_fim,
+          reserva_finalidade: createDto.reserva_finalidade,
           assentos_necessarios: createDto.assentos_necessarios,
           carga_necessaria: createDto.carga_necessaria,
           observacoes_veiculo: createDto.observacoes_veiculo,
@@ -272,6 +279,11 @@ export class ProgramacaoOSService {
         await this.criarTecnicos(prisma, programacao.id, createDto.tecnicos);
       }
 
+      // Criar reserva de veículo imediatamente (vinculada à programação)
+      if (createDto.necessita_veiculo && createDto.veiculo_id) {
+        await this.criarReservaVeiculoProgramacao(prisma, programacao, usuarioId);
+      }
+
       // Registrar histórico
       await this.registrarHistorico(
         prisma,
@@ -304,12 +316,16 @@ export class ProgramacaoOSService {
     }
 
     // Prepare data without undefined fields to avoid Prisma issues
+    // ✅ Separar campos de relacionamentos (materiais, ferramentas, tecnicos)
+    const { materiais, ferramentas, tecnicos, tarefas_ids, ...restDto } = updateDto as any;
     const updateData: any = {};
 
-    Object.keys(updateDto).forEach(key => {
-      const value = updateDto[key as keyof typeof updateDto];
+    Object.keys(restDto).forEach(key => {
+      const value = restDto[key as keyof typeof restDto];
       if (value !== undefined) {
-        if (key === 'data_previsao_inicio' || key === 'data_previsao_fim' || key === 'data_hora_programada') {
+        // Converter campos de data para Date object
+        if (key === 'data_previsao_inicio' || key === 'data_previsao_fim' || key === 'data_hora_programada' ||
+            key === 'reserva_data_inicio' || key === 'reserva_data_fim') {
           updateData[key] = new Date(value as string);
         } else {
           updateData[key] = value;
@@ -317,38 +333,48 @@ export class ProgramacaoOSService {
       }
     });
 
-    const programacaoAtualizada = await this.prisma.programacoes_os.update({
-      where: { id },
-      data: updateData,
-      include: {
-        tarefas_programacao: {
-          include: {
-            tarefa: {
-              select: {
-                id: true,
-                nome: true,
-                categoria: true,
-                tipo_manutencao: true,
-                tempo_estimado: true,
-                duracao_estimada: true,
+    return await this.prisma.$transaction(async (prisma) => {
+      const programacaoAtualizada = await prisma.programacoes_os.update({
+        where: { id },
+        data: updateData,
+        include: {
+          tarefas_programacao: {
+            include: {
+              tarefa: {
+                select: {
+                  id: true,
+                  nome: true,
+                  categoria: true,
+                  tipo_manutencao: true,
+                  tempo_estimado: true,
+                  duracao_estimada: true,
+                },
               },
             },
           },
+          ordem_servico: true,
         },
-      },
+      });
+
+      // Criar/atualizar reserva de veículo vinculada à programação
+      if (updateDto.veiculo_id && updateDto.necessita_veiculo) {
+        await this.criarReservaVeiculoProgramacao(prisma, programacaoAtualizada, usuarioId);
+      }
+
+      // Registrar histórico
+      await this.registrarHistorico(
+        prisma,
+        id,
+        'ATUALIZACAO',
+        'Sistema',
+        usuarioId,
+        'Programação atualizada',
+      );
+
+      return this.mapearParaResponse(programacaoAtualizada);
+    }, {
+      timeout: 15000,
     });
-
-    // Registrar histórico
-    await this.registrarHistorico(
-      this.prisma,
-      id,
-      'ATUALIZACAO',
-      'Sistema',
-      usuarioId,
-      'Programação atualizada',
-    );
-
-    return this.mapearParaResponse(programacaoAtualizada);
   }
 
   async analisar(id: string, dto: AnalisarProgramacaoDto, usuarioId?: string): Promise<void> {
@@ -358,14 +384,16 @@ export class ProgramacaoOSService {
       throw new ConflictException('Apenas programações pendentes podem ser analisadas');
     }
 
-    await this.prisma.programacoes_os.update({
-      where: { id },
-      data: {
-        status: StatusProgramacaoOS.EM_ANALISE,
-        analisado_por_id: usuarioId,
-        data_analise: new Date(),
-      },
-    });
+    // ✅ Usar SQL direto porque Prisma client não foi regenerado
+    await this.prisma.$executeRaw`
+      UPDATE programacoes_os
+      SET
+        status = ${StatusProgramacaoOS.EM_ANALISE}::status_programacao_os,
+        analisado_por_id = ${usuarioId || null},
+        data_analise = ${new Date()},
+        observacoes_analise = ${dto.observacoes_analise || null}
+      WHERE id = ${id}
+    `;
 
     await this.registrarHistorico(
       this.prisma,
@@ -387,19 +415,34 @@ export class ProgramacaoOSService {
     }
 
     await this.prisma.$transaction(async (prisma) => {
-      // Atualizar programação
-      await prisma.programacoes_os.update({
-        where: { id },
-        data: {
-          status: StatusProgramacaoOS.APROVADA,
-          aprovado_por_id: usuarioId,
-          data_aprovacao: new Date(),
-          orcamento_previsto: dto.ajustes_orcamento || programacao.orcamento_previsto,
-          data_hora_programada: dto.data_programada_sugerida && dto.hora_programada_sugerida
-            ? new Date(`${dto.data_programada_sugerida}T${dto.hora_programada_sugerida}:00Z`)
-            : programacao.data_hora_programada,
-        },
-      });
+      // Atualizar programação usando SQL direto para incluir novos campos
+      await prisma.$executeRawUnsafe(`
+        UPDATE programacoes_os
+        SET
+          status = $1::status_programacao_os,
+          aprovado_por_id = $2,
+          data_aprovacao = $3,
+          observacoes_aprovacao = $4,
+          ajustes_orcamento = $5,
+          data_programada_sugerida = $6,
+          hora_programada_sugerida = $7,
+          orcamento_previsto = $8,
+          data_hora_programada = $9
+        WHERE id = $10
+      `,
+        StatusProgramacaoOS.APROVADA,
+        usuarioId || null,
+        new Date(),
+        dto.observacoes_aprovacao || null,
+        dto.ajustes_orcamento || null,
+        dto.data_programada_sugerida || null,
+        dto.hora_programada_sugerida || null,
+        dto.ajustes_orcamento || programacao.orcamento_previsto,
+        dto.data_programada_sugerida && dto.hora_programada_sugerida
+          ? new Date(`${dto.data_programada_sugerida}T${dto.hora_programada_sugerida}:00Z`)
+          : programacao.data_hora_programada,
+        id
+      );
 
       // Registrar histórico
       await this.registrarHistorico(
@@ -413,10 +456,37 @@ export class ProgramacaoOSService {
         StatusProgramacaoOS.APROVADA,
       );
 
-      // Gerar OS automaticamente
-      await this.gerarOrdemServico(prisma, id);
+      // Gerar OS automaticamente com status PROGRAMADA
+      const osId = await this.gerarOrdemServico(prisma, id);
+
+      // Atualizar reserva existente para vincular à OS (se houver)
+      if (programacao.necessita_veiculo && programacao.veiculo_id) {
+        // Buscar reserva vinculada à programação
+        const reservaProgramacao = await prisma.reserva_veiculo.findFirst({
+          where: {
+            solicitante_id: id,
+            tipo_solicitante: 'programacao_os',
+          },
+        });
+
+        if (reservaProgramacao) {
+          // Atualizar para vincular à OS
+          await prisma.reserva_veiculo.update({
+            where: { id: reservaProgramacao.id },
+            data: {
+              solicitante_id: osId,
+              tipo_solicitante: 'ordem_servico',
+              finalidade: `Execução de OS: ${programacao.descricao}`,
+            },
+          });
+          this.logger.log(`Reserva vinculada à OS ${osId}`);
+        } else {
+          // Se não houver reserva, criar uma nova
+          await this.criarReservaVeiculo(prisma, programacao, osId, usuarioId);
+        }
+      }
     }, {
-      timeout: 10000, // 10 seconds timeout for approval process
+      timeout: 15000, // 15 seconds timeout for approval process
     });
   }
 
@@ -432,6 +502,7 @@ export class ProgramacaoOSService {
       data: {
         status: StatusProgramacaoOS.REJEITADA,
         motivo_rejeicao: dto.motivo_rejeicao,
+        sugestoes_melhoria: dto.sugestoes_melhoria,
       },
     });
 
@@ -853,7 +924,7 @@ export class ProgramacaoOSService {
     });
   }
 
-  private async gerarOrdemServico(prisma: any, programacaoId: string): Promise<void> {
+  private async gerarOrdemServico(prisma: any, programacaoId: string): Promise<string> {
     const programacao = await prisma.programacoes_os.findUnique({
       where: { id: programacaoId },
       include: {
@@ -873,7 +944,7 @@ export class ProgramacaoOSService {
     });
     const numeroOS = `OS-${ano}-${String(count + 1).padStart(3, '0')}`;
 
-    // Criar OS
+    // Criar OS com status PROGRAMADA (não EM_EXECUCAO)
     const os = await prisma.ordens_servico.create({
       data: {
         programacao_id: programacaoId,
@@ -882,6 +953,7 @@ export class ProgramacaoOSService {
         local: programacao.local,
         ativo: programacao.ativo,
         condicoes: programacao.condicoes,
+        status: 'PROGRAMADA', // Status inicial é PROGRAMADA
         tipo: programacao.tipo,
         prioridade: programacao.prioridade,
         origem: programacao.origem,
@@ -954,6 +1026,190 @@ export class ProgramacaoOSService {
         tecnico_id: t.tecnico_id,
       }));
       await prisma.tecnicos_os.createMany({ data: tecnicosOS });
+    }
+
+    return os.id;
+  }
+
+  /**
+   * Cria uma reserva de veículo para a ordem de serviço
+   */
+  private async criarReservaVeiculo(
+    prisma: any,
+    programacao: any,
+    osId: string,
+    usuarioId?: string
+  ): Promise<void> {
+    try {
+      // Determinar datas da reserva
+      const dataInicio = programacao.reserva_data_inicio
+        ? new Date(programacao.reserva_data_inicio)
+        : programacao.data_hora_programada || new Date();
+
+      const dataFim = programacao.reserva_data_fim
+        ? new Date(programacao.reserva_data_fim)
+        : programacao.data_hora_programada || new Date();
+
+      const horaInicio = programacao.reserva_hora_inicio || '08:00';
+      const horaFim = programacao.reserva_hora_fim || '18:00';
+
+      const finalidade = programacao.reserva_finalidade
+        || `Execução de OS: ${programacao.descricao}`;
+
+      await prisma.reserva_veiculo.create({
+        data: {
+          veiculo_id: programacao.veiculo_id,
+          solicitante_id: osId,
+          tipo_solicitante: 'ordem_servico',
+          data_inicio: dataInicio,
+          data_fim: dataFim,
+          hora_inicio: horaInicio,
+          hora_fim: horaFim,
+          responsavel: programacao.responsavel || 'Sistema',
+          responsavel_id: programacao.responsavel_id,
+          finalidade,
+          observacoes: programacao.observacoes_veiculo,
+          status: 'ativa',
+          criado_por: 'Sistema',
+          criado_por_id: usuarioId,
+        },
+      });
+
+      this.logger.log(`Reserva de veículo criada para OS ${osId}`);
+    } catch (error) {
+      this.logger.error(`Erro ao criar reserva de veículo: ${error.message}`, error.stack);
+      // Não lançar erro para não interromper a aprovação
+    }
+  }
+
+  /**
+   * Atualiza uma reserva de veículo existente
+   */
+  private async atualizarReservaVeiculo(
+    prisma: any,
+    reservaId: string,
+    programacao: any,
+    usuarioId?: string
+  ): Promise<void> {
+    try {
+      // Determinar datas da reserva
+      const dataInicio = programacao.reserva_data_inicio
+        ? new Date(programacao.reserva_data_inicio)
+        : programacao.data_hora_programada || new Date();
+
+      const dataFim = programacao.reserva_data_fim
+        ? new Date(programacao.reserva_data_fim)
+        : programacao.data_hora_programada || new Date();
+
+      const horaInicio = programacao.reserva_hora_inicio || '08:00';
+      const horaFim = programacao.reserva_hora_fim || '18:00';
+
+      const finalidade = programacao.reserva_finalidade
+        || `Execução de OS: ${programacao.descricao}`;
+
+      await prisma.reserva_veiculo.update({
+        where: { id: reservaId },
+        data: {
+          veiculo_id: programacao.veiculo_id,
+          data_inicio: dataInicio,
+          data_fim: dataFim,
+          hora_inicio: horaInicio,
+          hora_fim: horaFim,
+          responsavel: programacao.responsavel || 'Sistema',
+          responsavel_id: programacao.responsavel_id,
+          finalidade,
+          observacoes: programacao.observacoes_veiculo,
+          atualizado_por: 'Sistema',
+          atualizado_por_id: usuarioId,
+        },
+      });
+
+      this.logger.log(`Reserva de veículo ${reservaId} atualizada`);
+    } catch (error) {
+      this.logger.error(`Erro ao atualizar reserva de veículo: ${error.message}`, error.stack);
+      // Não lançar erro para não interromper a atualização
+    }
+  }
+
+  /**
+   * Cria uma reserva de veículo vinculada à programação (antes da aprovação)
+   */
+  private async criarReservaVeiculoProgramacao(
+    prisma: any,
+    programacao: any,
+    usuarioId?: string
+  ): Promise<void> {
+    try {
+      // Determinar datas da reserva
+      const dataInicio = programacao.reserva_data_inicio
+        ? new Date(programacao.reserva_data_inicio)
+        : programacao.data_hora_programada || new Date();
+
+      const dataFim = programacao.reserva_data_fim
+        ? new Date(programacao.reserva_data_fim)
+        : programacao.data_hora_programada || new Date();
+
+      const horaInicio = programacao.reserva_hora_inicio || '08:00';
+      const horaFim = programacao.reserva_hora_fim || '18:00';
+
+      const finalidade = programacao.reserva_finalidade
+        || `Programação de OS: ${programacao.descricao}`;
+
+      // Verificar se já existe uma reserva para esta programação
+      const reservaExistente = await prisma.reserva_veiculo.findFirst({
+        where: {
+          solicitante_id: programacao.id,
+          tipo_solicitante: 'programacao_os',
+        },
+      });
+
+      if (reservaExistente) {
+        // Atualizar reserva existente
+        await prisma.reserva_veiculo.update({
+          where: { id: reservaExistente.id },
+          data: {
+            veiculo_id: programacao.veiculo_id,
+            data_inicio: dataInicio,
+            data_fim: dataFim,
+            hora_inicio: horaInicio,
+            hora_fim: horaFim,
+            responsavel: programacao.responsavel || 'Sistema',
+            responsavel_id: programacao.responsavel_id,
+            finalidade,
+            observacoes: programacao.observacoes_veiculo,
+            status: 'ativa',
+            atualizado_por: 'Sistema',
+            atualizado_por_id: usuarioId,
+          },
+        });
+
+        this.logger.log(`Reserva de veículo atualizada para programação ${programacao.id}`);
+      } else {
+        // Criar nova reserva vinculada à programação
+        await prisma.reserva_veiculo.create({
+          data: {
+            veiculo_id: programacao.veiculo_id,
+            solicitante_id: programacao.id,
+            tipo_solicitante: 'programacao_os', // Vinculada à programação
+            data_inicio: dataInicio,
+            data_fim: dataFim,
+            hora_inicio: horaInicio,
+            hora_fim: horaFim,
+            responsavel: programacao.responsavel || 'Sistema',
+            responsavel_id: programacao.responsavel_id,
+            finalidade,
+            observacoes: programacao.observacoes_veiculo,
+            status: 'ativa',
+            criado_por: 'Sistema',
+            criado_por_id: usuarioId,
+          },
+        });
+
+        this.logger.log(`Reserva de veículo criada para programação ${programacao.id}`);
+      }
+    } catch (error) {
+      this.logger.error(`Erro ao criar/atualizar reserva de veículo para programação: ${error.message}`, error.stack);
+      // Não lançar erro para não interromper a criação/edição
     }
   }
 
@@ -1036,6 +1292,7 @@ export class ProgramacaoOSService {
       observacoes_programacao: programacao.observacoes_programacao,
       justificativa: programacao.justificativa,
       motivo_rejeicao: programacao.motivo_rejeicao,
+      sugestoes_melhoria: programacao.sugestoes_melhoria,
       motivo_cancelamento: programacao.motivo_cancelamento,
       tarefas_programacao: programacao.tarefas_programacao?.map((tp: any) => ({
         id: tp.id,
@@ -1060,9 +1317,14 @@ export class ProgramacaoOSService {
       analisado_por: programacao.analisado_por,
       analisado_por_id: programacao.analisado_por_id,
       data_analise: programacao.data_analise,
+      observacoes_analise: programacao.observacoes_analise,
       aprovado_por: programacao.aprovado_por,
       aprovado_por_id: programacao.aprovado_por_id,
       data_aprovacao: programacao.data_aprovacao,
+      observacoes_aprovacao: programacao.observacoes_aprovacao,
+      ajustes_orcamento: programacao.ajustes_orcamento ? Number(programacao.ajustes_orcamento) : null,
+      data_programada_sugerida: programacao.data_programada_sugerida,
+      hora_programada_sugerida: programacao.hora_programada_sugerida,
     };
   }
 

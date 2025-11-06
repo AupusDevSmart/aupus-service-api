@@ -722,8 +722,8 @@ export class TarefasService {
 
   private mapearParaResponse(tarefa: any): TarefaResponseDto {
     return {
-      id: tarefa.id,
-      plano_manutencao_id: tarefa.plano_manutencao_id,
+      id: tarefa.id?.trim() || tarefa.id, // ✅ TRIM para remover espaços extras
+      plano_manutencao_id: tarefa.plano_manutencao_id?.trim() || tarefa.plano_manutencao_id, // ✅ TRIM
       tag: tarefa.tag,
       nome: tarefa.nome,
       descricao: tarefa.descricao,
@@ -736,8 +736,8 @@ export class TarefasService {
       duracao_estimada: Number(tarefa.duracao_estimada),
       tempo_estimado: tarefa.tempo_estimado,
       ordem: tarefa.ordem,
-      planta_id: tarefa.planta_id,
-      equipamento_id: tarefa.equipamento_id,
+      planta_id: tarefa.planta_id?.trim() || tarefa.planta_id, // ✅ TRIM
+      equipamento_id: tarefa.equipamento_id?.trim() || tarefa.equipamento_id, // ✅ TRIM
       planejador: tarefa.planejador,
       responsavel: tarefa.responsavel,
       observacoes: tarefa.observacoes,

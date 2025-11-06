@@ -194,6 +194,11 @@ export class DiagramasService {
         },
         status: eq.status,
         propriedades: eq.propriedades,
+        // Campos MQTT para integração com dados em tempo real
+        mqtt_habilitado: eq.mqtt_habilitado,
+        topico_mqtt: eq.topico_mqtt,
+        fabricante: eq.fabricante,
+        modelo: eq.modelo,
         // Se includeData=true, buscar dados em tempo real (implementar depois com MQTT)
         dadosTempoReal: includeData ? null : undefined,
       };

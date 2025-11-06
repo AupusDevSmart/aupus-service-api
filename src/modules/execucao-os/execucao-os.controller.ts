@@ -127,6 +127,36 @@ export class ExecucaoOSController {
     return { message: 'OS programada com sucesso' };
   }
 
+  @Post('iniciar-de-programacao/:programacao_id')
+  @ApiOperation({
+    summary: '✅ Criar execução de OS a partir de uma programação APROVADA',
+    description: 'Cria uma nova ordem de serviço (execução) a partir de uma programação aprovada, copiando todos os dados (materiais, ferramentas, técnicos, tarefas)',
+  })
+  @ApiParam({ name: 'programacao_id', description: 'ID da programação aprovada' })
+  @ApiResponse({
+    status: HttpStatus.CREATED,
+    description: 'Ordem de serviço criada e execução iniciada com sucesso',
+  })
+  @ApiResponse({
+    status: HttpStatus.NOT_FOUND,
+    description: 'Programação não encontrada',
+  })
+  @ApiResponse({
+    status: HttpStatus.CONFLICT,
+    description: 'Programação não está aprovada ou já possui uma OS criada',
+  })
+  async iniciarDeProgramacao(
+    @Param('programacao_id') programacaoId: string,
+    @Body() dto: IniciarExecucaoDto,
+  ): Promise<{ message: string; os_id: string }> {
+    const usuarioId = undefined; // TODO: Obter da sessão
+    const result = await this.execucaoOSService.iniciarDeProgramacao(programacaoId, dto, usuarioId);
+    return {
+      message: 'Ordem de serviço criada e execução iniciada com sucesso',
+      os_id: result.os_id
+    };
+  }
+
   @Patch(':id/iniciar')
   @ApiOperation({
     summary: 'Iniciar execução da OS',

@@ -16,18 +16,18 @@ export class FindAllPlantasDto {
   @Min(1, { message: 'Página deve ser maior que 0' })
   page?: number = 1;
 
-  @ApiPropertyOptional({ 
-    description: 'Número de itens por página', 
-    example: 10, 
-    default: 10, 
-    minimum: 1, 
-    maximum: 100 
+  @ApiPropertyOptional({
+    description: 'Número de itens por página',
+    example: 10,
+    default: 10,
+    minimum: 1,
+    maximum: 1000
   })
   @IsOptional()
   @Type(() => Number)
   @IsInt({ message: 'Limit deve ser um número inteiro' })
   @Min(1, { message: 'Limit deve ser maior que 0' })
-  @Max(100, { message: 'Limit não pode ser maior que 100' })
+  @Max(1000, { message: 'Limit não pode ser maior que 1000' })
   limit?: number = 10;
 
   @ApiPropertyOptional({ 

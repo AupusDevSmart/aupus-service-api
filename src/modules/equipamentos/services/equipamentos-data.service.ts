@@ -9,9 +9,12 @@ export class EquipamentosDataService {
    * Obtém o dado mais recente de um equipamento
    */
   async obterDadoAtual(equipamentoId: string) {
-    // Verificar se o equipamento existe
+    // Verificar se o equipamento existe e buscar informações dele
     const equipamento = await this.prisma.equipamentos.findFirst({
       where: { id: equipamentoId, deleted_at: null },
+      include: {
+        tipo_equipamento_rel: true,
+      },
     });
 
     if (!equipamento) {
@@ -25,12 +28,21 @@ export class EquipamentosDataService {
     });
 
     if (!ultimoDado) {
-      throw new NotFoundException(
-        'Nenhum dado encontrado para este equipamento',
-      );
+      // Retornar estrutura com equipamento mas sem dado
+      return {
+        equipamento: {
+          id: equipamento.id,
+          nome: equipamento.nome,
+          tipo: equipamento.tipo_equipamento_rel?.nome || equipamento.tipo_equipamento,
+          mqtt_habilitado: equipamento.mqtt_habilitado,
+          topico_mqtt: equipamento.topico_mqtt,
+        },
+        dado: null,
+        message: 'Nenhum dado MQTT disponível para este equipamento',
+      };
     }
 
-    return this.formatDadoResponse(ultimoDado);
+    return this.formatDadoResponse(equipamento, ultimoDado);
   }
 
   /**
@@ -77,20 +89,23 @@ export class EquipamentosDataService {
     // TODO: Implementar agrupamento por intervalo
     // Por enquanto retorna raw data
     const dadosFormatados = dados.map((dado) => ({
-      timestamp: dado.timestamp_dados,
+      id: dado.id,
+      timestamp_dados: dado.timestamp_dados,
       dados: dado.dados,
       qualidade: dado.qualidade,
       fonte: dado.fonte,
+      created_at: dado.created_at,
     }));
 
     return {
-      dados: dadosFormatados,
-      meta: {
+      data: dadosFormatados,
+      pagination: {
+        page: 1,
+        limit: limite,
         total: dadosFormatados.length,
-        inicio: inicio || null,
-        fim: fim || null,
-        intervalo,
-        equipamentoId,
+        totalPages: 1,
+        hasNextPage: false,
+        hasPreviousPage: false,
       },
     };
   }
@@ -98,14 +113,23 @@ export class EquipamentosDataService {
   /**
    * Formata resposta de um dado
    */
-  private formatDadoResponse(dado: any) {
+  private formatDadoResponse(equipamento: any, dado: any) {
     return {
-      id: dado.id,
-      equipamentoId: dado.equipamento_id,
-      dados: dado.dados,
-      fonte: dado.fonte,
-      timestamp: dado.timestamp_dados,
-      qualidade: dado.qualidade,
+      equipamento: {
+        id: equipamento.id,
+        nome: equipamento.nome,
+        tipo: equipamento.tipo_equipamento_rel?.nome || equipamento.tipo_equipamento,
+        mqtt_habilitado: equipamento.mqtt_habilitado,
+        topico_mqtt: equipamento.topico_mqtt,
+      },
+      dado: {
+        id: dado.id,
+        dados: dado.dados,
+        fonte: dado.fonte,
+        timestamp_dados: dado.timestamp_dados,
+        qualidade: dado.qualidade,
+        created_at: dado.created_at,
+      },
     };
   }
 }

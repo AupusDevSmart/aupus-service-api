@@ -130,9 +130,19 @@ export class DiagramaGateway
   private enviarAtualizacaoEquipamento(event: any) {
     const { equipamentoId, diagramaId, dados } = event;
 
+    console.log('📤 [WebSocket] Emitindo dados do equipamento', equipamentoId);
+    console.log('📤 [WebSocket] Estrutura do event:', {
+      temEquipamentoId: !!equipamentoId,
+      temDiagramaId: !!diagramaId,
+      temDados: !!dados,
+      temDados_dados: !!dados?.dados,
+      temTimestamp: !!dados?.timestamp_dados,
+    });
+
     // Enviar para sala do diagrama
     if (diagramaId) {
-      this.server.to(`diagrama:${diagramaId}`).emit('equipamento_update', {
+      const roomDiagrama = `diagrama:${diagramaId}`;
+      this.server.to(roomDiagrama).emit('equipamento_update', {
         type: 'equipamento_update',
         equipamentoId,
         dados: dados.dados,
@@ -142,7 +152,8 @@ export class DiagramaGateway
     }
 
     // Enviar para sala específica do equipamento (se houver cliente escutando)
-    this.server.to(`equipamento:${equipamentoId}`).emit('equipamento_dados', {
+    const roomEquipamento = `equipamento:${equipamentoId}`;
+    this.server.to(roomEquipamento).emit('equipamento_dados', {
       type: 'equipamento_dados',
       equipamentoId,
       dados: dados.dados,

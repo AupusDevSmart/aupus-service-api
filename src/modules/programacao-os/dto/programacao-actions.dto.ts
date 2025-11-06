@@ -64,7 +64,6 @@ export class CreateProgramacaoTarefasDto {
   @ApiProperty({ description: 'IDs das tarefas selecionadas', example: ['clrx1234567890123456789012'] })
   @IsArray()
   @IsString({ each: true })
-  @Length(26, 26, { each: true })
   tarefas_ids: string[];
 
   @ApiPropertyOptional({ description: 'Descrição customizada' })
@@ -102,7 +101,6 @@ export class AdicionarTarefasDto {
   @ApiProperty({ description: 'IDs das tarefas a serem adicionadas' })
   @IsArray()
   @IsString({ each: true })
-  @Length(26, 26, { each: true })
   tarefas_ids: string[];
 
   @ApiPropertyOptional({ description: 'Observações' })

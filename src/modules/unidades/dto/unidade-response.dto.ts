@@ -1,5 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { TipoUnidade, StatusUnidade } from './create-unidade.dto';
+import { TipoUnidade, StatusUnidade, GrupoUnidade, SubgrupoUnidade, TipoUnidadeEnergia } from './create-unidade.dto';
 
 export class PlantaBasica {
   @ApiProperty({ example: 'plt_01234567890123456789012345' })
@@ -48,6 +48,27 @@ export class UnidadeResponse {
     example: ['Entrada', 'Saída', 'Transformador 1'],
   })
   pontosMedicao?: string[];
+
+  @ApiPropertyOptional({ example: false })
+  irrigante?: boolean;
+
+  @ApiPropertyOptional({ enum: GrupoUnidade, example: GrupoUnidade.A })
+  grupo?: GrupoUnidade;
+
+  @ApiPropertyOptional({ enum: SubgrupoUnidade, example: SubgrupoUnidade.A4_VERDE })
+  subgrupo?: SubgrupoUnidade;
+
+  @ApiPropertyOptional({ enum: TipoUnidadeEnergia, example: TipoUnidadeEnergia.CARGA })
+  tipoUnidade?: TipoUnidadeEnergia;
+
+  @ApiPropertyOptional({ example: 150.5, description: 'Demanda de carga em kW' })
+  demandaCarga?: number;
+
+  @ApiPropertyOptional({ example: 200.0, description: 'Demanda de geração em kW' })
+  demandaGeracao?: number;
+
+  @ApiPropertyOptional({ example: 'con_01234567890123456789012345' })
+  concessionariaId?: string;
 
   @ApiPropertyOptional({ type: PlantaBasica })
   planta?: PlantaBasica;
