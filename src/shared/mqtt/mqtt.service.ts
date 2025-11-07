@@ -41,7 +41,7 @@ export class MqttService extends EventEmitter implements OnModuleInit, OnModuleD
       this.flushAllBuffers();
     }, this.bufferInterval);
 
-    console.log('📊 Sistema de agregação de dados (1 minuto) inicializado');
+    // console.log('📊 Sistema de agregação de dados (1 minuto) inicializado');
   }
 
   onModuleDestroy() {
@@ -70,11 +70,11 @@ export class MqttService extends EventEmitter implements OnModuleInit, OnModuleD
       reconnectPeriod: 5000,
     };
 
-    console.log(`🔌 Conectando ao MQTT broker: ${mqttUrl}`);
+    // console.log(`🔌 Conectando ao MQTT broker: ${mqttUrl}`);
     this.client = mqtt.connect(mqttUrl, options);
 
     this.client.on('connect', () => {
-      console.log('✅ MQTT conectado');
+      // console.log('✅ MQTT conectado');
       this.carregarTopicosEquipamentos();
     });
 
@@ -83,11 +83,11 @@ export class MqttService extends EventEmitter implements OnModuleInit, OnModuleD
     });
 
     this.client.on('error', (error) => {
-      console.error('❌ Erro MQTT:', error);
+      // console.error('❌ Erro MQTT:', error);
     });
 
     this.client.on('reconnect', () => {
-      console.log('🔄 Reconectando ao MQTT...');
+      // console.log('🔄 Reconectando ao MQTT...');
     });
   }
 
@@ -107,7 +107,7 @@ export class MqttService extends EventEmitter implements OnModuleInit, OnModuleD
       },
     });
 
-    console.log(`📡 Carregando ${equipamentos.length} tópicos MQTT...`);
+    // console.log(`📡 Carregando ${equipamentos.length} tópicos MQTT...`);
 
     for (const equip of equipamentos) {
       this.subscribeTopic(equip.topico_mqtt!, equip.id);
@@ -122,9 +122,9 @@ export class MqttService extends EventEmitter implements OnModuleInit, OnModuleD
       this.subscriptions.set(topic, []);
       this.client.subscribe(topic, (err) => {
         if (err) {
-          console.error(`❌ Erro ao subscrever tópico ${topic}:`, err);
+          // console.error(`❌ Erro ao subscrever tópico ${topic}:`, err);
         } else {
-          console.log(`✅ Subscrito ao tópico: ${topic}`);
+          // console.log(`✅ Subscrito ao tópico: ${topic}`);
         }
       });
     }
@@ -152,7 +152,7 @@ export class MqttService extends EventEmitter implements OnModuleInit, OnModuleD
     if (equipamentos.length === 0) {
       this.client.unsubscribe(topic);
       this.subscriptions.delete(topic);
-      console.log(`🔕 Desinscrito do tópico: ${topic}`);
+      // console.log(`🔕 Desinscrito do tópico: ${topic}`);
     }
   }
 
@@ -162,19 +162,19 @@ export class MqttService extends EventEmitter implements OnModuleInit, OnModuleD
   private async handleMessage(topic: string, payload: Buffer) {
     try {
       // LOG: Mensagem recebida
-      console.log('📨 [MQTT] Mensagem recebida no tópico:', topic);
-      console.log('📨 [MQTT] Payload (primeiros 200 chars):', payload.toString().substring(0, 200));
+      // console.log('📨 [MQTT] Mensagem recebida no tópico:', topic);
+      // console.log('📨 [MQTT] Payload (primeiros 200 chars):', payload.toString().substring(0, 200));
 
       // Parse do payload JSON
       const dados = JSON.parse(payload.toString());
-      console.log('📨 [MQTT] Timestamp nos dados:', dados.timestamp, '| Status:', dados.status?.work_state_text || 'N/A');
+      // console.log('📨 [MQTT] Timestamp nos dados:', dados.timestamp, '| Status:', dados.status?.work_state_text || 'N/A');
 
       // Obter equipamentos que escutam este tópico
       const equipamentoIds = this.subscriptions.get(topic);
-      console.log('📨 [MQTT] Equipamentos inscritos:', equipamentoIds?.length || 0);
+      // console.log('📨 [MQTT] Equipamentos inscritos:', equipamentoIds?.length || 0);
 
       if (!equipamentoIds || equipamentoIds.length === 0) {
-        console.log('⚠️ [MQTT] Nenhum equipamento inscrito neste tópico');
+        // console.log('⚠️ [MQTT] Nenhum equipamento inscrito neste tópico');
         return;
       }
 
@@ -245,7 +245,7 @@ export class MqttService extends EventEmitter implements OnModuleInit, OnModuleD
       });
 
       if (!equipamento) {
-        console.warn(`⚠️ Equipamento ${equipamentoId} não encontrado`);
+        // console.warn(`⚠️ Equipamento ${equipamentoId} não encontrado`);
         return;
       }
 
@@ -257,10 +257,10 @@ export class MqttService extends EventEmitter implements OnModuleInit, OnModuleD
         const validacao = this.validarDadosContraSchema(dados, schema);
 
         if (!validacao.valido) {
-          console.warn(
-            `⚠️ Dados inválidos para equipamento ${equipamento.nome} (${equipamento.tipo_equipamento_rel?.nome}):`,
-            validacao.erros,
-          );
+          // console.warn(
+          //   `⚠️ Dados inválidos para equipamento ${equipamento.nome} (${equipamento.tipo_equipamento_rel?.nome}):`,
+          //   validacao.erros,
+          // );
           qualidade = 'BAD';
           // Adicionar erros aos dados
           dados._validation_errors = validacao.erros;
@@ -327,7 +327,7 @@ export class MqttService extends EventEmitter implements OnModuleInit, OnModuleD
   public disconnect() {
     if (this.client) {
       this.client.end();
-      console.log('🔌 MQTT desconectado');
+      // console.log('🔌 MQTT desconectado');
     }
   }
 
@@ -349,7 +349,7 @@ export class MqttService extends EventEmitter implements OnModuleInit, OnModuleD
         timestamp_inicio: new Date(),
       };
       this.buffers.set(equipamentoId, buffer);
-      console.log(`📊 [Buffer] Criado buffer para equipamento ${equipamentoId}`);
+      // console.log(`📊 [Buffer] Criado buffer para equipamento ${equipamentoId}`);
     }
 
     buffer.leituras.push({
@@ -368,7 +368,7 @@ export class MqttService extends EventEmitter implements OnModuleInit, OnModuleD
       return;
     }
 
-    console.log(`🔄 [Buffer] Flush de ${equipamentoIds.length} buffers...`);
+    // console.log(`🔄 [Buffer] Flush de ${equipamentoIds.length} buffers...`);
 
     for (const equipamentoId of equipamentoIds) {
       const buffer = this.buffers.get(equipamentoId);
@@ -412,25 +412,36 @@ export class MqttService extends EventEmitter implements OnModuleInit, OnModuleD
         },
       });
 
-      console.log(
-        `✅ [Buffer] Flush ${equipamentoId}: ${leituras.length} leituras agregadas (${qualidadeGeral})`,
-      );
+      // console.log(
+      //   `✅ [Buffer] Flush ${equipamentoId}: ${leituras.length} leituras agregadas (${qualidadeGeral})`,
+      // );
 
-      // Log de informações para inversores (estrutura aninhada)
-      if (dadosAgregados.power?.active_total !== undefined) {
-        console.log(
-          `   📊 Potência Ativa: ${dadosAgregados.power.active_total} W (${(dadosAgregados.power.active_total / 1000).toFixed(2)} kW)`,
-        );
-        if (dadosAgregados.energy?.period_energy_kwh) {
-          console.log(`   ⚡ Energia no período: ${dadosAgregados.energy.period_energy_kwh} kWh`);
-        }
-      } else if (dadosAgregados.power_avg !== undefined) {
-        // Log para estrutura legada
-        console.log(
-          `   📊 Potência: min=${dadosAgregados.power_min?.toFixed(2)} avg=${dadosAgregados.power_avg?.toFixed(2)} max=${dadosAgregados.power_max?.toFixed(2)} kW`,
-        );
-        console.log(`   ⚡ Energia: ${dadosAgregados.energia_kwh?.toFixed(4)} kWh`);
-      }
+      // Log de informações por tipo de equipamento
+      // if (dadosAgregados.Dados) {
+      //   // M-160 - Multimedidor
+      //   const potTotal = dadosAgregados.Dados.Pa + dadosAgregados.Dados.Pb + dadosAgregados.Dados.Pc;
+      //   console.log(`   📊 [M-160] Potência Total: ${potTotal.toFixed(2)} W (${(potTotal / 1000).toFixed(2)} kW)`);
+      //   console.log(`   📊 [M-160] Por Fase: A=${dadosAgregados.Dados.Pa.toFixed(2)}W | B=${dadosAgregados.Dados.Pb.toFixed(2)}W | C=${dadosAgregados.Dados.Pc.toFixed(2)}W`);
+      //   console.log(`   🔌 [M-160] Tensões: Va=${dadosAgregados.Dados.Va.toFixed(1)}V | Vb=${dadosAgregados.Dados.Vb.toFixed(1)}V | Vc=${dadosAgregados.Dados.Vc.toFixed(1)}V`);
+      //   console.log(`   ⚡ [M-160] Energia Importada: ${dadosAgregados.Dados.phf.toFixed(2)} kWh | Exportada: ${dadosAgregados.Dados.phr.toFixed(2)} kWh`);
+      //   if (dadosAgregados.Dados.period_energy_kwh) {
+      //     console.log(`   ⏱️ [M-160] Energia no período: ${dadosAgregados.Dados.period_energy_kwh} kWh`);
+      //   }
+      // } else if (dadosAgregados.power?.active_total !== undefined) {
+      //   // Inversores
+      //   console.log(
+      //     `   📊 Potência Ativa: ${dadosAgregados.power.active_total} W (${(dadosAgregados.power.active_total / 1000).toFixed(2)} kW)`,
+      //   );
+      //   if (dadosAgregados.energy?.period_energy_kwh) {
+      //     console.log(`   ⚡ Energia no período: ${dadosAgregados.energy.period_energy_kwh} kWh`);
+      //   }
+      // } else if (dadosAgregados.power_avg !== undefined) {
+      //   // Estrutura legada
+      //   console.log(
+      //     `   📊 Potência: min=${dadosAgregados.power_min?.toFixed(2)} avg=${dadosAgregados.power_avg?.toFixed(2)} max=${dadosAgregados.power_max?.toFixed(2)} kW`,
+      //   );
+      //   console.log(`   ⚡ Energia: ${dadosAgregados.energia_kwh?.toFixed(4)} kWh`);
+      // }
 
       // Limpar buffer
       buffer.leituras = [];
@@ -469,10 +480,86 @@ export class MqttService extends EventEmitter implements OnModuleInit, OnModuleD
       agregado.info = ultimaLeitura.info;
     }
 
-    // Verificar se é estrutura de inversor (tem power como objeto)
+    // Verificar tipo de estrutura
     const isInversorData = ultimaLeitura.power && typeof ultimaLeitura.power === 'object';
+    const isM160Data = ultimaLeitura.Dados && typeof ultimaLeitura.Dados === 'object';
 
-    if (isInversorData) {
+    if (isM160Data) {
+      // ESTRUTURA M-160 - Multimedidor 4Q
+      // Estrutura: { Dados: { phf, phr, qhfi, qhri, Va, Vb, Vc, Ia, Ib, Ic, Pa, Pb, Pc, FPA, FPB, FPC, freq, timestamp } }
+
+      const dadosM160 = leituras.map(l => l.dados.Dados);
+
+      // Tensões (V)
+      const Va = dadosM160.map(d => d.Va).filter(v => v != null);
+      const Vb = dadosM160.map(d => d.Vb).filter(v => v != null);
+      const Vc = dadosM160.map(d => d.Vc).filter(v => v != null);
+
+      // Correntes (A)
+      const Ia = dadosM160.map(d => d.Ia).filter(v => v != null);
+      const Ib = dadosM160.map(d => d.Ib).filter(v => v != null);
+      const Ic = dadosM160.map(d => d.Ic).filter(v => v != null);
+
+      // Potências (W)
+      const Pa = dadosM160.map(d => d.Pa).filter(v => v != null);
+      const Pb = dadosM160.map(d => d.Pb).filter(v => v != null);
+      const Pc = dadosM160.map(d => d.Pc).filter(v => v != null);
+
+      // Fatores de Potência
+      const FPA = dadosM160.map(d => d.FPA).filter(v => v != null);
+      const FPB = dadosM160.map(d => d.FPB).filter(v => v != null);
+      const FPC = dadosM160.map(d => d.FPC).filter(v => v != null);
+
+      // Energia (kWh)
+      const phf = dadosM160.map(d => d.phf).filter(v => v != null); // Energia ativa importada
+      const phr = dadosM160.map(d => d.phr).filter(v => v != null); // Energia ativa exportada
+      const qhfi = dadosM160.map(d => d.qhfi).filter(v => v != null); // Energia reativa indutiva
+      const qhri = dadosM160.map(d => d.qhri).filter(v => v != null); // Energia reativa capacitiva
+
+      // Frequência (Hz)
+      const freq = dadosM160.map(d => d.freq).filter(v => v != null);
+
+      agregado.Dados = {
+        // Tensões (média)
+        Va: Va.length > 0 ? parseFloat(this.mean(Va).toFixed(2)) : 0,
+        Vb: Vb.length > 0 ? parseFloat(this.mean(Vb).toFixed(2)) : 0,
+        Vc: Vc.length > 0 ? parseFloat(this.mean(Vc).toFixed(2)) : 0,
+
+        // Correntes (média)
+        Ia: Ia.length > 0 ? parseFloat(this.mean(Ia).toFixed(2)) : 0,
+        Ib: Ib.length > 0 ? parseFloat(this.mean(Ib).toFixed(2)) : 0,
+        Ic: Ic.length > 0 ? parseFloat(this.mean(Ic).toFixed(2)) : 0,
+
+        // Potências (média)
+        Pa: Pa.length > 0 ? parseFloat(this.mean(Pa).toFixed(2)) : 0,
+        Pb: Pb.length > 0 ? parseFloat(this.mean(Pb).toFixed(2)) : 0,
+        Pc: Pc.length > 0 ? parseFloat(this.mean(Pc).toFixed(2)) : 0,
+
+        // Fatores de potência (média)
+        FPA: FPA.length > 0 ? parseFloat(this.mean(FPA).toFixed(3)) : 0,
+        FPB: FPB.length > 0 ? parseFloat(this.mean(FPB).toFixed(3)) : 0,
+        FPC: FPC.length > 0 ? parseFloat(this.mean(FPC).toFixed(3)) : 0,
+
+        // Energia (última leitura - são valores cumulativos)
+        phf: ultimaLeitura.Dados.phf || 0,
+        phr: ultimaLeitura.Dados.phr || 0,
+        qhfi: ultimaLeitura.Dados.qhfi || 0,
+        qhri: ultimaLeitura.Dados.qhri || 0,
+
+        // Frequência (média)
+        freq: freq.length > 0 ? parseFloat(this.mean(freq).toFixed(2)) : 0,
+
+        // Timestamp (última leitura)
+        timestamp: ultimaLeitura.Dados.timestamp,
+      };
+
+      // Calcular energia do período (kWh)
+      const potenciaTotal = (agregado.Dados.Pa + agregado.Dados.Pb + agregado.Dados.Pc) / 1000; // kW
+      const intervalo_horas =
+        (leituras[leituras.length - 1].timestamp.getTime() - primeiraLeitura.timestamp.getTime()) / (1000 * 3600);
+      agregado.Dados.period_energy_kwh = parseFloat((potenciaTotal * intervalo_horas).toFixed(4));
+
+    } else if (isInversorData) {
       // ESTRUTURA DE INVERSOR - preservar nested objects
 
       // ========== POWER ==========

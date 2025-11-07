@@ -24,7 +24,7 @@ export class DiagramaGateway
   constructor(private mqttService: MqttService) {}
 
   afterInit(server: Server) {
-    console.log('✅ WebSocket Gateway inicializado');
+    // console.log('✅ WebSocket Gateway inicializado');
 
     // Escutar eventos do MQTT e repassar via WebSocket
     this.mqttService.on('equipamento_dados', (event) => {
@@ -33,11 +33,11 @@ export class DiagramaGateway
   }
 
   handleConnection(client: Socket) {
-    console.log(`🔌 Cliente conectado: ${client.id}`);
+    // console.log(`🔌 Cliente conectado: ${client.id}`);
   }
 
   handleDisconnect(client: Socket) {
-    console.log(`🔌 Cliente desconectado: ${client.id}`);
+    // console.log(`🔌 Cliente desconectado: ${client.id}`);
   }
 
   /**
@@ -52,7 +52,7 @@ export class DiagramaGateway
     const room = `diagrama:${diagramaId}`;
 
     client.join(room);
-    console.log(`📡 Cliente ${client.id} inscrito no diagrama ${diagramaId}`);
+    // console.log(`📡 Cliente ${client.id} inscrito no diagrama ${diagramaId}`);
 
     return {
       event: 'subscribed',
@@ -72,7 +72,7 @@ export class DiagramaGateway
     const room = `diagrama:${diagramaId}`;
 
     client.leave(room);
-    console.log(`📡 Cliente ${client.id} desinscrito do diagrama ${diagramaId}`);
+    // console.log(`📡 Cliente ${client.id} desinscrito do diagrama ${diagramaId}`);
 
     return {
       event: 'unsubscribed',
@@ -92,9 +92,9 @@ export class DiagramaGateway
     const room = `equipamento:${equipamentoId}`;
 
     client.join(room);
-    console.log(
-      `📡 Cliente ${client.id} inscrito no equipamento ${equipamentoId}`,
-    );
+    // console.log(
+    //   `📡 Cliente ${client.id} inscrito no equipamento ${equipamentoId}`,
+    // );
 
     return {
       event: 'subscribed',
@@ -114,9 +114,9 @@ export class DiagramaGateway
     const room = `equipamento:${equipamentoId}`;
 
     client.leave(room);
-    console.log(
-      `📡 Cliente ${client.id} desinscrito do equipamento ${equipamentoId}`,
-    );
+    // console.log(
+    //   `📡 Cliente ${client.id} desinscrito do equipamento ${equipamentoId}`,
+    // );
 
     return {
       event: 'unsubscribed',
@@ -130,14 +130,14 @@ export class DiagramaGateway
   private enviarAtualizacaoEquipamento(event: any) {
     const { equipamentoId, diagramaId, dados } = event;
 
-    console.log('📤 [WebSocket] Emitindo dados do equipamento', equipamentoId);
-    console.log('📤 [WebSocket] Estrutura do event:', {
-      temEquipamentoId: !!equipamentoId,
-      temDiagramaId: !!diagramaId,
-      temDados: !!dados,
-      temDados_dados: !!dados?.dados,
-      temTimestamp: !!dados?.timestamp_dados,
-    });
+    // console.log('📤 [WebSocket] Emitindo dados do equipamento', equipamentoId);
+    // console.log('📤 [WebSocket] Estrutura do event:', {
+    //   temEquipamentoId: !!equipamentoId,
+    //   temDiagramaId: !!diagramaId,
+    //   temDados: !!dados,
+    //   temDados_dados: !!dados?.dados,
+    //   temTimestamp: !!dados?.timestamp_dados,
+    // });
 
     // Enviar para sala do diagrama
     if (diagramaId) {

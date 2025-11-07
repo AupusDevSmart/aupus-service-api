@@ -393,6 +393,20 @@ export class ProgramacaoDetalhesResponseDto extends ProgramacaoResponseDto {
 
   @ApiPropertyOptional({ description: 'Ordem de serviço gerada (se aprovada)' })
   ordem_servico?: any;
+
+  @ApiPropertyOptional({ description: 'Reserva de veículo vinculada (se houver)' })
+  reserva_veiculo?: {
+    id: string;
+    veiculo_id: string;
+    data_inicio: Date;
+    data_fim: Date;
+    hora_inicio: string;
+    hora_fim: string;
+    responsavel: string;
+    finalidade: string;
+    status: string;
+    veiculo?: any;
+  };
 }
 
 export class PaginationDto {
