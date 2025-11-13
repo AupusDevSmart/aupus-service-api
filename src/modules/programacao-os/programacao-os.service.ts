@@ -379,9 +379,34 @@ export class ProgramacaoOSService {
         },
       });
 
-      // Criar/atualizar reserva de veículo vinculada à programação
-      if (updateDto.veiculo_id && updateDto.necessita_veiculo) {
+      // Criar/atualizar/cancelar reserva de veículo vinculada à programação
+      // ✅ CORREÇÃO: Só criar/atualizar reserva se necessita_veiculo for true E houver veiculo_id
+      if (programacaoAtualizada.necessita_veiculo && programacaoAtualizada.veiculo_id) {
         await this.criarReservaVeiculoProgramacao(prisma, programacaoAtualizada, usuarioId);
+      } else if (!programacaoAtualizada.necessita_veiculo && programacao.reserva_id) {
+        // Se desmarcou necessita_veiculo, cancelar reserva existente
+        try {
+          const reservaIdLimpo = programacao.reserva_id.trim();
+          await prisma.reserva_veiculo.update({
+            where: { id: reservaIdLimpo },
+            data: {
+              status: 'cancelada',
+              motivo_cancelamento: 'Programação não necessita mais de veículo',
+              data_cancelamento: new Date(),
+              cancelado_por: 'Sistema',
+            },
+          });
+
+          // Remover reserva_id da programação
+          await prisma.programacoes_os.update({
+            where: { id },
+            data: { reserva_id: null },
+          });
+
+          this.logger.log(`Reserva ${reservaIdLimpo} cancelada automaticamente`);
+        } catch (error) {
+          this.logger.error(`Erro ao cancelar reserva: ${error.message}`);
+        }
       }
 
       // Registrar histórico
@@ -482,18 +507,16 @@ export class ProgramacaoOSService {
       // Gerar OS automaticamente com status PROGRAMADA
       const osId = await this.gerarOrdemServico(prisma, id);
 
-      // Atualizar reserva existente para vincular à OS (se houver)
-      if (programacao.necessita_veiculo && programacao.veiculo_id) {
-        // Buscar reserva vinculada à programação
-        const reservaProgramacao = await prisma.reserva_veiculo.findFirst({
-          where: {
-            solicitante_id: id,
-            tipo_solicitante: 'programacao_os',
-          },
+      // ✅ CORREÇÃO: Verificar se a programação já tem uma reserva vinculada
+      if (programacao.reserva_id) {
+        // Buscar reserva vinculada à programação (com trim no ID)
+        const reservaId = programacao.reserva_id.trim();
+        const reservaProgramacao = await prisma.reserva_veiculo.findUnique({
+          where: { id: reservaId },
         });
 
         if (reservaProgramacao) {
-          // Atualizar para vincular à OS
+          // Atualizar reserva para vincular à OS
           await prisma.reserva_veiculo.update({
             where: { id: reservaProgramacao.id },
             data: {
@@ -502,10 +525,25 @@ export class ProgramacaoOSService {
               finalidade: `Execução de OS: ${programacao.descricao}`,
             },
           });
-          this.logger.log(`Reserva vinculada à OS ${osId}`);
-        } else {
-          // Se não houver reserva, criar uma nova
-          await this.criarReservaVeiculo(prisma, programacao, osId, usuarioId);
+
+          // ✅ Salvar reserva_id na OS
+          await prisma.ordens_servico.update({
+            where: { id: osId },
+            data: { reserva_id: reservaProgramacao.id },
+          });
+
+          this.logger.log(`Reserva ${reservaProgramacao.id} vinculada à OS ${osId}`);
+        }
+      } else if (programacao.necessita_veiculo && programacao.veiculo_id) {
+        // Se não houver reserva_id mas precisar de veículo, criar uma nova reserva
+        const novaReservaId = await this.criarReservaVeiculo(prisma, programacao, osId, usuarioId);
+
+        // ✅ CORREÇÃO: Salvar reserva_id na OS se foi criada
+        if (novaReservaId) {
+          await prisma.ordens_servico.update({
+            where: { id: osId },
+            data: { reserva_id: novaReservaId },
+          });
         }
       }
     }, {
@@ -964,6 +1002,9 @@ export class ProgramacaoOSService {
         materiais: true,
         ferramentas: true,
         tecnicos: true,
+        historico: {
+          orderBy: { data: 'asc' },
+        },
       },
     });
 
@@ -977,23 +1018,27 @@ export class ProgramacaoOSService {
     const numeroOS = `OS-${ano}-${String(count + 1).padStart(3, '0')}`;
 
     // Criar OS com status PROGRAMADA (não EM_EXECUCAO)
+    // ✅ CORREÇÃO: Copiar TODOS os campos relevantes da programação para a OS
     const os = await prisma.ordens_servico.create({
       data: {
         programacao_id: programacaoId,
         numero_os: numeroOS,
+        // Campos básicos
         descricao: programacao.descricao,
         local: programacao.local,
         ativo: programacao.ativo,
         condicoes: programacao.condicoes,
-        status: 'PROGRAMADA', // Status inicial é PROGRAMADA
+        status: 'PLANEJADA', // Status inicial é PLANEJADA
         tipo: programacao.tipo,
         prioridade: programacao.prioridade,
         origem: programacao.origem,
+        // Relacionamentos
         planta_id: programacao.planta_id,
         equipamento_id: programacao.equipamento_id,
         anomalia_id: programacao.anomalia_id,
         plano_manutencao_id: programacao.plano_manutencao_id,
         dados_origem: programacao.dados_origem,
+        // Planejamento
         tempo_estimado: programacao.tempo_estimado,
         duracao_estimada: programacao.duracao_estimada,
         data_hora_programada: programacao.data_hora_programada || new Date(),
@@ -1001,8 +1046,17 @@ export class ProgramacaoOSService {
         responsavel_id: programacao.responsavel_id,
         time_equipe: programacao.time_equipe,
         orcamento_previsto: programacao.orcamento_previsto,
+        // Observações
         observacoes: programacao.observacoes,
         observacoes_programacao: programacao.observacoes_programacao,
+        // ✅ NOVO: Campos de auditoria da programação
+        criado_por: programacao.criado_por,
+        criado_por_id: programacao.criado_por_id,
+        programado_por: programacao.aprovado_por, // Quem aprovou a programação = quem programou a OS
+        programado_por_id: programacao.aprovado_por_id,
+        aprovado_por: programacao.aprovado_por,
+        aprovado_por_id: programacao.aprovado_por_id,
+        data_aprovacao: programacao.data_aprovacao,
       },
     });
 
@@ -1060,6 +1114,42 @@ export class ProgramacaoOSService {
       await prisma.tecnicos_os.createMany({ data: tecnicosOS });
     }
 
+    // ✅ NOVO: Copiar histórico da programação para o histórico da OS
+    if (programacao.historico && programacao.historico.length > 0) {
+      const historicoOS = programacao.historico.map(h => ({
+        os_id: os.id,
+        acao: `[PROGRAMAÇÃO] ${h.acao}`,
+        usuario: h.usuario,
+        usuario_id: h.usuario_id,
+        data: h.data,
+        observacoes: h.observacoes,
+        dados_extras: {
+          origem: 'programacao',
+          programacao_id: programacaoId,
+          status_anterior_programacao: h.status_anterior,
+          status_novo_programacao: h.status_novo,
+          dados_extras_originais: h.dados_extras,
+        },
+      }));
+      await prisma.historico_os.createMany({ data: historicoOS });
+    }
+
+    // ✅ NOVO: Registrar criação da OS no histórico
+    await prisma.historico_os.create({
+      data: {
+        os_id: os.id,
+        acao: 'CRIACAO_AUTO',
+        usuario: 'Sistema',
+        usuario_id: programacao.aprovado_por_id,
+        observacoes: `OS gerada automaticamente a partir da programação ${programacao.codigo}`,
+        status_novo: 'PLANEJADA',
+        dados_extras: {
+          programacao_id: programacaoId,
+          programacao_codigo: programacao.codigo,
+        },
+      },
+    });
+
     return os.id;
   }
 
@@ -1071,12 +1161,12 @@ export class ProgramacaoOSService {
     programacao: any,
     osId: string,
     usuarioId?: string
-  ): Promise<void> {
+  ): Promise<string | null> {
     try {
       // Validar se o veículo existe
       if (!programacao.veiculo_id) {
         this.logger.warn('Tentativa de criar reserva sem veiculo_id');
-        return;
+        return null;
       }
 
       // ✅ CORRIGIR: Remover espaços em branco do ID
@@ -1091,7 +1181,7 @@ export class ProgramacaoOSService {
 
       if (!veiculo) {
         this.logger.warn(`Veículo ${veiculoId} não encontrado. Reserva não será criada.`);
-        return;
+        return null;
       }
 
       // Determinar datas da reserva
@@ -1109,7 +1199,7 @@ export class ProgramacaoOSService {
       const finalidade = programacao.reserva_finalidade
         || `Execução de OS: ${programacao.descricao}`;
 
-      await prisma.reserva_veiculo.create({
+      const reserva = await prisma.reserva_veiculo.create({
         data: {
           veiculo_id: veiculoId,
           solicitante_id: osId,
@@ -1129,9 +1219,11 @@ export class ProgramacaoOSService {
       });
 
       this.logger.log(`Reserva de veículo criada para OS ${osId}`);
+      return reserva.id;
     } catch (error) {
       this.logger.error(`Erro ao criar reserva de veículo: ${error.message}`, error.stack);
       // Não lançar erro para não interromper a aprovação
+      return null;
     }
   }
 
@@ -1250,66 +1342,60 @@ export class ProgramacaoOSService {
       if (reservaExistente) {
         this.logger.log(`[RESERVA] Reserva existente encontrada: ${reservaExistente.id}, atualizando...`);
 
-        // Atualizar reserva existente com cast no ENUM
-        await prisma.$executeRawUnsafe(`
-          UPDATE reservas_veiculos
-          SET veiculo_id = $1,
-              data_inicio = $2,
-              data_fim = $3,
-              hora_inicio = $4,
-              hora_fim = $5,
-              responsavel = $6,
-              responsavel_id = $7,
-              finalidade = $8,
-              observacoes = $9,
-              status = $10::status_reserva,
-              atualizado_em = NOW()
-          WHERE id = $11
-        `, veiculoId, dataInicio, dataFim, horaInicio, horaFim,
-           programacao.responsavel || 'Sistema', programacao.responsavel_id,
-           finalidade, programacao.observacoes_veiculo, 'ativa', reservaExistente.id);
+        // Atualizar reserva existente usando Prisma
+        await prisma.reserva_veiculo.update({
+          where: { id: reservaExistente.id },
+          data: {
+            veiculo_id: veiculoId,
+            data_inicio: dataInicio,
+            data_fim: dataFim,
+            hora_inicio: horaInicio,
+            hora_fim: horaFim,
+            responsavel: programacao.responsavel || 'Sistema',
+            responsavel_id: programacao.responsavel_id,
+            finalidade,
+            observacoes: programacao.observacoes_veiculo,
+            status: 'ativa',
+          },
+        });
 
-        // ✅ Atualizar programacao com reserva_id (com trim)
-        await prisma.$executeRawUnsafe(`
-          UPDATE programacoes_os
-          SET reserva_id = TRIM($1)
-          WHERE id = $2
-        `, reservaExistente.id, programacao.id);
+        // ✅ Atualizar programacao com reserva_id
+        await prisma.programacoes_os.update({
+          where: { id: programacao.id },
+          data: { reserva_id: reservaExistente.id },
+        });
 
         this.logger.log(`[RESERVA] ✅ Reserva de veículo atualizada: ${reservaExistente.id}`);
       } else {
         this.logger.log(`[RESERVA] Nenhuma reserva existente, criando nova...`);
 
-        // Criar nova reserva com cast no ENUM
-        const result: any = await prisma.$queryRawUnsafe(`
-          INSERT INTO reservas_veiculos (
-            id, criado_em, atualizado_em, veiculo_id, solicitante_id, tipo_solicitante,
-            data_inicio, data_fim, hora_inicio, hora_fim, responsavel, responsavel_id,
-            finalidade, observacoes, status, criado_por, criado_por_id
-          )
-          VALUES (
-            gen_random_uuid()::text, NOW(), NOW(), $1, $2, $3::tipo_solicitante,
-            $4, $5, $6, $7, $8, $9,
-            $10, $11, $12::status_reserva, $13, $14
-          )
-          RETURNING id
-        `, veiculoId, programacao.id, 'programacao_os',
-           dataInicio, dataFim, horaInicio, horaFim, programacao.responsavel || 'Sistema',
-           programacao.responsavel_id, finalidade, programacao.observacoes_veiculo,
-           'ativa', 'Sistema', usuarioId);
+        // Criar nova reserva usando Prisma (gerará CUID automaticamente)
+        const novaReserva = await prisma.reserva_veiculo.create({
+          data: {
+            veiculo_id: veiculoId,
+            solicitante_id: programacao.id,
+            tipo_solicitante: 'programacao_os',
+            data_inicio: dataInicio,
+            data_fim: dataFim,
+            hora_inicio: horaInicio,
+            hora_fim: horaFim,
+            responsavel: programacao.responsavel || 'Sistema',
+            responsavel_id: programacao.responsavel_id,
+            finalidade,
+            observacoes: programacao.observacoes_veiculo,
+            status: 'ativa',
+            criado_por: 'Sistema',
+            criado_por_id: usuarioId,
+          },
+        });
 
-        const novaReservaId = result[0]?.id;
+        // ✅ Atualizar programacao com reserva_id
+        await prisma.programacoes_os.update({
+          where: { id: programacao.id },
+          data: { reserva_id: novaReserva.id },
+        });
 
-        if (novaReservaId) {
-          // ✅ Atualizar programacao com reserva_id (com trim)
-          await prisma.$executeRawUnsafe(`
-            UPDATE programacoes_os
-            SET reserva_id = TRIM($1)
-            WHERE id = $2
-          `, novaReservaId, programacao.id);
-
-          this.logger.log(`[RESERVA] ✅ Reserva de veículo criada: ${novaReservaId}`);
-        }
+        this.logger.log(`[RESERVA] ✅ Reserva de veículo criada: ${novaReserva.id}`);
       }
     } catch (error) {
       this.logger.error(`[RESERVA] ❌ Erro ao criar/atualizar reserva de veículo: ${error.message}`, error.stack);
@@ -1384,9 +1470,16 @@ export class ProgramacaoOSService {
       tempo_estimado: Number(programacao.tempo_estimado),
       duracao_estimada: Number(programacao.duracao_estimada),
       necessita_veiculo: programacao.necessita_veiculo,
+      veiculo_id: programacao.veiculo_id,
+      reserva_data_inicio: programacao.reserva_data_inicio,
+      reserva_data_fim: programacao.reserva_data_fim,
+      reserva_hora_inicio: programacao.reserva_hora_inicio,
+      reserva_hora_fim: programacao.reserva_hora_fim,
+      reserva_finalidade: programacao.reserva_finalidade,
       assentos_necessarios: programacao.assentos_necessarios,
       carga_necessaria: programacao.carga_necessaria ? Number(programacao.carga_necessaria) : null,
       observacoes_veiculo: programacao.observacoes_veiculo,
+      reserva_id: programacao.reserva_id,
       data_hora_programada: programacao.data_hora_programada,
       responsavel: programacao.responsavel,
       responsavel_id: programacao.responsavel_id,

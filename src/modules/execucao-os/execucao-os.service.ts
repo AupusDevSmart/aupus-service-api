@@ -100,12 +100,42 @@ export class ExecucaoOSService {
       include: {
         tarefas_os: {
           include: {
-            tarefa: {
+            tarefa: true,
+          },
+        },
+        materiais: true,
+        ferramentas: true,
+        tecnicos: true,
+        programacao: {
+          select: {
+            id: true,
+            codigo: true,
+            descricao: true,
+          },
+        },
+        anomalia: {
+          select: {
+            id: true,
+            descricao: true,
+            prioridade: true,
+            status: true,
+          },
+        },
+        plano_manutencao: {
+          select: {
+            id: true,
+            nome: true,
+            descricao: true,
+          },
+        },
+        reserva_veiculo: {
+          include: {
+            veiculo: {
               select: {
                 id: true,
-                nome: true,
-                categoria: true,
-                tipo_manutencao: true,
+                placa: true,
+                modelo: true,
+                marca: true,
               },
             },
           },
@@ -115,6 +145,75 @@ export class ExecucaoOSService {
       skip: (page - 1) * limit,
       take: limit,
     });
+
+    // 🔧 FIX: Buscar manualmente os relacionamentos quando os IDs têm espaços em branco
+    for (const ordem of ordens) {
+      // Buscar anomalia se o ID existir mas a relação não veio
+      if (ordem.anomalia_id && !ordem.anomalia) {
+        const anomaliaId = ordem.anomalia_id.trim();
+        if (anomaliaId) {
+          ordem.anomalia = await this.prisma.anomalias.findUnique({
+            where: { id: anomaliaId },
+            select: {
+              id: true,
+              descricao: true,
+              prioridade: true,
+              status: true,
+            },
+          });
+        }
+      }
+
+      // Buscar plano_manutencao se o ID existir mas a relação não veio
+      if (ordem.plano_manutencao_id && !ordem.plano_manutencao) {
+        const planoId = ordem.plano_manutencao_id.trim();
+        if (planoId) {
+          ordem.plano_manutencao = await this.prisma.planos_manutencao.findUnique({
+            where: { id: planoId },
+            select: {
+              id: true,
+              nome: true,
+              descricao: true,
+            },
+          });
+        }
+      }
+
+      // Buscar programacao se o ID existir mas a relação não veio
+      if (ordem.programacao_id && !ordem.programacao) {
+        const progId = ordem.programacao_id.trim();
+        if (progId) {
+          ordem.programacao = await this.prisma.programacoes_os.findUnique({
+            where: { id: progId },
+            select: {
+              id: true,
+              codigo: true,
+              descricao: true,
+            },
+          });
+        }
+      }
+
+      // Buscar reserva_veiculo se o ID existir mas a relação não veio
+      if (ordem.reserva_id && !ordem.reserva_veiculo) {
+        const reservaId = ordem.reserva_id.trim();
+        if (reservaId) {
+          ordem.reserva_veiculo = await this.prisma.reserva_veiculo.findUnique({
+            where: { id: reservaId },
+            include: {
+              veiculo: {
+                select: {
+                  id: true,
+                  placa: true,
+                  modelo: true,
+                  marca: true,
+                },
+              },
+            },
+          });
+        }
+      }
+    }
 
     // Buscar estatísticas
     const stats = await this.obterEstatisticas();
@@ -150,6 +249,12 @@ export class ExecucaoOSService {
               },
             },
           },
+          // ✅ CORREÇÃO: Filtrar tarefas com tarefa_id válido
+          where: {
+            tarefa_id: {
+              not: null,
+            },
+          },
         },
         materiais: true,
         ferramentas: true,
@@ -166,6 +271,18 @@ export class ExecucaoOSService {
         },
         historico: {
           orderBy: { data: 'desc' },
+        },
+        reserva_veiculo: {
+          include: {
+            veiculo: {
+              select: {
+                id: true,
+                placa: true,
+                modelo: true,
+                marca: true,
+              },
+            },
+          },
         },
       },
     });
@@ -234,7 +351,7 @@ export class ExecucaoOSService {
 
       // Criar reserva de veículo se necessário
       if (dto.reserva_veiculo) {
-        await prisma.reserva_veiculo.create({
+        const reserva = await prisma.reserva_veiculo.create({
           data: {
             veiculo_id: dto.reserva_veiculo.veiculo_id,
             solicitante_id: id,
@@ -250,6 +367,12 @@ export class ExecucaoOSService {
             km_inicial: dto.reserva_veiculo.km_inicial,
             criado_por_id: usuarioId,
           },
+        });
+
+        // Atualizar OS com o reserva_id para estabelecer a relação
+        await prisma.ordens_servico.update({
+          where: { id },
+          data: { reserva_id: reserva.id },
         });
       }
 
@@ -342,6 +465,7 @@ export class ExecucaoOSService {
           equipamento_id: programacao.equipamento_id,
           anomalia_id: programacao.anomalia_id,
           plano_manutencao_id: programacao.plano_manutencao_id,
+          reserva_id: programacao.reserva_id,
           dados_origem: programacao.dados_origem as any,
           tempo_estimado: programacao.tempo_estimado,
           duracao_estimada: programacao.duracao_estimada,
@@ -812,8 +936,26 @@ export class ExecucaoOSService {
         });
       }
 
-      // TODO: Implement vehicle reservation finalization
-      // Need to query reserva_veiculo separately and finalize if exists
+      // ✅ Finalizar reserva de veículo se existir
+      if (os.reserva_id) {
+        const reservaId = os.reserva_id.trim();
+        const reserva = await prisma.reserva_veiculo.findUnique({
+          where: { id: reservaId },
+        });
+
+        if (reserva && reserva.status === 'ativa') {
+          await prisma.reserva_veiculo.update({
+            where: { id: reservaId },
+            data: {
+              status: 'finalizada',
+              km_final: dto.km_final,
+              observacoes_finalizacao: dto.observacoes_veiculo,
+              data_finalizacao: dataHoraFim,
+              finalizado_por_id: usuarioId,
+            },
+          });
+        }
+      }
 
       // Registrar histórico
       await this.registrarHistorico(
@@ -848,8 +990,25 @@ export class ExecucaoOSService {
         },
       });
 
-      // TODO: Implement vehicle reservation cancellation
-      // Need to query reserva_veiculo separately and cancel if exists
+      // ✅ Cancelar reserva de veículo se existir
+      if (os.reserva_id) {
+        const reservaId = os.reserva_id.trim();
+        const reserva = await prisma.reserva_veiculo.findUnique({
+          where: { id: reservaId },
+        });
+
+        if (reserva && reserva.status === 'ativa') {
+          await prisma.reserva_veiculo.update({
+            where: { id: reservaId },
+            data: {
+              status: 'cancelada',
+              motivo_cancelamento: dto.motivo_cancelamento,
+              data_cancelamento: new Date(),
+              cancelado_por_id: usuarioId,
+            },
+          });
+        }
+      }
 
       // Registrar histórico
       await this.registrarHistorico(
@@ -1040,7 +1199,7 @@ export class ExecucaoOSService {
       proxima_manutencao: os.proxima_manutencao,
       avaliacao_qualidade: os.avaliacao_qualidade,
       observacoes_qualidade: os.observacoes_qualidade,
-      tarefas_os: os.tarefas_os?.map((to: any) => ({
+      tarefas_os: os.tarefas_os?.filter((to: any) => to.tarefa).map((to: any) => ({
         id: to.id,
         os_id: to.os_id,
         tarefa_id: to.tarefa_id,
@@ -1058,6 +1217,50 @@ export class ExecucaoOSService {
           tipo_manutencao: to.tarefa.tipo_manutencao,
         },
       })) || [],
+      materiais: os.materiais?.map((m: any) => ({
+        id: m.id,
+        os_id: m.os_id,
+        descricao: m.descricao,
+        quantidade_planejada: Number(m.quantidade_planejada),
+        quantidade_consumida: m.quantidade_consumida ? Number(m.quantidade_consumida) : null,
+        unidade: m.unidade,
+        custo_unitario: m.custo_unitario ? Number(m.custo_unitario) : null,
+        custo_total: m.custo_total ? Number(m.custo_total) : null,
+        confirmado: m.confirmado,
+        disponivel: m.disponivel,
+        observacoes: m.observacoes,
+        created_at: m.created_at,
+        updated_at: m.updated_at,
+      })) || [],
+      ferramentas: os.ferramentas?.map((f: any) => ({
+        id: f.id,
+        os_id: f.os_id,
+        descricao: f.descricao,
+        quantidade: f.quantidade,
+        confirmada: f.confirmada,
+        disponivel: f.disponivel,
+        utilizada: f.utilizada,
+        condicao_antes: f.condicao_antes,
+        condicao_depois: f.condicao_depois,
+        observacoes: f.observacoes,
+        created_at: f.created_at,
+        updated_at: f.updated_at,
+      })) || [],
+      tecnicos: os.tecnicos?.map((t: any) => ({
+        id: t.id,
+        os_id: t.os_id,
+        nome: t.nome,
+        especialidade: t.especialidade,
+        horas_estimadas: Number(t.horas_estimadas),
+        horas_trabalhadas: t.horas_trabalhadas ? Number(t.horas_trabalhadas) : null,
+        custo_hora: t.custo_hora ? Number(t.custo_hora) : null,
+        custo_total: t.custo_total ? Number(t.custo_total) : null,
+        disponivel: t.disponivel,
+        presente: t.presente,
+        tecnico_id: t.tecnico_id,
+        created_at: t.created_at,
+        updated_at: t.updated_at,
+      })) || [],
       criado_por: os.criado_por,
       criado_por_id: os.criado_por_id,
       programado_por: os.programado_por,
@@ -1067,6 +1270,11 @@ export class ExecucaoOSService {
       aprovado_por: os.aprovado_por,
       aprovado_por_id: os.aprovado_por_id,
       data_aprovacao: os.data_aprovacao,
+      // Relacionamentos expandidos
+      programacao: os.programacao,
+      anomalia: os.anomalia,
+      plano_manutencao: os.plano_manutencao,
+      reserva_veiculo: os.reserva_veiculo,
     };
   }
 
@@ -1168,7 +1376,26 @@ export class ExecucaoOSService {
         created_at: r.created_at,
         updated_at: r.updated_at,
       })) || [],
-      reserva_veiculo: undefined, // TODO: Query separately if needed
+      reserva_veiculo: os.reserva_veiculo ? {
+        id: os.reserva_veiculo.id,
+        veiculo_id: os.reserva_veiculo.veiculo_id,
+        veiculo: os.reserva_veiculo.veiculo,
+        solicitante_id: os.reserva_veiculo.solicitante_id,
+        tipo_solicitante: os.reserva_veiculo.tipo_solicitante,
+        data_inicio: os.reserva_veiculo.data_inicio,
+        data_fim: os.reserva_veiculo.data_fim,
+        hora_inicio: os.reserva_veiculo.hora_inicio,
+        hora_fim: os.reserva_veiculo.hora_fim,
+        responsavel: os.reserva_veiculo.responsavel,
+        responsavel_id: os.reserva_veiculo.responsavel_id,
+        finalidade: os.reserva_veiculo.finalidade,
+        status: os.reserva_veiculo.status,
+        km_inicial: os.reserva_veiculo.km_inicial,
+        km_final: os.reserva_veiculo.km_final,
+        observacoes: os.reserva_veiculo.observacoes,
+        criado_em: os.reserva_veiculo.criado_em,
+        atualizado_em: os.reserva_veiculo.atualizado_em,
+      } : undefined,
       historico: os.historico?.map((h: any) => ({
         id: h.id,
         os_id: h.os_id,

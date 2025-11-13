@@ -297,6 +297,9 @@ export class ProgramacaoResponseDto {
   @ApiPropertyOptional({ description: 'Observações sobre veículo' })
   observacoes_veiculo?: string;
 
+  @ApiPropertyOptional({ description: 'ID da reserva de veículo vinculada' })
+  reserva_id?: string;
+
   // Programação
   @ApiPropertyOptional({ description: 'Data e hora programada' })
   data_hora_programada?: string;

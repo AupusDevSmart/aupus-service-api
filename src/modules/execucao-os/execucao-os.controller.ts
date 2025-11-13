@@ -99,8 +99,8 @@ export class ExecucaoOSController {
     status: HttpStatus.NOT_FOUND,
     description: 'OS não encontrada',
   })
-  async buscarPorId(@Param('id', ParseUUIDPipe) id: string): Promise<OrdemServicoDetalhesResponseDto> {
-    return this.execucaoOSService.buscarPorId(id);
+  async buscarPorId(@Param('id') id: string): Promise<OrdemServicoDetalhesResponseDto> {
+    return this.execucaoOSService.buscarPorId(id.trim());
   }
 
   @Patch(':id/programar')
@@ -118,12 +118,12 @@ export class ExecucaoOSController {
     description: 'OS não está em status adequado para programação',
   })
   async programar(
-    @Param('id', ParseUUIDPipe) id: string,
+    @Param('id') id: string,
     @Body() dto: ProgramarOSDto,
   ): Promise<{ message: string }> {
     // TODO: Obter usuarioId da sessão quando implementar autenticação
     const usuarioId = undefined;
-    await this.execucaoOSService.programar(id, dto, usuarioId);
+    await this.execucaoOSService.programar(id.trim(), dto, usuarioId);
     return { message: 'OS programada com sucesso' };
   }
 
@@ -172,12 +172,12 @@ export class ExecucaoOSController {
     description: 'OS não está programada',
   })
   async iniciar(
-    @Param('id', ParseUUIDPipe) id: string,
+    @Param('id') id: string,
     @Body() dto: IniciarExecucaoDto,
   ): Promise<{ message: string }> {
     // TODO: Obter usuarioId da sessão quando implementar autenticação
     const usuarioId = undefined;
-    await this.execucaoOSService.iniciar(id, dto, usuarioId);
+    await this.execucaoOSService.iniciar(id.trim(), dto, usuarioId);
     return { message: 'Execução iniciada com sucesso' };
   }
 
@@ -196,12 +196,12 @@ export class ExecucaoOSController {
     description: 'OS não está em execução',
   })
   async pausar(
-    @Param('id', ParseUUIDPipe) id: string,
+    @Param('id') id: string,
     @Body() dto: PausarExecucaoDto,
   ): Promise<{ message: string }> {
     // TODO: Obter usuarioId da sessão quando implementar autenticação
     const usuarioId = undefined;
-    await this.execucaoOSService.pausar(id, dto, usuarioId);
+    await this.execucaoOSService.pausar(id.trim(), dto, usuarioId);
     return { message: 'Execução pausada' };
   }
 
@@ -220,12 +220,12 @@ export class ExecucaoOSController {
     description: 'OS não está pausada',
   })
   async retomar(
-    @Param('id', ParseUUIDPipe) id: string,
+    @Param('id') id: string,
     @Body() dto: RetomarExecucaoDto,
   ): Promise<{ message: string }> {
     // TODO: Obter usuarioId da sessão quando implementar autenticação
     const usuarioId = undefined;
-    await this.execucaoOSService.retomar(id, dto, usuarioId);
+    await this.execucaoOSService.retomar(id.trim(), dto, usuarioId);
     return { message: 'Execução retomada' };
   }
 
@@ -240,12 +240,12 @@ export class ExecucaoOSController {
     description: 'Checklist atualizado',
   })
   async atualizarChecklist(
-    @Param('id', ParseUUIDPipe) id: string,
+    @Param('id') id: string,
     @Body() dto: AtualizarChecklistDto,
   ): Promise<{ message: string }> {
     // TODO: Obter usuarioId da sessão quando implementar autenticação
     const usuarioId = undefined;
-    await this.execucaoOSService.atualizarChecklist(id, dto, usuarioId);
+    await this.execucaoOSService.atualizarChecklist(id.trim(), dto, usuarioId);
     return { message: 'Checklist atualizado com sucesso' };
   }
 
@@ -260,12 +260,12 @@ export class ExecucaoOSController {
     description: 'Consumo de materiais registrado',
   })
   async registrarMateriais(
-    @Param('id', ParseUUIDPipe) id: string,
+    @Param('id') id: string,
     @Body() dto: RegistrarMateriaisDto,
   ): Promise<{ message: string }> {
     // TODO: Obter usuarioId da sessão quando implementar autenticação
     const usuarioId = undefined;
-    await this.execucaoOSService.registrarMateriais(id, dto, usuarioId);
+    await this.execucaoOSService.registrarMateriais(id.trim(), dto, usuarioId);
     return { message: 'Consumo de materiais registrado' };
   }
 
@@ -280,12 +280,12 @@ export class ExecucaoOSController {
     description: 'Uso de ferramentas registrado',
   })
   async registrarFerramentas(
-    @Param('id', ParseUUIDPipe) id: string,
+    @Param('id') id: string,
     @Body() dto: RegistrarFerramentasDto,
   ): Promise<{ message: string }> {
     // TODO: Obter usuarioId da sessão quando implementar autenticação
     const usuarioId = undefined;
-    await this.execucaoOSService.registrarFerramentas(id, dto, usuarioId);
+    await this.execucaoOSService.registrarFerramentas(id.trim(), dto, usuarioId);
     return { message: 'Uso de ferramentas registrado' };
   }
 
@@ -299,8 +299,8 @@ export class ExecucaoOSController {
     status: HttpStatus.OK,
     description: 'Lista de tarefas da OS',
   })
-  async listarTarefas(@Param('id', ParseUUIDPipe) id: string) {
-    const os = await this.execucaoOSService.buscarPorId(id);
+  async listarTarefas(@Param('id') id: string) {
+    const os = await this.execucaoOSService.buscarPorId(id.trim());
     return { tarefas: os.tarefas_os };
   }
 
@@ -316,13 +316,13 @@ export class ExecucaoOSController {
     description: 'Tarefa concluída',
   })
   async concluirTarefa(
-    @Param('id', ParseUUIDPipe) id: string,
-    @Param('tarefaId', ParseUUIDPipe) tarefaId: string,
+    @Param('id') id: string,
+    @Param('tarefaId') tarefaId: string,
     @Body() dto: ConcluirTarefaDto,
   ): Promise<{ message: string }> {
     // TODO: Obter usuarioId da sessão quando implementar autenticação
     const usuarioId = undefined;
-    await this.execucaoOSService.concluirTarefa(id, tarefaId, dto, usuarioId);
+    await this.execucaoOSService.concluirTarefa(id.trim(), tarefaId.trim(), dto, usuarioId);
     return { message: 'Tarefa concluída com sucesso' };
   }
 
@@ -338,13 +338,13 @@ export class ExecucaoOSController {
     description: 'Tarefa cancelada',
   })
   async cancelarTarefa(
-    @Param('id', ParseUUIDPipe) id: string,
-    @Param('tarefaId', ParseUUIDPipe) tarefaId: string,
+    @Param('id') id: string,
+    @Param('tarefaId') tarefaId: string,
     @Body() dto: CancelarTarefaDto,
   ): Promise<{ message: string }> {
     // TODO: Obter usuarioId da sessão quando implementar autenticação
     const usuarioId = undefined;
-    await this.execucaoOSService.cancelarTarefa(id, tarefaId, dto, usuarioId);
+    await this.execucaoOSService.cancelarTarefa(id.trim(), tarefaId.trim(), dto, usuarioId);
     return { message: 'Tarefa cancelada' };
   }
 
@@ -362,7 +362,7 @@ export class ExecucaoOSController {
     type: AnexoOSResponseDto,
   })
   async adicionarAnexo(
-    @Param('id', ParseUUIDPipe) id: string,
+    @Param('id') id: string,
     @UploadedFile() file: any,
     @Body() dto: AdicionarAnexoDto,
     @Query('tipo') tipo: TipoAnexoOS,
@@ -370,7 +370,7 @@ export class ExecucaoOSController {
     // TODO: Obter usuarioId da sessão quando implementar autenticação
     const usuarioId = undefined;
     return this.anexosOSService.uploadAnexo(
-      id,
+      id.trim(),
       file,
       tipo,
       dto.descricao,
@@ -390,8 +390,8 @@ export class ExecucaoOSController {
     description: 'Lista de anexos da OS',
     type: [AnexoOSResponseDto],
   })
-  async listarAnexos(@Param('id', ParseUUIDPipe) id: string): Promise<AnexoOSResponseDto[]> {
-    return this.anexosOSService.listarAnexosOS(id);
+  async listarAnexos(@Param('id') id: string): Promise<AnexoOSResponseDto[]> {
+    return this.anexosOSService.listarAnexosOS(id.trim());
   }
 
   @Get(':id/anexos/:anexoId')
@@ -407,10 +407,10 @@ export class ExecucaoOSController {
     type: AnexoOSResponseDto,
   })
   async obterAnexo(
-    @Param('id', ParseUUIDPipe) id: string,
-    @Param('anexoId', ParseUUIDPipe) anexoId: string,
+    @Param('id') id: string,
+    @Param('anexoId') anexoId: string,
   ): Promise<AnexoOSResponseDto> {
-    return this.anexosOSService.buscarAnexo(anexoId);
+    return this.anexosOSService.buscarAnexo(anexoId.trim());
   }
 
   @Get(':id/anexos/:anexoId/download')
@@ -425,12 +425,12 @@ export class ExecucaoOSController {
     description: 'Arquivo do anexo',
   })
   async downloadAnexo(
-    @Param('id', ParseUUIDPipe) id: string,
-    @Param('anexoId', ParseUUIDPipe) anexoId: string,
+    @Param('id') id: string,
+    @Param('anexoId') anexoId: string,
     @Res({ passthrough: true }) res: Response,
   ): Promise<StreamableFile> {
-    const anexo = await this.anexosOSService.buscarAnexo(anexoId);
-    const caminhoArquivo = await this.anexosOSService.obterCaminhoArquivo(anexoId);
+    const anexo = await this.anexosOSService.buscarAnexo(anexoId.trim());
+    const caminhoArquivo = await this.anexosOSService.obterCaminhoArquivo(anexoId.trim());
 
     const file = fs.createReadStream(caminhoArquivo);
 
@@ -454,12 +454,12 @@ export class ExecucaoOSController {
     description: 'Anexo removido',
   })
   async removerAnexo(
-    @Param('id', ParseUUIDPipe) id: string,
-    @Param('anexoId', ParseUUIDPipe) anexoId: string,
+    @Param('id') id: string,
+    @Param('anexoId') anexoId: string,
   ): Promise<{ message: string }> {
     // TODO: Obter usuarioId da sessão quando implementar autenticação
     const usuarioId = undefined;
-    await this.anexosOSService.removerAnexo(anexoId, usuarioId);
+    await this.anexosOSService.removerAnexo(anexoId.trim(), usuarioId);
     return { message: 'Anexo removido com sucesso' };
   }
 
@@ -478,12 +478,12 @@ export class ExecucaoOSController {
     description: 'OS não pode ser finalizada no status atual',
   })
   async finalizar(
-    @Param('id', ParseUUIDPipe) id: string,
+    @Param('id') id: string,
     @Body() dto: FinalizarOSDto,
   ): Promise<{ message: string }> {
     // TODO: Obter usuarioId da sessão quando implementar autenticação
     const usuarioId = undefined;
-    await this.execucaoOSService.finalizar(id, dto, usuarioId);
+    await this.execucaoOSService.finalizar(id.trim(), dto, usuarioId);
     return { message: 'OS finalizada com sucesso' };
   }
 
@@ -502,12 +502,12 @@ export class ExecucaoOSController {
     description: 'OS não pode ser cancelada',
   })
   async cancelar(
-    @Param('id', ParseUUIDPipe) id: string,
+    @Param('id') id: string,
     @Body() dto: CancelarOSDto,
   ): Promise<{ message: string }> {
     // TODO: Obter usuarioId da sessão quando implementar autenticação
     const usuarioId = undefined;
-    await this.execucaoOSService.cancelar(id, dto, usuarioId);
+    await this.execucaoOSService.cancelar(id.trim(), dto, usuarioId);
     return { message: 'OS cancelada' };
   }
 
@@ -521,9 +521,9 @@ export class ExecucaoOSController {
     status: HttpStatus.OK,
     description: 'Relatório gerado',
   })
-  async gerarRelatorio(@Param('id', ParseUUIDPipe) id: string) {
+  async gerarRelatorio(@Param('id') id: string) {
     // TODO: Implementar geração de relatório PDF
-    const os = await this.execucaoOSService.buscarPorId(id);
-    return { message: 'Relatório em desenvolvimento', os_id: id };
+    const os = await this.execucaoOSService.buscarPorId(id.trim());
+    return { message: 'Relatório em desenvolvimento', os_id: id.trim() };
   }
 }

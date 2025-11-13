@@ -1608,6 +1608,7 @@ model reserva_veiculo {
   observacoes             String?
   veiculo                 veiculo           @relation(fields: [veiculo_id], references: [id], onDelete: Cascade)
   programacoes_os         programacoes_os[]
+  ordens_servico          ordens_servico[]
 
   @@index([veiculo_id])
   @@index([solicitante_id])
@@ -1792,6 +1793,7 @@ model ordens_servico {
   equipamento_id          String?                   @map("equipamento_id") @db.Char(26)
   anomalia_id             String?                   @map("anomalia_id") @db.Char(26)
   plano_manutencao_id     String?                   @map("plano_manutencao_id") @db.Char(26)
+  reserva_id              String?                   @map("reserva_id") @db.VarChar(26)
   dados_origem            Json?                     @map("dados_origem")
   tempo_estimado          Decimal                   @map("tempo_estimado") @db.Decimal(5, 2)
   duracao_estimada        Decimal                   @map("duracao_estimada") @db.Decimal(5, 2)
@@ -1833,6 +1835,7 @@ model ordens_servico {
   plano_manutencao        planos_manutencao?        @relation(fields: [plano_manutencao_id], references: [id])
   planta                  plantas?                  @relation(fields: [planta_id], references: [id])
   programacao             programacoes_os           @relation(fields: [programacao_id], references: [id])
+  reserva_veiculo         reserva_veiculo?          @relation(fields: [reserva_id], references: [id])
   registros_tempo         registros_tempo_os[]
   tarefas_os              tarefas_os[]
   tecnicos                tecnicos_os[]
@@ -1845,6 +1848,7 @@ model ordens_servico {
   @@index([data_hora_programada])
   @@index([planta_id])
   @@index([equipamento_id])
+  @@index([reserva_id])
   @@index([deletado_em])
   @@map("ordens_servico")
 }
@@ -1870,7 +1874,7 @@ model tarefas_programacao_os {
 model tarefas_os {
   id             String         @id @default(cuid())
   os_id          String         @map("os_id")
-  tarefa_id      String         @map("tarefa_id") @db.Char(26)
+  tarefa_id      String?        @map("tarefa_id") @db.Char(26)
   ordem          Int            @default(0)
   status         String         @default("PENDENTE") @db.VarChar(20)
   data_conclusao DateTime?      @map("data_conclusao")
@@ -1879,9 +1883,8 @@ model tarefas_os {
   created_at     DateTime       @default(now()) @map("created_at")
   updated_at     DateTime       @updatedAt @map("updated_at")
   ordem_servico  ordens_servico @relation(fields: [os_id], references: [id], onDelete: Cascade)
-  tarefa         tarefas        @relation(fields: [tarefa_id], references: [id])
+  tarefa         tarefas?       @relation(fields: [tarefa_id], references: [id])
 
-  @@unique([os_id, tarefa_id])
   @@index([os_id])
   @@index([tarefa_id])
   @@map("tarefas_os")
