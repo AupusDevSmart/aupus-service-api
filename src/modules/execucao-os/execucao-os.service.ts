@@ -1177,6 +1177,7 @@ export class ExecucaoOSService {
       equipamento_id: os.equipamento_id,
       anomalia_id: os.anomalia_id,
       plano_manutencao_id: os.plano_manutencao_id,
+      reserva_id: os.reserva_id,
       dados_origem: os.dados_origem,
       tempo_estimado: Number(os.tempo_estimado),
       duracao_estimada: Number(os.duracao_estimada),

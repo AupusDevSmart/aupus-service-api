@@ -448,6 +448,9 @@ export class OrdemServicoResponseDto {
   @ApiPropertyOptional({ description: 'ID do plano de manutenção' })
   plano_manutencao_id?: string;
 
+  @ApiPropertyOptional({ description: 'ID da reserva de veículo' })
+  reserva_id?: string;
+
   @ApiPropertyOptional({ description: 'Dados da origem' })
   dados_origem?: any;
 
