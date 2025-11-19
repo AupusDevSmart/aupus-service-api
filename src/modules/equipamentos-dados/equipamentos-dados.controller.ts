@@ -88,7 +88,11 @@ export class EquipamentosDadosController {
   /**
    * GET /equipamentos-dados/:id/custos-energia
    * Retorna cálculo de custos de energia para um equipamento M160
-   * Suporta filtros de período (dia ou mês)
+   *
+   * ✅ ATUALIZADO: Suporta 3 modos de filtro:
+   * 1. periodo=dia&data=YYYY-MM-DD (dia completo)
+   * 2. periodo=mes&data=YYYY-MM (mês completo)
+   * 3. periodo=custom&timestamp_inicio=ISO8601&timestamp_fim=ISO8601 (range customizado)
    */
   @Get(':id/custos-energia')
   async getCustosEnergia(
@@ -96,7 +100,7 @@ export class EquipamentosDadosController {
     @Query() query: CustosEnergiaQueryDto,
   ) {
     this.logger.log(
-      `GET /equipamentos-dados/${id}/custos-energia?periodo=${query.periodo}&data=${query.data || 'atual'}`,
+      `GET /equipamentos-dados/${id}/custos-energia?periodo=${query.periodo || 'custom'}&data=${query.data || ''}&timestamp_inicio=${query.timestamp_inicio || ''}&timestamp_fim=${query.timestamp_fim || ''}`,
     );
 
     // Determinar range de datas com base no período
@@ -115,11 +119,38 @@ export class EquipamentosDadosController {
 
   /**
    * Calcula range de datas com base no período solicitado
+   * ✅ ATUALIZADO: Suporta período customizado com timestamps
    */
   private calcularRangeDatas(query: CustosEnergiaQueryDto): {
     dataInicio: Date;
     dataFim: Date;
   } {
+    // MODO 1: Período customizado com timestamps
+    if (query.periodo === PeriodoTipo.CUSTOM || (query.timestamp_inicio && query.timestamp_fim)) {
+      if (!query.timestamp_inicio || !query.timestamp_fim) {
+        throw new Error(
+          'Para período customizado, timestamp_inicio e timestamp_fim são obrigatórios',
+        );
+      }
+
+      const dataInicio = new Date(query.timestamp_inicio);
+      const dataFim = new Date(query.timestamp_fim);
+
+      // Validar que início é antes do fim
+      if (dataInicio >= dataFim) {
+        throw new Error('timestamp_inicio deve ser anterior a timestamp_fim');
+      }
+
+      // Validar que não é um período muito longo (máximo 1 ano)
+      const diffDias = (dataFim.getTime() - dataInicio.getTime()) / (1000 * 60 * 60 * 24);
+      if (diffDias > 366) {
+        throw new Error('Período máximo permitido: 1 ano (366 dias)');
+      }
+
+      return { dataInicio, dataFim };
+    }
+
+    // MODO 2 e 3: Dia ou Mês com data de referência
     const dataRef = query.data ? new Date(query.data) : new Date();
 
     if (query.periodo === PeriodoTipo.DIA) {
@@ -131,7 +162,7 @@ export class EquipamentosDadosController {
       dataFim.setHours(23, 59, 59, 999);
 
       return { dataInicio, dataFim };
-    } else {
+    } else if (query.periodo === PeriodoTipo.MES) {
       // Mês completo: primeiro dia 00:00:00 até último dia 23:59:59
       const dataInicio = new Date(dataRef.getFullYear(), dataRef.getMonth(), 1, 0, 0, 0, 0);
       const dataFim = new Date(
@@ -146,6 +177,20 @@ export class EquipamentosDadosController {
 
       return { dataInicio, dataFim };
     }
+
+    // Default: mês atual (backward compatibility)
+    const dataInicio = new Date(new Date().getFullYear(), new Date().getMonth(), 1, 0, 0, 0, 0);
+    const dataFim = new Date(
+      new Date().getFullYear(),
+      new Date().getMonth() + 1,
+      0,
+      23,
+      59,
+      59,
+      999,
+    );
+
+    return { dataInicio, dataFim };
   }
 
   /**
@@ -217,17 +262,17 @@ export class EquipamentosDadosController {
           tarifa_tusd: tarifas.tusd_p,
           tarifa_te: tarifas.te_p,
           tarifa_total: tarifas.tusd_p + tarifas.te_p,
-          horario_inicio: '17:00',
-          horario_fim: '20:00',
-          dias_aplicacao: 'Segunda a Sexta',
+          horario_inicio: '18:00', // ✅ ATUALIZADO de 17:00 para 18:00
+          horario_fim: '21:00',    // ✅ ATUALIZADO de 20:00 para 21:00
+          dias_aplicacao: 'Todos', // ✅ ATUALIZADO: ponta agora é todos os dias
         },
         {
           tipo_horario: 'FORA_PONTA',
           tarifa_tusd: tarifas.tusd_fp,
           tarifa_te: tarifas.te_fp,
           tarifa_total: tarifas.tusd_fp + tarifas.te_fp,
-          horario_inicio: null,
-          horario_fim: null,
+          horario_inicio: '06:00', // ✅ ATUALIZADO: FP tem 2 períodos: 06:00-18:00 e 21:00-21:30
+          horario_fim: '18:00',
           dias_aplicacao: 'Todos',
         },
         {
@@ -235,8 +280,8 @@ export class EquipamentosDadosController {
           tarifa_tusd: tarifas.tusd_fp,
           tarifa_te: tarifas.te_fp,
           tarifa_total: tarifas.tusd_fp + tarifas.te_fp,
-          horario_inicio: null,
-          horario_fim: null,
+          horario_inicio: '21:30', // ✅ ATUALIZADO: HR inicia às 21:30
+          horario_fim: '06:00',
           dias_aplicacao: 'Todos',
           observacao: 'Na tarifa Verde: HR = FP',
         },

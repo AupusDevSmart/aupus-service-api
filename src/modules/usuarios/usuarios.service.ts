@@ -151,9 +151,9 @@ export class UsuariosService {
   async findOne(id: string): Promise<UsuarioResponseDto> {
     try {
       const usuario = await this.prisma.usuarios.findFirst({
-        where: { 
-          id, 
-          deleted_at: null 
+        where: {
+          id,
+          deleted_at: null
         }
       });
 
@@ -168,6 +168,23 @@ export class UsuariosService {
       }
       console.error('Erro ao buscar usuário:', error);
       throw new BadRequestException('Erro ao buscar usuário');
+    }
+  }
+
+  /**
+   * Busca usuário por email (usado para autenticação)
+   * Retorna o usuário com a senha para validação
+   */
+  async findByEmail(email: string) {
+    try {
+      const usuario = await this.prisma.usuarios.findUnique({
+        where: { email },
+      });
+
+      return usuario; // Retorna null se não encontrar
+    } catch (error) {
+      console.error('Erro ao buscar usuário por email:', error);
+      throw new BadRequestException('Erro ao buscar usuário por email');
     }
   }
 
@@ -431,9 +448,9 @@ export class UsuariosService {
   async resetPassword(id: string, data: ResetPasswordDto) {
     try {
       const usuario = await this.prisma.usuarios.findFirst({
-        where: { 
-          id, 
-          deleted_at: null 
+        where: {
+          id,
+          deleted_at: null
         },
       });
 
@@ -451,9 +468,9 @@ export class UsuariosService {
         },
       });
 
-      return { 
+      return {
         message: 'Senha resetada com sucesso',
-        senhaTemporaria: data.novaSenha 
+        senhaTemporaria: data.novaSenha
       };
     } catch (error) {
       if (error instanceof NotFoundException) {
@@ -461,6 +478,55 @@ export class UsuariosService {
       }
       console.error('Erro ao resetar senha:', error);
       throw new BadRequestException('Erro ao resetar senha');
+    }
+  }
+
+  async updateAvatar(userId: string, filename: string) {
+    try {
+      const usuario = await this.prisma.usuarios.findFirst({
+        where: {
+          id: userId,
+          deleted_at: null
+        },
+      });
+
+      if (!usuario) {
+        throw new NotFoundException('Usuário não encontrado');
+      }
+
+      // Se o usuário já tem um avatar, deletar o arquivo antigo
+      if (usuario.avatar_url) {
+        try {
+          const fs = require('fs').promises;
+          const path = require('path');
+          const oldFilePath = path.join(__dirname, '../../..', usuario.avatar_url);
+          await fs.unlink(oldFilePath).catch(err => {
+            console.log('Arquivo antigo não encontrado ou já removido:', err.message);
+          });
+        } catch (error) {
+          console.log('Erro ao deletar avatar antigo:', error);
+          // Continua mesmo se falhar ao deletar o arquivo antigo
+        }
+      }
+
+      const imageUrl = `/uploads/avatars/${filename}`;
+
+      await this.prisma.usuarios.update({
+        where: { id: userId },
+        data: {
+          avatar_url: imageUrl,
+          updated_at: new Date(),
+        },
+      });
+
+      console.log(`✅ Avatar atualizado para usuário ${userId}: ${imageUrl}`);
+      return { imageUrl };
+    } catch (error) {
+      if (error instanceof NotFoundException) {
+        throw error;
+      }
+      console.error('Erro ao atualizar avatar:', error);
+      throw new BadRequestException('Erro ao atualizar avatar');
     }
   }
 
@@ -1459,6 +1525,7 @@ export class UsuariosService {
         endereco: usuario.endereco,
         cep: usuario.cep,
         manager_id: usuario.manager_id,
+        avatar_url: usuario.avatar_url, // ← ADICIONADO
         all_permissions: [], // Não buscar permissions na listagem por performance
         roles: [], // Não buscar roles na listagem por performance
         created_at: usuario.created_at,
@@ -1482,6 +1549,7 @@ export class UsuariosService {
         endereco: usuario.endereco,
         cep: usuario.cep,
         manager_id: usuario.manager_id,
+        avatar_url: usuario.avatar_url, // ← ADICIONADO
         all_permissions: [],
         roles: [],
         created_at: usuario.created_at,
@@ -1520,6 +1588,7 @@ export class UsuariosService {
         endereco: usuario.endereco,
         cep: usuario.cep,
         manager_id: usuario.manager_id,
+        avatar_url: usuario.avatar_url, // ← ADICIONADO
         all_permissions: allPermissions, // Array de objetos com id, name, guard_name, source
         roles: userPermissions.role ? [userPermissions.role.name] : [],
         role_details: userPermissions.role || undefined,
@@ -1544,6 +1613,7 @@ export class UsuariosService {
         endereco: usuario.endereco,
         cep: usuario.cep,
         manager_id: usuario.manager_id,
+        avatar_url: usuario.avatar_url, // ← ADICIONADO
         all_permissions: [], // Array vazio em caso de erro
         roles: [],
         role_details: undefined,

@@ -3,6 +3,8 @@ import { EquipamentosDadosController } from './equipamentos-dados.controller';
 import { EquipamentosDadosService } from './equipamentos-dados.service';
 import { ClassificacaoHorariosService } from './services/classificacao-horarios.service';
 import { CalculoCustosService } from './services/calculo-custos.service';
+import { FeriadosNacionaisService } from './services/feriados-nacionais.service';
+import { MqttIngestionService } from './services/mqtt-ingestion.service';
 import { PrismaModule } from '../../shared/prisma/prisma.module';
 
 @Module({
@@ -12,7 +14,9 @@ import { PrismaModule } from '../../shared/prisma/prisma.module';
     EquipamentosDadosService,
     ClassificacaoHorariosService,
     CalculoCustosService,
+    FeriadosNacionaisService,
+    MqttIngestionService, // ✅ NOVO
   ],
-  exports: [EquipamentosDadosService],
+  exports: [EquipamentosDadosService, MqttIngestionService], // ✅ Exportar para uso em outros módulos
 })
 export class EquipamentosDadosModule {}

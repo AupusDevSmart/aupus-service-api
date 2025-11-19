@@ -1,6 +1,7 @@
-import { Injectable, OnModuleInit, OnModuleDestroy } from '@nestjs/common';
+import { Injectable, OnModuleInit, OnModuleDestroy, Inject, forwardRef } from '@nestjs/common';
 import * as mqtt from 'mqtt';
 import { PrismaService } from '../prisma/prisma.service';
+import { MqttIngestionService } from '../../modules/equipamentos-dados/services/mqtt-ingestion.service';
 import { EventEmitter } from 'events';
 import Ajv from 'ajv';
 import addFormats from 'ajv-formats';
@@ -26,7 +27,11 @@ export class MqttService extends EventEmitter implements OnModuleInit, OnModuleD
   private bufferInterval = 60000; // 1 minuto em ms
   private flushTimer: NodeJS.Timeout;
 
-  constructor(private readonly prisma: PrismaService) {
+  constructor(
+    private readonly prisma: PrismaService,
+    @Inject(forwardRef(() => MqttIngestionService))
+    private readonly mqttIngestionService: MqttIngestionService,
+  ) {
     super();
     // Inicializar Ajv com formatos adicionais
     this.ajv = new Ajv({ allErrors: true });
@@ -284,8 +289,32 @@ export class MqttService extends EventEmitter implements OnModuleInit, OnModuleD
         timestampDados = new Date();
       }
 
-      // Adicionar ao buffer ao invés de salvar imediatamente
-      this.addToBuffer(equipamentoId, timestampDados, dados, qualidade);
+      // ✅ NOVO: Se é M-160, processar com MqttIngestionService para cálculo de PHF
+      const codigo = equipamento.tipo_equipamento_rel?.codigo;
+      const isM160 = codigo === 'M-160' || codigo === 'M160' || codigo === 'METER_M160';
+
+      if (isM160 && dados.Dados?.phf !== undefined) {
+        try {
+          // Processar leitura M-160 com cálculo de PHF e classificação de horário
+          await this.mqttIngestionService.processarLeituraMQTT(
+            equipamentoId,
+            dados,
+            timestampDados,
+          );
+
+          // console.log(`✅ [M-160] Leitura processada com PHF: ${dados.Dados.phf} kWh`);
+
+          // ⚠️ NÃO adicionar M-160 ao buffer para evitar conflito de UNIQUE constraint
+          // O MqttIngestionService já salvou a leitura individual
+        } catch (error) {
+          console.error(`❌ [M-160] Erro ao processar PHF:`, error);
+          // Em caso de erro, continuar com fluxo normal de buffer
+          this.addToBuffer(equipamentoId, timestampDados, dados, qualidade);
+        }
+      } else {
+        // Adicionar ao buffer para outros equipamentos (inversores, etc)
+        this.addToBuffer(equipamentoId, timestampDados, dados, qualidade);
+      }
 
       // Emitir evento para WebSocket (com dados em tempo real)
       this.emit('equipamento_dados', {

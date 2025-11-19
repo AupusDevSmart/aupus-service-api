@@ -58,7 +58,10 @@ export class UsuarioResponseDto {
   @ApiPropertyOptional({ description: 'ID do gerente responsável' })
   manager_id?: string;
 
-  @ApiProperty({ 
+  @ApiPropertyOptional({ description: 'URL da foto de perfil do usuário' })
+  avatar_url?: string;
+
+  @ApiProperty({
     description: 'Permissões do usuário (objetos completos)',
     type: 'array',
     example: [

@@ -1,4 +1,4 @@
-// src/app.module.ts - ATUALIZADO COM USUARIOS MODULE
+// src/app.module.ts - ATUALIZADO COM USUARIOS MODULE E AUTH MODULE
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { AppController } from './app.controller';
@@ -6,6 +6,7 @@ import { AppService } from './app.service';
 import { PrismaModule } from './shared/prisma/prisma.module';
 import { MqttModule } from './shared/mqtt/mqtt.module';
 import { WebSocketModule } from './websocket/websocket.module';
+import { AuthModule } from './modules/auth/auth.module';
 import { UsuariosModule } from './modules/usuarios/usuarios.module';
 import { RolesModule } from './modules/roles/roles.module';
 import { PermissionsModule } from './modules/permissions/permissions.module';
@@ -24,6 +25,7 @@ import { DiagramasModule } from './modules/diagramas/diagramas.module';
 import { TiposEquipamentosModule } from './modules/tipos-equipamentos/tipos-equipamentos.module';
 import { ConcessionariasModule } from './modules/concessionarias/concessionarias.module';
 import { EquipamentosDadosModule } from './modules/equipamentos-dados/equipamentos-dados.module';
+import { UploadsModule } from './modules/uploads/uploads.module';
 
 @Module({
   imports: [
@@ -37,8 +39,11 @@ import { EquipamentosDadosModule } from './modules/equipamentos-dados/equipament
     PrismaModule,
 
     // ✅ MQTT e WebSocket para dados em tempo real
-    MqttModule,  
+    MqttModule,
     WebSocketModule,
+
+    // ✅ Autenticação
+    AuthModule,
 
     // ✅ Módulos de negócio
     UsuariosModule,
@@ -59,6 +64,7 @@ import { EquipamentosDadosModule } from './modules/equipamentos-dados/equipament
     ExecucaoOSModule,
     ConcessionariasModule,
     EquipamentosDadosModule,
+    UploadsModule, // Módulo para servir arquivos de upload
   ],
   controllers: [AppController],
   providers: [AppService],

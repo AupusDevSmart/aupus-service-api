@@ -153,6 +153,7 @@ export class CalculoCustosService {
 
   /**
    * Busca leituras MQTT do período
+   * ✅ ATUALIZADO: Usa novos campos energia_kwh e potencia_ativa_kw
    */
   private async buscarLeiturasPeriodo(
     equipamentoId: string,
@@ -166,9 +167,11 @@ export class CalculoCustosService {
           gte: dataInicio,
           lte: dataFim,
         },
-        // Apenas dados agregados (1 minuto)
-        num_leituras: {
-          not: null,
+        energia_kwh: {
+          not: null, // ✅ Apenas leituras com energia calculada
+        },
+        qualidade: {
+          in: ['OK', 'SUSPEITO'], // ✅ Excluir PRIMEIRA_LEITURA e PHF_RESET
         },
       },
       orderBy: {
@@ -176,23 +179,26 @@ export class CalculoCustosService {
       },
       select: {
         timestamp_dados: true,
-        dados: true,
+        energia_kwh: true,          // ✅ NOVO campo
+        potencia_ativa_kw: true,    // ✅ NOVO campo
+        dados: true,                 // Fallback para compatibilidade
       },
     });
 
     return dados.map((d) => {
-      const dadosJson = d.dados as any;
+      // Priorizar novos campos calculados
+      const energia_kwh = d.energia_kwh
+        ? parseFloat(d.energia_kwh.toString())
+        : 0;
 
-      // Suportar tanto estrutura nova quanto legada
-      const energia_kwh = dadosJson.energy?.period_energy_kwh || dadosJson.energia_kwh || 0;
-      const potencia_kw = dadosJson.power?.active_total
-        ? dadosJson.power.active_total / 1000 // Converter W para kW
-        : dadosJson.power_avg || 0;
+      const potencia_kw = d.potencia_ativa_kw
+        ? parseFloat(d.potencia_ativa_kw.toString())
+        : 0;
 
       return {
         timestamp: d.timestamp_dados,
-        energia_kwh: typeof energia_kwh === 'number' ? energia_kwh : parseFloat(energia_kwh),
-        potencia_kw: typeof potencia_kw === 'number' ? potencia_kw : parseFloat(potencia_kw),
+        energia_kwh,
+        potencia_kw,
       };
     });
   }

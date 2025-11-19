@@ -6,8 +6,17 @@ import { PermissionResponseDto } from './dto';
 export class PermissionsService {
   constructor(private prisma: PrismaService) {}
 
+  /**
+   * Retorna todas as permissões MODERNAS (padrão recurso.acao)
+   * Filtra automaticamente permissões legadas (sem ponto)
+   */
   async findAll(): Promise<PermissionResponseDto[]> {
     const permissions = await this.prisma.permissions.findMany({
+      where: {
+        name: {
+          contains: '.' // Apenas permissões modernas (recurso.acao)
+        }
+      },
       orderBy: {
         name: 'asc'
       }
@@ -16,6 +25,8 @@ export class PermissionsService {
     return permissions.map(permission => ({
       id: Number(permission.id),
       name: permission.name,
+      display_name: permission.display_name || permission.name,
+      description: permission.description || '',
       guard_name: permission.guard_name,
       created_at: permission.created_at,
       updated_at: permission.updated_at
@@ -34,63 +45,104 @@ export class PermissionsService {
     return {
       id: Number(permission.id),
       name: permission.name,
+      display_name: permission.display_name || permission.name,
+      description: permission.description || '',
       guard_name: permission.guard_name,
       created_at: permission.created_at,
       updated_at: permission.updated_at
     };
   }
 
+  /**
+   * Retorna permissões modernas agrupadas por categoria
+   * Categorização baseada no recurso (parte antes do ponto)
+   */
   async findGrouped(): Promise<{ [category: string]: PermissionResponseDto[] }> {
     const permissions = await this.findAll();
-    
-    // Group permissions by category based on the permission names
-    const grouped: { [category: string]: PermissionResponseDto[] } = {};
-    
-    // Define categories based on your frontend structure
-    const categories = {
-      'Dashboard': ['Dashboard'],
-      'Monitoramento': ['MonitoramentoConsumo', 'MonitoramentoClientes'],
-      'Gestão de Energia': ['GeracaoEnergia', 'MinhasUsinas', 'Equipamentos', 'Plantas'],
-      'Comercial': ['GestaoOportunidades', 'Oportunidades', 'Prospeccao', 'ProspeccaoListagem'],
-      'Financeiro': ['Financeiro'],
-      'Clube': ['ClubeAupus', 'AreaDoProprietario', 'AreaDoAssociado'],
-      'Gestão': ['Usuarios', 'Organizacoes', 'Associados', 'Proprietarios'],
-      'Unidades': ['UnidadesConsumidoras'],
-      'Sistema': ['Configuracoes', 'Documentos']
+
+    // Mapeamento de recursos para categorias
+    const resourceToCategory: { [resource: string]: string } = {
+      // Dashboard
+      'dashboard': 'Dashboard',
+
+      // Gestão
+      'usuarios': 'Gestão',
+      'organizacoes': 'Gestão',
+      'equipe': 'Gestão',
+
+      // Gestão de Energia
+      'plantas': 'Gestão de Energia',
+      'unidades': 'Gestão de Energia',
+      'equipamentos': 'Gestão de Energia',
+      'ugs': 'Gestão de Energia',
+
+      // Monitoramento
+      'monitoramento': 'Monitoramento',
+
+      // Supervisório
+      'scada': 'Supervisório',
+      'supervisorio': 'Supervisório',
+      'controle': 'Supervisório',
+
+      // Comercial
+      'prospeccao': 'Comercial',
+      'prospec': 'Comercial',
+      'oportunidades': 'Comercial',
+
+      // Financeiro
+      'financeiro': 'Financeiro',
+
+      // Clube
+      'clube': 'Clube',
+
+      // Sistema
+      'concessionarias': 'Sistema',
+      'configuracoes': 'Sistema',
+      'documentos': 'Sistema',
+      'relatorios': 'Sistema',
+
+      // Administração
+      'admin': 'Administração',
     };
 
-    // Initialize categories
-    Object.keys(categories).forEach(category => {
-      grouped[category] = [];
-    });
+    const grouped: { [category: string]: PermissionResponseDto[] } = {};
 
-    // Group permissions
     permissions.forEach(permission => {
-      let found = false;
-      for (const [category, permissionNames] of Object.entries(categories)) {
-        if (permissionNames.includes(permission.name)) {
-          grouped[category].push(permission);
-          found = true;
-          break;
-        }
+      // Extrair recurso (parte antes do ponto)
+      const [resource] = permission.name.split('.');
+
+      // Determinar categoria
+      const category = resourceToCategory[resource] || 'Outros';
+
+      // Adicionar à categoria
+      if (!grouped[category]) {
+        grouped[category] = [];
       }
-      
-      // If not found in any category, add to "Outros"
-      if (!found) {
-        if (!grouped['Outros']) {
-          grouped['Outros'] = [];
-        }
-        grouped['Outros'].push(permission);
+      grouped[category].push(permission);
+    });
+
+    // Ordenar categorias (ordem fixa)
+    const categoryOrder = [
+      'Dashboard',
+      'Gestão',
+      'Gestão de Energia',
+      'Monitoramento',
+      'Supervisório',
+      'Comercial',
+      'Financeiro',
+      'Clube',
+      'Sistema',
+      'Administração',
+      'Outros'
+    ];
+
+    const orderedGrouped: { [category: string]: PermissionResponseDto[] } = {};
+    categoryOrder.forEach(category => {
+      if (grouped[category] && grouped[category].length > 0) {
+        orderedGrouped[category] = grouped[category];
       }
     });
 
-    // Remove empty categories
-    Object.keys(grouped).forEach(category => {
-      if (grouped[category].length === 0) {
-        delete grouped[category];
-      }
-    });
-
-    return grouped;
+    return orderedGrouped;
   }
 }

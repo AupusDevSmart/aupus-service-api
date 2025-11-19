@@ -10,13 +10,19 @@ import {
   Query,
   HttpCode,
   HttpStatus,
+  UploadedFile,
+  UseInterceptors,
 } from '@nestjs/common';
 import {
   ApiTags,
   ApiOperation,
   ApiResponse,
   ApiParam,
+  ApiConsumes,
 } from '@nestjs/swagger';
+import { FileInterceptor } from '@nestjs/platform-express';
+import { diskStorage } from 'multer';
+import { extname } from 'path';
 import { UsuariosService } from './usuarios.service';
 import { 
   CreateUsuarioDto, 
@@ -145,7 +151,52 @@ export class UsuariosController {
   ) {
     return this.usuariosService.resetPassword(id, resetPasswordDto);
   }
-  
+
+  @Post(':id/upload-avatar')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Upload de foto de perfil do usuário' })
+  @ApiConsumes('multipart/form-data')
+  @ApiParam({ name: 'id', description: 'ID do usuário' })
+  @ApiResponse({
+    status: 200,
+    description: 'Avatar atualizado com sucesso',
+    schema: {
+      type: 'object',
+      properties: {
+        imageUrl: { type: 'string' }
+      }
+    }
+  })
+  @ApiResponse({ status: 400, description: 'Arquivo inválido' })
+  @ApiResponse({ status: 404, description: 'Usuário não encontrado' })
+  @UseInterceptors(
+    FileInterceptor('file', {
+      storage: diskStorage({
+        destination: './uploads/avatars',
+        filename: (req, file, callback) => {
+          const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9);
+          const ext = extname(file.originalname);
+          callback(null, `avatar-${uniqueSuffix}${ext}`);
+        },
+      }),
+      fileFilter: (req, file, callback) => {
+        if (!file.mimetype.match(/\/(jpg|jpeg|png|gif)$/)) {
+          return callback(new Error('Apenas imagens são permitidas!'), false);
+        }
+        callback(null, true);
+      },
+      limits: {
+        fileSize: 2 * 1024 * 1024, // 2MB
+      },
+    }),
+  )
+  uploadAvatar(
+    @Param('id') id: string,
+    @UploadedFile() file: Express.Multer.File,
+  ) {
+    return this.usuariosService.updateAvatar(id, file.filename);
+  }
+
   // ============================================================================
   // ENDPOINTS DE GESTÃO DE ROLES E PERMISSIONS
   // ============================================================================
