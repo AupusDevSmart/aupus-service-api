@@ -258,6 +258,14 @@ export class DiagramasService {
       totalConexoes: conexoesFormatadas.length,
     };
 
+    console.log('📤 [FIND ONE] Configurações do diagrama sendo retornadas:', JSON.stringify(diagrama.configuracoes, null, 2));
+    const configs = diagrama.configuracoes as any;
+    if (configs?.labelPositions) {
+      console.log('✅ [FIND ONE] labelPositions encontrado com', Object.keys(configs.labelPositions).length, 'entradas');
+    } else {
+      console.log('⚠️ [FIND ONE] labelPositions NÃO encontrado nas configurações');
+    }
+
     return {
       id: diagrama.id,
       nome: diagrama.nome,
@@ -304,9 +312,14 @@ export class DiagramasService {
 
     // Mesclar configurações existentes com as novas
     const configExistente = diagramaExistente.configuracoes as any || {};
+    console.log('🔍 [UPDATE DIAGRAMA] Configurações existentes:', JSON.stringify(configExistente, null, 2));
+    console.log('🔍 [UPDATE DIAGRAMA] Novas configurações recebidas:', JSON.stringify(configuracoes, null, 2));
+
     const novasConfiguracoes = configuracoes
       ? { ...configExistente, ...configuracoes }
       : diagramaExistente.configuracoes;
+
+    console.log('✅ [UPDATE DIAGRAMA] Configurações após merge:', JSON.stringify(novasConfiguracoes, null, 2));
 
     // Incrementar versão
     const versaoAtual = diagramaExistente.versao.split('.');
@@ -378,6 +391,7 @@ export class DiagramasService {
    * Formata a resposta do diagrama
    */
   private formatDiagramaResponse(diagrama: any) {
+    console.log('📤 [FORMAT RESPONSE] Configurações sendo retornadas:', JSON.stringify(diagrama.configuracoes, null, 2));
     return {
       id: diagrama.id,
       nome: diagrama.nome,

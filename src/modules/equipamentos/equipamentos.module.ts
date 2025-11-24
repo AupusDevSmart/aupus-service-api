@@ -8,7 +8,7 @@ import { MqttModule } from '../../shared/mqtt/mqtt.module';
 @Module({
   imports: [
     PrismaModule, 
-    MqttModule
+    //MqttModule
   ],
   controllers: [EquipamentosController],
   providers: [EquipamentosService, EquipamentosDataService],
