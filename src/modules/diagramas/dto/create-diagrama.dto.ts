@@ -72,6 +72,14 @@ class ConfiguracoesDto {
   @ApiPropertyOptional({ description: 'Conexões visuais (que envolvem componentes visuais)', type: 'array' })
   @IsOptional()
   conexoesVisuais?: any[];
+
+  @ApiPropertyOptional({
+    description: 'Posições customizadas dos labels dos componentes (mapeado por equipamento_id)',
+    example: { 'eqp_123abc': { x: 10, y: -15 } }
+  })
+  @IsOptional()
+  @IsObject()
+  labelPositions?: Record<string, { x: number; y: number }>;
 }
 
 export class CreateDiagramaDto {

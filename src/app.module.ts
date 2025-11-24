@@ -37,8 +37,8 @@ import { EquipamentosDadosModule } from './modules/equipamentos-dados/equipament
     PrismaModule,
 
     // ✅ MQTT e WebSocket para dados em tempo real
-    MqttModule,  
-    WebSocketModule,
+    //MqttModule,  
+    //WebSocketModule,
 
     // ✅ Módulos de negócio
     UsuariosModule,
