@@ -297,6 +297,9 @@ export class ProgramacaoResponseDto {
   @ApiPropertyOptional({ description: 'Observações sobre veículo' })
   observacoes_veiculo?: string;
 
+  @ApiPropertyOptional({ description: 'ID da reserva de veículo vinculada' })
+  reserva_id?: string;
+
   // Programação
   @ApiPropertyOptional({ description: 'Data e hora programada' })
   data_hora_programada?: string;
@@ -393,6 +396,20 @@ export class ProgramacaoDetalhesResponseDto extends ProgramacaoResponseDto {
 
   @ApiPropertyOptional({ description: 'Ordem de serviço gerada (se aprovada)' })
   ordem_servico?: any;
+
+  @ApiPropertyOptional({ description: 'Reserva de veículo vinculada (se houver)' })
+  reserva_veiculo?: {
+    id: string;
+    veiculo_id: string;
+    data_inicio: Date;
+    data_fim: Date;
+    hora_inicio: string;
+    hora_fim: string;
+    responsavel: string;
+    finalidade: string;
+    status: string;
+    veiculo?: any;
+  };
 }
 
 export class PaginationDto {

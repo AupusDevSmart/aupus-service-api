@@ -1189,19 +1189,19 @@ model equipamentos_dados_tecnicos {
 }
 
 model equipamentos_dados {
-  id                  String       @id @default(cuid()) @db.Char(26)
-  equipamento_id      String       @db.Char(26)
-  dados               Json
-  fonte               String       @default("MQTT") @db.VarChar(20)
-  timestamp_dados     DateTime     @default(now()) @db.Timestamp(0)
-  qualidade           String?      @db.VarChar(20)
-  created_at          DateTime     @default(now()) @db.Timestamp(0)
+  id              String   @id @default(cuid()) @db.Char(26)
+  equipamento_id  String   @db.Char(26)
+  dados           Json
+  fonte           String   @default("MQTT") @db.VarChar(20)
+  timestamp_dados DateTime @default(now()) @db.Timestamp(0)
+  qualidade       String?  @db.VarChar(20)
+  created_at      DateTime @default(now()) @db.Timestamp(0)
 
   // Campos para agregação de 1 minuto
-  timestamp_fim       DateTime?    @db.Timestamp(0)
-  num_leituras        Int?         // Número de leituras agregadas no período
+  timestamp_fim DateTime? @db.Timestamp(0)
+  num_leituras  Int? // Número de leituras agregadas no período
 
-  equipamento         equipamentos @relation(fields: [equipamento_id], references: [id], onDelete: Cascade)
+  equipamento equipamentos @relation(fields: [equipamento_id], references: [id], onDelete: Cascade)
 
   @@index([equipamento_id])
   @@index([timestamp_dados])
@@ -1579,34 +1579,36 @@ model documentacao_veiculo {
 }
 
 model reserva_veiculo {
-  id                      String          @id @default(cuid())
-  criado_em               DateTime        @default(now()) @map("criado_em")
-  atualizado_em           DateTime        @updatedAt @map("atualizado_em")
-  veiculo_id              String          @map("veiculo_id")
-  solicitante_id          String?         @map("solicitante_id") @db.VarChar(100)
-  tipo_solicitante        TipoSolicitante @map("tipo_solicitante")
-  data_inicio             DateTime        @map("data_inicio")
-  data_fim                DateTime        @map("data_fim")
-  hora_inicio             String          @map("hora_inicio") @db.VarChar(5)
-  hora_fim                String          @map("hora_fim") @db.VarChar(5)
-  responsavel             String          @db.VarChar(100)
-  responsavel_id          String?         @map("responsavel_id") @db.Char(26)
+  id                      String            @id @default(cuid())
+  criado_em               DateTime          @default(now()) @map("criado_em")
+  atualizado_em           DateTime          @updatedAt @map("atualizado_em")
+  veiculo_id              String            @map("veiculo_id")
+  solicitante_id          String?           @map("solicitante_id") @db.VarChar(100)
+  tipo_solicitante        TipoSolicitante   @map("tipo_solicitante")
+  data_inicio             DateTime          @map("data_inicio")
+  data_fim                DateTime          @map("data_fim")
+  hora_inicio             String            @map("hora_inicio") @db.VarChar(5)
+  hora_fim                String            @map("hora_fim") @db.VarChar(5)
+  responsavel             String            @db.VarChar(100)
+  responsavel_id          String?           @map("responsavel_id") @db.Char(26)
   finalidade              String
-  status                  StatusReserva   @default(ativa)
-  criado_por              String?         @map("criado_por") @db.VarChar(100)
-  criado_por_id           String?         @map("criado_por_id") @db.Char(26)
-  motivo_cancelamento     String?         @map("motivo_cancelamento")
-  data_cancelamento       DateTime?       @map("data_cancelamento")
-  cancelado_por           String?         @map("cancelado_por") @db.VarChar(100)
-  cancelado_por_id        String?         @map("cancelado_por_id") @db.Char(26)
-  data_finalizacao        DateTime?       @map("data_finalizacao")
-  finalizado_por          String?         @map("finalizado_por") @db.VarChar(100)
-  finalizado_por_id       String?         @map("finalizado_por_id") @db.Char(26)
-  km_inicial              Int?            @map("km_inicial")
-  km_final                Int?            @map("km_final")
-  observacoes_finalizacao String?         @map("observacoes_finalizacao")
+  status                  StatusReserva     @default(ativa)
+  criado_por              String?           @map("criado_por") @db.VarChar(100)
+  criado_por_id           String?           @map("criado_por_id") @db.Char(26)
+  motivo_cancelamento     String?           @map("motivo_cancelamento")
+  data_cancelamento       DateTime?         @map("data_cancelamento")
+  cancelado_por           String?           @map("cancelado_por") @db.VarChar(100)
+  cancelado_por_id        String?           @map("cancelado_por_id") @db.Char(26)
+  data_finalizacao        DateTime?         @map("data_finalizacao")
+  finalizado_por          String?           @map("finalizado_por") @db.VarChar(100)
+  finalizado_por_id       String?           @map("finalizado_por_id") @db.Char(26)
+  km_inicial              Int?              @map("km_inicial")
+  km_final                Int?              @map("km_final")
+  observacoes_finalizacao String?           @map("observacoes_finalizacao")
   observacoes             String?
-  veiculo                 veiculo         @relation(fields: [veiculo_id], references: [id], onDelete: Cascade)
+  veiculo                 veiculo           @relation(fields: [veiculo_id], references: [id], onDelete: Cascade)
+  programacoes_os         programacoes_os[]
+  ordens_servico          ordens_servico[]
 
   @@index([veiculo_id])
   @@index([solicitante_id])
@@ -1641,12 +1643,13 @@ model programacoes_os {
   tempo_estimado           Decimal                      @map("tempo_estimado") @db.Decimal(5, 2)
   duracao_estimada         Decimal                      @map("duracao_estimada") @db.Decimal(5, 2)
   necessita_veiculo        Boolean                      @default(false) @map("necessita_veiculo")
-  veiculo_id               String?                      @map("veiculo_id") @db.Char(26)
+  veiculo_id               String?                      @map("veiculo_id") @db.VarChar(26)
   reserva_data_inicio      DateTime?                    @map("reserva_data_inicio") @db.Date
   reserva_data_fim         DateTime?                    @map("reserva_data_fim") @db.Date
   reserva_hora_inicio      String?                      @map("reserva_hora_inicio") @db.VarChar(5)
   reserva_hora_fim         String?                      @map("reserva_hora_fim") @db.VarChar(5)
   reserva_finalidade       String?                      @map("reserva_finalidade")
+  reserva_id               String?                      @map("reserva_id") @db.VarChar(26)
   assentos_necessarios     Int?                         @map("assentos_necessarios")
   carga_necessaria         Decimal?                     @map("carga_necessaria") @db.Decimal(8, 2)
   observacoes_veiculo      String?                      @map("observacoes_veiculo")
@@ -1682,6 +1685,7 @@ model programacoes_os {
   equipamento              equipamentos?                @relation(fields: [equipamento_id], references: [id])
   plano_manutencao         planos_manutencao?           @relation(fields: [plano_manutencao_id], references: [id])
   planta                   plantas?                     @relation(fields: [planta_id], references: [id])
+  reserva_veiculo          reserva_veiculo?             @relation(fields: [reserva_id], references: [id])
   tarefas_programacao      tarefas_programacao_os[]
   tecnicos                 tecnicos_programacao_os[]
 
@@ -1789,6 +1793,7 @@ model ordens_servico {
   equipamento_id          String?                   @map("equipamento_id") @db.Char(26)
   anomalia_id             String?                   @map("anomalia_id") @db.Char(26)
   plano_manutencao_id     String?                   @map("plano_manutencao_id") @db.Char(26)
+  reserva_id              String?                   @map("reserva_id") @db.VarChar(26)
   dados_origem            Json?                     @map("dados_origem")
   tempo_estimado          Decimal                   @map("tempo_estimado") @db.Decimal(5, 2)
   duracao_estimada        Decimal                   @map("duracao_estimada") @db.Decimal(5, 2)
@@ -1830,6 +1835,7 @@ model ordens_servico {
   plano_manutencao        planos_manutencao?        @relation(fields: [plano_manutencao_id], references: [id])
   planta                  plantas?                  @relation(fields: [planta_id], references: [id])
   programacao             programacoes_os           @relation(fields: [programacao_id], references: [id])
+  reserva_veiculo         reserva_veiculo?          @relation(fields: [reserva_id], references: [id])
   registros_tempo         registros_tempo_os[]
   tarefas_os              tarefas_os[]
   tecnicos                tecnicos_os[]
@@ -1842,6 +1848,7 @@ model ordens_servico {
   @@index([data_hora_programada])
   @@index([planta_id])
   @@index([equipamento_id])
+  @@index([reserva_id])
   @@index([deletado_em])
   @@map("ordens_servico")
 }
@@ -1849,14 +1856,14 @@ model ordens_servico {
 model tarefas_programacao_os {
   id             String          @id @default(cuid())
   programacao_id String          @map("programacao_id")
-  tarefa_id      String          @map("tarefa_id") @db.Char(26)
+  tarefa_id      String?         @map("tarefa_id") @db.Char(26)
   ordem          Int             @default(0)
   status         String          @default("PENDENTE") @db.VarChar(20)
   observacoes    String?
   created_at     DateTime        @default(now()) @map("created_at")
   updated_at     DateTime        @updatedAt @map("updated_at")
   programacao    programacoes_os @relation(fields: [programacao_id], references: [id], onDelete: Cascade)
-  tarefa         tarefas         @relation(fields: [tarefa_id], references: [id])
+  tarefa         tarefas?        @relation(fields: [tarefa_id], references: [id])
 
   @@unique([programacao_id, tarefa_id])
   @@index([programacao_id])
@@ -1867,7 +1874,7 @@ model tarefas_programacao_os {
 model tarefas_os {
   id             String         @id @default(cuid())
   os_id          String         @map("os_id")
-  tarefa_id      String         @map("tarefa_id") @db.Char(26)
+  tarefa_id      String?        @map("tarefa_id") @db.Char(26)
   ordem          Int            @default(0)
   status         String         @default("PENDENTE") @db.VarChar(20)
   data_conclusao DateTime?      @map("data_conclusao")
@@ -1876,9 +1883,8 @@ model tarefas_os {
   created_at     DateTime       @default(now()) @map("created_at")
   updated_at     DateTime       @updatedAt @map("updated_at")
   ordem_servico  ordens_servico @relation(fields: [os_id], references: [id], onDelete: Cascade)
-  tarefa         tarefas        @relation(fields: [tarefa_id], references: [id])
+  tarefa         tarefas?       @relation(fields: [tarefa_id], references: [id])
 
-  @@unique([os_id, tarefa_id])
   @@index([os_id])
   @@index([tarefa_id])
   @@map("tarefas_os")

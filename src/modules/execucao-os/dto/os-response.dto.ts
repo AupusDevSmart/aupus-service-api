@@ -332,6 +332,14 @@ export class ReservaVeiculoResponseDto {
   @ApiProperty({ description: 'ID do veículo' })
   veiculo_id: string;
 
+  @ApiPropertyOptional({ description: 'Dados do veículo' })
+  veiculo?: {
+    id: string;
+    placa: string;
+    modelo?: string;
+    marca?: string;
+  };
+
   @ApiPropertyOptional({ description: 'ID do solicitante' })
   solicitante_id?: string;
 
@@ -440,6 +448,9 @@ export class OrdemServicoResponseDto {
   @ApiPropertyOptional({ description: 'ID do plano de manutenção' })
   plano_manutencao_id?: string;
 
+  @ApiPropertyOptional({ description: 'ID da reserva de veículo' })
+  reserva_id?: string;
+
   @ApiPropertyOptional({ description: 'Dados da origem' })
   dados_origem?: any;
 
@@ -521,6 +532,16 @@ export class OrdemServicoResponseDto {
   @ApiPropertyOptional({ description: 'Tarefas da OS', type: [TarefaOSResponseDto] })
   tarefas_os?: TarefaOSResponseDto[];
 
+  // Recursos
+  @ApiPropertyOptional({ description: 'Materiais da OS', type: [MaterialOSResponseDto] })
+  materiais?: MaterialOSResponseDto[];
+
+  @ApiPropertyOptional({ description: 'Ferramentas da OS', type: [FerramentaOSResponseDto] })
+  ferramentas?: FerramentaOSResponseDto[];
+
+  @ApiPropertyOptional({ description: 'Técnicos da OS', type: [TecnicoOSResponseDto] })
+  tecnicos?: TecnicoOSResponseDto[];
+
   // Auditoria
   @ApiPropertyOptional({ description: 'Criado por' })
   criado_por?: string;
@@ -548,6 +569,19 @@ export class OrdemServicoResponseDto {
 
   @ApiPropertyOptional({ description: 'Data da aprovação' })
   data_aprovacao?: string;
+
+  // Relacionamentos expandidos
+  @ApiPropertyOptional({ description: 'Dados da programação de origem' })
+  programacao?: any;
+
+  @ApiPropertyOptional({ description: 'Dados da anomalia' })
+  anomalia?: any;
+
+  @ApiPropertyOptional({ description: 'Dados do plano de manutenção' })
+  plano_manutencao?: any;
+
+  @ApiPropertyOptional({ description: 'Reserva de veículo', type: ReservaVeiculoResponseDto })
+  reserva_veiculo?: ReservaVeiculoResponseDto;
 }
 
 export class OrdemServicoDetalhesResponseDto extends OrdemServicoResponseDto {

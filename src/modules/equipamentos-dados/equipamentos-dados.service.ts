@@ -14,9 +14,12 @@ export class EquipamentosDadosService {
   async findLatest(equipamentoId: string) {
     this.logger.log(`Buscando dado mais recente para equipamento ${equipamentoId}`);
 
+    // Limpar espaços do ID (problema de CHAR vs VARCHAR)
+    const equipamentoIdLimpo = equipamentoId.trim();
+
     // Verificar se o equipamento existe
     const equipamento = await this.prisma.equipamentos.findUnique({
-      where: { id: equipamentoId },
+      where: { id: equipamentoIdLimpo },
       include: {
         tipo_equipamento_rel: true,
       },
@@ -27,8 +30,9 @@ export class EquipamentosDadosService {
     }
 
     // Buscar o dado mais recente
+    // Como equipamento_id no banco pode ter espaços, usar o ID do equipamento encontrado
     const dado = await this.prisma.equipamentos_dados.findFirst({
-      where: { equipamento_id: equipamentoId },
+      where: { equipamento_id: equipamento.id },
       orderBy: { timestamp_dados: 'desc' },
     });
 
@@ -69,9 +73,12 @@ export class EquipamentosDadosService {
   async findHistory(equipamentoId: string, query: EquipamentoDadosQueryDto) {
     this.logger.log(`Buscando histórico para equipamento ${equipamentoId}`);
 
+    // Limpar espaços do ID (problema de CHAR vs VARCHAR)
+    const equipamentoIdLimpo = equipamentoId.trim();
+
     // Verificar se o equipamento existe
     const equipamento = await this.prisma.equipamentos.findUnique({
-      where: { id: equipamentoId },
+      where: { id: equipamentoIdLimpo },
     });
 
     if (!equipamento) {
@@ -81,9 +88,9 @@ export class EquipamentosDadosService {
     const { page = 1, limit = 100, startDate, endDate, fonte, qualidade } = query;
     const skip = (page - 1) * limit;
 
-    // Construir filtros
+    // Construir filtros (usar o ID do equipamento encontrado com espaços)
     const where: any = {
-      equipamento_id: equipamentoId,
+      equipamento_id: equipamento.id,
     };
 
     if (startDate || endDate) {
