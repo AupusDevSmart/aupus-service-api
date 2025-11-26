@@ -61,6 +61,12 @@ export class UsuarioResponseDto {
   @ApiPropertyOptional({ description: 'URL da foto de perfil do usuário' })
   avatar_url?: string;
 
+  @ApiPropertyOptional({
+    description: 'Role do usuário (coluna usuarios.role)',
+    example: 'admin'
+  })
+  role?: string;
+
   @ApiProperty({
     description: 'Permissões do usuário (objetos completos)',
     type: 'array',
@@ -71,7 +77,7 @@ export class UsuarioResponseDto {
   })
   all_permissions: UserPermissionResponse[];
 
-  @ApiProperty({ 
+  @ApiProperty({
     description: 'Roles do usuário (nomes)',
     type: [String],
     example: ['admin']

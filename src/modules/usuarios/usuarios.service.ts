@@ -1508,54 +1508,31 @@ export class UsuariosService {
   // ============================================================================
 
   private async mapToUsuarioResponseDtoOptimized(usuario: any): Promise<UsuarioResponseDto> {
-    try {
-      // Versão otimizada que não faz consultas desnecessárias para listagem
-      return {
-        id: usuario.id,
-        status: usuario.status as UsuarioStatus,
-        concessionaria_atual_id: usuario.concessionaria_atual_id,
-        organizacao_atual: usuario.organizacao_atual_id,
-        nome: usuario.nome,
-        email: usuario.email,
-        telefone: usuario.telefone,
-        instagram: usuario.instagram,
-        cpf_cnpj: usuario.cpf_cnpj,
-        cidade: usuario.cidade,
-        estado: usuario.estado,
-        endereco: usuario.endereco,
-        cep: usuario.cep,
-        manager_id: usuario.manager_id,
-        avatar_url: usuario.avatar_url, // ← ADICIONADO
-        all_permissions: [], // Não buscar permissions na listagem por performance
-        roles: [], // Não buscar roles na listagem por performance
-        created_at: usuario.created_at,
-        updated_at: usuario.updated_at,
-      };
-    } catch (error) {
-      console.error('Erro ao mapear usuário otimizado:', error);
-      // Fallback para dados básicos em caso de erro
-      return {
-        id: usuario.id,
-        status: usuario.status as UsuarioStatus,
-        concessionaria_atual_id: usuario.concessionaria_atual_id,
-        organizacao_atual: usuario.organizacao_atual_id,
-        nome: usuario.nome,
-        email: usuario.email,
-        telefone: usuario.telefone,
-        instagram: usuario.instagram,
-        cpf_cnpj: usuario.cpf_cnpj,
-        cidade: usuario.cidade,
-        estado: usuario.estado,
-        endereco: usuario.endereco,
-        cep: usuario.cep,
-        manager_id: usuario.manager_id,
-        avatar_url: usuario.avatar_url, // ← ADICIONADO
-        all_permissions: [],
-        roles: [],
-        created_at: usuario.created_at,
-        updated_at: usuario.updated_at,
-      };
-    }
+    // ✅ SIMPLIFICADO: Usar apenas a coluna role da tabela usuarios
+    const role = usuario.role || 'vendedor'; // Default apenas se NULL
+
+    return {
+      id: usuario.id,
+      status: usuario.status as UsuarioStatus,
+      concessionaria_atual_id: usuario.concessionaria_atual_id,
+      organizacao_atual: usuario.organizacao_atual_id,
+      nome: usuario.nome,
+      email: usuario.email,
+      telefone: usuario.telefone,
+      instagram: usuario.instagram,
+      cpf_cnpj: usuario.cpf_cnpj,
+      cidade: usuario.cidade,
+      estado: usuario.estado,
+      endereco: usuario.endereco,
+      cep: usuario.cep,
+      manager_id: usuario.manager_id,
+      avatar_url: usuario.avatar_url,
+      role: role, // ← Campo role direto
+      all_permissions: [],
+      roles: [role], // ← Array com a role para compatibilidade
+      created_at: usuario.created_at,
+      updated_at: usuario.updated_at,
+    };
   }
 
   private async mapToUsuarioResponseDto(usuario: any): Promise<UsuarioResponseDto> {
