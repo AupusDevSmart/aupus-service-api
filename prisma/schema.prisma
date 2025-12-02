@@ -962,6 +962,8 @@ model usuarios {
   other_usuarios                                                   usuarios[]               @relation("usuariosTousuarios")
   concessionarias                                                  concessionarias?         @relation(fields: [concessionaria_atual_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "usuarios_concessionaria_atual_id_foreign")
   organizacoes_usuarios_organizacao_atual_idToorganizacoes         organizacoes?            @relation("usuarios_organizacao_atual_idToorganizacoes", fields: [organizacao_atual_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "usuarios_organizacao_atual_id_foreign")
+  configuracao_demanda_criadas                                     configuracao_demanda[]   @relation("configuracao_demanda_created_by")
+  configuracao_demanda_atualizadas                                 configuracao_demanda[]   @relation("configuracao_demanda_updated_by")
 
   @@index([email], map: "idx_usuarios_email")
   @@index([manager_id], map: "idx_usuarios_manager")
@@ -1021,9 +1023,10 @@ model unidades {
   created_at        DateTime                 @default(now()) @db.Timestamp(0)
   updated_at        DateTime                 @updatedAt @db.Timestamp(0)
   deleted_at        DateTime?                @db.Timestamp(0)
-  equipamentos      equipamentos[]
-  planta            plantas                  @relation(fields: [planta_id], references: [id])
-  concessionaria    concessionarias_energia? @relation(fields: [concessionaria_id], references: [id])
+  equipamentos         equipamentos[]
+  planta               plantas                  @relation(fields: [planta_id], references: [id])
+  concessionaria       concessionarias_energia? @relation(fields: [concessionaria_id], references: [id])
+  configuracao_demanda configuracao_demanda?
 
   @@index([planta_id])
   @@index([tipo])
@@ -2427,4 +2430,26 @@ enum TipoAnexoOS {
   MANUAL       @map("MANUAL")
 
   @@map("tipo_anexo_os")
+}
+
+model configuracao_demanda {
+  id                    String    @id @default(cuid()) @db.Char(26)
+  unidade_id            String    @unique @db.Char(26)
+  fonte                 String    @default("AGRUPAMENTO") @db.VarChar(20)
+  equipamentos_ids      Json      @db.Json
+  mostrar_detalhes      Boolean   @default(true)
+  intervalo_atualizacao Int       @default(30)
+  aplicar_perdas        Boolean   @default(true)
+  fator_perdas          Decimal   @default(3.0) @db.Decimal(5, 2)
+  valor_contratado      Decimal?  @db.Decimal(10, 2)
+  percentual_adicional  Decimal?  @default(10.0) @db.Decimal(5, 2)
+  created_at            DateTime  @default(now()) @db.Timestamp(0)
+  updated_at            DateTime  @updatedAt @db.Timestamp(0)
+  created_by            String?   @db.Char(26)
+  updated_by            String?   @db.Char(26)
+  unidade               unidades  @relation(fields: [unidade_id], references: [id], onDelete: Cascade)
+  criado_por            usuarios? @relation("configuracao_demanda_created_by", fields: [created_by], references: [id])
+  atualizado_por        usuarios? @relation("configuracao_demanda_updated_by", fields: [updated_by], references: [id])
+
+  @@index([unidade_id], map: "idx_configuracao_demanda_unidade")
 }

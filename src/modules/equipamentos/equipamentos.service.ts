@@ -110,6 +110,7 @@ export class EquipamentosService {
       equipamento_pai_id,
       semDiagrama,
       tipo,
+      mqtt_habilitado,
       orderBy = 'created_at',
       orderDirection = 'desc'
     } = query;
@@ -157,6 +158,14 @@ export class EquipamentosService {
     if (tipo) {
       where.tipo_equipamento_id = tipo;
     }
+
+    // Filtro por MQTT habilitado
+    if (mqtt_habilitado !== undefined) {
+      where.mqtt_habilitado = mqtt_habilitado;
+      console.log('   🔌 Adicionando filtro mqtt_habilitado =', mqtt_habilitado);
+    }
+
+    console.log('   📋 WHERE clause final:', JSON.stringify(where, null, 2));
 
     const [data, total] = await Promise.all([
       this.prisma.equipamentos.findMany({
@@ -583,6 +592,7 @@ export class EquipamentosService {
     console.log('🔍 [findByUnidade] Iniciando busca de equipamentos');
     console.log('   📋 UnidadeId:', unidadeId);
     console.log('   📋 Query params:', JSON.stringify(query, null, 2));
+    console.log('   🔌 mqtt_habilitado filter:', query.mqtt_habilitado);
 
     // Verificar se unidade existe
     const unidadeExists = await this.prisma.unidades.findFirst({

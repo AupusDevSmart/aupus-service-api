@@ -428,7 +428,7 @@ export class UnidadesService {
     }
   }
 
-  async remove(id: string): Promise<{ message: string }> {
+  async remove(id: string): Promise<{ message: string; deletedEquipments?: number }> {
     try {
       const unidade = await this.prisma.unidades.findFirst({
         where: {
@@ -438,7 +438,9 @@ export class UnidadesService {
         include: {
           _count: {
             select: {
-              equipamentos: true,
+              equipamentos: {
+                where: { deleted_at: null }
+              },
             },
           },
         },
@@ -448,26 +450,48 @@ export class UnidadesService {
         throw new NotFoundException(`Unidade com ID ${id} não encontrada`);
       }
 
-      // Verificar se há equipamentos vinculados
-      if (unidade._count.equipamentos > 0) {
-        throw new BadRequestException(
-          `Não é possível remover unidade que possui ${unidade._count.equipamentos} equipamento(s) vinculado(s)`,
-        );
-      }
+      // Contar equipamentos que serão deletados
+      const equipamentosCount = unidade._count.equipamentos;
 
-      // Soft delete
-      await this.prisma.unidades.update({
-        where: { id },
-        data: {
-          deleted_at: new Date(),
-        },
+      // Iniciar transação para deletar unidade e equipamentos em cascata
+      const result = await this.prisma.$transaction(async (prisma) => {
+        // 1. Soft delete de todos os equipamentos da unidade
+        if (equipamentosCount > 0) {
+          await prisma.equipamentos.updateMany({
+            where: {
+              unidade_id: id,
+              deleted_at: null,
+            },
+            data: {
+              deleted_at: new Date(),
+            },
+          });
+          console.log(`✅ [UNIDADES SERVICE] ${equipamentosCount} equipamento(s) deletado(s) em cascata`);
+        }
+
+        // 2. Soft delete da unidade
+        await prisma.unidades.update({
+          where: { id },
+          data: {
+            deleted_at: new Date(),
+          },
+        });
+
+        return { equipamentosCount };
       });
 
-      return { message: 'Unidade removida com sucesso' };
+      const message = result.equipamentosCount > 0
+        ? `Unidade removida com sucesso junto com ${result.equipamentosCount} equipamento(s)`
+        : 'Unidade removida com sucesso';
+
+      return {
+        message,
+        deletedEquipments: result.equipamentosCount
+      };
     } catch (error) {
       console.error('❌ [UNIDADES SERVICE] Erro ao remover unidade:', error);
 
-      if (error instanceof NotFoundException || error instanceof BadRequestException) {
+      if (error instanceof NotFoundException) {
         throw error;
       }
 

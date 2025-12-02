@@ -730,10 +730,21 @@ export class MqttService extends EventEmitter implements OnModuleInit, OnModuleD
         }
 
         // Calcular energia gerada no período (kWh)
-        if (agregado.power?.active_total) {
-          const intervalo_horas =
-            (leituras[leituras.length - 1].timestamp.getTime() - primeiraLeitura.timestamp.getTime()) / (1000 * 3600);
-          agregado.energy.period_energy_kwh = parseFloat(((agregado.power.active_total / 1000) * intervalo_horas).toFixed(4));
+        // CORREÇÃO: Somar energia de cada leitura (potência × tempo), não fazer média!
+        const activePowers = leituras.map(l => l.dados.power?.active_total).filter(v => v != null);
+        if (activePowers.length > 0) {
+          // Cada leitura representa 1 minuto de consumo
+          // Energia = Soma de (Potência em W / 1000 / 60) para converter W·min para kWh
+          const energiaTotal = activePowers.reduce((sum, power) => {
+            return sum + (power / 1000 / 60); // W para kW, minutos para horas
+          }, 0);
+          agregado.energy.period_energy_kwh = parseFloat(energiaTotal.toFixed(4));
+
+          // LOG para debug da correção
+          console.log(`📊 [INVERSOR] Energia calculada corretamente:`);
+          console.log(`   - ${activePowers.length} leituras no buffer`);
+          console.log(`   - Potência média: ${this.mean(activePowers).toFixed(0)} W`);
+          console.log(`   - Energia total período: ${energiaTotal.toFixed(4)} kWh`);
         }
       }
 

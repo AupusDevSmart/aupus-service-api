@@ -1,13 +1,14 @@
 // src/modules/plantas/plantas.controller.ts - CORRIGIDO
-import { 
-  Controller, 
-  Post, 
-  Get, 
+import {
+  Controller,
+  Post,
+  Get,
   Put,
+  Delete,
   Param,
-  Body, 
+  Body,
   Query,
-  HttpStatus, 
+  HttpStatus,
   Logger,
   ValidationPipe
 } from '@nestjs/common';
@@ -262,12 +263,58 @@ export class PlantasController {
 
     try {
       const planta = await this.plantasService.update(id, updatePlantaDto);
-      
+
       this.logger.log(`✅ [UPDATE PLANTA] Planta atualizada com sucesso: ${planta.nome}`);
       return planta;
-      
+
     } catch (error) {
       this.logger.error(`❌ [UPDATE PLANTA] Erro ao atualizar planta ${id}:`, error.message);
+      throw error;
+    }
+  }
+
+  // ✅ ROTA: DELETE /api/v1/plantas/:id (Deletar planta)
+  @Delete(':id')
+  @ApiOperation({
+    summary: 'Deletar planta',
+    description: 'Remove uma planta e todas as suas dependências do sistema'
+  })
+  @ApiParam({
+    name: 'id',
+    description: 'ID da planta',
+    example: 'plt_01234567890123456789012345'
+  })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Planta deletada com sucesso'
+  })
+  @ApiResponse({
+    status: HttpStatus.NOT_FOUND,
+    description: 'Planta não encontrada'
+  })
+  @ApiResponse({
+    status: HttpStatus.CONFLICT,
+    description: 'Planta possui dependências que impedem a exclusão'
+  })
+  async remove(@Param('id') id: string): Promise<{ message: string; deletedUnits?: number; deletedEquipments?: number }> {
+    // Fazer trim do ID para garantir que não há espaços
+    const plantaId = id.trim();
+    this.logger.log(`🗑️ [DELETE PLANTA] Deletando planta ${plantaId}`);
+
+    try {
+      const result = await this.plantasService.remove(plantaId);
+
+      this.logger.log(`✅ [DELETE PLANTA] Planta ${plantaId} deletada com sucesso`);
+      if (result.deletedUnits) {
+        this.logger.log(`   📦 ${result.deletedUnits} unidade(s) deletada(s)`);
+      }
+      if (result.deletedEquipments) {
+        this.logger.log(`   ⚙️ ${result.deletedEquipments} equipamento(s) deletado(s)`);
+      }
+      return result;
+
+    } catch (error) {
+      this.logger.error(`❌ [DELETE PLANTA] Erro ao deletar planta ${id}:`, error.message);
       throw error;
     }
   }

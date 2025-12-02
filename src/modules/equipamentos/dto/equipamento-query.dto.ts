@@ -72,10 +72,24 @@ export class EquipamentoQueryDto {
   @IsString()
   equipamento_pai_id?: string;
 
-  @ApiPropertyOptional({ 
-    example: 'nome', 
+  @ApiPropertyOptional({
+    example: true,
+    description: 'Filtrar apenas equipamentos com MQTT habilitado',
+    type: Boolean
+  })
+  @IsOptional()
+  @Transform(({ value }) => {
+    if (value === 'true') return true;
+    if (value === 'false') return false;
+    return value;
+  })
+  @IsBoolean()
+  mqtt_habilitado?: boolean;
+
+  @ApiPropertyOptional({
+    example: 'nome',
     enum: ['nome', 'criticidade', 'created_at', 'fabricante', 'valor_contabil'],
-    description: 'Campo para ordenação' 
+    description: 'Campo para ordenação'
   })
   @IsOptional()
   @IsString()

@@ -99,33 +99,58 @@ export class MqttIngestionService {
 
   /**
    * Extrai PHF (Period Hour Forward) do payload MQTT
+   * Suporta múltiplos formatos:
+   * - M-160: Dados.phf (em kWh)
+   * - Inversores: energy.total_yield (em kWh acumulado)
    */
   private extrairPHF(payload: any): number | null {
-    // M-160: campo está em payload.Dados.phf
-    const phf = payload?.Dados?.phf;
+    // Formato 1: M-160 (Dados.phf)
+    const phfM160 = payload?.Dados?.phf;
+    if (typeof phfM160 === 'number' && phfM160 >= 0) {
+      return phfM160;
+    }
 
-    if (typeof phf === 'number' && phf >= 0) {
-      return phf;
+    // Formato 2: Inversores (energy.total_yield)
+    const totalYield = payload?.energy?.total_yield;
+    if (typeof totalYield === 'number' && totalYield >= 0) {
+      return totalYield;
     }
 
     return null;
   }
 
   /**
-   * Extrai potência ativa total (Pa + Pb + Pc) do payload MQTT
+   * Extrai potência ativa total do payload MQTT
+   * Suporta múltiplos formatos:
+   * - M-160: Dados.Pa + Dados.Pb + Dados.Pc (em W)
+   * - Inversores: power.active_total (em W)
    */
   private extrairPotenciaAtiva(payload: any): number | null {
+    // Formato 1: Inversores (power.active_total)
+    if (payload?.power?.active_total !== undefined) {
+      const potenciaW = Number(payload.power.active_total);
+      if (!isNaN(potenciaW) && potenciaW >= 0) {
+        // Converter de W para kW
+        return potenciaW / 1000;
+      }
+    }
+
+    // Formato 2: M-160 (Dados.Pa + Dados.Pb + Dados.Pc)
     const dados = payload?.Dados;
+    if (dados) {
+      const Pa = typeof dados.Pa === 'number' ? dados.Pa : 0;
+      const Pb = typeof dados.Pb === 'number' ? dados.Pb : 0;
+      const Pc = typeof dados.Pc === 'number' ? dados.Pc : 0;
 
-    if (!dados) return null;
+      const potenciaTotal = Pa + Pb + Pc;
 
-    const Pa = typeof dados.Pa === 'number' ? dados.Pa : 0;
-    const Pb = typeof dados.Pb === 'number' ? dados.Pb : 0;
-    const Pc = typeof dados.Pc === 'number' ? dados.Pc : 0;
+      if (potenciaTotal > 0) {
+        // Converter de W para kW
+        return potenciaTotal / 1000;
+      }
+    }
 
-    const potenciaTotal = Pa + Pb + Pc;
-
-    return potenciaTotal;
+    return null;
   }
 
   /**

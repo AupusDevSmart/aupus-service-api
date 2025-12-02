@@ -26,6 +26,8 @@ import { TiposEquipamentosModule } from './modules/tipos-equipamentos/tipos-equi
 import { ConcessionariasModule } from './modules/concessionarias/concessionarias.module';
 import { EquipamentosDadosModule } from './modules/equipamentos-dados/equipamentos-dados.module';
 import { UploadsModule } from './modules/uploads/uploads.module';
+import { ConfiguracaoDemandaModule } from './modules/configuracao-demanda/configuracao-demanda.module';
+import { CoaModule } from './modules/coa/coa.module';
 
 @Module({
   imports: [
@@ -64,6 +66,8 @@ import { UploadsModule } from './modules/uploads/uploads.module';
     ExecucaoOSModule,
     ConcessionariasModule,
     EquipamentosDadosModule,
+    ConfiguracaoDemandaModule,
+    CoaModule, // Centro de Operações Avançadas
     UploadsModule, // Módulo para servir arquivos de upload
   ],
   controllers: [AppController],

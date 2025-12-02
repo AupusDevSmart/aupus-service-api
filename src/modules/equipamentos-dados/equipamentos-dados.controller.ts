@@ -1,4 +1,4 @@
-import { Controller, Get, Param, Query, Logger } from '@nestjs/common';
+import { Controller, Get, Param, Query, Logger, Post, Body } from '@nestjs/common';
 import { EquipamentosDadosService } from './equipamentos-dados.service';
 import { CalculoCustosService } from './services/calculo-custos.service';
 import { EquipamentoDadosQueryDto } from './dto/equipamento-dados-query.dto';
@@ -84,6 +84,9 @@ export class EquipamentosDadosController {
     this.logger.log(`GET /equipamentos-dados/${id}/grafico-ano?ano=${ano || 'atual'}`);
     return this.service.getGraficoAno(id, ano);
   }
+
+  // Endpoints de múltiplos equipamentos removidos
+  // A agregação é feita no frontend usando os endpoints individuais
 
   /**
    * GET /equipamentos-dados/:id/custos-energia
