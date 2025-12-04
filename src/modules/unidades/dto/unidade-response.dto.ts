@@ -1,6 +1,17 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { TipoUnidade, StatusUnidade, GrupoUnidade, SubgrupoUnidade, TipoUnidadeEnergia } from './create-unidade.dto';
 
+export class ProprietarioBasico {
+  @ApiProperty({ example: 'usr_01234567890123456789012345' })
+  id: string;
+
+  @ApiProperty({ example: 'João Silva' })
+  nome: string;
+
+  @ApiProperty({ example: 'joao@exemplo.com' })
+  email: string;
+}
+
 export class PlantaBasica {
   @ApiProperty({ example: 'plt_01234567890123456789012345' })
   id: string;
@@ -10,6 +21,9 @@ export class PlantaBasica {
 
   @ApiPropertyOptional({ example: 'São Paulo - SP' })
   localizacao?: string;
+
+  @ApiPropertyOptional({ type: ProprietarioBasico })
+  proprietario?: ProprietarioBasico;
 }
 
 export class UnidadeResponse {

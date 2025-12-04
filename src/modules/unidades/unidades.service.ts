@@ -23,10 +23,14 @@ export class UnidadesService {
     console.log('📝 [CREATE UNIDADE] Valor é string vazia?', concessionaria_id === '');
 
     try {
+      // Normalizar IDs (trim)
+      const plantaIdTrimmed = planta_id?.trim();
+      const concessionariaIdTrimmed = concessionaria_id?.trim();
+
       // 1. Verificar se a planta existe
       const planta = await this.prisma.plantas.findFirst({
         where: {
-          id: planta_id,
+          id: plantaIdTrimmed,
           deleted_at: null,
         },
         select: {
@@ -37,21 +41,21 @@ export class UnidadesService {
       });
 
       if (!planta) {
-        throw new NotFoundException(`Planta com ID ${planta_id} não encontrada`);
+        throw new NotFoundException(`Planta com ID ${plantaIdTrimmed} não encontrada`);
       }
 
       // 2. Se concessionaria_id foi fornecido, verificar se existe
-      if (concessionaria_id) {
+      if (concessionariaIdTrimmed) {
         console.log('✅ [CREATE UNIDADE] concessionaria_id fornecido, verificando se existe...');
         const concessionaria = await this.prisma.concessionarias_energia.findFirst({
           where: {
-            id: concessionaria_id,
+            id: concessionariaIdTrimmed,
             deleted_at: null,
           },
         });
 
         if (!concessionaria) {
-          throw new NotFoundException(`Concessionária com ID ${concessionaria_id} não encontrada`);
+          throw new NotFoundException(`Concessionária com ID ${concessionariaIdTrimmed} não encontrada`);
         }
         console.log('✅ [CREATE UNIDADE] Concessionária encontrada:', concessionaria.nome);
       } else {
@@ -61,9 +65,9 @@ export class UnidadesService {
       // 3. Preparar dados para criação
       const dataToCreate = {
         ...unidadeData,
-        planta_id,
+        planta_id: plantaIdTrimmed,
         pontos_medicao: pontos_medicao ? pontos_medicao : null,
-        concessionaria_id: concessionaria_id || null,
+        concessionaria_id: concessionariaIdTrimmed || null,
         status: 'ativo',
       };
 
@@ -79,6 +83,13 @@ export class UnidadesService {
               id: true,
               nome: true,
               localizacao: true,
+              proprietario: {
+                select: {
+                  id: true,
+                  nome: true,
+                  email: true,
+                },
+              },
             },
           },
         },
@@ -136,7 +147,11 @@ export class UnidadesService {
       }
 
       // Filtros específicos
-      if (plantaId) whereClause.planta_id = plantaId;
+      if (plantaId) {
+        const plantaIdTrimmed = plantaId.trim();
+        whereClause.planta_id = plantaIdTrimmed;
+        console.log('🔍 [FINDALL UNIDADES] Filtrando por planta:', plantaIdTrimmed);
+      }
       if (tipo) whereClause.tipo = tipo;
       if (status) whereClause.status = status;
       if (estado) whereClause.estado = estado;
@@ -228,6 +243,13 @@ export class UnidadesService {
               id: true,
               nome: true,
               localizacao: true,
+              proprietario: {
+                select: {
+                  id: true,
+                  nome: true,
+                  email: true,
+                },
+              },
             },
           },
           _count: {
@@ -279,6 +301,13 @@ export class UnidadesService {
               id: true,
               nome: true,
               localizacao: true,
+              proprietario: {
+                select: {
+                  id: true,
+                  nome: true,
+                  email: true,
+                },
+              },
             },
           },
           _count: {
@@ -318,51 +347,57 @@ export class UnidadesService {
     console.log('📝 [UPDATE UNIDADE] Valor é string vazia?', concessionaria_id === '');
 
     try {
+      // Normalizar IDs (trim)
+      const idTrimmed = id?.trim();
+      const plantaIdTrimmed = planta_id?.trim();
+      const concessionariaIdTrimmed = concessionaria_id?.trim();
+
       // 1. Verificar se a unidade existe
       const unidadeExistente = await this.prisma.unidades.findFirst({
         where: {
-          id,
+          id: idTrimmed,
           deleted_at: null,
         },
       });
 
       if (!unidadeExistente) {
-        throw new NotFoundException(`Unidade com ID ${id} não encontrada`);
+        throw new NotFoundException(`Unidade com ID ${idTrimmed} não encontrada`);
       }
 
       console.log('📋 [UPDATE UNIDADE] Unidade existente encontrada:', unidadeExistente.nome);
       console.log('🔑 [UPDATE UNIDADE] concessionaria_id atual no banco:', unidadeExistente.concessionaria_id);
 
       // 2. Se mudou de planta, verificar se a nova planta existe
-      if (planta_id && planta_id !== unidadeExistente.planta_id) {
+      if (plantaIdTrimmed && plantaIdTrimmed !== unidadeExistente.planta_id?.trim()) {
         const planta = await this.prisma.plantas.findFirst({
           where: {
-            id: planta_id,
+            id: plantaIdTrimmed,
             deleted_at: null,
           },
         });
 
         if (!planta) {
-          throw new NotFoundException(`Planta com ID ${planta_id} não encontrada`);
+          throw new NotFoundException(`Planta com ID ${plantaIdTrimmed} não encontrada`);
         }
       }
 
       // 3. Se mudou de concessionária, verificar se existe
-      if (concessionaria_id !== undefined && concessionaria_id !== unidadeExistente.concessionaria_id) {
+      const concessionariaAtualTrimmed = unidadeExistente.concessionaria_id?.trim();
+      if (concessionaria_id !== undefined && concessionariaIdTrimmed !== concessionariaAtualTrimmed) {
         console.log('🔄 [UPDATE UNIDADE] Mudança de concessionária detectada');
-        console.log('   Anterior:', unidadeExistente.concessionaria_id);
-        console.log('   Nova:', concessionaria_id);
+        console.log('   Anterior:', concessionariaAtualTrimmed);
+        console.log('   Nova:', concessionariaIdTrimmed);
 
-        if (concessionaria_id) {
+        if (concessionariaIdTrimmed) {
           const concessionaria = await this.prisma.concessionarias_energia.findFirst({
             where: {
-              id: concessionaria_id,
+              id: concessionariaIdTrimmed,
               deleted_at: null,
             },
           });
 
           if (!concessionaria) {
-            throw new NotFoundException(`Concessionária com ID ${concessionaria_id} não encontrada`);
+            throw new NotFoundException(`Concessionária com ID ${concessionariaIdTrimmed} não encontrada`);
           }
           console.log('✅ [UPDATE UNIDADE] Nova concessionária encontrada:', concessionaria.nome);
         } else {
@@ -379,16 +414,16 @@ export class UnidadesService {
         ...unidadeData,
       };
 
-      if (planta_id !== undefined) updateData.planta_id = planta_id;
+      if (planta_id !== undefined) updateData.planta_id = plantaIdTrimmed;
       if (pontos_medicao !== undefined) updateData.pontos_medicao = pontos_medicao || null;
-      if (concessionaria_id !== undefined) updateData.concessionaria_id = concessionaria_id || null;
+      if (concessionaria_id !== undefined) updateData.concessionaria_id = concessionariaIdTrimmed || null;
 
       console.log('💾 [UPDATE UNIDADE] Dados que serão atualizados:', JSON.stringify(updateData, null, 2));
       console.log('🔑 [UPDATE UNIDADE] concessionaria_id no objeto final:', updateData.concessionaria_id);
 
       // 5. Atualizar a unidade
       const unidadeAtualizada = await this.prisma.unidades.update({
-        where: { id },
+        where: { id: idTrimmed },
         data: updateData,
         include: {
           planta: {
@@ -396,6 +431,13 @@ export class UnidadesService {
               id: true,
               nome: true,
               localizacao: true,
+              proprietario: {
+                select: {
+                  id: true,
+                  nome: true,
+                  email: true,
+                },
+              },
             },
           },
           _count: {
@@ -620,6 +662,13 @@ export class UnidadesService {
             id: unidadeDb.planta.id?.trim() || unidadeDb.planta.id, // ✅ TRIM
             nome: unidadeDb.planta.nome,
             localizacao: unidadeDb.planta.localizacao,
+            proprietario: unidadeDb.planta.proprietario
+              ? {
+                  id: unidadeDb.planta.proprietario.id,
+                  nome: unidadeDb.planta.proprietario.nome,
+                  email: unidadeDb.planta.proprietario.email,
+                }
+              : undefined,
           }
         : undefined,
       totalEquipamentos: unidadeDb._count?.equipamentos || 0,

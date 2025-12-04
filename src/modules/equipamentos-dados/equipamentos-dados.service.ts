@@ -283,24 +283,16 @@ export class EquipamentosDadosService {
       // Tentar diferentes estruturas de dados
       if (d.dados.power?.active_total !== undefined) {
         potenciaKw = d.dados.power.active_total / 1000;
-        console.log(`  - Usando power.active_total: ${d.dados.power.active_total} W -> ${potenciaKw} kW`);
       } else if (d.dados.dc?.total_power !== undefined) {
         potenciaKw = d.dados.dc.total_power / 1000;
-        console.log(`  - Usando dc.total_power: ${d.dados.dc.total_power} W -> ${potenciaKw} kW`);
       } else if (d.dados.power?.active !== undefined) {
         potenciaKw = d.dados.power.active / 1000;
-        console.log(`  - Usando power.active: ${d.dados.power.active} W -> ${potenciaKw} kW`);
       } else if (d.dados.power_avg !== undefined) {
         potenciaKw = d.dados.power_avg;
-        console.log(`  - Usando power_avg: ${potenciaKw} kW`);
       } else if (d.dados.potencia_ativa_kw !== undefined) {
         potenciaKw = d.dados.potencia_ativa_kw;
-        console.log(`  - Usando potencia_ativa_kw: ${potenciaKw} kW`);
       } else if (d.dados.active_power !== undefined) {
         potenciaKw = d.dados.active_power / 1000;
-        console.log(`  - Usando active_power: ${d.dados.active_power} W -> ${potenciaKw} kW`);
-      } else {
-        console.log(`  ⚠️ Nenhum campo de potência encontrado em:`, Object.keys(d.dados));
       }
 
       if (potenciaKw > 0 || true) { // Aceitar zeros também (inversores à noite, etc.)

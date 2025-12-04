@@ -145,7 +145,7 @@ export class CoaService {
       select: {
         id: true,
         nome: true,
-        tipo_unidade: true,
+        tipo: true,
         latitude: true,
         longitude: true,
         cidade: true,
@@ -349,7 +349,7 @@ export class CoaService {
         unidadesProcessadas.push({
           id: unidade.id,
           nome: unidade.nome,
-          tipo: unidade.tipo_unidade,
+          tipo: unidade.tipo,
           status,
           ultimaLeitura,
           coordenadas: unidade.latitude && unidade.longitude ? {

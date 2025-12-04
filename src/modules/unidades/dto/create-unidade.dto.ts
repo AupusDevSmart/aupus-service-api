@@ -8,10 +8,8 @@ export enum StatusUnidade {
 
 export enum TipoUnidade {
   UFV = 'UFV',
-  Carga = 'Carga',
-  Motor = 'Motor',
-  Inversor = 'Inversor',
-  Transformador = 'Transformador',
+  PCH = 'PCH',
+  OUTRO = 'OUTRO',
 }
 
 export enum GrupoUnidade {
@@ -28,6 +26,7 @@ export enum SubgrupoUnidade {
 export enum TipoUnidadeEnergia {
   CARGA = 'Carga',
   GERACAO = 'Geração',
+  CARGA_E_GERACAO = 'Carga e Geração',
 }
 
 export class CreateUnidadeDto {
