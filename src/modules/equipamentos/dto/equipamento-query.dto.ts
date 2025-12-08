@@ -33,6 +33,11 @@ export class EquipamentoQueryDto {
   @IsString()
   planta_id?: string;
 
+  @ApiPropertyOptional({ example: 'usr_01234567890123456789012345', description: 'Filtrar por proprietário (busca em plantas do proprietário)' })
+  @IsOptional()
+  @IsString()
+  proprietario_id?: string;
+
   @ApiPropertyOptional({ example: 'UC', enum: ['UC', 'UAR'] })
   @IsOptional()
   @IsString()

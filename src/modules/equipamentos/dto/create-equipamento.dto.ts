@@ -155,6 +155,21 @@ export class CreateEquipamentoDto {
   @IsString()
   observacoes?: string;
 
+  @ApiPropertyOptional({ example: 'TAG-001' })
+  @IsOptional()
+  @IsString()
+  tag?: string;
+
+  @ApiPropertyOptional({ example: false })
+  @IsOptional()
+  @IsBoolean()
+  mqtt_habilitado?: boolean;
+
+  @ApiPropertyOptional({ example: 'solar/medidor/01' })
+  @IsOptional()
+  @IsString()
+  topico_mqtt?: string;
+
   @ApiPropertyOptional({ example: false })
   @IsOptional()
   @IsBoolean()

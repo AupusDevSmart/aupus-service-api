@@ -129,6 +129,15 @@ export class Equipamento {
   @ApiPropertyOptional({ example: 'Observações gerais' })
   observacoes?: string;
 
+  @ApiPropertyOptional({ example: 'TAG-001' })
+  tag?: string;
+
+  @ApiPropertyOptional({ example: false })
+  mqtt_habilitado?: boolean;
+
+  @ApiPropertyOptional({ example: 'solar/medidor/01' })
+  topico_mqtt?: string;
+
   @ApiPropertyOptional({ example: false })
   mcpse?: boolean;
 

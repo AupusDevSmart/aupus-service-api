@@ -19,6 +19,7 @@ import { UpdateEquipamentoDto } from './dto/update-equipamento.dto';
 import { EquipamentoQueryDto } from './dto/equipamento-query.dto';
 import { CreateComponenteUARDto } from './dto/componente-uar.dto';
 import { ConfigurarMqttDto } from './dto/configurar-mqtt.dto';
+import { CreateEquipamentoRapidoDto } from './dto/create-equipamento-rapido.dto';
 
 @ApiTags('Equipamentos')
 @Controller('equipamentos')
@@ -34,6 +35,40 @@ export class EquipamentosController {
   @ApiResponse({ status: 400, description: 'Dados inválidos' })
   create(@Body() createDto: CreateEquipamentoDto) {
     return this.equipamentosService.create(createDto);
+  }
+
+  @Post('rapido')
+  @ApiOperation({
+    summary: 'Criar equipamento rapidamente com dados mínimos',
+    description: 'Cria equipamento para uso imediato no diagrama. Apenas tipo e unidade são obrigatórios. O nome é gerado automaticamente se não fornecido. Dados completos podem ser preenchidos depois na página de cadastro.'
+  })
+  @ApiResponse({
+    status: 201,
+    description: 'Equipamento criado rapidamente. Complete os dados depois.',
+    schema: {
+      example: {
+        success: true,
+        message: 'Equipamento criado rapidamente. Complete os dados depois na página de cadastro.',
+        data: {
+          id: 'cmhcg1w27000ejqo84gbjeyty',
+          nome: 'Medidor 1',
+          tag: 'MED-001',
+          classificacao: 'UC',
+          criticidade: '3',
+          em_operacao: 'sim',
+          tipoEquipamento: {
+            id: '01JAQTE1MOTOR000000000017',
+            codigo: 'MEDIDOR',
+            nome: 'Medidor de Energia'
+          }
+        }
+      }
+    }
+  })
+  @ApiResponse({ status: 400, description: 'Dados inválidos' })
+  @ApiResponse({ status: 404, description: 'Unidade ou tipo de equipamento não encontrado' })
+  criarEquipamentoRapido(@Body() createDto: CreateEquipamentoRapidoDto) {
+    return this.equipamentosService.criarEquipamentoRapido(createDto);
   }
 
   @Get()

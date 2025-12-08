@@ -46,6 +46,14 @@ export class FindAllUnidadesDto {
   plantaId?: string;
 
   @ApiPropertyOptional({
+    description: 'Filtrar por ID do proprietário (busca em plantas do proprietário)',
+    example: 'usr_01234567890123456789012345',
+  })
+  @IsOptional()
+  @IsString()
+  proprietarioId?: string;
+
+  @ApiPropertyOptional({
     description: 'Filtrar por tipo de unidade',
     enum: TipoUnidade,
     example: TipoUnidade.UFV,

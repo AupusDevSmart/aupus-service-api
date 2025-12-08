@@ -6,6 +6,7 @@ import { UpdateEquipamentoDto } from './dto/update-equipamento.dto';
 import { EquipamentoQueryDto } from './dto/equipamento-query.dto';
 import { CreateComponenteUARDto } from './dto/componente-uar.dto';
 import { ConfigurarMqttDto } from './dto/configurar-mqtt.dto';
+import { CreateEquipamentoRapidoDto } from './dto/create-equipamento-rapido.dto';
 
 @Injectable()
 export class EquipamentosService {
@@ -98,6 +99,102 @@ export class EquipamentosService {
     });
   }
 
+  /**
+   * Cria um equipamento rapidamente com dados mínimos para uso imediato no diagrama
+   * Ideal para adicionar equipamentos durante a edição do sinóptico
+   * Dados completos podem ser preenchidos posteriormente na página de cadastro
+   */
+  async criarEquipamentoRapido(dto: CreateEquipamentoRapidoDto) {
+    // Validar se unidade existe
+    const unidade = await this.prisma.unidades.findFirst({
+      where: { id: dto.unidade_id?.trim(), deleted_at: null }
+    });
+
+    if (!unidade) {
+      throw new NotFoundException('Unidade não encontrada');
+    }
+
+    // Validar se tipo de equipamento existe
+    const tipoEquipamento = await this.prisma.tipos_equipamentos.findUnique({
+      where: { id: dto.tipo_equipamento_id?.trim() }
+    });
+
+    if (!tipoEquipamento) {
+      throw new NotFoundException('Tipo de equipamento não encontrado');
+    }
+
+    // Gerar nome automático se não fornecido
+    let nome = dto.nome?.trim();
+    if (!nome) {
+      // Contar quantos equipamentos desse tipo já existem na unidade
+      const count = await this.prisma.equipamentos.count({
+        where: {
+          unidade_id: dto.unidade_id?.trim(),
+          tipo_equipamento_id: dto.tipo_equipamento_id?.trim(),
+          deleted_at: null
+        }
+      });
+
+      nome = `${tipoEquipamento.nome} ${count + 1}`;
+    }
+
+    // Criar equipamento com dados mínimos
+    const equipamento = await this.prisma.equipamentos.create({
+      data: {
+        nome: nome.trim(),
+        tag: dto.tag?.trim() || null,
+        unidade_id: dto.unidade_id.trim(),
+        classificacao: dto.classificacao || 'UC',
+        tipo_equipamento_id: dto.tipo_equipamento_id.trim(),
+        criticidade: '3', // Criticidade média por padrão
+        em_operacao: 'sim',
+        // Campos vazios/padrão - podem ser preenchidos depois
+        fabricante: null,
+        modelo: null,
+        numero_serie: null,
+        localizacao: 'A definir',
+      },
+      include: {
+        tipo_equipamento_rel: {
+          select: {
+            id: true,
+            codigo: true,
+            nome: true,
+            categoria: true,
+            largura_padrao: true,
+            altura_padrao: true,
+            icone_svg: true,
+          }
+        },
+        unidade: {
+          select: {
+            id: true,
+            nome: true,
+            planta: {
+              select: {
+                id: true,
+                nome: true,
+              }
+            }
+          }
+        }
+      }
+    });
+
+    return {
+      success: true,
+      message: 'Equipamento criado rapidamente. Complete os dados depois na página de cadastro.',
+      data: {
+        ...equipamento,
+        // Garantir trim em todos os campos de string
+        id: equipamento.id?.trim(),
+        nome: equipamento.nome?.trim(),
+        tag: equipamento.tag?.trim() || null,
+        tipoEquipamento: equipamento.tipo_equipamento_rel,
+      },
+    };
+  }
+
   async findAll(query: EquipamentoQueryDto) {
     const {
       page = 1,
@@ -105,6 +202,7 @@ export class EquipamentosService {
       search,
       unidade_id,
       planta_id,
+      proprietario_id,
       classificacao,
       criticidade,
       equipamento_pai_id,
@@ -134,11 +232,24 @@ export class EquipamentosService {
 
     if (unidade_id) where.unidade_id = unidade_id;
 
-    // Filtrar por planta (via relação com unidade)
-    if (planta_id && !unidade_id) {
-      where.unidade = {
-        planta_id: planta_id
-      };
+    // Filtros hierárquicos: proprietário > planta > unidade
+    // Prioridade: unidade > planta > proprietário
+    // Se unidade está selecionada, não aplicar filtros de planta ou proprietário
+    if (!unidade_id) {
+      // Filtrar por planta (via relação com unidade)
+      if (planta_id) {
+        where.unidade = {
+          planta_id: planta_id.trim()
+        };
+      }
+      // Filtrar por proprietário (via relação com unidade -> planta -> proprietário)
+      else if (proprietario_id) {
+        where.unidade = {
+          planta: {
+            proprietario_id: proprietario_id.trim()
+          }
+        };
+      }
     }
 
     if (classificacao) where.classificacao = classificacao;
@@ -540,19 +651,59 @@ export class EquipamentosService {
 
   async salvarComponentesUARLote(ucId: string, componentes: Partial<CreateEquipamentoDto & { id?: string }>[]) {
     const equipamentoUC = await this.prisma.equipamentos.findFirst({
-      where: { id: ucId, deleted_at: null, classificacao: 'UC' }
+      where: { id: ucId.trim(), deleted_at: null, classificacao: 'UC' }
     });
 
     if (!equipamentoUC) {
       throw new NotFoundException('Equipamento UC não encontrado');
     }
 
+    console.log('💾 [BACKEND] Salvando componentes UAR em lote');
+    console.log('💾 [BACKEND] UC ID:', ucId);
+    console.log('💾 [BACKEND] Componentes recebidos:', componentes.length);
+    console.log('💾 [BACKEND] IDs recebidos:', componentes.map(c => (c as any).id?.trim()));
+
+    // 1. Buscar componentes existentes no banco
+    const componentesExistentes = await this.prisma.equipamentos.findMany({
+      where: {
+        equipamento_pai_id: ucId.trim(),
+        deleted_at: null,
+      },
+      select: { id: true }
+    });
+
+    const idsExistentes = componentesExistentes.map(c => c.id.trim());
+    const idsRecebidos = componentes
+      .map(c => (c as any).id?.trim())
+      .filter(Boolean); // Remove undefined/null
+
+    console.log('💾 [BACKEND] IDs existentes no banco:', idsExistentes);
+    console.log('💾 [BACKEND] IDs recebidos (limpos):', idsRecebidos);
+
+    // 2. Identificar componentes a serem excluídos (soft delete)
+    const idsParaExcluir = idsExistentes.filter(id => !idsRecebidos.includes(id));
+
+    console.log('💾 [BACKEND] IDs para EXCLUIR:', idsParaExcluir);
+
+    if (idsParaExcluir.length > 0) {
+      await this.prisma.equipamentos.updateMany({
+        where: {
+          id: { in: idsParaExcluir },
+        },
+        data: {
+          deleted_at: new Date(),
+        },
+      });
+      console.log(`✅ [BACKEND] ${idsParaExcluir.length} componentes excluídos`);
+    }
+
+    // 3. Criar/Atualizar componentes
     const resultados = [];
 
     for (const componente of componentes) {
-      const componenteId = (componente as any).id;
+      const componenteId = (componente as any).id?.trim();
       const { dados_tecnicos, ...componenteData } = componente;
-      
+
       const baseData = {
         nome: componente.nome,
         fabricante: componente.fabricante,
@@ -560,27 +711,37 @@ export class EquipamentosService {
         numero_serie: componente.numero_serie,
         criticidade: componente.criticidade,
         tipo_equipamento: componente.tipo_equipamento,
+        data_instalacao: componente.data_instalacao,
         localizacao_especifica: componente.localizacao_especifica,
+        observacoes: componente.observacoes,
+        fornecedor: componente.fornecedor,
+        valor_imobilizado: componente.valor_imobilizado,
+        valor_depreciacao: componente.valor_depreciacao,
+        valor_contabil: componente.valor_contabil,
         classificacao: 'UAR' as const,
-        equipamento_pai_id: ucId,
+        equipamento_pai_id: ucId.trim(),
         unidade_id: equipamentoUC.unidade_id,
       };
 
-      if (componenteId) {
-        // Atualizar
+      if (componenteId && !componenteId.startsWith('temp_')) {
+        // Atualizar componente existente
+        console.log(`🔄 [BACKEND] Atualizando componente ${componenteId}`);
         const atualizado = await this.prisma.equipamentos.update({
           where: { id: componenteId },
           data: baseData,
         });
         resultados.push(atualizado);
       } else {
-        // Criar
+        // Criar novo componente
+        console.log(`➕ [BACKEND] Criando novo componente`);
         const criado = await this.prisma.equipamentos.create({
           data: baseData as any,
         });
         resultados.push(criado);
       }
     }
+
+    console.log(`✅ [BACKEND] ${resultados.length} componentes processados com sucesso`);
 
     return {
       message: `${resultados.length} componentes processados com sucesso`,

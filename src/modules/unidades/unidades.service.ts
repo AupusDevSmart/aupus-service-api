@@ -123,6 +123,7 @@ export class UnidadesService {
       limit = 10,
       search,
       plantaId,
+      proprietarioId,
       tipo,
       status,
       estado,
@@ -146,12 +147,22 @@ export class UnidadesService {
         ];
       }
 
-      // Filtros específicos
+      // Filtros hierárquicos: proprietário > planta
+      // Prioridade: planta > proprietário
       if (plantaId) {
         const plantaIdTrimmed = plantaId.trim();
         whereClause.planta_id = plantaIdTrimmed;
         console.log('🔍 [FINDALL UNIDADES] Filtrando por planta:', plantaIdTrimmed);
       }
+      // Se não tem planta mas tem proprietário, filtrar por proprietário (via relação com planta)
+      else if (proprietarioId) {
+        const proprietarioIdTrimmed = proprietarioId.trim();
+        whereClause.planta = {
+          proprietario_id: proprietarioIdTrimmed
+        };
+        console.log('🔍 [FINDALL UNIDADES] Filtrando por proprietário:', proprietarioIdTrimmed);
+      }
+
       if (tipo) whereClause.tipo = tipo;
       if (status) whereClause.status = status;
       if (estado) whereClause.estado = estado;
