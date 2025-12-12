@@ -1386,45 +1386,16 @@ export class UsuariosService {
   // ============================================================================
 
   /**
-   * Mapeia roles do sistema Spatie para valores válidos do constraint da coluna role
-   * Usado para manter compatibilidade com aplicação legacy
+   * Retorna o nome da role do Spatie diretamente para a coluna role
+   * NOTA: A constraint CHECK foi removida em 2025-12-09, então agora a coluna aceita qualquer valor
+   * Mantido para compatibilidade com aplicação legacy, mas não faz mais mapeamento
    */
   private mapSpatieRoleToValidDbRole(spatieRoleName: string): string {
-    if (!spatieRoleName) return 'vendedor'; // fallback seguro
-    
-    const roleName = spatieRoleName.toLowerCase().trim();
-    
-    // Mapeamento de roles do Spatie para valores aceitos pelo constraint
-    const mapping: Record<string, string> = {
-      'proprietario': 'gerente',     // proprietario do Spatie vira gerente na coluna legacy
-      'propietario': 'gerente',      // typo comum
-      'owner': 'gerente',
-      'user': 'vendedor',
-      'cliente': 'vendedor',
-      'associado': 'vendedor',
-      'cativo': 'vendedor',
-      'admin': 'admin',
-      'administrator': 'admin',
-      'super-admin': 'admin',
-      'aupus': 'admin',
-      'consultor': 'consultor',
-      'analyst': 'consultor',
-      'gerente': 'gerente',
-      'manager': 'gerente',
-      'vendedor': 'vendedor',
-      'seller': 'vendedor',
-      'salesperson': 'vendedor'
-    };
-    
-    const mappedRole = mapping[roleName];
-    if (mappedRole) {
-      console.log(`🔄 [ROLE MAPPING] '${spatieRoleName}' → '${mappedRole}' (para compatibilidade DB)`);
-      return mappedRole;
-    }
-    
-    // Se não encontrou mapeamento, usar fallback seguro
-    console.log(`⚠️ [ROLE MAPPING] Role '${spatieRoleName}' não mapeada, usando fallback 'vendedor'`);
-    return 'vendedor';
+    if (!spatieRoleName) return 'vendedor'; // fallback seguro apenas se NULL
+
+    // ✅ ATUALIZADO: Constraint CHECK foi removida, retornar o valor original
+    console.log(`✅ [ROLE SYNC] Sincronizando role '${spatieRoleName}' na coluna legacy`);
+    return spatieRoleName;
   }
 
   /**

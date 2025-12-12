@@ -167,15 +167,17 @@ export class CreateProgramacaoDto {
   tarefas_ids?: string[];
 
   // Planejamento
-  @ApiProperty({ description: 'Tempo estimado em horas', example: 4.5 })
+  @ApiPropertyOptional({ description: 'Tempo estimado em horas (padrão: 2h)', example: 4.5 })
+  @IsOptional()
   @IsNumber({ maxDecimalPlaces: 2 })
   @Min(0.25)
-  tempo_estimado: number;
+  tempo_estimado?: number;
 
-  @ApiProperty({ description: 'Duração estimada em horas', example: 6.0 })
+  @ApiPropertyOptional({ description: 'Duração estimada em horas (padrão: 3h ou 1.5x tempo_estimado)', example: 6.0 })
+  @IsOptional()
   @IsNumber({ maxDecimalPlaces: 2 })
   @Min(0.25)
-  duracao_estimada: number;
+  duracao_estimada?: number;
 
   @ApiPropertyOptional({ description: 'Data e hora de previsão de início', example: '2025-02-15T08:00:00Z' })
   @IsOptional()

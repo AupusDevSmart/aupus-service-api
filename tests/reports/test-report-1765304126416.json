@@ -1,0 +1,478 @@
+{
+  "timestamp": "2025-12-09T18:15:26.413Z",
+  "summary": {
+    "totalTests": 27,
+    "totalPassed": 7,
+    "totalFailed": 19,
+    "totalWarned": 1,
+    "successRate": "25.93%",
+    "duration": 3914
+  },
+  "phases": [
+    {
+      "phase": "FASE 1: Infraestrutura",
+      "passed": 5,
+      "failed": 0,
+      "warned": 1,
+      "total": 6,
+      "duration": 3122
+    },
+    {
+      "phase": "FASE 2: CRUD de Usuários",
+      "passed": 0,
+      "failed": 7,
+      "warned": 0,
+      "total": 7,
+      "duration": 348
+    },
+    {
+      "phase": "FASE 3: Autenticação",
+      "passed": 2,
+      "failed": 4,
+      "warned": 0,
+      "total": 6,
+      "duration": 299
+    },
+    {
+      "phase": "FASE 4: Roles e Permissions",
+      "passed": 0,
+      "failed": 8,
+      "warned": 0,
+      "total": 8,
+      "duration": 145
+    }
+  ],
+  "failures": [
+    {
+      "phase": "CRUD",
+      "test": "Criar Usuário Simples",
+      "message": "Erro: Request failed with status code 401"
+    },
+    {
+      "phase": "CRUD",
+      "test": "Criar Usuário com RoleId",
+      "message": "Erro: Request failed with status code 401"
+    },
+    {
+      "phase": "CRUD",
+      "test": "Criar Usuário com PermissionIds",
+      "message": "Erro: Request failed with status code 401"
+    },
+    {
+      "phase": "CRUD",
+      "test": "Listar Usuários",
+      "message": "Erro: Request failed with status code 401"
+    },
+    {
+      "phase": "CRUD",
+      "test": "Buscar Usuário por ID",
+      "message": "Teste pulado: nenhum usuário foi criado no TEST 7"
+    },
+    {
+      "phase": "CRUD",
+      "test": "Atualizar Usuário",
+      "message": "Teste pulado: nenhum usuário foi criado no TEST 7"
+    },
+    {
+      "phase": "CRUD",
+      "test": "Deletar Usuário",
+      "message": "Teste pulado: nenhum usuário foi criado no TEST 7"
+    },
+    {
+      "phase": "Autenticação",
+      "test": "Login com Credenciais Válidas",
+      "message": "Erro: Request failed with status code 401"
+    },
+    {
+      "phase": "Autenticação",
+      "test": "Payload do JWT",
+      "message": "Teste pulado: nenhum token disponível do TEST 14"
+    },
+    {
+      "phase": "Autenticação",
+      "test": "Refresh Token",
+      "message": "Teste pulado: nenhum refresh token disponível do TEST 14"
+    },
+    {
+      "phase": "Autenticação",
+      "test": "Rota Protegida com Token Válido",
+      "message": "Teste pulado: nenhum token disponível"
+    },
+    {
+      "phase": "Permissions",
+      "test": "Atribuir Role",
+      "message": "Teste pulado: usuário de teste não foi criado"
+    },
+    {
+      "phase": "Permissions",
+      "test": "Atribuir Permissão Direta",
+      "message": "Teste pulado: usuário de teste não foi criado"
+    },
+    {
+      "phase": "Permissions",
+      "test": "Remover Permissão Direta",
+      "message": "Teste pulado: usuário ou permission não disponível"
+    },
+    {
+      "phase": "Permissions",
+      "test": "Sincronizar Permissões",
+      "message": "Teste pulado: usuário de teste não foi criado"
+    },
+    {
+      "phase": "Permissions",
+      "test": "Buscar Permissões do Usuário",
+      "message": "Teste pulado: usuário de teste não foi criado"
+    },
+    {
+      "phase": "Permissions",
+      "test": "Verificar Permissão Específica",
+      "message": "Teste pulado: usuário de teste não foi criado"
+    },
+    {
+      "phase": "Permissions",
+      "test": "Verificar Múltiplas Permissões",
+      "message": "Teste pulado: usuário de teste não foi criado"
+    },
+    {
+      "phase": "Permissions",
+      "test": "Categorização de Permissões",
+      "message": "Teste pulado: usuário de teste não foi criado"
+    }
+  ],
+  "allResults": [
+    {
+      "phase": "FASE 1: Infraestrutura",
+      "results": [
+        {
+          "test": "Existência de Tabelas",
+          "status": "PASS",
+          "message": "Todas as 6 tabelas necessárias existem",
+          "data": [
+            "model_has_permissions",
+            "model_has_roles",
+            "permissions",
+            "role_has_permissions",
+            "roles",
+            "usuarios"
+          ]
+        },
+        {
+          "test": "Constraint da Coluna Role",
+          "status": "WARN",
+          "message": "Constraint existe mas não foi possível extrair valores",
+          "data": {
+            "conname": "usuarios_role_check",
+            "constraint_def": "CHECK (((role)::text = ANY (ARRAY[('admin'::character varying)::text, ('consultor'::character varying)::text, ('gerente'::character varying)::text, ('vendedor'::character varying)::text])))"
+          }
+        },
+        {
+          "test": "Índices de Performance",
+          "status": "PASS",
+          "message": "2 índices encontrados",
+          "data": [
+            {
+              "tablename": "model_has_permissions",
+              "indexname": "model_has_permissions_model_id_model_type_index"
+            },
+            {
+              "tablename": "model_has_roles",
+              "indexname": "model_has_roles_model_id_model_type_index"
+            }
+          ]
+        },
+        {
+          "test": "Roles Cadastradas",
+          "status": "PASS",
+          "message": "9 roles encontradas no sistema",
+          "data": [
+            {
+              "id": 1,
+              "name": "super_admin",
+              "guard_name": "api"
+            },
+            {
+              "id": 2,
+              "name": "admin",
+              "guard_name": "api"
+            },
+            {
+              "id": 3,
+              "name": "cativo",
+              "guard_name": "api"
+            },
+            {
+              "id": 4,
+              "name": "corretor",
+              "guard_name": "api"
+            },
+            {
+              "id": 5,
+              "name": "associado",
+              "guard_name": "api"
+            },
+            {
+              "id": 6,
+              "name": "proprietario",
+              "guard_name": "api"
+            },
+            {
+              "id": 7,
+              "name": "gerente",
+              "guard_name": "api"
+            },
+            {
+              "id": 8,
+              "name": "vendedor",
+              "guard_name": "api"
+            },
+            {
+              "id": 9,
+              "name": "consultor",
+              "guard_name": "api"
+            }
+          ]
+        },
+        {
+          "test": "Permissions Cadastradas",
+          "status": "PASS",
+          "message": "126 permissions encontradas (94 modernas)",
+          "data": {
+            "total": 126,
+            "modern": 94,
+            "sample": [
+              {
+                "id": 1,
+                "name": "PainelGeral"
+              },
+              {
+                "id": 2,
+                "name": "PainelGeralOrganizacoes"
+              },
+              {
+                "id": 3,
+                "name": "PainelGeralCativos"
+              },
+              {
+                "id": 4,
+                "name": "PainelGeralClube"
+              },
+              {
+                "id": 5,
+                "name": "MonitoramentoOrganizacoes"
+              },
+              {
+                "id": 6,
+                "name": "Monitoramento"
+              },
+              {
+                "id": 7,
+                "name": "NET"
+              },
+              {
+                "id": 8,
+                "name": "CRM"
+              },
+              {
+                "id": 9,
+                "name": "Oportunidades"
+              },
+              {
+                "id": 10,
+                "name": "Usuarios"
+              }
+            ]
+          }
+        },
+        {
+          "test": "Relacionamento Roles-Permissions",
+          "status": "PASS",
+          "message": "6 roles têm permissions associadas",
+          "data": {
+            "rolesWithPermissions": 6
+          }
+        }
+      ]
+    },
+    {
+      "phase": "FASE 2: CRUD de Usuários",
+      "results": [
+        {
+          "test": "Criar Usuário Simples",
+          "status": "FAIL",
+          "message": "Erro: Request failed with status code 401",
+          "data": {
+            "success": false,
+            "error": {
+              "code": "UNAUTHORIZED",
+              "message": "Unauthorized"
+            },
+            "meta": {
+              "timestamp": "2025-12-09T18:15:25.955Z",
+              "requestId": "cad26a2d-0a8c-48cd-a1f0-e18e5c7e57a9"
+            }
+          }
+        },
+        {
+          "test": "Criar Usuário com RoleId",
+          "status": "FAIL",
+          "message": "Erro: Request failed with status code 401",
+          "data": {
+            "success": false,
+            "error": {
+              "code": "UNAUTHORIZED",
+              "message": "Unauthorized"
+            },
+            "meta": {
+              "timestamp": "2025-12-09T18:15:25.960Z",
+              "requestId": "17518749-dea2-4607-9bef-b734e807c87d"
+            }
+          }
+        },
+        {
+          "test": "Criar Usuário com PermissionIds",
+          "status": "FAIL",
+          "message": "Erro: Request failed with status code 401",
+          "data": {
+            "success": false,
+            "error": {
+              "code": "UNAUTHORIZED",
+              "message": "Unauthorized"
+            },
+            "meta": {
+              "timestamp": "2025-12-09T18:15:25.964Z",
+              "requestId": "c0f6dfe4-ac2e-43b3-83df-4ca33d89076d"
+            }
+          }
+        },
+        {
+          "test": "Listar Usuários",
+          "status": "FAIL",
+          "message": "Erro: Request failed with status code 401",
+          "data": {
+            "success": false,
+            "error": {
+              "code": "UNAUTHORIZED",
+              "message": "Unauthorized"
+            },
+            "meta": {
+              "timestamp": "2025-12-09T18:15:25.969Z",
+              "requestId": "7308c663-3cd6-47a0-a2ae-a39736dd412d"
+            }
+          }
+        },
+        {
+          "test": "Buscar Usuário por ID",
+          "status": "FAIL",
+          "message": "Teste pulado: nenhum usuário foi criado no TEST 7"
+        },
+        {
+          "test": "Atualizar Usuário",
+          "status": "FAIL",
+          "message": "Teste pulado: nenhum usuário foi criado no TEST 7"
+        },
+        {
+          "test": "Deletar Usuário",
+          "status": "FAIL",
+          "message": "Teste pulado: nenhum usuário foi criado no TEST 7"
+        }
+      ]
+    },
+    {
+      "phase": "FASE 3: Autenticação",
+      "results": [
+        {
+          "test": "Login com Credenciais Válidas",
+          "status": "FAIL",
+          "message": "Erro: Request failed with status code 401",
+          "data": {
+            "success": false,
+            "error": {
+              "code": "UNAUTHORIZED",
+              "message": "Email ou senha inválidos"
+            },
+            "meta": {
+              "timestamp": "2025-12-09T18:15:26.120Z",
+              "requestId": "ebe3c65a-6c34-41a3-a8c1-69532dd36c69"
+            }
+          }
+        },
+        {
+          "test": "Login com Credenciais Inválidas",
+          "status": "PASS",
+          "message": "Login rejeitado corretamente (401/400)",
+          "data": {
+            "status": 401
+          }
+        },
+        {
+          "test": "Payload do JWT",
+          "status": "FAIL",
+          "message": "Teste pulado: nenhum token disponível do TEST 14"
+        },
+        {
+          "test": "Refresh Token",
+          "status": "FAIL",
+          "message": "Teste pulado: nenhum refresh token disponível do TEST 14"
+        },
+        {
+          "test": "Rota Protegida com Token Válido",
+          "status": "FAIL",
+          "message": "Teste pulado: nenhum token disponível"
+        },
+        {
+          "test": "Rota Protegida sem Token",
+          "status": "PASS",
+          "message": "Acesso bloqueado corretamente (401 Unauthorized)",
+          "data": {
+            "status": 401
+          }
+        }
+      ]
+    },
+    {
+      "phase": "FASE 4: Roles e Permissions",
+      "results": [
+        {
+          "test": "Atribuir Role",
+          "status": "FAIL",
+          "message": "Teste pulado: usuário de teste não foi criado"
+        },
+        {
+          "test": "Atribuir Permissão Direta",
+          "status": "FAIL",
+          "message": "Teste pulado: usuário de teste não foi criado"
+        },
+        {
+          "test": "Remover Permissão Direta",
+          "status": "FAIL",
+          "message": "Teste pulado: usuário ou permission não disponível"
+        },
+        {
+          "test": "Sincronizar Permissões",
+          "status": "FAIL",
+          "message": "Teste pulado: usuário de teste não foi criado"
+        },
+        {
+          "test": "Buscar Permissões do Usuário",
+          "status": "FAIL",
+          "message": "Teste pulado: usuário de teste não foi criado"
+        },
+        {
+          "test": "Verificar Permissão Específica",
+          "status": "FAIL",
+          "message": "Teste pulado: usuário de teste não foi criado"
+        },
+        {
+          "test": "Verificar Múltiplas Permissões",
+          "status": "FAIL",
+          "message": "Teste pulado: usuário de teste não foi criado"
+        },
+        {
+          "test": "Categorização de Permissões",
+          "status": "FAIL",
+          "message": "Teste pulado: usuário de teste não foi criado"
+        }
+      ]
+    }
+  ]
+}

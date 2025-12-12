@@ -317,7 +317,7 @@ export class ExecucaoOSService {
       });
 
       // Confirmar materiais
-      if (dto.materiais_confirmados.length > 0) {
+      if (dto.materiais_confirmados && dto.materiais_confirmados.length > 0) {
         await prisma.materiais_os.updateMany({
           where: {
             os_id: id,
@@ -328,7 +328,7 @@ export class ExecucaoOSService {
       }
 
       // Confirmar ferramentas
-      if (dto.ferramentas_confirmadas.length > 0) {
+      if (dto.ferramentas_confirmadas && dto.ferramentas_confirmadas.length > 0) {
         await prisma.ferramentas_os.updateMany({
           where: {
             os_id: id,
@@ -339,7 +339,7 @@ export class ExecucaoOSService {
       }
 
       // Confirmar técnicos
-      if (dto.tecnicos_confirmados.length > 0) {
+      if (dto.tecnicos_confirmados && dto.tecnicos_confirmados.length > 0) {
         await prisma.tecnicos_os.updateMany({
           where: {
             os_id: id,
@@ -909,31 +909,43 @@ export class ExecucaoOSService {
           proxima_manutencao: dto.proxima_manutencao,
           avaliacao_qualidade: dto.avaliacao_qualidade,
           observacoes_qualidade: dto.observacoes_qualidade,
+          // Novos campos adicionados
+          atividades_realizadas: dto.atividades_realizadas,
+          checklist_concluido: dto.checklist_concluido,
+          procedimentos_seguidos: dto.procedimentos_seguidos,
+          equipamentos_seguranca: dto.equipamentos_seguranca,
+          incidentes_seguranca: dto.incidentes_seguranca,
+          medidas_seguranca_adicionais: dto.medidas_seguranca_adicionais,
+          custos_adicionais: dto.custos_adicionais,
           finalizado_por_id: usuarioId,
         },
       });
 
       // Atualizar materiais consumidos finais
-      for (const material of dto.materiais_consumidos) {
-        await prisma.materiais_os.update({
-          where: { id: material.id },
-          data: {
-            quantidade_consumida: material.quantidade_consumida,
-            observacoes: material.observacoes,
-          },
-        });
+      if (dto.materiais_consumidos && dto.materiais_consumidos.length > 0) {
+        for (const material of dto.materiais_consumidos) {
+          await prisma.materiais_os.update({
+            where: { id: material.id },
+            data: {
+              quantidade_consumida: material.quantidade_consumida,
+              observacoes: material.observacoes,
+            },
+          });
+        }
       }
 
       // Atualizar ferramentas utilizadas finais
-      for (const ferramenta of dto.ferramentas_utilizadas) {
-        await prisma.ferramentas_os.update({
-          where: { id: ferramenta.id },
-          data: {
-            condicao_depois: ferramenta.condicao_depois,
-            observacoes: ferramenta.observacoes,
-            utilizada: true,
-          },
-        });
+      if (dto.ferramentas_utilizadas && dto.ferramentas_utilizadas.length > 0) {
+        for (const ferramenta of dto.ferramentas_utilizadas) {
+          await prisma.ferramentas_os.update({
+            where: { id: ferramenta.id },
+            data: {
+              condicao_depois: ferramenta.condicao_depois,
+              observacoes: ferramenta.observacoes,
+              utilizada: true,
+            },
+          });
+        }
       }
 
       // ✅ Finalizar reserva de veículo se existir
@@ -1200,6 +1212,14 @@ export class ExecucaoOSService {
       proxima_manutencao: os.proxima_manutencao,
       avaliacao_qualidade: os.avaliacao_qualidade,
       observacoes_qualidade: os.observacoes_qualidade,
+      // Detalhes da execução
+      atividades_realizadas: os.atividades_realizadas,
+      checklist_concluido: os.checklist_concluido,
+      procedimentos_seguidos: os.procedimentos_seguidos,
+      equipamentos_seguranca: os.equipamentos_seguranca,
+      incidentes_seguranca: os.incidentes_seguranca,
+      medidas_seguranca_adicionais: os.medidas_seguranca_adicionais,
+      custos_adicionais: os.custos_adicionais ? Number(os.custos_adicionais) : null,
       tarefas_os: os.tarefas_os?.filter((to: any) => to.tarefa).map((to: any) => ({
         id: to.id,
         os_id: to.os_id,

@@ -48,27 +48,96 @@ export class UsuariosController {
   constructor(private readonly usuariosService: UsuariosService) {}
 
   // ============================================================================
-  // ENDPOINTS BÁSICOS DE USUÁRIO
+  // ENDPOINTS AUXILIARES (rotas estáticas devem vir ANTES de rotas parametrizadas)
   // ============================================================================
 
-  @Get()
-  @ApiOperation({ summary: 'Listar usuários com filtros e paginação' })
+  @Get('available/roles')
+  @ApiOperation({ summary: 'Listar todos os roles disponíveis' })
   @ApiResponse({
     status: 200,
-    description: 'Lista paginada de usuários',
+    description: 'Lista de roles disponíveis',
+    schema: {
+      type: 'array',
+      items: { type: 'object' }
+    }
   })
-  findAll(@Query() query: UsuarioQueryDto) {
-    return this.usuariosService.findAll(query);
+  getAvailableRoles() {
+    return this.usuariosService.getAllAvailableRoles();
+  }
+
+  @Get('available/permissions')
+  @ApiOperation({ summary: 'Listar todas as permissões disponíveis' })
+  @ApiResponse({
+    status: 200,
+    description: 'Lista de permissões disponíveis',
+    schema: {
+      type: 'array',
+      items: { type: 'object' }
+    }
+  })
+  getAvailablePermissions() {
+    return this.usuariosService.getAllAvailablePermissions();
+  }
+
+  @Get('available/permissions/grouped')
+  @ApiOperation({ summary: 'Listar permissões disponíveis agrupadas por categoria' })
+  @ApiResponse({
+    status: 200,
+    description: 'Permissões agrupadas por categoria',
+    schema: {
+      type: 'object',
+      additionalProperties: {
+        type: 'array',
+        items: { type: 'object' }
+      }
+    }
+  })
+  getAvailablePermissionsGrouped() {
+    return this.usuariosService.getAvailablePermissionsGrouped();
+  }
+
+  @Get('debug/constraint-values')
+  @ApiOperation({ summary: 'Descobrir valores válidos do constraint role' })
+  @ApiResponse({
+    status: 200,
+    description: 'Valores válidos do constraint role',
+    schema: {
+      type: 'object',
+      properties: {
+        validValues: {
+          type: 'array',
+          items: { type: 'string' }
+        }
+      }
+    }
+  })
+  async getValidRoleConstraintValues() {
+    const validValues = await this.usuariosService.getValidRoleConstraintValues();
+    return { validValues };
+  }
+
+  @Get('debug/user-permissions/:userId')
+  @ApiOperation({
+    summary: 'Debug - Verificar estado das permissões do usuário',
+    description: 'Endpoint para debugging - mostra dados brutos de roles e permissions'
+  })
+  @ApiParam({ name: 'userId', description: 'ID do usuário' })
+  @ApiResponse({
+    status: 200,
+    description: 'Dados de debug das permissões'
+  })
+  debugUserPermissionsNew(@Param('userId') userId: string) {
+    return this.usuariosService.debugUserPermissions(userId);
   }
 
   @Get('debug-permissions/:id')
-  @ApiOperation({ 
+  @ApiOperation({
     summary: 'Debug - Verificar estado das permissões do usuário',
     description: 'Endpoint para debugging - mostra dados brutos de roles e permissions'
   })
   @ApiParam({ name: 'id', description: 'ID do usuário' })
-  @ApiResponse({ 
-    status: 200, 
+  @ApiResponse({
+    status: 200,
     description: 'Dados de debug das permissões',
     schema: {
       type: 'object',
@@ -83,6 +152,20 @@ export class UsuariosController {
   })
   debugUserPermissions(@Param('id') id: string) {
     return this.usuariosService.debugUserPermissions(id);
+  }
+
+  // ============================================================================
+  // ENDPOINTS BÁSICOS DE USUÁRIO
+  // ============================================================================
+
+  @Get()
+  @ApiOperation({ summary: 'Listar usuários com filtros e paginação' })
+  @ApiResponse({
+    status: 200,
+    description: 'Lista paginada de usuários',
+  })
+  findAll(@Query() query: UsuarioQueryDto) {
+    return this.usuariosService.findAll(query);
   }
 
   @Get(':id')
@@ -448,83 +531,20 @@ export class UsuariosController {
     return this.usuariosService.bulkAssignPermissions(bulkData);
   }
 
-  // ============================================================================
-  // ENDPOINTS AUXILIARES
-  // ============================================================================
-
-  @Get('available/roles')
-  @ApiOperation({ summary: 'Listar todos os roles disponíveis' })
-  @ApiResponse({ 
-    status: 200, 
-    description: 'Lista de roles disponíveis',
-    schema: {
-      type: 'array',
-      items: { type: 'object' }
-    }
-  })
-  getAvailableRoles() {
-    return this.usuariosService.getAllAvailableRoles();
-  }
-
-  @Get('available/permissions')
-  @ApiOperation({ summary: 'Listar todas as permissões disponíveis' })
-  @ApiResponse({ 
-    status: 200, 
-    description: 'Lista de permissões disponíveis',
-    schema: {
-      type: 'array',
-      items: { type: 'object' }
-    }
-  })
-  getAvailablePermissions() {
-    return this.usuariosService.getAllAvailablePermissions();
-  }
-
-  @Get('available/permissions/grouped')
-  @ApiOperation({ summary: 'Listar permissões disponíveis agrupadas por categoria' })
-  @ApiResponse({ 
-    status: 200, 
-    description: 'Permissões agrupadas por categoria',
-    schema: {
-      type: 'object',
-      additionalProperties: {
-        type: 'array',
-        items: { type: 'object' }
-      }
-    }
-  })
-  getAvailablePermissionsGrouped() {
-    return this.usuariosService.getAvailablePermissionsGrouped();
-  }
-
-  @Get('debug/user-permissions/:userId')
-  @ApiOperation({ 
-    summary: 'Debug - Verificar estado das permissões do usuário',
-    description: 'Endpoint para debugging - mostra dados brutos de roles e permissions'
-  })
-  @ApiParam({ name: 'userId', description: 'ID do usuário' })
-  @ApiResponse({ 
-    status: 200, 
-    description: 'Dados de debug das permissões'
-  })
-  debugUserPermissionsNew(@Param('userId') userId: string) {
-    return this.usuariosService.debugUserPermissions(userId);
-  }
-
   @Post('sync/legacy-roles')
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ 
+  @ApiOperation({
     summary: 'Sincronizar roles legacy com sistema Spatie',
     description: 'Migra usuários que têm role na coluna mas não no sistema Spatie. Use apenas quando necessário.'
   })
-  @ApiResponse({ 
-    status: 200, 
+  @ApiResponse({
+    status: 200,
     description: 'Sincronização concluída',
     schema: {
       type: 'object',
       properties: {
         migrated: { type: 'number' },
-        errors: { 
+        errors: {
           type: 'array',
           items: { type: 'object' }
         }
@@ -541,33 +561,13 @@ export class UsuariosController {
 
   @Post('test-simple')
   @ApiOperation({ summary: 'Endpoint de teste simples' })
-  @ApiResponse({ 
-    status: 200, 
-    description: 'Teste realizado com sucesso' 
+  @ApiResponse({
+    status: 200,
+    description: 'Teste realizado com sucesso'
   })
   testSimple(@Body() body: any) {
     console.log('🔥 TESTE SIMPLES - Chegou no controller!');
     console.log('📝 Body recebido:', body);
     return { success: true, message: 'Controller funcionando!', data: body };
-  }
-
-  @Get('debug/constraint-values')
-  @ApiOperation({ summary: 'Descobrir valores válidos do constraint role' })
-  @ApiResponse({ 
-    status: 200, 
-    description: 'Valores válidos do constraint role',
-    schema: {
-      type: 'object',
-      properties: {
-        validValues: {
-          type: 'array',
-          items: { type: 'string' }
-        }
-      }
-    }
-  })
-  async getValidRoleConstraintValues() {
-    const validValues = await this.usuariosService.getValidRoleConstraintValues();
-    return { validValues };
   }
 }

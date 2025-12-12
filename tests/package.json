@@ -1,0 +1,25 @@
+{
+  "name": "aupus-nexon-tests",
+  "version": "1.0.0",
+  "description": "Suite completa de testes para o sistema de usuários e permissões do Aupus Nexon",
+  "scripts": {
+    "test": "ts-node run-all-tests.ts",
+    "test:infra": "ts-node 00-infrastructure.test.ts",
+    "test:crud": "ts-node 01-api-crud.test.ts",
+    "test:auth": "ts-node 02-authentication.test.ts",
+    "test:perms": "ts-node 03-permissions.test.ts",
+    "test:watch": "nodemon --exec ts-node run-all-tests.ts",
+    "test:report": "ts-node run-all-tests.ts && cat reports/test-report-*.json | tail -1"
+  },
+  "dependencies": {
+    "axios": "^1.6.0",
+    "jsonwebtoken": "^9.0.2"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "@types/jsonwebtoken": "^9.0.5",
+    "ts-node": "^10.9.0",
+    "typescript": "^5.0.0",
+    "nodemon": "^3.0.0"
+  }
+}

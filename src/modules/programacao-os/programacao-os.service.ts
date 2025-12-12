@@ -235,8 +235,8 @@ export class ProgramacaoOSService {
           anomalia_id: createDto.anomalia_id,
           plano_manutencao_id: createDto.plano_manutencao_id,
           dados_origem: createDto.dados_origem,
-          tempo_estimado: createDto.tempo_estimado,
-          duracao_estimada: createDto.duracao_estimada,
+          tempo_estimado: createDto.tempo_estimado || 2, // Padrão: 2 horas
+          duracao_estimada: createDto.duracao_estimada || (createDto.tempo_estimado ? createDto.tempo_estimado * 1.5 : 3), // Padrão: 3h ou 1.5x tempo
           data_previsao_inicio: createDto.data_previsao_inicio ? new Date(createDto.data_previsao_inicio) : null,
           data_previsao_fim: createDto.data_previsao_fim ? new Date(createDto.data_previsao_fim) : null,
           necessita_veiculo: createDto.necessita_veiculo || false,
@@ -472,7 +472,7 @@ export class ProgramacaoOSService {
           data_aprovacao = $3,
           observacoes_aprovacao = $4,
           ajustes_orcamento = $5,
-          data_programada_sugerida = $6,
+          data_programada_sugerida = $6::date,
           hora_programada_sugerida = $7,
           orcamento_previsto = $8,
           data_hora_programada = $9

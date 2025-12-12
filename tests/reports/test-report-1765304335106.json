@@ -1,0 +1,890 @@
+{
+  "timestamp": "2025-12-09T18:18:55.105Z",
+  "summary": {
+    "totalTests": 27,
+    "totalPassed": 10,
+    "totalFailed": 15,
+    "totalWarned": 2,
+    "successRate": "37.04%",
+    "duration": 24338
+  },
+  "phases": [
+    {
+      "phase": "FASE 1: Infraestrutura",
+      "passed": 5,
+      "failed": 0,
+      "warned": 1,
+      "total": 6,
+      "duration": 3174
+    },
+    {
+      "phase": "FASE 2: CRUD de Usuários",
+      "passed": 0,
+      "failed": 7,
+      "warned": 0,
+      "total": 7,
+      "duration": 9466
+    },
+    {
+      "phase": "FASE 3: Autenticação",
+      "passed": 5,
+      "failed": 0,
+      "warned": 1,
+      "total": 6,
+      "duration": 7383
+    },
+    {
+      "phase": "FASE 4: Roles e Permissions",
+      "passed": 0,
+      "failed": 8,
+      "warned": 0,
+      "total": 8,
+      "duration": 4315
+    }
+  ],
+  "failures": [
+    {
+      "phase": "CRUD",
+      "test": "Criar Usuário Simples",
+      "message": "Resposta inesperada ao criar usuário"
+    },
+    {
+      "phase": "CRUD",
+      "test": "Criar Usuário com RoleId",
+      "message": "Erro: Cannot read properties of undefined (reading 'id')"
+    },
+    {
+      "phase": "CRUD",
+      "test": "Criar Usuário com PermissionIds",
+      "message": "Erro: Request failed with status code 404"
+    },
+    {
+      "phase": "CRUD",
+      "test": "Listar Usuários",
+      "message": "Formato de resposta inesperado"
+    },
+    {
+      "phase": "CRUD",
+      "test": "Buscar Usuário por ID",
+      "message": "Teste pulado: nenhum usuário foi criado no TEST 7"
+    },
+    {
+      "phase": "CRUD",
+      "test": "Atualizar Usuário",
+      "message": "Teste pulado: nenhum usuário foi criado no TEST 7"
+    },
+    {
+      "phase": "CRUD",
+      "test": "Deletar Usuário",
+      "message": "Teste pulado: nenhum usuário foi criado no TEST 7"
+    },
+    {
+      "phase": "Permissions",
+      "test": "Atribuir Role",
+      "message": "Teste pulado: usuário de teste não foi criado"
+    },
+    {
+      "phase": "Permissions",
+      "test": "Atribuir Permissão Direta",
+      "message": "Teste pulado: usuário de teste não foi criado"
+    },
+    {
+      "phase": "Permissions",
+      "test": "Remover Permissão Direta",
+      "message": "Teste pulado: usuário ou permission não disponível"
+    },
+    {
+      "phase": "Permissions",
+      "test": "Sincronizar Permissões",
+      "message": "Teste pulado: usuário de teste não foi criado"
+    },
+    {
+      "phase": "Permissions",
+      "test": "Buscar Permissões do Usuário",
+      "message": "Teste pulado: usuário de teste não foi criado"
+    },
+    {
+      "phase": "Permissions",
+      "test": "Verificar Permissão Específica",
+      "message": "Teste pulado: usuário de teste não foi criado"
+    },
+    {
+      "phase": "Permissions",
+      "test": "Verificar Múltiplas Permissões",
+      "message": "Teste pulado: usuário de teste não foi criado"
+    },
+    {
+      "phase": "Permissions",
+      "test": "Categorização de Permissões",
+      "message": "Teste pulado: usuário de teste não foi criado"
+    }
+  ],
+  "allResults": [
+    {
+      "phase": "FASE 1: Infraestrutura",
+      "results": [
+        {
+          "test": "Existência de Tabelas",
+          "status": "PASS",
+          "message": "Todas as 6 tabelas necessárias existem",
+          "data": [
+            "model_has_permissions",
+            "model_has_roles",
+            "permissions",
+            "role_has_permissions",
+            "roles",
+            "usuarios"
+          ]
+        },
+        {
+          "test": "Constraint da Coluna Role",
+          "status": "WARN",
+          "message": "Constraint existe mas não foi possível extrair valores",
+          "data": {
+            "conname": "usuarios_role_check",
+            "constraint_def": "CHECK (((role)::text = ANY (ARRAY[('admin'::character varying)::text, ('consultor'::character varying)::text, ('gerente'::character varying)::text, ('vendedor'::character varying)::text])))"
+          }
+        },
+        {
+          "test": "Índices de Performance",
+          "status": "PASS",
+          "message": "2 índices encontrados",
+          "data": [
+            {
+              "tablename": "model_has_permissions",
+              "indexname": "model_has_permissions_model_id_model_type_index"
+            },
+            {
+              "tablename": "model_has_roles",
+              "indexname": "model_has_roles_model_id_model_type_index"
+            }
+          ]
+        },
+        {
+          "test": "Roles Cadastradas",
+          "status": "PASS",
+          "message": "9 roles encontradas no sistema",
+          "data": [
+            {
+              "id": 1,
+              "name": "super_admin",
+              "guard_name": "api"
+            },
+            {
+              "id": 2,
+              "name": "admin",
+              "guard_name": "api"
+            },
+            {
+              "id": 3,
+              "name": "cativo",
+              "guard_name": "api"
+            },
+            {
+              "id": 4,
+              "name": "corretor",
+              "guard_name": "api"
+            },
+            {
+              "id": 5,
+              "name": "associado",
+              "guard_name": "api"
+            },
+            {
+              "id": 6,
+              "name": "proprietario",
+              "guard_name": "api"
+            },
+            {
+              "id": 7,
+              "name": "gerente",
+              "guard_name": "api"
+            },
+            {
+              "id": 8,
+              "name": "vendedor",
+              "guard_name": "api"
+            },
+            {
+              "id": 9,
+              "name": "consultor",
+              "guard_name": "api"
+            }
+          ]
+        },
+        {
+          "test": "Permissions Cadastradas",
+          "status": "PASS",
+          "message": "126 permissions encontradas (94 modernas)",
+          "data": {
+            "total": 126,
+            "modern": 94,
+            "sample": [
+              {
+                "id": 1,
+                "name": "PainelGeral"
+              },
+              {
+                "id": 2,
+                "name": "PainelGeralOrganizacoes"
+              },
+              {
+                "id": 3,
+                "name": "PainelGeralCativos"
+              },
+              {
+                "id": 4,
+                "name": "PainelGeralClube"
+              },
+              {
+                "id": 5,
+                "name": "MonitoramentoOrganizacoes"
+              },
+              {
+                "id": 6,
+                "name": "Monitoramento"
+              },
+              {
+                "id": 7,
+                "name": "NET"
+              },
+              {
+                "id": 8,
+                "name": "CRM"
+              },
+              {
+                "id": 9,
+                "name": "Oportunidades"
+              },
+              {
+                "id": 10,
+                "name": "Usuarios"
+              }
+            ]
+          }
+        },
+        {
+          "test": "Relacionamento Roles-Permissions",
+          "status": "PASS",
+          "message": "6 roles têm permissions associadas",
+          "data": {
+            "rolesWithPermissions": 6
+          }
+        }
+      ]
+    },
+    {
+      "phase": "FASE 2: CRUD de Usuários",
+      "results": [
+        {
+          "test": "Criar Usuário Simples",
+          "status": "FAIL",
+          "message": "Resposta inesperada ao criar usuário",
+          "data": {
+            "success": true,
+            "data": {
+              "id": "nuaxehuuf9pv0nvkewjd6p45yf",
+              "status": "Ativo",
+              "concessionaria_atual_id": null,
+              "organizacao_atual": null,
+              "nome": "Usuário Teste Simples",
+              "email": "teste.simples.1765304316346@teste.com",
+              "telefone": "11999999999",
+              "instagram": null,
+              "cpf_cnpj": null,
+              "cidade": null,
+              "estado": null,
+              "endereco": null,
+              "cep": null,
+              "manager_id": null,
+              "avatar_url": null,
+              "all_permissions": [],
+              "roles": [],
+              "created_at": null,
+              "updated_at": null,
+              "senhaTemporaria": "Aupus123!",
+              "primeiroAcesso": true
+            },
+            "meta": {
+              "timestamp": "2025-12-09T18:18:37.300Z",
+              "requestId": "4fb7adf9-1782-4d9d-a125-22ec37990e99"
+            }
+          }
+        },
+        {
+          "test": "Criar Usuário com RoleId",
+          "status": "FAIL",
+          "message": "Erro: Cannot read properties of undefined (reading 'id')"
+        },
+        {
+          "test": "Criar Usuário com PermissionIds",
+          "status": "FAIL",
+          "message": "Erro: Request failed with status code 404",
+          "data": {
+            "success": false,
+            "error": {
+              "code": "NOT_FOUND",
+              "message": "Usuário não encontrado"
+            },
+            "meta": {
+              "timestamp": "2025-12-09T18:18:41.900Z",
+              "requestId": "42b7265d-4791-494a-8797-1c8ab6b645a8"
+            }
+          }
+        },
+        {
+          "test": "Listar Usuários",
+          "status": "FAIL",
+          "message": "Formato de resposta inesperado",
+          "data": {
+            "success": true,
+            "data": {
+              "data": [
+                {
+                  "id": "ppkh5pl3o8d974is9z00x4bxzl",
+                  "status": "Ativo",
+                  "concessionaria_atual_id": null,
+                  "organizacao_atual": null,
+                  "nome": "Henrique Gustavo Fiorese",
+                  "email": "fazenda.fiorese@gmail.com",
+                  "telefone": "6199859091",
+                  "instagram": null,
+                  "cpf_cnpj": "01762674173",
+                  "cidade": null,
+                  "estado": null,
+                  "endereco": "Avenida Brasília - Formosinha",
+                  "cep": "73813-01",
+                  "manager_id": null,
+                  "avatar_url": null,
+                  "role": "gerente",
+                  "all_permissions": [],
+                  "roles": [
+                    "gerente"
+                  ],
+                  "created_at": null,
+                  "updated_at": "2025-11-24T18:40:37.000Z"
+                },
+                {
+                  "id": "nuaxehuuf9pv0nvkewjd6p45yf",
+                  "status": "Ativo",
+                  "concessionaria_atual_id": null,
+                  "organizacao_atual": null,
+                  "nome": "Usuário Teste Simples",
+                  "email": "teste.simples.1765304316346@teste.com",
+                  "telefone": "11999999999",
+                  "instagram": null,
+                  "cpf_cnpj": null,
+                  "cidade": null,
+                  "estado": null,
+                  "endereco": null,
+                  "cep": null,
+                  "manager_id": null,
+                  "avatar_url": null,
+                  "role": "vendedor",
+                  "all_permissions": [],
+                  "roles": [
+                    "vendedor"
+                  ],
+                  "created_at": null,
+                  "updated_at": null
+                },
+                {
+                  "id": "k6g72ojagrl415bsak6y68qi96",
+                  "status": "Ativo",
+                  "concessionaria_atual_id": null,
+                  "organizacao_atual": null,
+                  "nome": "Admin",
+                  "email": "admin@email.com",
+                  "telefone": null,
+                  "instagram": null,
+                  "cpf_cnpj": null,
+                  "cidade": null,
+                  "estado": null,
+                  "endereco": null,
+                  "cep": null,
+                  "manager_id": null,
+                  "avatar_url": null,
+                  "role": "vendedor",
+                  "all_permissions": [],
+                  "roles": [
+                    "vendedor"
+                  ],
+                  "created_at": null,
+                  "updated_at": "2025-12-08T20:24:29.000Z"
+                },
+                {
+                  "id": "88ccmpmn7avjlc8ol3j0ed7axi",
+                  "status": "Ativo",
+                  "concessionaria_atual_id": null,
+                  "organizacao_atual": null,
+                  "nome": "Usuário Teste Permissions",
+                  "email": "perms.test.1765304261897@teste.com",
+                  "telefone": "11944444444",
+                  "instagram": null,
+                  "cpf_cnpj": null,
+                  "cidade": null,
+                  "estado": null,
+                  "endereco": null,
+                  "cep": null,
+                  "manager_id": null,
+                  "avatar_url": null,
+                  "role": "vendedor",
+                  "all_permissions": [],
+                  "roles": [
+                    "vendedor"
+                  ],
+                  "created_at": null,
+                  "updated_at": null
+                },
+                {
+                  "id": "4awdsdmo1jeu9p4jms99ayxnj4",
+                  "status": "Ativo",
+                  "concessionaria_atual_id": null,
+                  "organizacao_atual": null,
+                  "nome": "Teste Vendedor",
+                  "email": "teste.vendedor@example.com",
+                  "telefone": "(11) 99999-9999",
+                  "instagram": null,
+                  "cpf_cnpj": null,
+                  "cidade": null,
+                  "estado": null,
+                  "endereco": null,
+                  "cep": null,
+                  "manager_id": null,
+                  "avatar_url": null,
+                  "role": "vendedor",
+                  "all_permissions": [],
+                  "roles": [
+                    "vendedor"
+                  ],
+                  "created_at": null,
+                  "updated_at": "2025-08-18T20:27:02.000Z"
+                },
+                {
+                  "id": "46s3jvitajhy00b67esqrie2jr",
+                  "status": "Ativo",
+                  "concessionaria_atual_id": null,
+                  "organizacao_atual": null,
+                  "nome": "Pedro Jubran Lunardelli",
+                  "email": "pjlunardelli@hotmail.com",
+                  "telefone": "+5511942229875",
+                  "instagram": null,
+                  "cpf_cnpj": "48934943840",
+                  "cidade": null,
+                  "estado": null,
+                  "endereco": "Rua 16 A, CEP: 74075-15",
+                  "cep": "74075-15",
+                  "manager_id": null,
+                  "avatar_url": null,
+                  "role": "gerente",
+                  "all_permissions": [],
+                  "roles": [
+                    "gerente"
+                  ],
+                  "created_at": null,
+                  "updated_at": "2025-12-02T21:30:59.000Z"
+                },
+                {
+                  "id": "3tp6gd6hmhyw0cf0mbf0cvi54v",
+                  "status": "Ativo",
+                  "concessionaria_atual_id": null,
+                  "organizacao_atual": null,
+                  "nome": "Teste Admin",
+                  "email": "teste.admin2@example.com",
+                  "telefone": "(11) 99999-9999",
+                  "instagram": null,
+                  "cpf_cnpj": null,
+                  "cidade": null,
+                  "estado": null,
+                  "endereco": null,
+                  "cep": null,
+                  "manager_id": null,
+                  "avatar_url": null,
+                  "role": "admin",
+                  "all_permissions": [],
+                  "roles": [
+                    "admin"
+                  ],
+                  "created_at": null,
+                  "updated_at": "2025-08-18T20:16:56.000Z"
+                },
+                {
+                  "id": "hh67nmg1zr4077ntvy5jaii7n1",
+                  "status": "Ativo",
+                  "concessionaria_atual_id": null,
+                  "organizacao_atual": null,
+                  "nome": "OLI ANTONIO FIORESE",
+                  "email": "teste.usuario2@example.com",
+                  "telefone": "(11) 99999-9999",
+                  "instagram": null,
+                  "cpf_cnpj": null,
+                  "cidade": null,
+                  "estado": null,
+                  "endereco": null,
+                  "cep": null,
+                  "manager_id": null,
+                  "avatar_url": null,
+                  "role": "vendedor",
+                  "all_permissions": [],
+                  "roles": [
+                    "vendedor"
+                  ],
+                  "created_at": null,
+                  "updated_at": "2025-10-02T10:50:55.000Z"
+                },
+                {
+                  "id": "0czhg392pxgbxirjxlx646b79b",
+                  "status": "Ativo",
+                  "concessionaria_atual_id": null,
+                  "organizacao_atual": null,
+                  "nome": "Usuário Teste Simples",
+                  "email": "teste.simples.1765304251640@teste.com",
+                  "telefone": "11999999999",
+                  "instagram": null,
+                  "cpf_cnpj": null,
+                  "cidade": null,
+                  "estado": null,
+                  "endereco": null,
+                  "cep": null,
+                  "manager_id": null,
+                  "avatar_url": null,
+                  "role": "vendedor",
+                  "all_permissions": [],
+                  "roles": [
+                    "vendedor"
+                  ],
+                  "created_at": null,
+                  "updated_at": null
+                },
+                {
+                  "id": "01K464Z69MJNFW96G06VQX9BA6",
+                  "status": "Ativo",
+                  "concessionaria_atual_id": null,
+                  "organizacao_atual": null,
+                  "nome": "testeserg",
+                  "email": "sergio@aupus",
+                  "telefone": "4564",
+                  "instagram": null,
+                  "cpf_cnpj": "454",
+                  "cidade": "54",
+                  "estado": "64",
+                  "endereco": "6",
+                  "cep": "45",
+                  "manager_id": "01K2CPBYE07B3HWW0CZHHB3ZCR",
+                  "avatar_url": null,
+                  "role": "consultor",
+                  "all_permissions": [],
+                  "roles": [
+                    "consultor"
+                  ],
+                  "created_at": "2025-09-02T21:22:47.000Z",
+                  "updated_at": "2025-09-02T21:22:47.000Z"
+                }
+              ],
+              "pagination": {
+                "page": 1,
+                "limit": 10,
+                "total": 33,
+                "totalPages": 4
+              }
+            },
+            "meta": {
+              "timestamp": "2025-12-09T18:18:42.863Z",
+              "requestId": "d5444c7b-7c9b-4a13-89e3-c5e40ed1a5f9"
+            }
+          }
+        },
+        {
+          "test": "Buscar Usuário por ID",
+          "status": "FAIL",
+          "message": "Teste pulado: nenhum usuário foi criado no TEST 7"
+        },
+        {
+          "test": "Atualizar Usuário",
+          "status": "FAIL",
+          "message": "Teste pulado: nenhum usuário foi criado no TEST 7"
+        },
+        {
+          "test": "Deletar Usuário",
+          "status": "FAIL",
+          "message": "Teste pulado: nenhum usuário foi criado no TEST 7"
+        }
+      ]
+    },
+    {
+      "phase": "FASE 3: Autenticação",
+      "results": [
+        {
+          "test": "Login com Credenciais Válidas",
+          "status": "PASS",
+          "message": "Login realizado com sucesso, tokens recebidos",
+          "data": {
+            "hasAccessToken": true,
+            "hasRefreshToken": true,
+            "tokenType": "Bearer",
+            "expiresIn": 3600,
+            "user": "admin@email.com"
+          }
+        },
+        {
+          "test": "Login com Credenciais Inválidas",
+          "status": "PASS",
+          "message": "Login rejeitado corretamente (401/400)",
+          "data": {
+            "status": 401
+          }
+        },
+        {
+          "test": "Payload do JWT",
+          "status": "PASS",
+          "message": "Token contém todos os campos necessários",
+          "data": {
+            "sub": "k6g72ojagrl415bsak6y68qi96",
+            "email": "admin@email.com",
+            "nome": "Admin",
+            "role": "super_admin",
+            "permissions": 22,
+            "exp": 1765307924,
+            "iat": 1765304324
+          }
+        },
+        {
+          "test": "Refresh Token",
+          "status": "PASS",
+          "message": "Tokens renovados com sucesso",
+          "data": {
+            "hasNewAccessToken": true,
+            "hasNewRefreshToken": true,
+            "tokensAreDifferent": true
+          }
+        },
+        {
+          "test": "Rota Protegida com Token Válido",
+          "status": "WARN",
+          "message": "Endpoint /auth/me pode não existir ou retornou formato inesperado",
+          "data": {
+            "success": true,
+            "data": {
+              "id": "k6g72ojagrl415bsak6y68qi96",
+              "status": "Ativo",
+              "concessionaria_atual_id": null,
+              "organizacao_atual": null,
+              "nome": "Admin",
+              "email": "admin@email.com",
+              "telefone": null,
+              "instagram": null,
+              "cpf_cnpj": null,
+              "cidade": null,
+              "estado": null,
+              "endereco": null,
+              "cep": null,
+              "manager_id": null,
+              "avatar_url": null,
+              "all_permissions": [
+                {
+                  "id": 14,
+                  "name": "Arquivos",
+                  "guard_name": "api",
+                  "source": "role"
+                },
+                {
+                  "id": 19,
+                  "name": "CadastroConcessionarias",
+                  "guard_name": "api",
+                  "source": "role"
+                },
+                {
+                  "id": 16,
+                  "name": "CadastroOrganizacoes",
+                  "guard_name": "api",
+                  "source": "role"
+                },
+                {
+                  "id": 15,
+                  "name": "Cadastros",
+                  "guard_name": "api",
+                  "source": "role"
+                },
+                {
+                  "id": 18,
+                  "name": "CadastroUnidadesConsumidoras",
+                  "guard_name": "api",
+                  "source": "role"
+                },
+                {
+                  "id": 17,
+                  "name": "CadastroUsuarios",
+                  "guard_name": "api",
+                  "source": "role"
+                },
+                {
+                  "id": 13,
+                  "name": "Configuracoes",
+                  "guard_name": "api",
+                  "source": "role"
+                },
+                {
+                  "id": 8,
+                  "name": "CRM",
+                  "guard_name": "api",
+                  "source": "role"
+                },
+                {
+                  "id": 20,
+                  "name": "FinanceiroAdmin",
+                  "guard_name": "api",
+                  "source": "role"
+                },
+                {
+                  "id": 6,
+                  "name": "Monitoramento",
+                  "guard_name": "api",
+                  "source": "role"
+                },
+                {
+                  "id": 5,
+                  "name": "MonitoramentoOrganizacoes",
+                  "guard_name": "api",
+                  "source": "role"
+                },
+                {
+                  "id": 7,
+                  "name": "NET",
+                  "guard_name": "api",
+                  "source": "role"
+                },
+                {
+                  "id": 9,
+                  "name": "Oportunidades",
+                  "guard_name": "api",
+                  "source": "role"
+                },
+                {
+                  "id": 11,
+                  "name": "Organizacoes",
+                  "guard_name": "api",
+                  "source": "role"
+                },
+                {
+                  "id": 1,
+                  "name": "PainelGeral",
+                  "guard_name": "api",
+                  "source": "role"
+                },
+                {
+                  "id": 3,
+                  "name": "PainelGeralCativos",
+                  "guard_name": "api",
+                  "source": "role"
+                },
+                {
+                  "id": 4,
+                  "name": "PainelGeralClube",
+                  "guard_name": "api",
+                  "source": "role"
+                },
+                {
+                  "id": 2,
+                  "name": "PainelGeralOrganizacoes",
+                  "guard_name": "api",
+                  "source": "role"
+                },
+                {
+                  "id": 22,
+                  "name": "Reclamacoes",
+                  "guard_name": "api",
+                  "source": "role"
+                },
+                {
+                  "id": 21,
+                  "name": "SuperAdmin",
+                  "guard_name": "api",
+                  "source": "role"
+                },
+                {
+                  "id": 12,
+                  "name": "UnidadesConsumidoras",
+                  "guard_name": "api",
+                  "source": "role"
+                },
+                {
+                  "id": 10,
+                  "name": "Usuarios",
+                  "guard_name": "api",
+                  "source": "role"
+                }
+              ],
+              "roles": [
+                "super_admin"
+              ],
+              "role_details": {
+                "id": 1,
+                "name": "super_admin",
+                "guard_name": "api"
+              },
+              "created_at": null,
+              "updated_at": "2025-12-08T20:24:29.000Z"
+            },
+            "meta": {
+              "timestamp": "2025-12-09T18:18:49.818Z",
+              "requestId": "60814299-3310-4468-8c11-3af7be7cc40b"
+            }
+          }
+        },
+        {
+          "test": "Rota Protegida sem Token",
+          "status": "PASS",
+          "message": "Acesso bloqueado corretamente (401 Unauthorized)",
+          "data": {
+            "status": 401
+          }
+        }
+      ]
+    },
+    {
+      "phase": "FASE 4: Roles e Permissions",
+      "results": [
+        {
+          "test": "Atribuir Role",
+          "status": "FAIL",
+          "message": "Teste pulado: usuário de teste não foi criado"
+        },
+        {
+          "test": "Atribuir Permissão Direta",
+          "status": "FAIL",
+          "message": "Teste pulado: usuário de teste não foi criado"
+        },
+        {
+          "test": "Remover Permissão Direta",
+          "status": "FAIL",
+          "message": "Teste pulado: usuário ou permission não disponível"
+        },
+        {
+          "test": "Sincronizar Permissões",
+          "status": "FAIL",
+          "message": "Teste pulado: usuário de teste não foi criado"
+        },
+        {
+          "test": "Buscar Permissões do Usuário",
+          "status": "FAIL",
+          "message": "Teste pulado: usuário de teste não foi criado"
+        },
+        {
+          "test": "Verificar Permissão Específica",
+          "status": "FAIL",
+          "message": "Teste pulado: usuário de teste não foi criado"
+        },
+        {
+          "test": "Verificar Múltiplas Permissões",
+          "status": "FAIL",
+          "message": "Teste pulado: usuário de teste não foi criado"
+        },
+        {
+          "test": "Categorização de Permissões",
+          "status": "FAIL",
+          "message": "Teste pulado: usuário de teste não foi criado"
+        }
+      ]
+    }
+  ]
+}

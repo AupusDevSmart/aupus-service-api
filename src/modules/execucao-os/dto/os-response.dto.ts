@@ -528,6 +528,28 @@ export class OrdemServicoResponseDto {
   @ApiPropertyOptional({ description: 'Observações sobre qualidade' })
   observacoes_qualidade?: string;
 
+  // Detalhes da execução
+  @ApiPropertyOptional({ description: 'Atividades realizadas durante a execução' })
+  atividades_realizadas?: string;
+
+  @ApiPropertyOptional({ description: 'Percentual de conclusão do checklist (0-100)' })
+  checklist_concluido?: number;
+
+  @ApiPropertyOptional({ description: 'Procedimentos seguidos durante a execução' })
+  procedimentos_seguidos?: string;
+
+  @ApiPropertyOptional({ description: 'EPIs e equipamentos de segurança utilizados' })
+  equipamentos_seguranca?: string;
+
+  @ApiPropertyOptional({ description: 'Incidentes de segurança ocorridos' })
+  incidentes_seguranca?: string;
+
+  @ApiPropertyOptional({ description: 'Medidas de segurança adicionais adotadas' })
+  medidas_seguranca_adicionais?: string;
+
+  @ApiPropertyOptional({ description: 'Custos adicionais não planejados' })
+  custos_adicionais?: number;
+
   // Tarefas associadas
   @ApiPropertyOptional({ description: 'Tarefas da OS', type: [TarefaOSResponseDto] })
   tarefas_os?: TarefaOSResponseDto[];

@@ -1828,9 +1828,17 @@ model ordens_servico {
   problemas_encontrados   String?                   @map("problemas_encontrados")
   recomendacoes           String?
   proxima_manutencao      String?                   @map("proxima_manutencao") @db.VarChar(255)
-  avaliacao_qualidade     Int?                      @map("avaliacao_qualidade") @db.SmallInt
-  observacoes_qualidade   String?                   @map("observacoes_qualidade")
-  criado_por              String?                   @map("criado_por") @db.VarChar(255)
+  avaliacao_qualidade          Int?                      @map("avaliacao_qualidade") @db.SmallInt
+  observacoes_qualidade        String?                   @map("observacoes_qualidade")
+  // Novos campos adicionados para finalização detalhada
+  atividades_realizadas        String?                   @map("atividades_realizadas")
+  checklist_concluido          Int?                      @map("checklist_concluido") @db.SmallInt
+  procedimentos_seguidos       String?                   @map("procedimentos_seguidos")
+  equipamentos_seguranca       String?                   @map("equipamentos_seguranca")
+  incidentes_seguranca         String?                   @map("incidentes_seguranca")
+  medidas_seguranca_adicionais String?                   @map("medidas_seguranca_adicionais")
+  custos_adicionais            Decimal?                  @map("custos_adicionais") @db.Decimal(12, 2)
+  criado_por                   String?                   @map("criado_por") @db.VarChar(255)
   criado_por_id           String?                   @map("criado_por_id") @db.Char(26)
   programado_por          String?                   @map("programado_por") @db.VarChar(255)
   programado_por_id       String?                   @map("programado_por_id") @db.Char(26)

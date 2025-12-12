@@ -18,7 +18,8 @@ export class CreateSubTarefaDto {
   tempo_estimado?: number;
 
   @IsInt()
+  @IsOptional()
   @Min(1)
   @Type(() => Number)
-  ordem: number;
+  ordem?: number;
 }

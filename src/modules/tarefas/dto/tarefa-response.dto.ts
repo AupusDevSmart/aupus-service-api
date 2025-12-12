@@ -40,7 +40,7 @@ export class SubTarefaResponseDto {
   descricao: string;
   obrigatoria: boolean;
   tempo_estimado?: number;
-  ordem: number;
+  ordem?: number;
   created_at: Date;
   updated_at: Date;
 }
@@ -81,7 +81,7 @@ export class TarefaResponseDto {
   criticidade: number;
   duracao_estimada: number;
   tempo_estimado: number;
-  ordem: number;
+  ordem?: number;
   planta_id?: string;
   equipamento_id: string;
   planejador?: string;

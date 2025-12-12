@@ -18,7 +18,7 @@ import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 export class ReservaVeiculoDto {
   @ApiProperty({ description: 'ID do veículo' })
   @IsString()
-  @Length(26, 26)
+  @IsNotEmpty()
   veiculo_id: string;
 
   @ApiProperty({ description: 'Data de início da reserva', example: '2025-02-15' })
@@ -64,7 +64,6 @@ export class ProgramarOSDto {
   @ApiPropertyOptional({ description: 'ID do responsável' })
   @IsOptional()
   @IsString()
-  @Length(26, 26)
   responsavel_id?: string;
 
   @ApiPropertyOptional({ description: 'Time/equipe' })
@@ -72,23 +71,23 @@ export class ProgramarOSDto {
   @IsString()
   time_equipe?: string;
 
-  @ApiProperty({ description: 'IDs dos materiais confirmados' })
+  @ApiPropertyOptional({ description: 'IDs dos materiais confirmados (lista vazia significa sem materiais confirmados)' })
+  @IsOptional()
   @IsArray()
   @IsString({ each: true })
-  @Length(26, 26, { each: true })
-  materiais_confirmados: string[];
+  materiais_confirmados?: string[];
 
-  @ApiProperty({ description: 'IDs das ferramentas confirmadas' })
+  @ApiPropertyOptional({ description: 'IDs das ferramentas confirmadas (lista vazia significa sem ferramentas confirmadas)' })
+  @IsOptional()
   @IsArray()
   @IsString({ each: true })
-  @Length(26, 26, { each: true })
-  ferramentas_confirmadas: string[];
+  ferramentas_confirmadas?: string[];
 
-  @ApiProperty({ description: 'IDs dos técnicos confirmados' })
+  @ApiPropertyOptional({ description: 'IDs dos técnicos confirmados (lista vazia significa sem técnicos confirmados)' })
+  @IsOptional()
   @IsArray()
   @IsString({ each: true })
-  @Length(26, 26, { each: true })
-  tecnicos_confirmados: string[];
+  tecnicos_confirmados?: string[];
 
   @ApiPropertyOptional({ description: 'Reserva de veículo' })
   @IsOptional()
@@ -146,7 +145,7 @@ export class RetomarExecucaoDto {
 export class AtividadeChecklistDto {
   @ApiProperty({ description: 'ID da atividade' })
   @IsString()
-  @Length(26, 26)
+  @IsNotEmpty()
   id: string;
 
   @ApiProperty({ description: 'Atividade concluída' })
@@ -170,7 +169,7 @@ export class AtualizarChecklistDto {
 export class MaterialConsumoDto {
   @ApiProperty({ description: 'ID do material' })
   @IsString()
-  @Length(26, 26)
+  @IsNotEmpty()
   id: string;
 
   @ApiProperty({ description: 'Quantidade consumida' })
@@ -195,7 +194,7 @@ export class RegistrarMateriaisDto {
 export class FerramentaUsoDto {
   @ApiProperty({ description: 'ID da ferramenta' })
   @IsString()
-  @Length(26, 26)
+  @IsNotEmpty()
   id: string;
 
   @ApiProperty({ description: 'Ferramenta utilizada' })
@@ -264,12 +263,12 @@ export class CancelarTarefaDto {
 export class MaterialFinalizacaoDto {
   @ApiProperty({ description: 'ID do material' })
   @IsString()
-  @Length(26, 26)
+  @IsNotEmpty()
   id: string;
 
-  @ApiProperty({ description: 'Quantidade consumida final' })
+  @ApiProperty({ description: 'Quantidade consumida final (mínimo 0.001)' })
   @IsNumber({ maxDecimalPlaces: 3 })
-  @Min(0)
+  @Min(0.001)
   quantidade_consumida: number;
 
   @ApiPropertyOptional({ description: 'Observações' })
@@ -281,7 +280,7 @@ export class MaterialFinalizacaoDto {
 export class FerramentaFinalizacaoDto {
   @ApiProperty({ description: 'ID da ferramenta' })
   @IsString()
-  @Length(26, 26)
+  @IsNotEmpty()
   id: string;
 
   @ApiProperty({ description: 'Condição final da ferramenta' })
@@ -321,17 +320,19 @@ export class FinalizarOSDto {
   @IsDateString()
   proxima_manutencao?: string;
 
-  @ApiProperty({ description: 'Materiais consumidos finais', type: [MaterialFinalizacaoDto] })
+  @ApiPropertyOptional({ description: 'Materiais consumidos finais (lista vazia significa nenhum material consumido)', type: [MaterialFinalizacaoDto] })
+  @IsOptional()
   @IsArray()
   @ValidateNested({ each: true })
   @Type(() => MaterialFinalizacaoDto)
-  materiais_consumidos: MaterialFinalizacaoDto[];
+  materiais_consumidos?: MaterialFinalizacaoDto[];
 
-  @ApiProperty({ description: 'Ferramentas utilizadas finais', type: [FerramentaFinalizacaoDto] })
+  @ApiPropertyOptional({ description: 'Ferramentas utilizadas finais (lista vazia significa nenhuma ferramenta utilizada)', type: [FerramentaFinalizacaoDto] })
+  @IsOptional()
   @IsArray()
   @ValidateNested({ each: true })
   @Type(() => FerramentaFinalizacaoDto)
-  ferramentas_utilizadas: FerramentaFinalizacaoDto[];
+  ferramentas_utilizadas?: FerramentaFinalizacaoDto[];
 
   @ApiProperty({ description: 'Avaliação da qualidade (1-5)' })
   @IsNumber()
@@ -354,6 +355,45 @@ export class FinalizarOSDto {
   @IsOptional()
   @IsString()
   observacoes_veiculo?: string;
+
+  // Novos campos adicionados
+  @ApiPropertyOptional({ description: 'Atividades realizadas durante a execução' })
+  @IsOptional()
+  @IsString()
+  atividades_realizadas?: string;
+
+  @ApiPropertyOptional({ description: 'Percentual de conclusão do checklist (0-100)' })
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  @Max(100)
+  checklist_concluido?: number;
+
+  @ApiPropertyOptional({ description: 'Procedimentos seguidos durante a execução' })
+  @IsOptional()
+  @IsString()
+  procedimentos_seguidos?: string;
+
+  @ApiPropertyOptional({ description: 'EPIs e equipamentos de segurança utilizados' })
+  @IsOptional()
+  @IsString()
+  equipamentos_seguranca?: string;
+
+  @ApiPropertyOptional({ description: 'Incidentes de segurança ocorridos' })
+  @IsOptional()
+  @IsString()
+  incidentes_seguranca?: string;
+
+  @ApiPropertyOptional({ description: 'Medidas de segurança adicionais adotadas' })
+  @IsOptional()
+  @IsString()
+  medidas_seguranca_adicionais?: string;
+
+  @ApiPropertyOptional({ description: 'Custos adicionais não planejados' })
+  @IsOptional()
+  @IsNumber({ maxDecimalPlaces: 2 })
+  @Min(0)
+  custos_adicionais?: number;
 }
 
 export class CancelarOSDto {
