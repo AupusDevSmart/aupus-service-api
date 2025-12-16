@@ -378,6 +378,17 @@ export class EquipamentosService {
             planta: true,
           },
         },
+        tipo_equipamento_rel: {
+          select: {
+            id: true,
+            codigo: true,
+            nome: true,
+            categoria: true,
+            largura_padrao: true,
+            altura_padrao: true,
+            icone_svg: true,
+          },
+        },
         equipamento_pai: {
           select: {
             id: true,
@@ -405,6 +416,7 @@ export class EquipamentosService {
     return {
       ...equipamento,
       totalComponentes: equipamento.equipamentos_filhos?.length || 0,
+      tipoEquipamento: equipamento.tipo_equipamento_rel,
     };
   }
 
