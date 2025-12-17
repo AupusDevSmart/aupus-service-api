@@ -408,19 +408,30 @@ export class PlantasService {
     plantaId: string,
     tipo?: string,
     status?: string,
-    comDiagrama?: boolean
+    comDiagrama?: boolean,
+    proprietarioId?: string | null
   ) {
     try {
-      // 1. Verificar se a planta existe
+      // 1. Verificar se a planta existe e pertence ao proprietário (se não for admin)
+      const whereClausePlanta: any = {
+        id: plantaId,
+        deleted_at: null
+      };
+
+      // Se proprietarioId foi fornecido, adicionar ao filtro
+      if (proprietarioId) {
+        whereClausePlanta.proprietario_id = proprietarioId;
+      }
+
       const planta = await this.prisma.plantas.findFirst({
-        where: {
-          id: plantaId,
-          deleted_at: null
-        }
+        where: whereClausePlanta
       });
 
       if (!planta) {
-        throw new NotFoundException(`Planta com ID ${plantaId} não encontrada`);
+        const message = proprietarioId
+          ? `Planta com ID ${plantaId} não encontrada ou não pertence a você`
+          : `Planta com ID ${plantaId} não encontrada`;
+        throw new NotFoundException(message);
       }
 
       // 2. Construir filtros

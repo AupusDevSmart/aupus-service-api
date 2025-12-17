@@ -31,6 +31,7 @@ import {
 import { EquipamentosService } from '../equipamentos/equipamentos.service';
 import { EquipamentoQueryDto } from '../equipamentos/dto/equipamento-query.dto';
 import { DiagramasService } from '../diagramas/services/diagramas.service';
+import { UserProprietarioId } from '../auth/decorators/user-proprietario.decorator';
 
 @ApiTags('unidades')
 @Controller('unidades')
@@ -82,12 +83,13 @@ export class UnidadesController {
   @Get()
   @ApiOperation({
     summary: 'Listar unidades',
-    description: 'Retorna lista paginada de unidades com filtros opcionais',
+    description: 'Retorna lista paginada de unidades com filtros opcionais. Usuários não-admin veem apenas suas unidades.',
   })
   @ApiQuery({ name: 'page', required: false, type: Number, example: 1 })
   @ApiQuery({ name: 'limit', required: false, type: Number, example: 10 })
   @ApiQuery({ name: 'search', required: false, type: String, description: 'Busca textual' })
   @ApiQuery({ name: 'plantaId', required: false, type: String, description: 'Filtrar por planta' })
+  @ApiQuery({ name: 'proprietarioId', required: false, type: String, description: 'Filtrar por proprietário (admin only)' })
   @ApiQuery({ name: 'tipo', required: false, enum: ['UFV', 'Carga', 'Motor', 'Inversor', 'Transformador'] })
   @ApiQuery({ name: 'status', required: false, enum: ['ativo', 'inativo'] })
   @ApiQuery({ name: 'estado', required: false, type: String })
@@ -100,11 +102,17 @@ export class UnidadesController {
   })
   async findAll(
     @Query(new ValidationPipe({ transform: true })) queryDto: FindAllUnidadesDto,
+    @UserProprietarioId() autoProprietarioId: string | null
   ): Promise<PaginatedUnidadesResponse> {
-    this.logger.log(`📋 [LIST UNIDADES] Buscando unidades:`, JSON.stringify(queryDto, null, 2));
+    const effectiveProprietarioId = autoProprietarioId || queryDto.proprietarioId;
+
+    this.logger.log(`📋 [LIST UNIDADES] autoProprietarioId: ${autoProprietarioId}, queryProprietarioId: ${queryDto.proprietarioId}, effective: ${effectiveProprietarioId}`);
 
     try {
-      const result = await this.unidadesService.findAll(queryDto);
+      const result = await this.unidadesService.findAll({
+        ...queryDto,
+        proprietarioId: effectiveProprietarioId
+      });
       this.logger.log(
         `✅ [LIST UNIDADES] Encontradas ${result.data.length} de ${result.pagination.total}`,
       );
@@ -368,7 +376,7 @@ export class UnidadesController {
   @Get(':id/diagramas')
   @ApiOperation({
     summary: 'Listar diagramas de uma unidade',
-    description: 'Retorna todos os diagramas vinculados a uma unidade específica',
+    description: 'Retorna todos os diagramas vinculados a uma unidade específica. Usuários não-admin só veem diagramas de suas unidades.',
   })
   @ApiParam({
     name: 'id',
@@ -381,13 +389,16 @@ export class UnidadesController {
   })
   @ApiResponse({
     status: HttpStatus.NOT_FOUND,
-    description: 'Unidade não encontrada',
+    description: 'Unidade não encontrada ou sem permissão',
   })
-  async findDiagramasByUnidade(@Param('id') id: string) {
-    this.logger.log(`📋 [LIST DIAGRAMAS BY UNIDADE] Unidade: ${id}`);
+  async findDiagramasByUnidade(
+    @Param('id') id: string,
+    @UserProprietarioId() autoProprietarioId: string | null
+  ) {
+    this.logger.log(`📋 [LIST DIAGRAMAS BY UNIDADE] Unidade: ${id}, autoProprietarioId: ${autoProprietarioId}`);
 
     try {
-      const diagramas = await this.diagramasService.findByUnidade(id);
+      const diagramas = await this.diagramasService.findByUnidade(id, autoProprietarioId);
       this.logger.log(`✅ [LIST DIAGRAMAS BY UNIDADE] Encontrados ${diagramas.length} diagramas`);
       return {
         success: true,

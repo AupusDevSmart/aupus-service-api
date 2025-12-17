@@ -20,6 +20,7 @@ import { EquipamentoQueryDto } from './dto/equipamento-query.dto';
 import { CreateComponenteUARDto } from './dto/componente-uar.dto';
 import { ConfigurarMqttDto } from './dto/configurar-mqtt.dto';
 import { CreateEquipamentoRapidoDto } from './dto/create-equipamento-rapido.dto';
+import { UserProprietarioId } from '../auth/decorators/user-proprietario.decorator';
 
 @ApiTags('Equipamentos')
 @Controller('equipamentos')
@@ -72,10 +73,16 @@ export class EquipamentosController {
   }
 
   @Get()
-  @ApiOperation({ summary: 'Listar equipamentos com filtros e paginação' })
+  @ApiOperation({ summary: 'Listar equipamentos com filtros e paginação. Usuários não-admin veem apenas seus equipamentos.' })
   @ApiResponse({ status: 200, description: 'Lista de equipamentos' })
-  findAll(@Query() query: EquipamentoQueryDto) {
-    return this.equipamentosService.findAll(query);
+  findAll(
+    @Query() query: EquipamentoQueryDto,
+    @UserProprietarioId() autoProprietarioId: string | null
+  ) {
+    return this.equipamentosService.findAll({
+      ...query,
+      proprietario_id: autoProprietarioId || query.proprietario_id
+    });
   }
 
   @Get('ucs-disponiveis')

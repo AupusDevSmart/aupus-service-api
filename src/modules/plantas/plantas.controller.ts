@@ -12,11 +12,11 @@ import {
   Logger,
   ValidationPipe
 } from '@nestjs/common';
-import { 
-  ApiTags, 
-  ApiOperation, 
-  ApiResponse, 
-  ApiBody, 
+import {
+  ApiTags,
+  ApiOperation,
+  ApiResponse,
+  ApiBody,
   ApiParam,
   ApiQuery
 } from '@nestjs/swagger';
@@ -25,6 +25,7 @@ import { CreatePlantaDto } from './dto/create-planta.dto';
 import { UpdatePlantaDto } from './dto/update-planta.dto';
 import { FindAllPlantasDto } from './dto/find-all-plantas.dto';
 import { Planta, ProprietarioBasico } from './entities/planta.entity';
+import { UserProprietarioId } from '../auth/decorators/user-proprietario.decorator';
 
 @ApiTags('plantas')
 @Controller('plantas') // ✅ CORRIGIDO: Remover 'api/v1' - só deixar 'plantas'
@@ -101,35 +102,42 @@ export class PlantasController {
 
   // ✅ ROTA: GET /api/v1/plantas (Listar plantas com filtros e paginação)
   @Get()
-  @ApiOperation({ 
+  @ApiOperation({
     summary: 'Listar plantas',
-    description: 'Retorna lista paginada de plantas com filtros opcionais'
+    description: 'Retorna lista paginada de plantas com filtros opcionais. Usuários não-admin veem apenas suas plantas.'
   })
   @ApiQuery({ name: 'page', required: false, type: Number, description: 'Número da página', example: 1 })
   @ApiQuery({ name: 'limit', required: false, type: Number, description: 'Itens por página', example: 10 })
   @ApiQuery({ name: 'search', required: false, type: String, description: 'Busca por nome, CNPJ, localização' })
-  @ApiQuery({ name: 'proprietarioId', required: false, type: String, description: 'Filtrar por proprietário' })
+  @ApiQuery({ name: 'proprietarioId', required: false, type: String, description: 'Filtrar por proprietário (admin only)' })
   @ApiQuery({ name: 'orderBy', required: false, enum: ['nome', 'cnpj', 'localizacao', 'cidade', 'criadoEm', 'proprietario'], description: 'Campo para ordenação' })
   @ApiQuery({ name: 'orderDirection', required: false, enum: ['asc', 'desc'], description: 'Direção da ordenação' })
-  @ApiResponse({ 
-    status: HttpStatus.OK, 
+  @ApiResponse({
+    status: HttpStatus.OK,
     description: 'Lista de plantas retornada com sucesso'
   })
-  @ApiResponse({ 
-    status: HttpStatus.BAD_REQUEST, 
-    description: 'Parâmetros inválidos' 
+  @ApiResponse({
+    status: HttpStatus.BAD_REQUEST,
+    description: 'Parâmetros inválidos'
   })
   async findAll(
-    @Query(new ValidationPipe({ transform: true })) queryDto: FindAllPlantasDto
+    @Query(new ValidationPipe({ transform: true })) queryDto: FindAllPlantasDto,
+    @UserProprietarioId() autoProprietarioId: string | null
   ): Promise<PaginatedResponse<Planta>> {
-    this.logger.log(`📋 [LIST PLANTAS] Buscando plantas com filtros:`, JSON.stringify(queryDto, null, 2));
+    // Auto-injetar proprietarioId para usuários não-admin
+    const effectiveProprietarioId = autoProprietarioId || queryDto.proprietarioId;
+
+    this.logger.log(`📋 [LIST PLANTAS] Buscando plantas - autoProprietarioId: ${autoProprietarioId}, queryProprietarioId: ${queryDto.proprietarioId}, effective: ${effectiveProprietarioId}`);
 
     try {
-      const result = await this.plantasService.findAll(queryDto);
-      
+      const result = await this.plantasService.findAll({
+        ...queryDto,
+        proprietarioId: effectiveProprietarioId
+      });
+
       this.logger.log(`✅ [LIST PLANTAS] Encontradas ${result.data.length} plantas de ${result.pagination.total} total`);
       return result;
-      
+
     } catch (error) {
       this.logger.error(`❌ [LIST PLANTAS] Erro ao buscar plantas:`, error.message);
       throw error;
@@ -181,7 +189,7 @@ export class PlantasController {
   @Get(':plantaId/unidades')
   @ApiOperation({
     summary: 'Listar unidades de uma planta',
-    description: 'Retorna lista de unidades de uma planta com informações de diagramas'
+    description: 'Retorna lista de unidades de uma planta com informações de diagramas. Usuários não-admin só veem suas plantas.'
   })
   @ApiParam({
     name: 'plantaId',
@@ -201,11 +209,12 @@ export class PlantasController {
   })
   async findUnidadesByPlanta(
     @Param('plantaId') plantaId: string,
+    @UserProprietarioId() autoProprietarioId: string | null,
     @Query('tipo') tipo?: string,
     @Query('status') status?: string,
     @Query('comDiagrama') comDiagrama?: boolean
   ) {
-    this.logger.log(`🏢 [GET UNIDADES] Buscando unidades da planta ${plantaId}`);
+    this.logger.log(`🏢 [GET UNIDADES] Buscando unidades da planta ${plantaId} - autoProprietarioId: ${autoProprietarioId}`);
     this.logger.log(`📝 [GET UNIDADES] Filtros - tipo: ${tipo}, status: ${status}, comDiagrama: ${comDiagrama}`);
 
     try {
@@ -213,7 +222,8 @@ export class PlantasController {
         plantaId,
         tipo,
         status,
-        comDiagrama
+        comDiagrama,
+        autoProprietarioId
       );
 
       this.logger.log(`✅ [GET UNIDADES] Encontradas ${result.data.length} unidades`);

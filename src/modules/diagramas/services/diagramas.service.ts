@@ -61,14 +61,29 @@ export class DiagramasService {
   /**
    * Busca todos os diagramas de uma unidade
    */
-  async findByUnidade(unidadeId: string) {
-    // Verificar se a unidade existe
-    const unidade = await this.prisma.unidades.findUnique({
-      where: { id: unidadeId, deleted_at: null },
+  async findByUnidade(unidadeId: string, proprietarioId?: string | null) {
+    // Verificar se a unidade existe e pertence ao proprietário (se fornecido)
+    const whereUnidade: any = {
+      id: unidadeId,
+      deleted_at: null,
+    };
+
+    // Se proprietarioId fornecido, adicionar filtro
+    if (proprietarioId) {
+      whereUnidade.planta = {
+        proprietario_id: proprietarioId,
+      };
+    }
+
+    const unidade = await this.prisma.unidades.findFirst({
+      where: whereUnidade,
     });
 
     if (!unidade) {
-      throw new NotFoundException('Unidade não encontrada');
+      const message = proprietarioId
+        ? 'Unidade não encontrada ou você não tem permissão para acessá-la'
+        : 'Unidade não encontrada';
+      throw new NotFoundException(message);
     }
 
     // Buscar diagramas da unidade
@@ -125,7 +140,7 @@ export class DiagramasService {
   /**
    * Busca um diagrama por ID com opção de incluir dados em tempo real
    */
-  async findOne(id: string, includeData = false) {
+  async findOne(id: string, includeData = false, proprietarioId?: string | null) {
     const diagrama = await this.prisma.diagramas_unitarios.findFirst({
       where: {
         id,
@@ -137,7 +152,7 @@ export class DiagramasService {
       throw new NotFoundException('Diagrama não encontrado');
     }
 
-    // Buscar unidade
+    // Buscar unidade com planta e proprietário
     const unidade = await this.prisma.unidades.findUnique({
       where: { id: diagrama.unidade_id },
       select: {
@@ -145,8 +160,18 @@ export class DiagramasService {
         nome: true,
         tipo: true,
         potencia: true,
+        planta: {
+          select: {
+            proprietario_id: true,
+          },
+        },
       },
     });
+
+    // Se proprietarioId foi fornecido, validar que o diagrama pertence ao usuário
+    if (proprietarioId && unidade?.planta?.proprietario_id !== proprietarioId) {
+      throw new NotFoundException('Diagrama não encontrado ou você não tem permissão para acessá-lo');
+    }
 
     // Buscar equipamentos posicionados neste diagrama
     const equipamentos = await this.prisma.equipamentos.findMany({

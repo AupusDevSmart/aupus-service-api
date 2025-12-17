@@ -32,6 +32,7 @@ import {
   UpdateConexaoDto,
   CreateConexoesBulkDto,
 } from './dto/create-conexao.dto';
+import { UserProprietarioId } from '../auth/decorators/user-proprietario.decorator';
 
 @ApiTags('Diagramas Sinópticos')
 // @ApiBearerAuth() // TODO: Descomentar quando implementar autenticação
@@ -78,7 +79,7 @@ export class DiagramasController {
   }
 
   @Get(':id')
-  @ApiOperation({ summary: 'Obter diagrama por ID' })
+  @ApiOperation({ summary: 'Obter diagrama por ID. Usuários não-admin só acessam diagramas de suas unidades.' })
   @ApiParam({ name: 'id', description: 'ID do diagrama' })
   @ApiQuery({
     name: 'includeData',
@@ -87,13 +88,14 @@ export class DiagramasController {
     description: 'Incluir dados em tempo real dos equipamentos',
   })
   @ApiResponse({ status: 200, description: 'Diagrama encontrado' })
-  @ApiResponse({ status: 404, description: 'Diagrama não encontrado' })
+  @ApiResponse({ status: 404, description: 'Diagrama não encontrado ou sem permissão' })
   async findOne(
     @Param('id') id: string,
     @Query('includeData') includeData?: string,
+    @UserProprietarioId() autoProprietarioId?: string | null
   ) {
     const includeDataBool = includeData === 'true';
-    const diagrama = await this.diagramasService.findOne(id, includeDataBool);
+    const diagrama = await this.diagramasService.findOne(id, includeDataBool, autoProprietarioId);
     return {
       success: true,
       data: diagrama,
