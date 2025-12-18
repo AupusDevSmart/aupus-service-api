@@ -13,7 +13,7 @@ export class EquipamentosDiagramaService {
     diagramaId: string,
     dto: AddEquipamentoDiagramaDto,
   ) {
-    const { equipamentoId, posicao, rotacao, dimensoes, propriedades } = dto;
+    const { equipamentoId, posicao, rotacao, dimensoes, propriedades, labelPosition } = dto;
 
     console.log(`📍 [addEquipamento] Recebido:`, {
       equipamentoId,
@@ -99,6 +99,7 @@ export class EquipamentosDiagramaService {
         posicao_x: posicao.x,
         posicao_y: posicao.y,
         rotacao: rotacao ?? 0,
+        label_position: labelPosition || 'bottom',
         largura_customizada: dimensoes?.largura,
         altura_customizada: dimensoes?.altura,
         propriedades: propriedadesMescladas as any,
@@ -123,7 +124,7 @@ export class EquipamentosDiagramaService {
     equipamentoId: string,
     dto: UpdateEquipamentoDiagramaDto,
   ) {
-    const { posicao, rotacao, dimensoes, propriedades } = dto;
+    const { posicao, rotacao, dimensoes, propriedades, labelPosition } = dto;
 
     // 1. Verificar se o equipamento está no diagrama
     const equipamento = await this.prisma.equipamentos.findFirst({
@@ -165,6 +166,7 @@ export class EquipamentosDiagramaService {
         posicao_x: posicao?.x,
         posicao_y: posicao?.y,
         rotacao,
+        label_position: labelPosition,
         largura_customizada: dimensoes?.largura,
         altura_customizada: dimensoes?.altura,
         propriedades: propriedadesMescladas as any,
@@ -379,6 +381,7 @@ export class EquipamentosDiagramaService {
         y: equipamento.posicao_y,
       },
       rotacao: equipamento.rotacao || 0,
+      label_position: equipamento.label_position,
       dimensoes: {
         largura: equipamento.largura_customizada || 64,
         altura: equipamento.altura_customizada || 64,

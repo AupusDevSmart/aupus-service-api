@@ -1142,6 +1142,7 @@ model equipamentos {
   posicao_y              Float?                        @db.Real
   propriedades           Json?
   rotacao                Float?                        @default(0) @db.Real
+  label_position         String?                       @default("top") @db.VarChar(10)
   status                 String?                       @default("NORMAL") @db.VarChar(20)
   tag                    String?                       @db.VarChar(50)
   tipo_equipamento_id    String?                       @db.Char(26)

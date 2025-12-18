@@ -213,6 +213,7 @@ export class DiagramasService {
           y: eq.posicao_y,
         },
         rotacao: eq.rotacao || 0,
+        label_position: eq.label_position,
         dimensoes: {
           largura: eq.largura_customizada || tipo?.largura_padrao || 64,
           altura: eq.altura_customizada || tipo?.altura_padrao || 64,

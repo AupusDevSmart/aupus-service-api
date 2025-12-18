@@ -43,6 +43,11 @@ export class AddEquipamentoDiagramaDto {
   @Max(360)
   rotacao?: number;
 
+  @ApiPropertyOptional({ description: 'Posição do label (top, bottom, left, right)', example: 'bottom' })
+  @IsOptional()
+  @IsString()
+  labelPosition?: string;
+
   @ApiPropertyOptional({ description: 'Dimensões customizadas', type: DimensoesDto })
   @IsOptional()
   @ValidateNested()
@@ -68,6 +73,11 @@ export class UpdateEquipamentoDiagramaDto {
   @Min(0)
   @Max(360)
   rotacao?: number;
+
+  @ApiPropertyOptional({ description: 'Posição do label (top, bottom, left, right)', example: 'bottom' })
+  @IsOptional()
+  @IsString()
+  labelPosition?: string;
 
   @ApiPropertyOptional({ description: 'Dimensões customizadas', type: DimensoesDto })
   @IsOptional()
