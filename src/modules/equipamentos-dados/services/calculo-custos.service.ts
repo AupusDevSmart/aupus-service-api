@@ -33,30 +33,76 @@ export class CalculoCustosService {
     equipamentoId: string,
     dataInicio: Date,
     dataFim: Date,
+    periodo?: 'dia' | 'mes' | 'custom', // ✅ NOVO: tipo de período
   ): Promise<{
     unidade: DadosUnidade;
     tarifas: TarifasConcessionaria;
     agregacao: AgregacaoEnergia;
     custos: CalculoCustos;
+    periodo_tipo?: string; // ✅ NOVO: informar tipo de período
   }> {
+    console.log(`\n💵 [CUSTOS] Iniciando cálculo de custos`);
+    console.log(`   Equipamento: ${equipamentoId}`);
+    console.log(`   Período: ${dataInicio.toLocaleString('pt-BR')} até ${dataFim.toLocaleString('pt-BR')}`);
+    console.log(`   Tipo: ${periodo || 'custom'}`);
+
     // 1. Buscar dados da unidade e tarifas
     const { unidade, tarifas } = await this.buscarDadosUnidadeETarifas(equipamentoId);
+    console.log(`   Unidade: ${unidade.nome} (Grupo ${unidade.grupo}, Irrigante: ${unidade.irrigante ? 'SIM' : 'NÃO'})`);
 
     // 2. Buscar leituras MQTT do período
     const leituras = await this.buscarLeiturasPeriodo(equipamentoId, dataInicio, dataFim);
+    console.log(`   Leituras encontradas: ${leituras.length}`);
+
+    if (leituras.length === 0) {
+      console.log(`   ⚠️  ATENÇÃO: Nenhuma leitura encontrada no período!`);
+    }
 
     // 3. Agregar energia por tipo de horário
     const agregacao = this.agregarEnergiaPorTipo(leituras, unidade, tarifas);
+    console.log(`   Energia total: ${agregacao.energia_total_kwh.toFixed(3)} kWh`);
+    console.log(`   - Ponta: ${agregacao.energia_ponta_kwh.toFixed(3)} kWh`);
+    console.log(`   - Fora Ponta: ${agregacao.energia_fora_ponta_kwh.toFixed(3)} kWh`);
+    console.log(`   - Reservado: ${agregacao.energia_reservado_kwh.toFixed(3)} kWh`);
+    console.log(`   - Irrigante: ${agregacao.energia_irrigante_kwh.toFixed(3)} kWh`);
 
-    // 4. Calcular custos
-    const custos = this.calcularCustosPorCategoria(agregacao, unidade, tarifas);
+    // 4. Decidir se inclui demanda no custo
+    // ✅ CENÁRIO C: Demanda só é cobrada em períodos mensais ou customizados >= 28 dias
+    const incluirDemanda = this.deveIncluirDemanda(periodo, dataInicio, dataFim);
+    console.log(`   Incluir demanda no custo: ${incluirDemanda ? 'SIM' : 'NÃO'}`);
+
+    const custos = this.calcularCustosPorCategoria(agregacao, unidade, tarifas, incluirDemanda);
+    console.log(`   Custo total: R$ ${custos.custo_total.toFixed(2)}`);
+    if (custos.custo_demanda > 0) {
+      console.log(`   - Custo demanda: R$ ${custos.custo_demanda.toFixed(2)}`);
+    }
+    if (custos.economia_irrigante > 0) {
+      console.log(`   Economia irrigante: R$ ${custos.economia_irrigante.toFixed(2)}`);
+    }
+    console.log('');
 
     return {
       unidade,
       tarifas,
       agregacao,
       custos,
+      periodo_tipo: periodo,
     };
+  }
+
+  /**
+   * Decide se deve incluir demanda contratada no cálculo de custos
+   *
+   * ATUALIZAÇÃO: Demanda nunca é incluída no cálculo
+   * Apenas demanda_maxima_kw é exibida como informação
+   */
+  private deveIncluirDemanda(
+    periodo: 'dia' | 'mes' | 'custom' | undefined,
+    dataInicio: Date,
+    dataFim: Date,
+  ): boolean {
+    // Nunca incluir demanda no custo
+    return false;
   }
 
   /**
@@ -115,7 +161,8 @@ export class CalculoCustosService {
       // Determinar qual conjunto de tarifas usar (A3a ou A4)
       const prefixo = unidade.subgrupo.toLowerCase().replace(/[^a-z0-9]/g, ''); // a3a, a4, etc
 
-      if (prefixo === 'a3a') {
+      // Verificar se contém 'a3a' no subgrupo
+      if (prefixo.includes('a3a')) {
         return {
           tusd_p: this.parseDecimal(concessionaria.a3a_verde_tusd_p),
           te_p: this.parseDecimal(concessionaria.a3a_verde_te_p),
@@ -124,7 +171,8 @@ export class CalculoCustosService {
           tusd_d: this.parseDecimal(concessionaria.a3a_verde_tusd_d),
           te_d: this.parseDecimal(concessionaria.a3a_verde_te_d),
         };
-      } else if (prefixo === 'a4') {
+      } else if (prefixo.includes('a4')) {
+        // Verifica se contém 'a4' (pega tanto 'a4' quanto 'a4verde')
         return {
           tusd_p: this.parseDecimal(concessionaria.a4_verde_tusd_p),
           te_p: this.parseDecimal(concessionaria.a4_verde_te_p),
@@ -170,9 +218,8 @@ export class CalculoCustosService {
         energia_kwh: {
           not: null, // ✅ Apenas leituras com energia calculada
         },
-        qualidade: {
-          in: ['OK', 'SUSPEITO'], // ✅ Excluir PRIMEIRA_LEITURA e PHF_RESET
-        },
+        // ✅ Aceitar todas as qualidades que tenham energia_kwh válida
+        // O campo energia_kwh já está sendo salvo corretamente, então podemos confiar nele
       },
       orderBy: {
         timestamp_dados: 'asc',
@@ -259,11 +306,13 @@ export class CalculoCustosService {
 
   /**
    * Calcula custos por categoria
+   * ✅ ATUALIZADO: Parâmetro incluirDemanda para controlar se demanda entra no custo
    */
   private calcularCustosPorCategoria(
     agregacao: AgregacaoEnergia,
     unidade: DadosUnidade,
     tarifas: TarifasConcessionaria,
+    incluirDemanda: boolean = false, // ✅ NOVO: só calcular demanda se true
   ): CalculoCustos {
     const custos: CalculoCustos = {
       custo_ponta: 0,
@@ -302,8 +351,8 @@ export class CalculoCustosService {
         custos.economia_irrigante = custo_sem_desconto - custos.custo_irrigante;
       }
 
-      // Demanda
-      if (unidade.demanda_contratada && tarifas.tusd_d) {
+      // Demanda (✅ só calcular se incluirDemanda = true, ou seja, período mensal)
+      if (incluirDemanda && unidade.demanda_contratada && tarifas.tusd_d) {
         custos.custo_demanda = unidade.demanda_contratada * tarifas.tusd_d;
       }
     } else {

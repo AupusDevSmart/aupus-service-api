@@ -187,9 +187,9 @@ export class EquipamentosDadosService {
    * Retorna dados agregados de 1 minuto para o dia especificado
    */
   async getGraficoDia(equipamentoId: string, data?: string) {
-    console.log(`\n📊 [GRÁFICO DIA] ========================================`);
-    console.log(`📊 [GRÁFICO DIA] Equipamento: ${equipamentoId}`);
-    console.log(`📊 [GRÁFICO DIA] Data solicitada: ${data || 'hoje'}`);
+    // console.log(`\n📊 [GRÁFICO DIA] ========================================`);
+    // console.log(`📊 [GRÁFICO DIA] Equipamento: ${equipamentoId}`);
+    // console.log(`📊 [GRÁFICO DIA] Data solicitada: ${data || 'hoje'}`);
 
     // Verificar o tipo do equipamento
     const equipamento = await this.prisma.equipamentos.findUnique({
@@ -208,10 +208,10 @@ export class EquipamentosDadosService {
     const dataFim = new Date(dataConsulta);
     dataFim.setDate(dataFim.getDate() + 1);
 
-    console.log(`📊 [GRÁFICO DIA] Período de busca:`);
-    console.log(`📊 [GRÁFICO DIA]   De: ${dataConsulta.toISOString()}`);
-    console.log(`📊 [GRÁFICO DIA]   Até: ${dataFim.toISOString()}`);
-    console.log(`📊 [GRÁFICO DIA] Tipo do equipamento: ${equipamento.tipo_equipamento_rel?.codigo}`);
+    // console.log(`📊 [GRÁFICO DIA] Período de busca:`);
+    // console.log(`📊 [GRÁFICO DIA]   De: ${dataConsulta.toISOString()}`);
+    // console.log(`📊 [GRÁFICO DIA]   Até: ${dataFim.toISOString()}`);
+    // console.log(`📊 [GRÁFICO DIA] Tipo do equipamento: ${equipamento.tipo_equipamento_rel?.codigo}`);
 
     // Buscar dados da tabela equipamentos_dados para TODOS os tipos de equipamento
     const dados = await this.prisma.equipamentos_dados.findMany({
@@ -231,29 +231,31 @@ export class EquipamentosDadosService {
       },
     });
 
-    console.log(`📊 [GRÁFICO DIA] Registros encontrados: ${dados.length}`);
-
-    if (dados.length > 0) {
-      console.log(`📊 [GRÁFICO DIA] Amostra do primeiro registro:`);
-      console.log(`📊 [GRÁFICO DIA]   Timestamp: ${dados[0].timestamp_dados}`);
-      console.log(`📊 [GRÁFICO DIA]   Num leituras: ${dados[0].num_leituras}`);
-      console.log(`📊 [GRÁFICO DIA]   Estrutura completa do dados:`, JSON.stringify(dados[0].dados, null, 2));
-
-      // Verificar especificamente para inversores
-      const dadosObj = dados[0].dados as any;
-      if (dadosObj.power) {
-        console.log(`📊 [GRÁFICO DIA]   power.active_total: ${dadosObj.power.active_total}`);
-      }
-      if (dadosObj.dc) {
-        console.log(`📊 [GRÁFICO DIA]   dc.total_power: ${dadosObj.dc.total_power}`);
-      }
-    }
+    // console.log(`📊 [GRÁFICO DIA] Registros encontrados: ${dados.length}`);
+    //
+    // if (dados.length > 0) {
+    //   console.log(`📊 [GRÁFICO DIA] Amostra do primeiro registro:`);
+    //   console.log(`📊 [GRÁFICO DIA]   Timestamp: ${dados[0].timestamp_dados}`);
+    //   console.log(`📊 [GRÁFICO DIA]   Num leituras: ${dados[0].num_leituras}`);
+    //   console.log(`📊 [GRÁFICO DIA]   Estrutura completa do dados:`, JSON.stringify(dados[0].dados, null, 2));
+    //
+    //   // Verificar especificamente para inversores
+    //   const dadosObj = dados[0].dados as any;
+    //   if (dadosObj.power) {
+    //     console.log(`📊 [GRÁFICO DIA]   power.active_total: ${dadosObj.power.active_total}`);
+    //   }
+    //   if (dadosObj.dc) {
+    //     console.log(`📊 [GRÁFICO DIA]   dc.total_power: ${dadosObj.dc.total_power}`);
+    //   }
+    // }
 
     // Agrupar dados em intervalos de 5 minutos para reduzir variação
     const INTERVALO_MINUTOS = 5;
     const dadosAgrupados = new Map<string, {
       timestamp: Date;
+      dados: any[];
       potencias: number[];
+      dadosM160: any[]; // Para preservar dados M160 (tensão, FP, etc)
     }>();
 
     dados.forEach((d: any) => {
@@ -266,22 +268,20 @@ export class EquipamentosDadosService {
       if (!dadosAgrupados.has(minutoKey)) {
         dadosAgrupados.set(minutoKey, {
           timestamp: minuto,
+          dados: [],
           potencias: [],
+          dadosM160: [],
         });
       }
 
       const grupo = dadosAgrupados.get(minutoKey)!;
+      grupo.dados.push(d);
+
+      // Extrair potência
       let potenciaKw = 0;
-
-      // Log da estrutura dos dados para debug (apenas primeiro)
-      if (dados.indexOf(d) === 0) {
-        console.log(`📊 [GRÁFICO DIA] Analisando estrutura dos dados:`);
-        console.log(`  - Chaves principais:`, Object.keys(d.dados));
-        console.log(`  - Dados completos:`, JSON.stringify(d.dados, null, 2));
-      }
-
-      // Tentar diferentes estruturas de dados
-      if (d.dados.power?.active_total !== undefined) {
+      if (d.dados.potencia_kw !== undefined) {
+        potenciaKw = d.dados.potencia_kw;
+      } else if (d.dados.power?.active_total !== undefined) {
         potenciaKw = d.dados.power.active_total / 1000;
       } else if (d.dados.dc?.total_power !== undefined) {
         potenciaKw = d.dados.dc.total_power / 1000;
@@ -293,34 +293,65 @@ export class EquipamentosDadosService {
         potenciaKw = d.dados.potencia_ativa_kw;
       } else if (d.dados.active_power !== undefined) {
         potenciaKw = d.dados.active_power / 1000;
+      } else if (d.dados.Dados) {
+        const Pa = d.dados.Dados.Pa || 0;
+        const Pb = d.dados.Dados.Pb || 0;
+        const Pc = d.dados.Dados.Pc || 0;
+        potenciaKw = (Pa + Pb + Pc) / 1000;
       }
 
-      if (potenciaKw > 0 || true) { // Aceitar zeros também (inversores à noite, etc.)
-        grupo.potencias.push(potenciaKw);
+      grupo.potencias.push(potenciaKw);
+
+      // Se houver dados M160, armazenar para agregação
+      if (d.dados.Dados) {
+        grupo.dadosM160.push(d.dados.Dados);
       }
     });
 
     // Converter para array e calcular médias por intervalo
-    const pontosAgrupados = Array.from(dadosAgrupados.entries())
-      .map(([_, grupo]) => {
-        const potenciaMedia = grupo.potencias.length > 0 ?
-          grupo.potencias.reduce((sum, p) => sum + p, 0) / grupo.potencias.length : 0;
-        const potenciaMin = grupo.potencias.length > 0 ? Math.min(...grupo.potencias) : 0;
-        const potenciaMax = grupo.potencias.length > 0 ? Math.max(...grupo.potencias) : 0;
+    const pontosAgrupados = Array.from(dadosAgrupados.values()).map((grupo) => {
+      // Calcular média da potência no intervalo de 5 minutos
+      const potenciaMedia = grupo.potencias.length > 0
+        ? grupo.potencias.reduce((sum, p) => sum + p, 0) / grupo.potencias.length
+        : 0;
 
-        return {
-          timestamp: grupo.timestamp,
-          hora: grupo.timestamp.toISOString(),
-          potencia_kw: potenciaMedia,
-          potencia_min: potenciaMin,
-          potencia_max: potenciaMax,
-          num_leituras: grupo.potencias.length,
-          qualidade: 'GOOD',
+      const potenciaMin = grupo.potencias.length > 0 ? Math.min(...grupo.potencias) : 0;
+      const potenciaMax = grupo.potencias.length > 0 ? Math.max(...grupo.potencias) : 0;
+
+      const ponto: any = {
+        timestamp: grupo.timestamp,
+        hora: grupo.timestamp.toISOString(),
+        potencia_kw: potenciaMedia,
+        potencia_min: potenciaMin,
+        potencia_max: potenciaMax,
+        num_leituras: grupo.dados.length,
+        qualidade: 'GOOD',
+      };
+
+      // Se houver dados M160, calcular média dos campos
+      if (grupo.dadosM160.length > 0) {
+        const avgM160 = {
+          Va: grupo.dadosM160.reduce((sum, d) => sum + (d.Va || 0), 0) / grupo.dadosM160.length,
+          Vb: grupo.dadosM160.reduce((sum, d) => sum + (d.Vb || 0), 0) / grupo.dadosM160.length,
+          Vc: grupo.dadosM160.reduce((sum, d) => sum + (d.Vc || 0), 0) / grupo.dadosM160.length,
+          Ia: grupo.dadosM160.reduce((sum, d) => sum + (d.Ia || 0), 0) / grupo.dadosM160.length,
+          Ib: grupo.dadosM160.reduce((sum, d) => sum + (d.Ib || 0), 0) / grupo.dadosM160.length,
+          Ic: grupo.dadosM160.reduce((sum, d) => sum + (d.Ic || 0), 0) / grupo.dadosM160.length,
+          Pa: grupo.dadosM160.reduce((sum, d) => sum + (d.Pa || 0), 0) / grupo.dadosM160.length,
+          Pb: grupo.dadosM160.reduce((sum, d) => sum + (d.Pb || 0), 0) / grupo.dadosM160.length,
+          Pc: grupo.dadosM160.reduce((sum, d) => sum + (d.Pc || 0), 0) / grupo.dadosM160.length,
+          FPA: grupo.dadosM160.reduce((sum, d) => sum + (d.FPA || 0), 0) / grupo.dadosM160.length,
+          FPB: grupo.dadosM160.reduce((sum, d) => sum + (d.FPB || 0), 0) / grupo.dadosM160.length,
+          FPC: grupo.dadosM160.reduce((sum, d) => sum + (d.FPC || 0), 0) / grupo.dadosM160.length,
+          freq: grupo.dadosM160.reduce((sum, d) => sum + (d.freq || 0), 0) / grupo.dadosM160.length,
         };
-      })
-      .sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime());
+        ponto.Dados = avgM160;
+      }
 
-    console.log(`📊 [GRÁFICO DIA] Pontos após agrupamento de ${INTERVALO_MINUTOS} minutos: ${pontosAgrupados.length}`);
+      return ponto;
+    }).sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime());
+
+    // console.log(`📊 [GRÁFICO DIA] Total de pontos processados: ${pontosAgrupados.length}`);
 
     // Aplicar suavização com média móvel para reduzir ruído
     const JANELA_SUAVIZACAO = 3;
@@ -337,14 +368,14 @@ export class EquipamentosDadosService {
       };
     });
 
-    console.log(`📊 [GRÁFICO DIA] Total de pontos após suavização (janela ${JANELA_SUAVIZACAO}): ${pontos.length}`);
-    if (pontos.length > 0) {
-      console.log(`📊 [GRÁFICO DIA] Primeiro ponto:`, pontos[0]);
-    }
+    // console.log(`📊 [GRÁFICO DIA] Total de pontos após suavização (janela ${JANELA_SUAVIZACAO}): ${pontos.length}`);
+    // if (pontos.length > 0) {
+    //   console.log(`📊 [GRÁFICO DIA] Primeiro ponto:`, pontos[0]);
+    // }
 
     // SE NÃO HOUVER DADOS E FOR INVERSOR, GERAR DADOS SIMULADOS
     if (pontos.length === 0 && equipamento.tipo_equipamento_rel?.codigo === 'INVERSOR') {
-      console.log(`⚠️ [GRÁFICO DIA] Sem dados reais para ${equipamento.nome}, gerando dados simulados...`);
+      // console.log(`⚠️ [GRÁFICO DIA] Sem dados reais para ${equipamento.nome}, gerando dados simulados...`);
 
       // Gerar curva típica de geração solar
       const horaInicio = 6; // 6:00
@@ -378,10 +409,10 @@ export class EquipamentosDadosService {
         }
       }
 
-      console.log(`✅ [GRÁFICO DIA] Gerados ${pontos.length} pontos simulados`);
+      // console.log(`✅ [GRÁFICO DIA] Gerados ${pontos.length} pontos simulados`);
     }
 
-    console.log(`📊 [GRÁFICO DIA] ========================================\n`);
+    // console.log(`📊 [GRÁFICO DIA] ========================================\n`);
 
     return {
       data: dataConsulta.toISOString().split('T')[0],
@@ -605,7 +636,10 @@ export class EquipamentosDadosService {
 
       // Extrair potência (suportar múltiplas estruturas)
       let potenciaKw = 0;
-      if (d.dados.power?.active_total !== undefined) {
+      // ✅ NOVO: Priorizar campo potencia_kw (M160 formato Resumo)
+      if (d.dados.potencia_kw !== undefined) {
+        potenciaKw = d.dados.potencia_kw;
+      } else if (d.dados.power?.active_total !== undefined) {
         potenciaKw = d.dados.power.active_total / 1000;
       } else if (d.dados.dc?.total_power !== undefined) {
         potenciaKw = d.dados.dc.total_power / 1000;
@@ -615,6 +649,12 @@ export class EquipamentosDadosService {
         potenciaKw = d.dados.power_avg;
       } else if (d.dados.potencia_ativa_kw !== undefined) {
         potenciaKw = d.dados.potencia_ativa_kw;
+      } else if (d.dados.Dados) {
+        // M160 formato legado: calcular potência das fases
+        const Pa = d.dados.Dados.Pa || 0;
+        const Pb = d.dados.Dados.Pb || 0;
+        const Pc = d.dados.Dados.Pc || 0;
+        potenciaKw = (Pa + Pb + Pc) / 1000;
       }
 
       if (potenciaKw > 0) {
@@ -812,7 +852,10 @@ export class EquipamentosDadosService {
 
       // Extrair potência (suportar múltiplas estruturas)
       let potenciaKw = 0;
-      if (d.dados.power?.active_total !== undefined) {
+      // ✅ NOVO: Priorizar campo potencia_kw (M160 formato Resumo)
+      if (d.dados.potencia_kw !== undefined) {
+        potenciaKw = d.dados.potencia_kw;
+      } else if (d.dados.power?.active_total !== undefined) {
         potenciaKw = d.dados.power.active_total / 1000;
       } else if (d.dados.dc?.total_power !== undefined) {
         potenciaKw = d.dados.dc.total_power / 1000;
@@ -822,14 +865,25 @@ export class EquipamentosDadosService {
         potenciaKw = d.dados.power_avg;
       } else if (d.dados.potencia_ativa_kw !== undefined) {
         potenciaKw = d.dados.potencia_ativa_kw;
+      } else if (d.dados.Dados) {
+        // M160 formato legado: calcular potência das fases
+        const Pa = d.dados.Dados.Pa || 0;
+        const Pb = d.dados.Dados.Pb || 0;
+        const Pc = d.dados.Dados.Pc || 0;
+        potenciaKw = (Pa + Pb + Pc) / 1000;
       }
 
       // Extrair energia se disponível
+      // ✅ NOVO: Priorizar campo energia_kwh (M160 formato Resumo)
       let energiaKwh = 0;
-      if (d.dados.energy?.daily_yield !== undefined) {
-        energiaKwh = d.dados.energy.daily_yield / 1000;
-      } else if (d.dados.energia_kwh !== undefined) {
+      if (d.dados.energia_kwh !== undefined) {
         energiaKwh = d.dados.energia_kwh;
+      } else if (d.dados.energy?.daily_yield !== undefined) {
+        energiaKwh = d.dados.energy.daily_yield / 1000;
+      } else if (d.dados.energy?.period_energy_kwh !== undefined) {
+        energiaKwh = d.dados.energy.period_energy_kwh;
+      } else if (d.dados.Dados?.period_energy_kwh !== undefined) {
+        energiaKwh = d.dados.Dados.period_energy_kwh;
       }
 
       if (potenciaKw > 0) {
@@ -959,7 +1013,10 @@ export class EquipamentosDadosService {
 
       // Extrair potência (suportar múltiplas estruturas)
       let potenciaKw = 0;
-      if (d.dados.power?.active_total !== undefined) {
+      // ✅ NOVO: Priorizar campo potencia_kw (M160 formato Resumo)
+      if (d.dados.potencia_kw !== undefined) {
+        potenciaKw = d.dados.potencia_kw;
+      } else if (d.dados.power?.active_total !== undefined) {
         potenciaKw = d.dados.power.active_total / 1000;
       } else if (d.dados.dc?.total_power !== undefined) {
         potenciaKw = d.dados.dc.total_power / 1000;
@@ -969,14 +1026,25 @@ export class EquipamentosDadosService {
         potenciaKw = d.dados.power_avg;
       } else if (d.dados.potencia_ativa_kw !== undefined) {
         potenciaKw = d.dados.potencia_ativa_kw;
+      } else if (d.dados.Dados) {
+        // M160 formato legado: calcular potência das fases
+        const Pa = d.dados.Dados.Pa || 0;
+        const Pb = d.dados.Dados.Pb || 0;
+        const Pc = d.dados.Dados.Pc || 0;
+        potenciaKw = (Pa + Pb + Pc) / 1000;
       }
 
       // Extrair energia se disponível
+      // ✅ NOVO: Priorizar campo energia_kwh (M160 formato Resumo)
       let energiaKwh = 0;
-      if (d.dados.energy?.daily_yield !== undefined) {
-        energiaKwh = d.dados.energy.daily_yield / 1000;
-      } else if (d.dados.energia_kwh !== undefined) {
+      if (d.dados.energia_kwh !== undefined) {
         energiaKwh = d.dados.energia_kwh;
+      } else if (d.dados.energy?.daily_yield !== undefined) {
+        energiaKwh = d.dados.energy.daily_yield / 1000;
+      } else if (d.dados.energy?.period_energy_kwh !== undefined) {
+        energiaKwh = d.dados.energy.period_energy_kwh;
+      } else if (d.dados.Dados?.period_energy_kwh !== undefined) {
+        energiaKwh = d.dados.Dados.period_energy_kwh;
       }
 
       if (potenciaKw > 0) {

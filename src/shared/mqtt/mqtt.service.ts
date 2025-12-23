@@ -166,13 +166,8 @@ export class MqttService extends EventEmitter implements OnModuleInit, OnModuleD
    */
   private async handleMessage(topic: string, payload: Buffer) {
     try {
-      // LOG: Mensagem recebida
-      // console.log('📨 [MQTT] Mensagem recebida no tópico:', topic);
-      // console.log('📨 [MQTT] Payload (primeiros 200 chars):', payload.toString().substring(0, 200));
-
       // Parse do payload JSON
       const dados = JSON.parse(payload.toString());
-      // console.log('📨 [MQTT] Timestamp nos dados:', dados.timestamp, '| Status:', dados.status?.work_state_text || 'N/A');
 
       // Obter equipamentos que escutam este tópico
       const equipamentoIds = this.subscriptions.get(topic);
@@ -289,27 +284,25 @@ export class MqttService extends EventEmitter implements OnModuleInit, OnModuleD
         timestampDados = new Date();
       }
 
-      // ✅ NOVO: Se é M-160, processar com MqttIngestionService para cálculo de PHF
+      // ✅ Se é M-160, processar no novo formato (Resumo)
       const codigo = equipamento.tipo_equipamento_rel?.codigo;
       const isM160 = codigo === 'M-160' || codigo === 'M160' || codigo === 'METER_M160';
 
-      if (isM160 && dados.Dados?.phf !== undefined) {
+      if (isM160) {
         try {
-          // Processar leitura M-160 com cálculo de PHF e classificação de horário
-          await this.mqttIngestionService.processarLeituraMQTT(
-            equipamentoId,
-            dados,
-            timestampDados,
-          );
-
-          // console.log(`✅ [M-160] Leitura processada com PHF: ${dados.Dados.phf} kWh`);
+          // Novo formato: JSON com campo Resumo (dados agregados de 30 segundos)
+          if (dados.Resumo && typeof dados.Resumo === 'object') {
+            await this.salvarDadosM160Resumo(equipamentoId, dados, timestampDados, qualidade);
+          } else {
+            console.warn(`⚠️ [M-160] Formato JSON desconhecido para equipamento ${equipamentoId}. Esperado campo "Resumo". Chaves recebidas:`, Object.keys(dados));
+          }
 
           // ⚠️ NÃO adicionar M-160 ao buffer para evitar conflito de UNIQUE constraint
-          // O MqttIngestionService já salvou a leitura individual
+          // O processamento já salvou a leitura diretamente no banco
         } catch (error) {
-          console.error(`❌ [M-160] Erro ao processar PHF:`, error);
-          // Em caso de erro, continuar com fluxo normal de buffer
-          this.addToBuffer(equipamentoId, timestampDados, dados, qualidade);
+          console.error(`❌ [M-160] Erro ao processar dados:`, error);
+          // Em caso de erro, não adicionar ao buffer - apenas logar o erro
+          // Não queremos processar dados M160 pelo fluxo de buffer que foi feito para inversores
         }
       } else {
         // Adicionar ao buffer para outros equipamentos (inversores, etc)
@@ -357,6 +350,160 @@ export class MqttService extends EventEmitter implements OnModuleInit, OnModuleD
     if (this.client) {
       this.client.end();
       // console.log('🔌 MQTT desconectado');
+    }
+  }
+
+  /**
+   * Salva dados do M160 no novo formato (Resumo)
+   * Novo formato: JSON chega agregado de 30 em 30 segundos
+   */
+  private async salvarDadosM160Resumo(
+    equipamentoId: string,
+    dados: any,
+    timestamp: Date,
+    qualidade: string,
+  ) {
+    try {
+      const resumo = dados.Resumo;
+
+      // Extrair timestamp do Resumo (se disponível) ou usar o fornecido
+      let timestampDados = timestamp;
+      if (resumo.timestamp) {
+        if (typeof resumo.timestamp === 'number') {
+          // Timestamp numérico (epoch em segundos ou milissegundos)
+          const ts = resumo.timestamp;
+          if (ts < 10000000000) {
+            timestampDados = new Date(ts * 1000);
+          } else {
+            timestampDados = new Date(ts);
+          }
+        } else if (typeof resumo.timestamp === 'string') {
+          // Timestamp string - pode ser formato brasileiro "DD/MM/YYYY HH:mm:ss"
+          const tsString = resumo.timestamp.trim();
+
+          // Tentar formato brasileiro: DD/MM/YYYY HH:mm:ss
+          const brazilianDateMatch = tsString.match(/^(\d{2})\/(\d{2})\/(\d{4})\s+(\d{2}):(\d{2}):(\d{2})$/);
+          if (brazilianDateMatch) {
+            const [_, day, month, year, hour, minute, second] = brazilianDateMatch;
+            // Criar data em UTC (ou local, dependendo do contexto)
+            timestampDados = new Date(
+              parseInt(year),
+              parseInt(month) - 1, // JavaScript months are 0-indexed
+              parseInt(day),
+              parseInt(hour),
+              parseInt(minute),
+              parseInt(second)
+            );
+          } else {
+            // Tentar parse ISO ou outros formatos
+            const ts = parseInt(tsString);
+            if (!isNaN(ts)) {
+              if (ts < 10000000000) {
+                timestampDados = new Date(ts * 1000);
+              } else {
+                timestampDados = new Date(ts);
+              }
+            } else {
+              // Tentar Date parse direto
+              timestampDados = new Date(tsString);
+            }
+          }
+        }
+      }
+
+      // Calcular potência média do período (kW)
+      // energia_total (kWh) / tempo (horas) = potência (kW)
+      // 30 segundos = 30/3600 horas = 0.00833... horas
+      const energiaKwh = resumo.energia_total || 0;
+      const tempoHoras = 30 / 3600; // 30 segundos em horas
+      const potenciaMediaKw = energiaKwh / tempoHoras;
+
+      // Montar objeto de dados processados (compatível com estrutura atual do banco)
+      const dadosProcessados = {
+        // Timestamp original
+        timestamp: dados.timestamp || timestampDados.toISOString(),
+
+        // Dados agregados do Resumo
+        Dados: {
+          // Tensões médias (V)
+          Va: resumo.Va_media || 0,
+          Vb: resumo.Vb_media || 0,
+          Vc: resumo.Vc_media || 0,
+
+          // Correntes médias (A)
+          Ia: resumo.Ia_media || 0,
+          Ib: resumo.Ib_media || 0,
+          Ic: resumo.Ic_media || 0,
+
+          // Potências médias (W)
+          Pa: resumo.Pa_medio || 0,
+          Pb: resumo.Pb_medio || 0,
+          Pc: resumo.Pc_medio || 0,
+
+          // Fatores de potência médios
+          FPA: resumo.FPa_medio || 0,
+          FPB: resumo.FPb_medio || 0,
+          FPC: resumo.FPc_medio || 0,
+
+          // Frequência média (Hz)
+          freq: resumo.freq_media || 0,
+
+          // Energia acumulada (kWh) - valores cumulativos
+          phf: resumo.somatorio_phf || 0,
+
+          // Timestamp da leitura
+          timestamp: resumo.timestamp,
+        },
+
+        // ✅ NOVOS CAMPOS: Potência e energia calculados do Resumo
+        potencia_kw: potenciaMediaKw, // Potência média do período (kW)
+        energia_kwh: energiaKwh, // Energia consumida no período de 30s (kWh)
+        total_leituras: resumo.total_leituras || 1, // Quantidade de leituras agregadas
+      };
+
+      // Salvar diretamente no banco (sem buffer) - usar upsert para evitar conflito de UNIQUE constraint
+      await this.prisma.equipamentos_dados.upsert({
+        where: {
+          uk_equipamento_timestamp: {
+            equipamento_id: equipamentoId,
+            timestamp_dados: timestampDados,
+          },
+        },
+        update: {
+          dados: dadosProcessados as any,
+          fonte: 'MQTT',
+          timestamp_fim: timestampDados,
+          num_leituras: resumo.total_leituras || 1,
+          qualidade: qualidade === 'GOOD' ? 'bom' : 'ruim',
+          // ✅ CAMPOS CRÍTICOS PARA CÁLCULO DE CUSTOS
+          potencia_ativa_kw: potenciaMediaKw,
+          energia_kwh: energiaKwh,
+        },
+        create: {
+          equipamento_id: equipamentoId,
+          dados: dadosProcessados as any,
+          fonte: 'MQTT',
+          timestamp_dados: timestampDados,
+          timestamp_fim: timestampDados,
+          num_leituras: resumo.total_leituras || 1,
+          qualidade: qualidade === 'GOOD' ? 'bom' : 'ruim',
+          // ✅ CAMPOS CRÍTICOS PARA CÁLCULO DE CUSTOS
+          potencia_ativa_kw: potenciaMediaKw,
+          energia_kwh: energiaKwh,
+        },
+      });
+
+      console.log(
+        `✅ [M-160 Resumo] Salvo - Energia: ${energiaKwh.toFixed(4)} kWh | Potência: ${potenciaMediaKw.toFixed(2)} kW | Leituras: ${resumo.total_leituras || 1}`,
+      );
+
+      // ✅ NOVO FORMATO: Não precisa processar PHF via MqttIngestionService
+      // O novo formato já vem com energia calculada (energia_total) e não tem PHF acumulado
+      // O campo somatorio_phf é apenas informativo, não precisa calcular delta
+
+    } catch (error) {
+      console.error(`❌ [M-160 Resumo] Erro ao salvar dados:`, error);
+      throw error;
     }
   }
 
@@ -514,7 +661,12 @@ export class MqttService extends EventEmitter implements OnModuleInit, OnModuleD
     const isM160Data = ultimaLeitura.Dados && typeof ultimaLeitura.Dados === 'object';
 
     if (isM160Data) {
-      // ESTRUTURA M-160 - Multimedidor 4Q
+      // ⚠️ ATENÇÃO: Esta lógica NÃO É MAIS USADA para M160!
+      // M160 agora envia dados no formato "Resumo" e são salvos diretamente via salvarDadosM160Resumo()
+      // M160 NÃO passa pelo buffer, portanto esta função nunca será chamada para M160
+      // Este código permanece apenas para retrocompatibilidade com possíveis equipamentos legados
+
+      // ESTRUTURA M-160 LEGADA - Multimedidor 4Q
       // Estrutura: { Dados: { phf, phr, qhfi, qhri, Va, Vb, Vc, Ia, Ib, Ic, Pa, Pb, Pc, FPA, FPB, FPC, freq, timestamp } }
 
       const dadosM160 = leituras.map(l => l.dados.Dados);

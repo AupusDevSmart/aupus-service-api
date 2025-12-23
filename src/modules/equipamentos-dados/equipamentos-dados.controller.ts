@@ -7,6 +7,7 @@ import { CustosEnergiaQueryDto, PeriodoTipo } from './dto/custos-energia-query.d
 @Controller('equipamentos-dados')
 export class EquipamentosDadosController {
   private readonly logger = new Logger(EquipamentosDadosController.name);
+  // Controller de dados de equipamentos com endpoint de custos de energia
 
   constructor(
     private readonly service: EquipamentosDadosService,
@@ -113,8 +114,8 @@ export class EquipamentosDadosController {
       `📊 [CUSTOS] Calculando custos para equipamento ${id} de ${dataInicio.toISOString()} até ${dataFim.toISOString()}`,
     );
 
-    // Chamar serviço de cálculo
-    const resultado = await this.custosService.calcularCustos(id, dataInicio, dataFim);
+    // Chamar serviço de cálculo (✅ passar tipo de período)
+    const resultado = await this.custosService.calcularCustos(id, dataInicio, dataFim, query.periodo);
 
     // Montar response DTO
     return this.montarResponseCustos(resultado, query, dataInicio, dataFim);
