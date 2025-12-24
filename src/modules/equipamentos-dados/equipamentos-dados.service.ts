@@ -201,12 +201,22 @@ export class EquipamentosDadosService {
       throw new NotFoundException(`Equipamento ${equipamentoId} não encontrado`);
     }
 
-    // Definir a data (hoje se não especificada)
-    const dataConsulta = data ? new Date(data) : new Date();
-    dataConsulta.setHours(0, 0, 0, 0);
+    // Definir o período de busca
+    let dataConsulta: Date;
+    let dataFim: Date;
 
-    const dataFim = new Date(dataConsulta);
-    dataFim.setDate(dataFim.getDate() + 1);
+    if (data) {
+      // Se data específica foi fornecida, buscar o dia completo
+      dataConsulta = new Date(data);
+      dataConsulta.setHours(0, 0, 0, 0);
+      dataFim = new Date(dataConsulta);
+      dataFim.setDate(dataFim.getDate() + 1);
+    } else {
+      // Se não foi fornecida data, buscar ÚLTIMAS 24 HORAS (não o dia atual)
+      dataFim = new Date(); // Agora
+      dataConsulta = new Date(dataFim);
+      dataConsulta.setHours(dataConsulta.getHours() - 24); // 24 horas atrás
+    }
 
     // console.log(`📊 [GRÁFICO DIA] Período de busca:`);
     // console.log(`📊 [GRÁFICO DIA]   De: ${dataConsulta.toISOString()}`);
@@ -571,12 +581,22 @@ export class EquipamentosDadosService {
       throw new NotFoundException('Nenhum equipamento válido encontrado');
     }
 
-    // Definir a data (hoje se não especificada)
-    const dataConsulta = data ? new Date(data) : new Date();
-    dataConsulta.setHours(0, 0, 0, 0);
+    // Definir o período de busca
+    let dataConsulta: Date;
+    let dataFim: Date;
 
-    const dataFim = new Date(dataConsulta);
-    dataFim.setDate(dataFim.getDate() + 1);
+    if (data) {
+      // Se data específica foi fornecida, buscar o dia completo
+      dataConsulta = new Date(data);
+      dataConsulta.setHours(0, 0, 0, 0);
+      dataFim = new Date(dataConsulta);
+      dataFim.setDate(dataFim.getDate() + 1);
+    } else {
+      // Se não foi fornecida data, buscar ÚLTIMAS 24 HORAS (não o dia atual)
+      dataFim = new Date(); // Agora
+      dataConsulta = new Date(dataFim);
+      dataConsulta.setHours(dataConsulta.getHours() - 24); // 24 horas atrás
+    }
 
     console.log(`📊 [GRÁFICO DIA MÚLTIPLO] Período de busca:`);
     console.log(`📊 [GRÁFICO DIA MÚLTIPLO]   De: ${dataConsulta.toISOString()}`);
