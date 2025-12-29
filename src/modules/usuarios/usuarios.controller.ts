@@ -12,6 +12,8 @@ import {
   HttpStatus,
   UploadedFile,
   UseInterceptors,
+  UseGuards,
+  Req,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -19,14 +21,15 @@ import {
   ApiResponse,
   ApiParam,
   ApiConsumes,
+  ApiBearerAuth,
 } from '@nestjs/swagger';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { diskStorage } from 'multer';
 import { extname } from 'path';
 import { UsuariosService } from './usuarios.service';
-import { 
-  CreateUsuarioDto, 
-  UpdateUsuarioDto, 
+import {
+  CreateUsuarioDto,
+  UpdateUsuarioDto,
   UsuarioQueryDto,
   ChangePasswordDto,
   ResetPasswordDto,
@@ -41,6 +44,8 @@ import {
   CheckPermissionDto,
   CheckMultiplePermissionsDto
 } from './dto';
+import { CurrentUser } from '../auth/decorators/current-user.decorator';
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 
 @ApiTags('Usuários')
 @Controller('usuarios')
@@ -159,13 +164,27 @@ export class UsuariosController {
   // ============================================================================
 
   @Get()
+  @ApiBearerAuth()
   @ApiOperation({ summary: 'Listar usuários com filtros e paginação' })
   @ApiResponse({
     status: 200,
     description: 'Lista paginada de usuários',
   })
-  findAll(@Query() query: UsuarioQueryDto) {
-    return this.usuariosService.findAll(query);
+  async findAll(@Query() query: UsuarioQueryDto, @CurrentUser() currentUser?: any) {
+    const requestingUserId = currentUser?.id;
+
+    const result = await this.usuariosService.findAll(query, requestingUserId);
+
+    // Adicionar debug na response
+    return {
+      ...result,
+      _debug: {
+        currentUserExists: !!currentUser,
+        currentUserId: requestingUserId,
+        currentUserEmail: currentUser?.email,
+        currentUserRole: currentUser?.role
+      }
+    };
   }
 
   @Get(':id')
@@ -178,12 +197,26 @@ export class UsuariosController {
   }
 
   @Post()
+  @ApiBearerAuth()
   @ApiOperation({ summary: 'Criar novo usuário' })
   @ApiResponse({ status: 201, description: 'Usuário criado com sucesso' })
   @ApiResponse({ status: 400, description: 'Dados inválidos' })
   @ApiResponse({ status: 409, description: 'Email já está em uso' })
-  create(@Body() createUsuarioDto: CreateUsuarioDto) {
-    return this.usuariosService.create(createUsuarioDto);
+  create(@Body() createUsuarioDto: CreateUsuarioDto, @CurrentUser() currentUser?: any) {
+    console.log('🔍 [CONTROLLER] Body recebido (RAW):', JSON.stringify(createUsuarioDto, null, 2));
+    console.log('🔍 [CONTROLLER] Tipo do body:', typeof createUsuarioDto);
+    console.log('🔍 [CONTROLLER] Keys do body:', Object.keys(createUsuarioDto || {}));
+    console.log('🔍 [CONTROLLER] Valores:', {
+      nome: createUsuarioDto?.nome,
+      email: createUsuarioDto?.email,
+      telefone: createUsuarioDto?.telefone
+    });
+
+    console.log('👤 [CONTROLLER] Current User completo:', currentUser);
+    console.log('🔑 [CONTROLLER] Creating User ID:', currentUser?.id);
+
+    const creatingUserId = currentUser?.id;
+    return this.usuariosService.create(createUsuarioDto, creatingUserId);
   }
 
   @Patch(':id')
@@ -567,7 +600,43 @@ export class UsuariosController {
   })
   testSimple(@Body() body: any) {
     console.log('🔥 TESTE SIMPLES - Chegou no controller!');
-    console.log('📝 Body recebido:', body);
-    return { success: true, message: 'Controller funcionando!', data: body };
+    console.log('📝 Body recebido:', JSON.stringify(body, null, 2));
+    console.log('📝 Tipo:', typeof body);
+    console.log('📝 Keys:', Object.keys(body || {}));
+    return {
+      success: true,
+      message: 'Controller funcionando!',
+      receivedData: body,
+      keys: Object.keys(body || {}),
+      tipo: typeof body
+    };
+  }
+
+  @Post('test-create-user')
+  @ApiOperation({ summary: 'Endpoint de teste para criar usuário SEM validação' })
+  @ApiResponse({
+    status: 200,
+    description: 'Teste realizado com sucesso'
+  })
+  testCreateUser(@Body() body: any, @CurrentUser() currentUser?: any) {
+    console.log('🔥 TESTE CREATE USER - Chegou no controller!');
+    console.log('📝 Body recebido (RAW):', JSON.stringify(body, null, 2));
+    console.log('📝 Current User:', currentUser);
+    console.log('📝 Keys do body:', Object.keys(body || {}));
+
+    return {
+      success: true,
+      message: 'Dados recebidos com sucesso!',
+      receivedBody: body,
+      bodyKeys: Object.keys(body || {}),
+      currentUser: currentUser,
+      analysis: {
+        hasNome: 'nome' in (body || {}),
+        hasEmail: 'email' in (body || {}),
+        hasTelefone: 'telefone' in (body || {}),
+        nomeValue: body?.nome,
+        emailValue: body?.email
+      }
+    };
   }
 }

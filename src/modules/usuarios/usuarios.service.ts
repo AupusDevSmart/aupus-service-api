@@ -1,9 +1,10 @@
 // src/modules/usuarios/usuarios.service.ts - VERSÃO COMPLETA E CORRIGIDA
-import { 
-  Injectable, 
-  NotFoundException, 
-  ConflictException, 
-  BadRequestException 
+import {
+  Injectable,
+  NotFoundException,
+  ConflictException,
+  BadRequestException,
+  Logger
 } from '@nestjs/common';
 import { PrismaService } from '../../shared/prisma/prisma.service';
 import { RolesService } from '../roles/roles.service';
@@ -30,13 +31,15 @@ import { customAlphabet } from 'nanoid';
 
 @Injectable()
 export class UsuariosService {
+  private readonly logger = new Logger(UsuariosService.name);
+
   constructor(
     private prisma: PrismaService,
     private rolesService: RolesService,
     private permissionsService: PermissionsService
   ) {}
 
-  async findAll(query: UsuarioQueryDto) {
+  async findAll(query: UsuarioQueryDto, requestingUserId?: string) {
     const {
       page = 1,
       limit = 10,
@@ -66,6 +69,44 @@ export class UsuariosService {
       where.status = status;
     }
 
+    // ============================================================================
+    // FILTRO ESPECIAL PARA PROPRIETÁRIOS
+    // Se o usuário logado é proprietário, mostrar apenas operadores que ele criou
+    // ============================================================================
+    if (requestingUserId) {
+      // Buscar usuário logado (com role legacy)
+      const requestingUser = await this.prisma.usuarios.findFirst({
+        where: { id: requestingUserId, deleted_at: null }
+      });
+
+      // Buscar role do usuário no sistema Spatie
+      const requestingUserRole = await this.prisma.model_has_roles.findFirst({
+        where: {
+          model_id: requestingUserId,
+          model_type: 'App\\Models\\User'
+        },
+        include: {
+          roles: true
+        }
+      });
+
+      // Verificar se é proprietário (em qualquer um dos sistemas)
+      const isProprietario =
+        requestingUserRole?.roles?.name === 'propietario' ||
+        requestingUser?.role === 'proprietario';
+
+      if (isProprietario) {
+        // Proprietário vê apenas operadores criados por ele + ele mesmo
+        where.OR = [
+          { created_by: requestingUserId }, // Operadores que ele criou
+          { id: requestingUserId }          // Ele mesmo
+        ];
+        this.logger.log(`🔒 [FINDALL] Proprietário ${requestingUserId} - filtrando por created_by OU próprio ID`);
+      } else {
+        this.logger.log(`✅ [FINDALL] Usuário ${requestingUserId} NÃO é proprietário - sem filtro created_by`);
+      }
+    }
+
     // Filtrar por role (singular) - case-insensitive
     if (role) {
       where.role = {
@@ -84,14 +125,14 @@ export class UsuariosService {
         }
       }));
     }
-    
+
     if (cidade) {
       where.cidade = {
         contains: cidade,
         mode: 'insensitive'
       };
     }
-    
+
     if (estado) {
       where.estado = {
         contains: estado,
@@ -188,22 +229,79 @@ export class UsuariosService {
     }
   }
 
-  async create(data: CreateUsuarioDto): Promise<UsuarioResponseDto> {
+  async create(data: CreateUsuarioDto, creatingUserId?: string): Promise<UsuarioResponseDto> {
     try {
       console.log('🚀 [CREATE USER] Iniciando criação de usuário');
       console.log('📝 [CREATE USER] Dados recebidos:', JSON.stringify(data, null, 2));
+      console.log('👤 [CREATE USER] Creating User ID recebido:', creatingUserId);
 
       // Verificar se email já existe
       const existingUser = await this.prisma.usuarios.findFirst({
-        where: { 
+        where: {
           email: data.email,
-          deleted_at: null 
+          deleted_at: null
         },
       });
 
       if (existingUser) {
         throw new ConflictException('Email já está em uso');
       }
+
+      // ============================================================================
+      // VALIDAÇÃO PARA PROPRIETÁRIOS
+      // Se o usuário criador é proprietário, só pode criar operadores
+      // ============================================================================
+      if (creatingUserId) {
+        // SEMPRE definir created_by quando houver creatingUserId
+        data.createdBy = creatingUserId;
+        console.log(`✅ [CREATE USER] Definindo data.createdBy como ${creatingUserId}`);
+
+        const creatingUser = await this.prisma.usuarios.findFirst({
+          where: { id: creatingUserId, deleted_at: null }
+        });
+
+        // Buscar role do usuário criador no sistema Spatie
+        const creatorRoleData = await this.prisma.model_has_roles.findFirst({
+          where: {
+            model_id: creatingUserId,
+            model_type: 'App\\Models\\User'
+          },
+          include: {
+            roles: true
+          }
+        });
+
+        // Verificar se o criador é proprietário (em qualquer um dos sistemas)
+        const isProprietario =
+          creatorRoleData?.roles?.name === 'propietario' ||
+          creatingUser?.role === 'proprietario';
+
+        if (isProprietario) {
+          console.log(`🔒 [CREATE USER] Proprietário ${creatingUserId} criando usuário`);
+
+          // Buscar role operador
+          const operadorRole = await this.prisma.roles.findFirst({
+            where: { name: 'operador' }
+          });
+
+          if (!operadorRole) {
+            throw new BadRequestException('Role operador não encontrada no sistema');
+          }
+
+          // Validar que está criando um operador
+          if (data.roleId && data.roleId !== Number(operadorRole.id)) {
+            throw new BadRequestException('Proprietários só podem criar usuários do tipo OPERADOR');
+          }
+
+          // Forçar roleId como operador se não foi especificado
+          if (!data.roleId) {
+            data.roleId = Number(operadorRole.id);
+            console.log(`✅ [CREATE USER] Definindo roleId automaticamente como operador (${operadorRole.id})`);
+          }
+        }
+      }
+
+      console.log('🔍 [CREATE USER] Antes de criar - data.createdBy:', data.createdBy);
 
       // Gerar ID
       const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 26);
@@ -242,6 +340,7 @@ export class UsuariosService {
           manager_id: data.managerId,
           concessionaria_atual_id: data.concessionariaAtualId,
           organizacao_atual_id: data.organizacaoAtualId,
+          created_by: data.createdBy, // ← NOVO: rastrear quem criou
           is_active: true,
           senha: hashedPassword,
         }
@@ -253,7 +352,7 @@ export class UsuariosService {
       console.log('✅ [CREATE USER] Usuário criado com sucesso');
 
       const result = await this.mapToUsuarioResponseDto(novoUsuario);
-      
+
       // Adicionar informações extras para resposta de criação
       return {
         ...result,
@@ -261,7 +360,7 @@ export class UsuariosService {
         primeiroAcesso: true,
       } as any;
     } catch (error) {
-      if (error instanceof ConflictException) {
+      if (error instanceof ConflictException || error instanceof BadRequestException) {
         throw error;
       }
       console.error('Erro ao criar usuário:', error);

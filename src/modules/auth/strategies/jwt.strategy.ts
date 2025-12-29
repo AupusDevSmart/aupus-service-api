@@ -43,12 +43,16 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     console.log(`✅ [JWT STRATEGY] Usuário validado: ${payload.sub}`);
 
     // Retornar dados que serão injetados em req.user
-    return {
+    const userData = {
       id: payload.sub,
       email: payload.email,
       nome: payload.nome,
       role: payload.role,
       permissions: payload.permissions || [],
     };
+
+    console.log(`📝 [JWT STRATEGY] Dados do usuário para req.user:`, userData);
+
+    return userData;
   }
 }

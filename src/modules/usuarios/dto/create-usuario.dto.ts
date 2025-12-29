@@ -25,6 +25,7 @@ export enum UsuarioRole {
   PROPIETARIO = 'propietario',
   LOCATARIO = 'associado',
   AUPUS = 'aupus',
+  OPERADOR = 'operador',  // Novo tipo - criado por proprietários
 }
 
 export type Permissao =
@@ -52,13 +53,13 @@ export type Permissao =
   | 'Plantas';
 
 export class CreateUsuarioDto {
-  @ApiProperty({ 
+  @ApiProperty({
     description: 'Nome completo do usuário',
     example: 'João Silva Santos'
   })
-  @IsString()
-  @IsNotEmpty()
-  @Length(2, 255)
+  @IsString({ message: 'Nome deve ser uma string' })
+  @IsNotEmpty({ message: 'Nome não pode estar vazio' })
+  @Length(2, 255, { message: 'Nome deve ter entre 2 e 255 caracteres' })
   nome: string;
 
   @ApiProperty({ 
@@ -158,7 +159,7 @@ export class CreateUsuarioDto {
   @Length(26, 26)
   organizacaoAtualId?: string;
 
-  @ApiPropertyOptional({ 
+  @ApiPropertyOptional({
     description: 'ID do gerente responsável',
     example: 'manager-uuid-here'
   })
@@ -166,6 +167,15 @@ export class CreateUsuarioDto {
   @IsString()
   @Length(36, 36)
   managerId?: string;
+
+  @ApiPropertyOptional({
+    description: 'ID do usuário que criou este usuário (proprietário que criou o operador)',
+    example: 'creator-uuid-here'
+  })
+  @IsOptional()
+  @IsString()
+  @Length(26, 26)
+  createdBy?: string;
 
   // ============================================================================
   // CAMPOS DO SISTEMA HÍBRIDO DE ROLES E PERMISSIONS

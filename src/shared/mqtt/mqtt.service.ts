@@ -62,24 +62,46 @@ export class MqttService extends EventEmitter implements OnModuleInit, OnModuleD
   }
 
   private async connect() {
+    // ✅ SISTEMA DE 3 MODOS: production, development, disabled
+    const mqttMode = process.env.MQTT_MODE || 'production';
+    const instanceId = process.env.INSTANCE_ID || 'unknown';
+
+    // Modo DISABLED: Não conectar ao MQTT
+    if (mqttMode === 'disabled') {
+      console.warn(`⏸️ [MQTT] DESABILITADO para instância: ${instanceId}`);
+      console.warn(`⏸️ [MQTT] Dados MQTT NÃO serão processados nesta instância`);
+      console.warn(`⏸️ [MQTT] Configure MQTT_MODE=development ou production para habilitar`);
+      return;
+    }
+
+    // Modo DEVELOPMENT: Conectar mas não salvar no banco
+    if (mqttMode === 'development') {
+      console.log(`🔧 [MQTT] MODO DESENVOLVIMENTO - Instância: ${instanceId}`);
+      console.log(`🔧 [MQTT] Conectará ao MQTT mas NÃO salvará dados no banco`);
+      console.log(`🔧 [MQTT] WebSocket e logs funcionarão normalmente`);
+    } else {
+      // Modo PRODUCTION: Funcionalidade completa
+      console.log(`🚀 [MQTT] MODO PRODUÇÃO - Instância: ${instanceId}`);
+    }
+
     // Construir URL do broker a partir de HOST e PORT
     const mqttHost = process.env.MQTT_HOST || 'localhost';
     const mqttPort = process.env.MQTT_PORT || '1883';
     const mqttUrl = `mqtt://${mqttHost}:${mqttPort}`;
 
     const options: mqtt.IClientOptions = {
-      clientId: `aupus-${Math.random().toString(16).substr(2, 8)}`,
+      clientId: `aupus-${instanceId}-${Math.random().toString(16).substr(2, 8)}`,
       username: process.env.MQTT_USERNAME,
       password: process.env.MQTT_PASSWORD,
       clean: true,
       reconnectPeriod: 5000,
     };
 
-    // console.log(`🔌 Conectando ao MQTT broker: ${mqttUrl}`);
+    console.log(`🔌 [MQTT] Conectando ao broker: ${mqttUrl}`);
     this.client = mqtt.connect(mqttUrl, options);
 
     this.client.on('connect', () => {
-      // console.log('✅ MQTT conectado');
+      console.log('✅ [MQTT] Conectado com sucesso!');
       this.carregarTopicosEquipamentos();
     });
 
@@ -88,11 +110,24 @@ export class MqttService extends EventEmitter implements OnModuleInit, OnModuleD
     });
 
     this.client.on('error', (error) => {
-      // console.error('❌ Erro MQTT:', error);
+      console.error('❌ [MQTT] ERRO:', error);
     });
 
     this.client.on('reconnect', () => {
-      // console.log('🔄 Reconectando ao MQTT...');
+      console.warn('🔄 [MQTT] Reconectando ao broker...');
+    });
+
+    // ✅ NOVO: Eventos adicionais para monitoramento
+    this.client.on('offline', () => {
+      console.error('🔴 [MQTT] ALERTA CRÍTICO: Broker OFFLINE! Dados não estão sendo recebidos!');
+    });
+
+    this.client.on('close', () => {
+      console.warn('⚠️ [MQTT] Conexão fechada');
+    });
+
+    this.client.on('end', () => {
+      console.log('🔌 [MQTT] Cliente MQTT encerrado');
     });
   }
 
@@ -112,11 +147,13 @@ export class MqttService extends EventEmitter implements OnModuleInit, OnModuleD
       },
     });
 
-    // console.log(`📡 Carregando ${equipamentos.length} tópicos MQTT...`);
+    console.log(`📡 [MQTT] Carregando ${equipamentos.length} tópicos MQTT...`);
 
     for (const equip of equipamentos) {
       this.subscribeTopic(equip.topico_mqtt!, equip.id);
     }
+
+    console.log(`✅ [MQTT] ${equipamentos.length} equipamentos inscritos em ${this.subscriptions.size} tópicos distintos`);
   }
 
   /**
@@ -354,6 +391,27 @@ export class MqttService extends EventEmitter implements OnModuleInit, OnModuleD
   }
 
   /**
+   * Verifica se o MQTT está conectado (para health check)
+   */
+  public isConnected(): boolean {
+    return this.client?.connected || false;
+  }
+
+  /**
+   * Retorna o número de tópicos subscritos (para health check)
+   */
+  public getSubscribedTopicsCount(): number {
+    return this.subscriptions.size;
+  }
+
+  /**
+   * Retorna lista de tópicos subscritos (para debug/monitoring)
+   */
+  public getSubscribedTopics(): string[] {
+    return Array.from(this.subscriptions.keys());
+  }
+
+  /**
    * Salva dados do M160 no novo formato (Resumo)
    * Novo formato: JSON chega agregado de 30 em 30 segundos
    */
@@ -363,6 +421,8 @@ export class MqttService extends EventEmitter implements OnModuleInit, OnModuleD
     timestamp: Date,
     qualidade: string,
   ) {
+    const mqttMode = process.env.MQTT_MODE || 'production';
+
     try {
       const resumo = dados.Resumo;
 
@@ -461,7 +521,19 @@ export class MqttService extends EventEmitter implements OnModuleInit, OnModuleD
         total_leituras: resumo.total_leituras || 1, // Quantidade de leituras agregadas
       };
 
-      // Salvar diretamente no banco (sem buffer) - usar upsert para evitar conflito de UNIQUE constraint
+      // Em modo DEVELOPMENT: Apenas logar, NÃO salvar no banco
+      if (mqttMode === 'development') {
+        console.log(`📨 [DEV] M-160 Resumo recebido (não salva):`, {
+          equipamento: equipamentoId,
+          energia: energiaKwh.toFixed(4) + ' kWh',
+          potencia: potenciaMediaKw.toFixed(2) + ' kW',
+          leituras: resumo.total_leituras || 1,
+          timestamp: timestampDados.toISOString()
+        });
+        return;
+      }
+
+      // PRODUÇÃO: Salvar diretamente no banco (sem buffer) - usar upsert para evitar conflito de UNIQUE constraint
       await this.prisma.equipamentos_dados.upsert({
         where: {
           uk_equipamento_timestamp: {
@@ -562,34 +634,73 @@ export class MqttService extends EventEmitter implements OnModuleInit, OnModuleD
       return;
     }
 
+    const mqttMode = process.env.MQTT_MODE || 'production';
+
+    // Copiar leituras antes de tentar salvar
+    const leiturasSalvar = [...buffer.leituras];
+
     try {
       const timestamp_fim = new Date();
-      const leituras = buffer.leituras;
 
       // Calcular agregações para inversores
-      const dadosAgregados = this.calcularAgregacoes(leituras);
+      const dadosAgregados = this.calcularAgregacoes(leiturasSalvar);
 
       // Determinar qualidade geral do período
-      const qualidades = leituras.map((l) => l.dados._qualidade);
+      const qualidades = leiturasSalvar.map((l) => l.dados._qualidade);
       const numGood = qualidades.filter((q) => q === 'GOOD').length;
       const qualidadeGeral =
-        numGood > leituras.length / 2 ? 'bom' : numGood > 0 ? 'parcial' : 'ruim';
+        numGood > leiturasSalvar.length / 2 ? 'bom' : numGood > 0 ? 'parcial' : 'ruim';
 
-      // Salvar dados agregados
-      await this.prisma.equipamentos_dados.create({
-        data: {
+      // Em modo DEVELOPMENT: Apenas logar, NÃO salvar no banco
+      if (mqttMode === 'development') {
+        console.log(`📨 [DEV] Buffer flush simulado (não salva):`, {
+          equipamento: equipamentoId,
+          leituras: leiturasSalvar.length,
+          qualidade: qualidadeGeral,
+          timestamp_inicio: buffer.timestamp_inicio,
+          dados_amostra: dadosAgregados.power?.active_total
+            ? `${dadosAgregados.power.active_total}W`
+            : dadosAgregados.Dados?.Pa
+            ? `${dadosAgregados.Dados.Pa}W`
+            : 'N/A'
+        });
+
+        // Limpar buffer mesmo sem salvar
+        buffer.leituras = [];
+        buffer.timestamp_inicio = new Date();
+        return;
+      }
+
+      // PRODUÇÃO: Salvar normalmente no banco
+      // ✅ CORREÇÃO CRÍTICA: Usar upsert() em vez de create() para evitar erro P2002
+      // quando múltiplas instâncias tentam salvar o mesmo dado
+      await this.prisma.equipamentos_dados.upsert({
+        where: {
+          uk_equipamento_timestamp: {
+            equipamento_id: equipamentoId,
+            timestamp_dados: buffer.timestamp_inicio,
+          },
+        },
+        update: {
+          dados: dadosAgregados as any,
+          fonte: 'MQTT',
+          timestamp_fim,
+          num_leituras: leiturasSalvar.length,
+          qualidade: qualidadeGeral,
+        },
+        create: {
           equipamento_id: equipamentoId,
           dados: dadosAgregados as any,
           fonte: 'MQTT',
           timestamp_dados: buffer.timestamp_inicio,
           timestamp_fim,
-          num_leituras: leituras.length,
+          num_leituras: leiturasSalvar.length,
           qualidade: qualidadeGeral,
         },
       });
 
       // console.log(
-      //   `✅ [Buffer] Flush ${equipamentoId}: ${leituras.length} leituras agregadas (${qualidadeGeral})`,
+      //   `✅ [Buffer] Flush ${equipamentoId}: ${leiturasSalvar.length} leituras agregadas (${qualidadeGeral})`,
       // );
 
       // Log de informações por tipo de equipamento
@@ -619,11 +730,15 @@ export class MqttService extends EventEmitter implements OnModuleInit, OnModuleD
       //   console.log(`   ⚡ Energia: ${dadosAgregados.energia_kwh?.toFixed(4)} kWh`);
       // }
 
-      // Limpar buffer
+      // ✅ CORREÇÃO: Só limpar buffer após salvar com sucesso
       buffer.leituras = [];
       buffer.timestamp_inicio = new Date();
     } catch (error) {
-      console.error(`❌ [Buffer] Erro ao fazer flush do buffer ${equipamentoId}:`, error);
+      // ❌ CORREÇÃO: Não limpar buffer se deu erro - manter dados para próxima tentativa
+      console.error(
+        `❌ [Buffer] Erro ao fazer flush do buffer ${equipamentoId} (mantendo ${buffer.leituras.length} leituras para retry):`,
+        error
+      );
     }
   }
 

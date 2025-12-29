@@ -928,6 +928,7 @@ model usuarios {
   is_active                                                        Boolean                  @default(true)
   pix                                                              String?                  @db.VarChar(255)
   avatar_url                                                       String?                  @db.VarChar(500)
+  created_by                                                       String?                  @db.Char(26)
   anexos_anomalias_usuario                                         anexos_anomalias[]       @relation("anexos_anomalias_usuario")
   anomalias_reportadas                                             anomalias[]              @relation("anomalias_usuario")
   concessionaria_usuario                                           concessionaria_usuario[]
@@ -960,6 +961,8 @@ model usuarios {
   unidades_consumidoras_unidades_consumidoras_usuario_idTousuarios unidades_consumidoras[]  @relation("unidades_consumidoras_usuario_idTousuarios")
   usuarios                                                         usuarios?                @relation("usuariosTousuarios", fields: [manager_id], references: [id], onUpdate: NoAction, map: "fk_usuarios_manager")
   other_usuarios                                                   usuarios[]               @relation("usuariosTousuarios")
+  criador                                                          usuarios?                @relation("usuarios_created_by", fields: [created_by], references: [id], onDelete: SetNull, onUpdate: NoAction, map: "fk_usuarios_created_by")
+  usuarios_criados                                                 usuarios[]               @relation("usuarios_created_by")
   concessionarias                                                  concessionarias?         @relation(fields: [concessionaria_atual_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "usuarios_concessionaria_atual_id_foreign")
   organizacoes_usuarios_organizacao_atual_idToorganizacoes         organizacoes?            @relation("usuarios_organizacao_atual_idToorganizacoes", fields: [organizacao_atual_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "usuarios_organizacao_atual_id_foreign")
   configuracao_demanda_criadas                                     configuracao_demanda[]   @relation("configuracao_demanda_created_by")
@@ -969,6 +972,7 @@ model usuarios {
   @@index([manager_id], map: "idx_usuarios_manager")
   @@index([role], map: "idx_usuarios_role")
   @@index([pix], map: "idx_usuarios_pix")
+  @@index([created_by], map: "idx_usuarios_created_by")
 }
 
 model plantas {
