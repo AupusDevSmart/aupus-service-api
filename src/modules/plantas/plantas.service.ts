@@ -23,12 +23,12 @@ export class PlantasService {
   constructor(private prisma: PrismaService) {}
 
   async create(createPlantaDto: CreatePlantaDto): Promise<Planta> {
-    const { endereco, proprietarioId, cnpj, ...plantaData } = createPlantaDto;
+    const { endereco, proprietarioId, cnpj, numero_uc, ...plantaData } = createPlantaDto;
 
     try {
       // 1. Verificar se o proprietário existe
       const proprietario = await this.prisma.usuarios.findUnique({
-        where: { 
+        where: {
           id: proprietarioId,
           is_active: true,
           deleted_at: null
@@ -60,6 +60,7 @@ export class PlantasService {
           cnpj,
           localizacao: plantaData.localizacao,
           horario_funcionamento: plantaData.horarioFuncionamento,
+          numero_uc: numero_uc || null, // ✅ Adicionar numero_uc
           logradouro: endereco.logradouro,
           bairro: endereco.bairro,
           cidade: endereco.cidade,
@@ -246,7 +247,7 @@ export class PlantasService {
 
   // ✅ CORRIGIDO: Usando tipos genéricos para UPDATE
   async update(id: string, updatePlantaDto: UpdatePlantaDto): Promise<Planta> {
-    const { endereco, proprietarioId, cnpj, ...plantaData } = updatePlantaDto;
+    const { endereco, proprietarioId, cnpj, numero_uc, ...plantaData } = updatePlantaDto;
 
     try {
       // 1. Verificar se a planta existe
@@ -264,7 +265,7 @@ export class PlantasService {
       // 2. Se há mudança de proprietário, verificar se ele existe
       if (proprietarioId && proprietarioId !== plantaExistente.proprietario_id) {
         const proprietario = await this.prisma.usuarios.findUnique({
-          where: { 
+          where: {
             id: proprietarioId,
             is_active: true,
             deleted_at: null
@@ -301,6 +302,7 @@ export class PlantasService {
       if (plantaData.horarioFuncionamento !== undefined) {
         updateData.horario_funcionamento = plantaData.horarioFuncionamento;
       }
+      if (numero_uc !== undefined) updateData.numero_uc = numero_uc || null; // ✅ Adicionar numero_uc
       if (proprietarioId !== undefined) updateData.proprietario_id = proprietarioId;
 
       // Campos de endereço
@@ -385,9 +387,10 @@ export class PlantasService {
       cnpj: plantaDb.cnpj,
       localizacao: plantaDb.localizacao,
       horarioFuncionamento: plantaDb.horario_funcionamento,
+      numeroUc: plantaDb.numero_uc || undefined, // ✅ Número da Unidade Consumidora
       endereco: {
         logradouro: plantaDb.logradouro,
-        bairro: plantaDb.bairro,
+        bairro: plantaDb.bairro || '', // ✅ Garantir string vazia se null
         cidade: plantaDb.cidade,
         uf: plantaDb.uf,
         cep: plantaDb.cep,

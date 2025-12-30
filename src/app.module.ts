@@ -1,12 +1,14 @@
 // src/app.module.ts - ATUALIZADO COM USUARIOS MODULE E AUTH MODULE
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
+import { ScheduleModule } from '@nestjs/schedule';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { PrismaModule } from './shared/prisma/prisma.module';
 import { MqttModule } from './shared/mqtt/mqtt.module';
 import { WebSocketModule } from './websocket/websocket.module';
 import { AuthModule } from './modules/auth/auth.module';
+import { HealthModule } from './modules/health/health.module';
 import { UsuariosModule } from './modules/usuarios/usuarios.module';
 import { RolesModule } from './modules/roles/roles.module';
 import { PermissionsModule } from './modules/permissions/permissions.module';
@@ -37,12 +39,18 @@ import { CoaModule } from './modules/coa/coa.module';
       envFilePath: ['.env.local', '.env'],
     }),
 
+    // ✅ Cron Jobs e Tarefas Agendadas
+    ScheduleModule.forRoot(),
+
     // ✅ Database
     PrismaModule,
 
     // ✅ MQTT e WebSocket para dados em tempo real
     MqttModule,
     WebSocketModule,
+
+    // ✅ Health Check e Monitoramento
+    HealthModule,
 
     // ✅ Autenticação
     AuthModule,

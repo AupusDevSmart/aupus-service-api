@@ -2,7 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { HealthService } from './health.service';
 
-interface Alert {
+export interface Alert {
   level: 'INFO' | 'WARNING' | 'CRITICAL';
   service: string;
   message: string;
@@ -17,7 +17,7 @@ export class AlertService {
   // Cache do último estado para evitar alertas duplicados
   private lastAlertState: {
     mqtt: 'ok' | 'degraded' | 'critical' | null;
-    data: 'ok' | 'degraded' | 'critical' | null;
+    data: 'ok' | 'warning' | 'critical' | null;
     database: 'ok' | 'critical' | null;
   } = {
     mqtt: null,

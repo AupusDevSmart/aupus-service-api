@@ -1,10 +1,11 @@
 // src/modules/plantas/dto/create-planta.dto.ts - GARANTIR CONSISTÊNCIA
-import { 
-  IsString, 
-  IsNotEmpty, 
-  Length, 
+import {
+  IsString,
+  IsNotEmpty,
+  Length,
   ValidateNested,
-  Matches
+  Matches,
+  IsOptional
 } from 'class-validator';
 import { Type } from 'class-transformer';
 import { ApiProperty } from '@nestjs/swagger';
@@ -58,8 +59,8 @@ export class EnderecoDto {
 }
 
 export class CreatePlantaDto {
-  @ApiProperty({ 
-    description: 'Nome da planta', 
+  @ApiProperty({
+    description: 'Nome da planta',
     example: 'Planta Industrial São Paulo'
   })
   @IsString({ message: 'Nome deve ser uma string' })
@@ -67,8 +68,18 @@ export class CreatePlantaDto {
   @Length(2, 100, { message: 'Nome deve ter entre 2 e 100 caracteres' })
   nome: string;
 
-  @ApiProperty({ 
-    description: 'CNPJ da planta', 
+  @ApiProperty({
+    description: 'Número da Unidade Consumidora',
+    example: '123456789',
+    required: false
+  })
+  @IsOptional()
+  @IsString({ message: 'Número UC deve ser uma string' })
+  @Length(1, 255, { message: 'Número UC deve ter entre 1 e 255 caracteres' })
+  numero_uc?: string;
+
+  @ApiProperty({
+    description: 'CNPJ da planta',
     example: '12.345.678/0001-90'
   })
   @IsString({ message: 'CNPJ deve ser uma string' })

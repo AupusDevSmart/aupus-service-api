@@ -61,8 +61,8 @@ export class UpdateEnderecoDto {
 }
 
 export class UpdatePlantaDto {
-  @ApiPropertyOptional({ 
-    description: 'Nome da planta', 
+  @ApiPropertyOptional({
+    description: 'Nome da planta',
     example: 'Planta Industrial São Paulo - Atualizada'
   })
   @IsOptional()
@@ -71,8 +71,17 @@ export class UpdatePlantaDto {
   @Length(2, 100, { message: 'Nome deve ter entre 2 e 100 caracteres' })
   nome?: string;
 
-  @ApiPropertyOptional({ 
-    description: 'CNPJ da planta', 
+  @ApiPropertyOptional({
+    description: 'Número da Unidade Consumidora',
+    example: '123456789'
+  })
+  @IsOptional()
+  @IsString({ message: 'Número UC deve ser uma string' })
+  @Length(1, 255, { message: 'Número UC deve ter entre 1 e 255 caracteres' })
+  numero_uc?: string;
+
+  @ApiPropertyOptional({
+    description: 'CNPJ da planta',
     example: '12.345.678/0001-90'
   })
   @IsOptional()

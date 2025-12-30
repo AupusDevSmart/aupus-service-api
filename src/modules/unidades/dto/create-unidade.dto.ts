@@ -47,6 +47,15 @@ export class CreateUnidadeDto {
   nome: string;
 
   @ApiProperty({
+    description: 'Número da Unidade Consumidora',
+    example: '123456789',
+    required: false,
+  })
+  @IsString()
+  @IsOptional()
+  numero_uc?: string;
+
+  @ApiProperty({
     description: 'Tipo da unidade',
     enum: TipoUnidade,
     example: TipoUnidade.UFV,

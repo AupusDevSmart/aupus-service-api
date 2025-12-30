@@ -3,7 +3,7 @@ import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
 import { HealthService } from './health.service';
 import { AlertService } from './alert.service';
 import { MetricsService } from './metrics.service';
-import { Public } from '../../shared/decorators/public.decorator';
+import { Public } from '../auth/decorators/public.decorator';
 
 @ApiTags('Health Check')
 @Controller('health')

@@ -52,6 +52,9 @@ export class Planta {
   @ApiProperty({ example: '06:00 às 22:00', description: 'Horário de funcionamento' })
   horarioFuncionamento: string;
 
+  @ApiProperty({ example: '123456789', description: 'Número da Unidade Consumidora', required: false })
+  numeroUc?: string;
+
   @ApiProperty({ type: Endereco, description: 'Endereço completo' })
   endereco: Endereco;
 
