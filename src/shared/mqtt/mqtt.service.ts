@@ -275,7 +275,7 @@ export class MqttService extends EventEmitter implements OnModuleInit, OnModuleD
               id: true,
               codigo: true,
               nome: true,
-              propriedades_schema: true,
+              mqtt_schema: true, // ✅ CORRIGIDO: usar mqtt_schema em vez de propriedades_schema
             },
           },
         },
@@ -288,7 +288,7 @@ export class MqttService extends EventEmitter implements OnModuleInit, OnModuleD
 
       // Validar dados contra o schema do tipo
       let qualidade = dados.qualidade || 'GOOD';
-      const schema = equipamento.tipo_equipamento_rel?.propriedades_schema;
+      const schema = equipamento.tipo_equipamento_rel?.mqtt_schema; // ✅ CORRIGIDO: usar mqtt_schema
 
       if (schema) {
         const validacao = this.validarDadosContraSchema(dados, schema);

@@ -25,34 +25,34 @@ export class TiposEquipamentosController {
 
   @Get()
   @ApiOperation({
-    summary: 'Listar tipos de equipamentos',
-    description: 'Retorna catálogo de tipos de equipamentos disponíveis com filtros opcionais',
+    summary: 'Listar tipos de equipamentos (modelos)',
+    description: 'Retorna catálogo de modelos de equipamentos disponíveis com filtros opcionais',
   })
   @ApiQuery({
-    name: 'categoria',
+    name: 'categoria_id',
     required: false,
     type: String,
-    description: 'Filtrar por categoria (GERACAO, DISTRIBUICAO, PROTECAO, MEDICAO, CONTROLE, etc.)',
+    description: 'Filtrar por ID da categoria de equipamento',
   })
   @ApiQuery({
     name: 'search',
     required: false,
     type: String,
-    description: 'Busca por código ou nome',
+    description: 'Busca por código, nome ou fabricante',
   })
   @ApiResponse({
     status: HttpStatus.OK,
     description: 'Lista de tipos de equipamentos retornada com sucesso',
   })
   async findAll(
-    @Query('categoria') categoria?: string,
+    @Query('categoria_id') categoria_id?: string,
     @Query('search') search?: string,
   ) {
     this.logger.log(`📋 [LIST TIPOS EQUIPAMENTOS] Buscando tipos de equipamentos`);
-    this.logger.log(`📝 [LIST TIPOS EQUIPAMENTOS] Filtros - categoria: ${categoria}, search: ${search}`);
+    this.logger.log(`📝 [LIST TIPOS EQUIPAMENTOS] Filtros - categoria_id: ${categoria_id}, search: ${search}`);
 
     try {
-      const result = await this.tiposEquipamentosService.findAll(categoria, search);
+      const result = await this.tiposEquipamentosService.findAll(categoria_id, search);
 
       this.logger.log(`✅ [LIST TIPOS EQUIPAMENTOS] Encontrados ${result.data.length} tipos`);
       return result;

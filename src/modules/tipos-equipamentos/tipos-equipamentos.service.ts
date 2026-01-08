@@ -20,41 +20,42 @@ export class TiposEquipamentosService {
   constructor(private prisma: PrismaService) {}
 
   /**
-   * Busca todos os tipos de equipamentos
-   * Pode filtrar por categoria e pesquisar por nome/código
+   * Busca todos os tipos de equipamentos (modelos)
+   * Pode filtrar por categoria_id e pesquisar por nome/código/fabricante
    */
-  async findAll(categoria?: string, search?: string) {
+  async findAll(categoria_id?: string, search?: string) {
     // Construir filtros
     const where: any = {};
 
-    if (categoria) {
-      where.categoria = categoria;
+    if (categoria_id) {
+      where.categoria_id = categoria_id;
     }
 
     if (search) {
       where.OR = [
         { codigo: { contains: search, mode: 'insensitive' } },
         { nome: { contains: search, mode: 'insensitive' } },
+        { fabricante: { contains: search, mode: 'insensitive' } },
       ];
     }
 
-    // Buscar tipos de equipamentos
+    // Buscar tipos de equipamentos com categoria
     const tipos = await this.prisma.tipos_equipamentos.findMany({
       where,
+      include: {
+        categoria: true,
+      },
       orderBy: [
-        { categoria: 'asc' },
+        { categoria: { nome: 'asc' } },
         { nome: 'asc' },
       ],
     });
 
     // Contar por categoria
     const categorias = await this.prisma.tipos_equipamentos.groupBy({
-      by: ['categoria'],
+      by: ['categoria_id'],
       _count: {
         id: true,
-      },
-      orderBy: {
-        categoria: 'asc',
       },
     });
 
@@ -63,18 +64,21 @@ export class TiposEquipamentosService {
         id: tipo.id,
         codigo: tipo.codigo,
         nome: tipo.nome,
+        categoriaId: tipo.categoria_id,
         categoria: tipo.categoria,
+        fabricante: tipo.fabricante,
         larguraPadrao: tipo.largura_padrao,
         alturaPadrao: tipo.altura_padrao,
         iconeSvg: tipo.icone_svg,
-        propriedadesSchema: tipo.propriedades_schema,
+        propriedadesSchema: tipo.propriedades_schema, // Campos técnicos do equipamento
+        mqttSchema: tipo.mqtt_schema, // ✅ NOVO: JSON Schema para validação MQTT
         createdAt: tipo.created_at,
         updatedAt: tipo.updated_at,
       })),
       meta: {
         total: tipos.length,
         categorias: categorias.map((cat) => ({
-          categoria: cat.categoria,
+          categoriaId: cat.categoria_id,
           total: cat._count.id,
         })),
       },
@@ -87,6 +91,9 @@ export class TiposEquipamentosService {
   async findOne(id: string) {
     const tipo = await this.prisma.tipos_equipamentos.findUnique({
       where: { id },
+      include: {
+        categoria: true,
+      },
     });
 
     if (!tipo) {
@@ -97,11 +104,14 @@ export class TiposEquipamentosService {
       id: tipo.id,
       codigo: tipo.codigo,
       nome: tipo.nome,
+      categoriaId: tipo.categoria_id,
       categoria: tipo.categoria,
+      fabricante: tipo.fabricante,
       larguraPadrao: tipo.largura_padrao,
       alturaPadrao: tipo.altura_padrao,
       iconeSvg: tipo.icone_svg,
-      propriedadesSchema: tipo.propriedades_schema,
+      propriedadesSchema: tipo.propriedades_schema, // Campos técnicos do equipamento
+      mqttSchema: tipo.mqtt_schema, // ✅ NOVO: JSON Schema para validação MQTT
       createdAt: tipo.created_at,
       updatedAt: tipo.updated_at,
     };
@@ -113,6 +123,9 @@ export class TiposEquipamentosService {
   async findByCode(codigo: string) {
     const tipo = await this.prisma.tipos_equipamentos.findUnique({
       where: { codigo },
+      include: {
+        categoria: true,
+      },
     });
 
     if (!tipo) {
@@ -123,11 +136,14 @@ export class TiposEquipamentosService {
       id: tipo.id,
       codigo: tipo.codigo,
       nome: tipo.nome,
+      categoriaId: tipo.categoria_id,
       categoria: tipo.categoria,
+      fabricante: tipo.fabricante,
       larguraPadrao: tipo.largura_padrao,
       alturaPadrao: tipo.altura_padrao,
       iconeSvg: tipo.icone_svg,
-      propriedadesSchema: tipo.propriedades_schema,
+      propriedadesSchema: tipo.propriedades_schema, // Campos técnicos do equipamento
+      mqttSchema: tipo.mqtt_schema, // ✅ NOVO: JSON Schema para validação MQTT
       createdAt: tipo.created_at,
       updatedAt: tipo.updated_at,
     };
@@ -168,22 +184,27 @@ export class TiposEquipamentosService {
   }
 
   /**
-   * Retorna todas as categorias disponíveis
+   * Retorna todas as categorias disponíveis (DEPRECATED - usar CategoriasEquipamentosService)
+   * Mantido por compatibilidade com código existente
    */
   async getCategorias() {
-    const categorias = await this.prisma.tipos_equipamentos.groupBy({
-      by: ['categoria'],
-      _count: {
-        id: true,
+    const categorias = await this.prisma.categorias_equipamentos.findMany({
+      include: {
+        _count: {
+          select: {
+            modelos: true,
+          },
+        },
       },
       orderBy: {
-        categoria: 'asc',
+        nome: 'asc',
       },
     });
 
     return categorias.map((cat) => ({
-      categoria: cat.categoria,
-      total: cat._count.id,
+      id: cat.id,
+      nome: cat.nome,
+      total: cat._count.modelos,
     }));
   }
 
@@ -194,20 +215,30 @@ export class TiposEquipamentosService {
     const [total, porCategoria] = await Promise.all([
       this.prisma.tipos_equipamentos.count(),
       this.prisma.tipos_equipamentos.groupBy({
-        by: ['categoria'],
+        by: ['categoria_id'],
         _count: {
           id: true,
-        },
-        orderBy: {
-          categoria: 'asc',
         },
       }),
     ]);
 
+    // Buscar nomes das categorias
+    const categoriaIds = porCategoria.map((cat) => cat.categoria_id);
+    const categorias = await this.prisma.categorias_equipamentos.findMany({
+      where: {
+        id: {
+          in: categoriaIds,
+        },
+      },
+    });
+
+    const categoriasMap = new Map(categorias.map((cat) => [cat.id, cat.nome]));
+
     return {
       total,
       categorias: porCategoria.map((cat) => ({
-        categoria: cat.categoria,
+        categoriaId: cat.categoria_id,
+        categoriaNome: categoriasMap.get(cat.categoria_id) || 'Desconhecida',
         total: cat._count.id,
       })),
     };

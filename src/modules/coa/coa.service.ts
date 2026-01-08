@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../../shared/prisma/prisma.service';
 import { Prisma } from '@prisma/client';
+import { CalculoCustosService } from '../equipamentos-dados/services/calculo-custos.service';
 
 export interface DashboardData {
   timestamp: Date;
@@ -13,6 +14,7 @@ export interface DashboardData {
     alertasAtivos: number;
     totalGeradores: number;
     totalCargas: number;
+    custoTotalHoje?: number; // ✅ NOVO: Custo total agregado do dia
   };
   plantas: PlantaResumo[];
   alertas: Alerta[];
@@ -46,6 +48,7 @@ export interface UnidadeResumo {
     potenciaAtual: number;
     energiaHoje: number;
     fatorPotencia: number;
+    custoEnergiaHoje?: number; // ✅ NOVO: Custo de energia do dia desta unidade
   };
 }
 
@@ -66,7 +69,10 @@ export class CoaService {
   private readonly CACHE_TTL = 30000; // 30 segundos
   private readonly TEMPO_OFFLINE = 10 * 60 * 1000; // 10 minutos
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly calculoCustosService: CalculoCustosService,
+  ) {}
 
   /**
    * Retorna dados agregados para o dashboard COA
@@ -110,6 +116,80 @@ export class CoaService {
 
       throw error;
     }
+  }
+
+  /**
+   * Calcula custos de energia agregados para unidades com M160 ativo
+   * ✅ PRÉ-FILTRO: Só calcula para unidades com equipamento M160 e tópico MQTT ativo
+   */
+  private async calcularCustosAgregados(unidades: any[]): Promise<Map<string, number>> {
+    const custosPorUnidade = new Map<string, number>();
+    const hoje = new Date();
+    const inicioDia = new Date(hoje.getFullYear(), hoje.getMonth(), hoje.getDate(), 0, 0, 0);
+
+    this.logger.log(`[CUSTOS] Calculando custos para ${unidades.length} unidades`);
+
+    // Processar unidades em paralelo (mas com limite para não sobrecarregar)
+    const BATCH_SIZE = 5;
+    for (let i = 0; i < unidades.length; i += BATCH_SIZE) {
+      const batch = unidades.slice(i, i + BATCH_SIZE);
+
+      await Promise.all(
+        batch.map(async (unidade) => {
+          try {
+            // 1. Buscar equipamentos M160 da unidade com tópico MQTT ativo
+            const equipamentosM160 = await this.prisma.equipamentos.findMany({
+              where: {
+                unidade_id: unidade.id,
+                deleted_at: null,
+                tipo_equipamento: {
+                  contains: 'M-160', // Filtrar M160
+                },
+                topico_mqtt: {
+                  not: null, // Deve ter tópico MQTT configurado
+                },
+              },
+              select: {
+                id: true,
+                nome: true,
+                topico_mqtt: true,
+              },
+            });
+
+            // 2. Pré-filtrar: se não tiver M160 com MQTT, pular
+            if (equipamentosM160.length === 0) {
+              this.logger.debug(`[CUSTOS] Unidade ${unidade.nome} sem M160 ativo - pulando`);
+              return;
+            }
+
+            // 3. Pegar o primeiro M160 (geralmente há apenas 1 por unidade)
+            const medidor = equipamentosM160[0];
+            this.logger.debug(`[CUSTOS] Calculando custo para unidade ${unidade.nome} usando ${medidor.nome}`);
+
+            // 4. Calcular custos do dia usando o serviço existente
+            const resultado = await this.calculoCustosService.calcularCustos(
+              medidor.id,
+              inicioDia,
+              hoje,
+              'dia',
+            );
+
+            // 5. Armazenar custo total
+            custosPorUnidade.set(unidade.id, resultado.custos.custo_total);
+            this.logger.debug(`[CUSTOS] Unidade ${unidade.nome}: R$ ${resultado.custos.custo_total.toFixed(2)}`);
+
+          } catch (error) {
+            // Ignorar erros individuais (ex: unidade sem concessionária)
+            this.logger.warn(`[CUSTOS] Erro ao calcular custo da unidade ${unidade.nome}: ${error.message}`);
+          }
+        })
+      );
+    }
+
+    const totalCalculado = Array.from(custosPorUnidade.values()).reduce((sum, v) => sum + v, 0);
+    this.logger.log(`[CUSTOS] Total calculado: R$ ${totalCalculado.toFixed(2)} para ${custosPorUnidade.size} unidades`);
+
+    return custosPorUnidade;
   }
 
   /**
@@ -161,6 +241,11 @@ export class CoaService {
       },
     });
 
+    // 2.5. Calcular custos de energia para unidades do tipo "Carga" com M160 ativo
+    this.logger.log('[COA] Calculando custos de energia...');
+    const unidadesCargas = unidades.filter(u => u.tipo === 'Carga');
+    const custosPorUnidade = await this.calcularCustosAgregados(unidadesCargas);
+
     // 3. Buscar últimas leituras de todos os equipamentos (query otimizada)
     const horaAtras = new Date(Date.now() - 60 * 60 * 1000); // 1 hora atrás
 
@@ -183,6 +268,92 @@ export class CoaService {
       )
       SELECT * FROM UltimasLeituras
     `;
+
+    // 3.5. ✅ CORRIGIDO: Buscar energia gerada/consumida do dia por unidade
+    // Lógica IDÊNTICA ao useDadosDemanda.ts (calcularEnergiaDia):
+    // - Para M160: buscar dados->Dados->phf da última leitura (energia acumulada em kWh)
+    // - Para inversores: buscar dados->energy->daily_yield da última leitura (já é total do dia em Wh, converter para kWh)
+    // Timezone: America/Sao_Paulo (UTC-3)
+    const energiaAgregadaDia = await this.prisma.$queryRaw<any[]>`
+      WITH DadosDia AS (
+        SELECT
+          e.unidade_id,
+          e.tipo_equipamento,
+          ed.dados,
+          ed.timestamp_dados,
+          ROW_NUMBER() OVER (PARTITION BY e.unidade_id ORDER BY ed.timestamp_dados DESC) as rn_ultima
+        FROM equipamentos_dados ed
+        INNER JOIN equipamentos e ON e.id = ed.equipamento_id
+        WHERE ed.timestamp_dados >= (CURRENT_DATE AT TIME ZONE 'America/Sao_Paulo')
+          AND e.deleted_at IS NULL
+          AND ed.dados IS NOT NULL
+      ),
+      EnergiaM160 AS (
+        -- M160: pegar Dados.phf da última leitura (energia acumulada em kWh)
+        -- Campo: dados->Dados->phf
+        SELECT
+          unidade_id,
+          COALESCE(
+            CAST(dados->'Dados'->>'phf' AS NUMERIC),
+            0
+          ) as energia_dia_kwh
+        FROM DadosDia
+        WHERE rn_ultima = 1
+          AND (tipo_equipamento ILIKE '%M-160%' OR tipo_equipamento ILIKE '%M160%')
+          AND dados->'Dados'->>'phf' IS NOT NULL
+      ),
+      EnergiaInversores AS (
+        -- Inversores: pegar energy.daily_yield da última leitura (em Wh, converter para kWh)
+        -- Campo: dados->energy->daily_yield (Wh) OU dados->daily_yield (kWh)
+        SELECT
+          unidade_id,
+          COALESCE(
+            -- Tentar energy.daily_yield (em Wh - estrutura MQTT)
+            CAST((dados->>'energy')::jsonb->>'daily_yield' AS NUMERIC) / 1000.0,
+            -- Fallback: daily_yield direto (já em kWh)
+            CAST(dados->>'daily_yield' AS NUMERIC),
+            0
+          ) as energia_dia_kwh
+        FROM DadosDia
+        WHERE rn_ultima = 1
+          AND tipo_equipamento ILIKE '%INVERSOR%'
+          AND (
+            dados->>'energy' IS NOT NULL OR
+            dados->>'daily_yield' IS NOT NULL
+          )
+      ),
+      EnergiaOutros AS (
+        -- Outros equipamentos: tentar campo energia_dia_kwh direto
+        SELECT
+          unidade_id,
+          COALESCE(CAST(dados->>'energia_dia_kwh' AS NUMERIC), 0) as energia_dia_kwh
+        FROM DadosDia
+        WHERE rn_ultima = 1
+          AND tipo_equipamento NOT ILIKE '%INVERSOR%'
+          AND tipo_equipamento NOT ILIKE '%M-160%'
+          AND tipo_equipamento NOT ILIKE '%M160%'
+          AND dados->>'energia_dia_kwh' IS NOT NULL
+      ),
+      EnergiaUnificada AS (
+        SELECT * FROM EnergiaM160
+        UNION ALL
+        SELECT * FROM EnergiaInversores
+        UNION ALL
+        SELECT * FROM EnergiaOutros
+      )
+      SELECT
+        unidade_id,
+        SUM(energia_dia_kwh) as energia_dia_kwh
+      FROM EnergiaUnificada
+      GROUP BY unidade_id
+    `;
+
+    // Criar mapa de energia diária por unidade
+    const energiaDiaPorUnidade = new Map<string, number>();
+    for (const row of energiaAgregadaDia) {
+      energiaDiaPorUnidade.set(row.unidade_id, Number(row.energia_dia_kwh) || 0);
+    }
+    this.logger.log(`[COA] Energia agregada calculada para ${energiaDiaPorUnidade.size} unidades`);
 
     // 4. Criar mapa de leituras por unidade
     const leiturasPorUnidade = new Map<string, any[]>();
@@ -227,11 +398,14 @@ export class CoaService {
 
         // Calcular métricas da unidade
         let potenciaTotal = 0;
-        let energiaTotal = 0;
         let fatorPotencia = 0;
         let ultimaLeitura: Date | null = null;
         let status: 'ONLINE' | 'OFFLINE' | 'ALERTA' = 'OFFLINE';
         let unidadeJaContada = false; // Flag para garantir que contamos a unidade apenas uma vez
+
+        // ✅ CORRIGIDO: Usar energia agregada do dia (soma de todas as leituras desde meia-noite)
+        // Em vez de somar apenas as últimas leituras
+        const energiaTotal = energiaDiaPorUnidade.get(unidade.id) || 0;
 
         for (const leitura of leiturasUnidade) {
           // Extrair potência - tentar coluna primeiro, depois JSON
@@ -257,24 +431,7 @@ export class CoaService {
             }
           }
 
-          // Extrair energia - tentar coluna primeiro, depois JSON
-          let energia = Number(leitura.energia_kwh) || 0;
-
-          // Se energia não estiver na coluna, extrair do JSON (inversores)
-          if (energia === 0 && leitura.dados) {
-            try {
-              const dados = leitura.dados as any;
-              // Formato inversores: energy.daily_yield (já em kWh)
-              if (dados?.energy?.daily_yield) {
-                energia = Number(dados.energy.daily_yield);
-              }
-            } catch (e) {
-              // Ignorar erro de parsing
-            }
-          }
-
           potenciaTotal += potencia;
-          energiaTotal += energia;
 
           // Determinar status baseado no timestamp
           const tempoDesdeUltimaLeitura = Date.now() - new Date(leitura.timestamp_dados).getTime();
@@ -346,6 +503,9 @@ export class CoaService {
           }
         }
 
+        // Buscar custo desta unidade (se calculado)
+        const custoUnidade = custosPorUnidade.get(unidade.id);
+
         unidadesProcessadas.push({
           id: unidade.id,
           nome: unidade.nome,
@@ -362,6 +522,7 @@ export class CoaService {
             potenciaAtual: Math.round(potenciaTotal * 100) / 100,
             energiaHoje: Math.round(energiaTotal * 100) / 100,
             fatorPotencia: Math.round(fatorPotencia * 100) / 100,
+            custoEnergiaHoje: custoUnidade !== undefined ? Math.round(custoUnidade * 100) / 100 : undefined,
           },
         });
 
@@ -392,7 +553,10 @@ export class CoaService {
       });
     }
 
-    // 6. Montar resposta final
+    // 6. Calcular custo total agregado
+    const custoTotalHoje = Array.from(custosPorUnidade.values()).reduce((sum, custo) => sum + custo, 0);
+
+    // 7. Montar resposta final
     return {
       timestamp: new Date(),
       resumoGeral: {
@@ -404,6 +568,7 @@ export class CoaService {
         alertasAtivos: alertas.length,
         totalGeradores,
         totalCargas,
+        custoTotalHoje: custosPorUnidade.size > 0 ? Math.round(custoTotalHoje * 100) / 100 : undefined,
       },
       plantas: plantasProcessadas,
       alertas: alertas.slice(0, 10), // Limitar a 10 alertas mais recentes

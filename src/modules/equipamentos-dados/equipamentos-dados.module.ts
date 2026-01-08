@@ -17,6 +17,11 @@ import { PrismaModule } from '../../shared/prisma/prisma.module';
     FeriadosNacionaisService,
     MqttIngestionService, // ✅ NOVO
   ],
-  exports: [EquipamentosDadosService, MqttIngestionService], // ✅ Exportar para uso em outros módulos
+  exports: [
+    EquipamentosDadosService,
+    MqttIngestionService,
+    CalculoCustosService,
+    ClassificacaoHorariosService,
+  ], // ✅ Exportar para uso em outros módulos
 })
 export class EquipamentosDadosModule {}

@@ -114,9 +114,12 @@ export class EquipamentosService {
       throw new NotFoundException('Unidade não encontrada');
     }
 
-    // Validar se tipo de equipamento existe
+    // Validar se tipo de equipamento existe e buscar categoria/fabricante
     const tipoEquipamento = await this.prisma.tipos_equipamentos.findUnique({
-      where: { id: dto.tipo_equipamento_id?.trim() }
+      where: { id: dto.tipo_equipamento_id?.trim() },
+      include: {
+        categoria: true,
+      },
     });
 
     if (!tipoEquipamento) {
@@ -148,8 +151,8 @@ export class EquipamentosService {
         tipo_equipamento_id: dto.tipo_equipamento_id.trim(),
         criticidade: '3', // Criticidade média por padrão
         em_operacao: 'sim',
-        // Campos vazios/padrão - podem ser preenchidos depois
-        fabricante: null,
+        // ✅ Preencher fabricante do modelo automaticamente
+        fabricante: tipoEquipamento.fabricante,
         modelo: null,
         numero_serie: null,
         localizacao: 'A definir',
@@ -160,7 +163,9 @@ export class EquipamentosService {
             id: true,
             codigo: true,
             nome: true,
+            categoria_id: true,
             categoria: true,
+            fabricante: true,
             largura_padrao: true,
             altura_padrao: true,
             icone_svg: true,

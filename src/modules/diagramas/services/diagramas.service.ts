@@ -186,6 +186,7 @@ export class DiagramasService {
     const tiposEquipamentos = tiposEquipamentosIds.length > 0
       ? await this.prisma.tipos_equipamentos.findMany({
           where: { id: { in: tiposEquipamentosIds } },
+          include: { categoria: true }, // ✅ INCLUIR relação categoria
         })
       : [];
     const tiposMap = new Map(tiposEquipamentos.map(t => [t.id, t]));

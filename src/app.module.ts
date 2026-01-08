@@ -25,6 +25,7 @@ import { ProgramacaoOSModule } from './modules/programacao-os/programacao-os.mod
 import { ExecucaoOSModule } from './modules/execucao-os/execucao-os.module';
 import { DiagramasModule } from './modules/diagramas/diagramas.module';
 import { TiposEquipamentosModule } from './modules/tipos-equipamentos/tipos-equipamentos.module';
+import { CategoriasEquipamentosModule } from './modules/categorias-equipamentos/categorias-equipamentos.module';
 import { ConcessionariasModule } from './modules/concessionarias/concessionarias.module';
 import { EquipamentosDadosModule } from './modules/equipamentos-dados/equipamentos-dados.module';
 import { UploadsModule } from './modules/uploads/uploads.module';
@@ -64,6 +65,7 @@ import { CoaModule } from './modules/coa/coa.module';
     EquipamentosModule,
     DiagramasModule,
     TiposEquipamentosModule,
+    CategoriasEquipamentosModule,
     AnomaliasModule,
     PlanosManutencaoModule,
     TarefasModule,

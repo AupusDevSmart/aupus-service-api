@@ -1088,20 +1088,37 @@ model inversor_leituras {
   @@index([created_at])
 }
 
+// ✅ NOVA TABELA: Categorias de Equipamentos
+model categorias_equipamentos {
+  id      String               @id @default(cuid()) @db.Char(26)
+  nome    String               @db.VarChar(100)
+
+  modelos tipos_equipamentos[]
+
+  @@map("categorias_equipamentos")
+}
+
 model tipos_equipamentos {
-  id                  String         @id @db.Char(26)
-  codigo              String         @unique @db.VarChar(50)
-  nome                String         @db.VarChar(100)
-  categoria           String         @db.VarChar(50)
+  id                  String                    @id @db.Char(26)
+  codigo              String                    @unique @db.VarChar(50)
+  nome                String                    @db.VarChar(100)
+
+  // ✅ NOVOS CAMPOS: Relação com categoria e fabricante
+  categoria_id        String                    @db.Char(26)
+  categoria           categorias_equipamentos   @relation(fields: [categoria_id], references: [id])
+  fabricante          String                    @db.VarChar(100)
+
   largura_padrao      Int            @default(32)
   altura_padrao       Int            @default(32)
   icone_svg           String?
-  propriedades_schema Json?
+  propriedades_schema Json?          // Campos técnicos: {campos: [{campo, tipo, unidade, obrigatorio}]}
+  mqtt_schema         Json?          // JSON Schema para validação MQTT (apenas equipamentos com telemetria)
   created_at          DateTime       @default(now())
   updated_at          DateTime       @updatedAt
   equipamentos        equipamentos[]
 
-  @@index([categoria])
+  @@index([categoria_id])
+  @@index([fabricante])
 }
 
 model equipamentos {
@@ -1110,6 +1127,7 @@ model equipamentos {
   classificacao          String                        @db.VarChar(10)
   equipamento_pai_id     String?                       @db.Char(26)
   fabricante             String?                       @db.VarChar(255)
+  fabricante_custom      String?                       @db.VarChar(255) // ✅ NOVO: Fabricante customizado (só se divergir do modelo)
   modelo                 String?                       @db.VarChar(255)
   numero_serie           String?                       @db.VarChar(255)
   criticidade            String                        @db.VarChar(1)
