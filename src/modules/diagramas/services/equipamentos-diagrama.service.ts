@@ -13,7 +13,7 @@ export class EquipamentosDiagramaService {
     diagramaId: string,
     dto: AddEquipamentoDiagramaDto,
   ) {
-    const { equipamentoId, posicao, rotacao, dimensoes, propriedades, labelPosition } = dto;
+    const { equipamentoId, posicao, rotacao, dimensoes, propriedades, labelPosition, labelOffset } = dto;
 
     console.log(`📍 [addEquipamento] Recebido:`, {
       equipamentoId,
@@ -78,11 +78,13 @@ export class EquipamentosDiagramaService {
       throw new BadRequestException('Rotação deve estar entre 0 e 360 graus');
     }
 
-    // 7. Mesclar propriedades existentes com as novas
+    // 7. Mesclar propriedades existentes com as novas (incluindo labelOffset)
     const propriedadesExistentes = (equipamento.propriedades as any) || {};
-    const propriedadesMescladas = propriedades
-      ? { ...propriedadesExistentes, ...propriedades }
-      : equipamento.propriedades;
+    const propriedadesMescladas = {
+      ...propriedadesExistentes,
+      ...propriedades,
+      ...(labelOffset !== undefined && labelOffset !== null ? { labelOffset } : {}),
+    };
 
     // 8. Atualizar equipamento
     console.log(`💾 [addEquipamento] Salvando no banco:`, {
@@ -124,7 +126,7 @@ export class EquipamentosDiagramaService {
     equipamentoId: string,
     dto: UpdateEquipamentoDiagramaDto,
   ) {
-    const { posicao, rotacao, dimensoes, propriedades, labelPosition } = dto;
+    const { posicao, rotacao, dimensoes, propriedades, labelPosition, labelOffset } = dto;
 
     // 1. Verificar se o equipamento está no diagrama
     const equipamento = await this.prisma.equipamentos.findFirst({
@@ -153,11 +155,13 @@ export class EquipamentosDiagramaService {
       throw new BadRequestException('Rotação deve estar entre 0 e 360 graus');
     }
 
-    // 4. Mesclar propriedades
+    // 4. Mesclar propriedades (incluindo labelOffset)
     const propriedadesExistentes = (equipamento.propriedades as any) || {};
-    const propriedadesMescladas = propriedades
-      ? { ...propriedadesExistentes, ...propriedades }
-      : equipamento.propriedades;
+    const propriedadesMescladas = {
+      ...propriedadesExistentes,
+      ...propriedades,
+      ...(labelOffset !== undefined && labelOffset !== null ? { labelOffset } : {}),
+    };
 
     // 5. Atualizar equipamento
     const equipamentoAtualizado = await this.prisma.equipamentos.update({
@@ -371,6 +375,7 @@ export class EquipamentosDiagramaService {
    * Formata a resposta do equipamento
    */
   private formatEquipamentoResponse(equipamento: any) {
+    const props = equipamento.propriedades as any || {};
     return {
       id: equipamento.id,
       diagramaId: equipamento.diagrama_id,
@@ -382,6 +387,7 @@ export class EquipamentosDiagramaService {
       },
       rotacao: equipamento.rotacao || 0,
       label_position: equipamento.label_position,
+      label_offset: props.labelOffset,
       dimensoes: {
         largura: equipamento.largura_customizada || 64,
         altura: equipamento.altura_customizada || 64,

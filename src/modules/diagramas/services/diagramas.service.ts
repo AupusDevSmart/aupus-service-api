@@ -173,41 +173,39 @@ export class DiagramasService {
       throw new NotFoundException('Diagrama não encontrado ou você não tem permissão para acessá-lo');
     }
 
-    // Buscar equipamentos posicionados neste diagrama
+    // ⚡ OTIMIZAÇÃO: Buscar equipamentos COM tipos em uma única query (JOIN)
     const equipamentos = await this.prisma.equipamentos.findMany({
       where: {
         diagrama_id: id,
         deleted_at: null,
       },
+      // ⚡ Fazer JOIN com tipo e categoria em uma única query
+      include: {
+        tipo_equipamento_rel: {
+          include: {
+            categoria: true,
+          },
+        },
+      },
     });
 
-    // Buscar tipos de equipamentos (filtrar nulls para BARRAMENTO/PONTO que não têm tipo)
-    const tiposEquipamentosIds = [... new Set(equipamentos.map(eq => eq.tipo_equipamento_id).filter(id => id !== null))];
-    const tiposEquipamentos = tiposEquipamentosIds.length > 0
-      ? await this.prisma.tipos_equipamentos.findMany({
-          where: { id: { in: tiposEquipamentosIds } },
-          include: { categoria: true }, // ✅ INCLUIR relação categoria
-        })
-      : [];
-    const tiposMap = new Map(tiposEquipamentos.map(t => [t.id, t]));
-
-    // Formatar equipamentos
+    // ⚡ Formatar equipamentos (tipo já vem do JOIN)
     const equipamentosFormatados = equipamentos.map((eq) => {
-      const tipo = tiposMap.get(eq.tipo_equipamento_id);
+      const tipoRel = eq.tipo_equipamento_rel;
       return {
         id: eq.id,
         nome: eq.nome,
         tag: eq.tag,
         classificacao: eq.classificacao,
         tipo_equipamento: eq.tipo_equipamento, // IMPORTANTE: Para BARRAMENTO/PONTO que não têm tipo_equipamento_id
-        tipo: tipo ? {
-          id: tipo.id,
-          codigo: tipo.codigo,
-          nome: tipo.nome,
-          categoria: tipo.categoria,
-          larguraPadrao: tipo.largura_padrao,
-          alturaPadrao: tipo.altura_padrao,
-          iconeSvg: tipo.icone_svg,
+        tipo: tipoRel ? {
+          id: tipoRel.id,
+          codigo: tipoRel.codigo,
+          nome: tipoRel.nome,
+          categoria: tipoRel.categoria,
+          larguraPadrao: tipoRel.largura_padrao,
+          alturaPadrao: tipoRel.altura_padrao,
+          iconeSvg: tipoRel.icone_svg,
         } : null,
         posicao: {
           x: eq.posicao_x,
@@ -216,8 +214,8 @@ export class DiagramasService {
         rotacao: eq.rotacao || 0,
         label_position: eq.label_position,
         dimensoes: {
-          largura: eq.largura_customizada || tipo?.largura_padrao || 64,
-          altura: eq.altura_customizada || tipo?.altura_padrao || 64,
+          largura: eq.largura_customizada || tipoRel?.largura_padrao || 64,
+          altura: eq.altura_customizada || tipoRel?.altura_padrao || 64,
         },
         status: eq.status,
         propriedades: eq.propriedades,
@@ -231,39 +229,31 @@ export class DiagramasService {
       };
     });
 
-    // Buscar conexões
+    // ⚡ OTIMIZAÇÃO: Buscar conexões COM equipamentos em uma única query (JOIN)
     const conexoes = await this.prisma.equipamentos_conexoes.findMany({
       where: {
         diagrama_id: id,
         deleted_at: null,
       },
+      // ⚡ Fazer JOIN com equipamentos de origem e destino
+      include: {
+        equipamento_origem: true,
+        equipamento_destino: true,
+      },
     });
 
-    // Buscar equipamentos origem e destino para as conexões
-    const equipamentosConexoesIds = [
-      ...new Set([
-        ...conexoes.map(c => c.equipamento_origem_id),
-        ...conexoes.map(c => c.equipamento_destino_id)
-      ])
-    ];
-    const equipamentosConexoes = await this.prisma.equipamentos.findMany({
-      where: { id: { in: equipamentosConexoesIds } },
-      select: { id: true, nome: true, tag: true },
-    });
-    const equipamentosConexoesMap = new Map(equipamentosConexoes.map(e => [e.id, e]));
-
-    // Formatar conexões
+    // ⚡ Formatar conexões (equipamentos já vêm do JOIN)
     const conexoesFormatadas = conexoes.map((conn) => ({
       id: conn.id,
       diagramaId: conn.diagrama_id,
       origem: {
         equipamentoId: conn.equipamento_origem_id,
-        equipamento: equipamentosConexoesMap.get(conn.equipamento_origem_id),
+        equipamento: conn.equipamento_origem,
         porta: conn.porta_origem,
       },
       destino: {
         equipamentoId: conn.equipamento_destino_id,
-        equipamento: equipamentosConexoesMap.get(conn.equipamento_destino_id),
+        equipamento: conn.equipamento_destino,
         porta: conn.porta_destino,
       },
       visual: {

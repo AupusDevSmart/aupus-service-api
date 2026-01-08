@@ -14,6 +14,16 @@ class PosicaoDto {
   y: number;
 }
 
+class LabelOffsetDto {
+  @ApiProperty({ description: 'Offset X em pixels (pode ser negativo)', example: -20 })
+  @IsNumber()
+  x: number;
+
+  @ApiProperty({ description: 'Offset Y em pixels (pode ser negativo)', example: 15 })
+  @IsNumber()
+  y: number;
+}
+
 class DimensoesDto {
   @ApiProperty({ description: 'Largura do equipamento', example: 64 })
   @IsNumber()
@@ -48,6 +58,12 @@ export class AddEquipamentoDiagramaDto {
   @IsString()
   labelPosition?: string;
 
+  @ApiPropertyOptional({ description: 'Offset customizado do label em pixels', type: LabelOffsetDto })
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => LabelOffsetDto)
+  labelOffset?: LabelOffsetDto;
+
   @ApiPropertyOptional({ description: 'Dimensões customizadas', type: DimensoesDto })
   @IsOptional()
   @ValidateNested()
@@ -78,6 +94,12 @@ export class UpdateEquipamentoDiagramaDto {
   @IsOptional()
   @IsString()
   labelPosition?: string;
+
+  @ApiPropertyOptional({ description: 'Offset customizado do label em pixels', type: LabelOffsetDto })
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => LabelOffsetDto)
+  labelOffset?: LabelOffsetDto;
 
   @ApiPropertyOptional({ description: 'Dimensões customizadas', type: DimensoesDto })
   @IsOptional()

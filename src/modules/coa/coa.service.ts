@@ -279,9 +279,10 @@ export class CoaService {
         SELECT
           e.unidade_id,
           e.tipo_equipamento,
+          ed.equipamento_id,
           ed.dados,
           ed.timestamp_dados,
-          ROW_NUMBER() OVER (PARTITION BY e.unidade_id ORDER BY ed.timestamp_dados DESC) as rn_ultima
+          ROW_NUMBER() OVER (PARTITION BY ed.equipamento_id ORDER BY ed.timestamp_dados DESC) as rn_ultima
         FROM equipamentos_dados ed
         INNER JOIN equipamentos e ON e.id = ed.equipamento_id
         WHERE ed.timestamp_dados >= (CURRENT_DATE AT TIME ZONE 'America/Sao_Paulo')
@@ -351,9 +352,14 @@ export class CoaService {
     // Criar mapa de energia diária por unidade
     const energiaDiaPorUnidade = new Map<string, number>();
     for (const row of energiaAgregadaDia) {
-      energiaDiaPorUnidade.set(row.unidade_id, Number(row.energia_dia_kwh) || 0);
+      const energiaValor = Number(row.energia_dia_kwh) || 0;
+      energiaDiaPorUnidade.set(row.unidade_id, energiaValor);
+      this.logger.log(`[COA] Energia unidade ${row.unidade_id}: ${energiaValor} kWh`);
     }
     this.logger.log(`[COA] Energia agregada calculada para ${energiaDiaPorUnidade.size} unidades`);
+
+    // DEBUG: Mostrar resultado bruto da query
+    this.logger.debug(`[COA DEBUG] energiaAgregadaDia raw:`, JSON.stringify(energiaAgregadaDia, null, 2));
 
     // 4. Criar mapa de leituras por unidade
     const leiturasPorUnidade = new Map<string, any[]>();
@@ -406,6 +412,11 @@ export class CoaService {
         // ✅ CORRIGIDO: Usar energia agregada do dia (soma de todas as leituras desde meia-noite)
         // Em vez de somar apenas as últimas leituras
         const energiaTotal = energiaDiaPorUnidade.get(unidade.id) || 0;
+
+        // DEBUG: Log energia por unidade
+        if (energiaTotal > 0) {
+          this.logger.log(`[COA] Unidade ${unidade.nome} (${unidade.tipo}): energia = ${energiaTotal} kWh`);
+        }
 
         for (const leitura of leiturasUnidade) {
           // Extrair potência - tentar coluna primeiro, depois JSON
