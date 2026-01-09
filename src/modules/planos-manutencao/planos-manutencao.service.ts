@@ -7,6 +7,8 @@ import {
   QueryPlanosDto,
   QueryPlanosPorPlantaDto,
   DuplicarPlanoDto,
+  ClonarPlanoLoteDto,
+  ClonarPlanoLoteResponseDto,
   UpdateStatusPlanoDto,
   PlanoManutencaoResponseDto,
   PlanoResumoDto,
@@ -507,7 +509,8 @@ export class PlanosManutencaoService {
           data_vigencia_inicio: planoOriginal.data_vigencia_inicio,
           data_vigencia_fim: planoOriginal.data_vigencia_fim,
           observacoes: planoOriginal.observacoes,
-          criado_por: duplicarDto.criado_por
+          // Apenas incluir criado_por se for fornecido
+          ...(duplicarDto.criado_por && { criado_por: duplicarDto.criado_por })
         }
       });
 
@@ -541,7 +544,8 @@ export class PlanosManutencaoService {
             observacoes: tarefaOriginal.observacoes,
             status: tarefaOriginal.status,
             ativo: tarefaOriginal.ativo,
-            criado_por: duplicarDto.criado_por
+            // Apenas incluir criado_por se for fornecido
+            ...(duplicarDto.criado_por && { criado_por: duplicarDto.criado_por })
           }
         });
 
@@ -581,6 +585,117 @@ export class PlanosManutencaoService {
 
     // Retornar plano criado com relacionamentos
     return this.buscarPorId(planoDuplicado.id, true);
+  }
+
+  /**
+   * Clona um plano de manutenção para múltiplos equipamentos
+   * Útil para replicar planos similares para vários equipamentos de uma vez
+   */
+  async clonarParaVariosEquipamentos(
+    planoOrigemId: string,
+    dto: ClonarPlanoLoteDto,
+  ): Promise<ClonarPlanoLoteResponseDto> {
+    // Verificar se plano origem existe
+    const planoOrigem = await this.prisma.planos_manutencao.findFirst({
+      where: {
+        id: planoOrigemId,
+        deleted_at: null
+      },
+      include: {
+        tarefas: {
+          where: { deleted_at: null },
+          select: { id: true }
+        }
+      }
+    });
+
+    if (!planoOrigem) {
+      throw new NotFoundException('Plano de manutenção original não encontrado');
+    }
+
+    const resultado: ClonarPlanoLoteResponseDto = {
+      planos_criados: 0,
+      planos_com_erro: 0,
+      detalhes: []
+    };
+
+    // Processar cada equipamento destino
+    for (const equipamentoId of dto.equipamentos_destino_ids) {
+      try {
+        // Buscar equipamento para pegar nome
+        const equipamento = await this.prisma.equipamentos.findFirst({
+          where: {
+            id: equipamentoId,
+            deleted_at: null
+          },
+          select: { nome: true }
+        });
+
+        if (!equipamento) {
+          resultado.planos_com_erro++;
+          resultado.detalhes.push({
+            equipamento_id: equipamentoId,
+            equipamento_nome: 'Desconhecido',
+            sucesso: false,
+            erro: 'Equipamento não encontrado'
+          });
+          continue;
+        }
+
+        // Verificar se equipamento já tem plano
+        const planoExistente = await this.prisma.planos_manutencao.findFirst({
+          where: {
+            equipamento_id: equipamentoId,
+            deleted_at: null
+          }
+        });
+
+        if (planoExistente) {
+          resultado.planos_com_erro++;
+          resultado.detalhes.push({
+            equipamento_id: equipamentoId,
+            equipamento_nome: equipamento.nome,
+            sucesso: false,
+            erro: 'Equipamento já possui um plano de manutenção'
+          });
+          continue;
+        }
+
+        // Gerar novo nome do plano
+        const novoNome = dto.manter_nome_original
+          ? planoOrigem.nome
+          : `${planoOrigem.nome} - ${equipamento.nome}`;
+
+        // Usar método de duplicação existente
+        const novoPlano = await this.duplicar(planoOrigemId, {
+          equipamento_destino_id: equipamentoId,
+          novo_nome: novoNome,
+          novo_prefixo_tag: dto.novo_prefixo_tag,
+          criado_por: dto.criado_por
+        });
+
+        resultado.planos_criados++;
+        resultado.detalhes.push({
+          equipamento_id: equipamentoId,
+          equipamento_nome: equipamento.nome,
+          sucesso: true,
+          plano_id: novoPlano.id,
+          plano_nome: novoPlano.nome,
+          total_tarefas: novoPlano.total_tarefas || 0
+        });
+
+      } catch (error) {
+        resultado.planos_com_erro++;
+        resultado.detalhes.push({
+          equipamento_id: equipamentoId,
+          equipamento_nome: 'Erro ao processar',
+          sucesso: false,
+          erro: error.message || 'Erro desconhecido'
+        });
+      }
+    }
+
+    return resultado;
   }
 
   async obterResumo(id: string): Promise<PlanoResumoDto> {
@@ -932,15 +1047,42 @@ export class PlanosManutencaoService {
   }
 
   private async gerarNovaTag(equipamentoId: string, prefixo: string): Promise<string> {
-    // Usar função do banco para gerar TAG única
-    const result = await this.prisma.$queryRaw<[{gerar_tag_tarefa: string}]>`
-      SELECT gerar_tag_tarefa(
-        (SELECT pm.id FROM planos_manutencao pm WHERE pm.equipamento_id = ${equipamentoId} AND pm.deleted_at IS NULL LIMIT 1),
-        ${prefixo}
-      ) as gerar_tag_tarefa
-    `;
+    // Gerar TAG única sem depender de função do banco
+    // Buscar plano do equipamento
+    const plano = await this.prisma.planos_manutencao.findFirst({
+      where: {
+        equipamento_id: equipamentoId,
+        deleted_at: null
+      },
+      include: {
+        tarefas: {
+          where: { deleted_at: null },
+          select: { tag: true }
+        }
+      }
+    });
 
-    return result[0]?.gerar_tag_tarefa || `${prefixo}-${Date.now()}`;
+    if (!plano) {
+      // Se não há plano ainda (caso raro durante criação), usar timestamp
+      return `${prefixo}-${Date.now()}`;
+    }
+
+    // Contar tarefas existentes e gerar próximo número
+    const totalTarefas = plano.tarefas.length;
+    const proximoNumero = totalTarefas + 1;
+
+    // Gerar TAG no formato: PREFIXO-001, PREFIXO-002, etc.
+    const numeroFormatado = proximoNumero.toString().padStart(3, '0');
+    const novaTag = `${prefixo}-${numeroFormatado}`;
+
+    // Verificar se TAG já existe (improvável, mas garantir unicidade)
+    const tagExiste = plano.tarefas.some(t => t.tag === novaTag);
+    if (tagExiste) {
+      // Se existir, usar timestamp como fallback
+      return `${prefixo}-${Date.now()}`;
+    }
+
+    return novaTag;
   }
 
   private contarPorStatus(stats: any[], status: StatusPlano): number {

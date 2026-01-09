@@ -21,6 +21,8 @@ import {
   QueryPlanosDto,
   QueryPlanosPorPlantaDto,
   DuplicarPlanoDto,
+  ClonarPlanoLoteDto,
+  ClonarPlanoLoteResponseDto,
   UpdateStatusPlanoDto,
   PlanoManutencaoResponseDto,
   PlanoResumoDto,
@@ -309,24 +311,77 @@ export class PlanosManutencaoController {
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({ summary: 'Duplicar plano completo para outro equipamento' })
   @ApiParam({ name: 'id', description: 'ID do plano a ser duplicado' })
-  @ApiResponse({ 
-    status: HttpStatus.CREATED, 
+  @ApiResponse({
+    status: HttpStatus.CREATED,
     description: 'Plano duplicado com sucesso',
-    type: PlanoManutencaoResponseDto 
+    type: PlanoManutencaoResponseDto
   })
-  @ApiResponse({ 
-    status: HttpStatus.NOT_FOUND, 
-    description: 'Plano original não encontrado' 
+  @ApiResponse({
+    status: HttpStatus.NOT_FOUND,
+    description: 'Plano original não encontrado'
   })
-  @ApiResponse({ 
-    status: HttpStatus.CONFLICT, 
-    description: 'Equipamento destino já possui plano' 
+  @ApiResponse({
+    status: HttpStatus.CONFLICT,
+    description: 'Equipamento destino já possui plano'
   })
   async duplicar(
     @Param('id') id: string,
     @Body() duplicarDto: DuplicarPlanoDto
   ): Promise<PlanoManutencaoResponseDto> {
     return this.planosManutencaoService.duplicar(id, duplicarDto);
+  }
+
+  @Post(':id/clonar-lote')
+  @HttpCode(HttpStatus.CREATED)
+  @ApiOperation({
+    summary: 'Clonar plano para múltiplos equipamentos',
+    description: 'Duplica um plano de manutenção (incluindo todas as tarefas) para vários equipamentos de uma só vez'
+  })
+  @ApiParam({ name: 'id', description: 'ID do plano a ser clonado' })
+  @ApiResponse({
+    status: HttpStatus.CREATED,
+    description: 'Clonagem concluída (pode ter sucessos e falhas)',
+    type: ClonarPlanoLoteResponseDto,
+    schema: {
+      example: {
+        planos_criados: 2,
+        planos_com_erro: 1,
+        detalhes: [
+          {
+            equipamento_id: 'eq-1',
+            equipamento_nome: 'Inversor 2',
+            sucesso: true,
+            plano_id: 'plano-123',
+            plano_nome: 'Manutenção Preventiva - Inversor 2',
+            total_tarefas: 15
+          },
+          {
+            equipamento_id: 'eq-2',
+            equipamento_nome: 'Inversor 3',
+            sucesso: true,
+            plano_id: 'plano-456',
+            plano_nome: 'Manutenção Preventiva - Inversor 3',
+            total_tarefas: 15
+          },
+          {
+            equipamento_id: 'eq-3',
+            equipamento_nome: 'Inversor 4',
+            sucesso: false,
+            erro: 'Equipamento já possui um plano de manutenção'
+          }
+        ]
+      }
+    }
+  })
+  @ApiResponse({
+    status: HttpStatus.NOT_FOUND,
+    description: 'Plano original não encontrado'
+  })
+  async clonarLote(
+    @Param('id') id: string,
+    @Body() clonarDto: ClonarPlanoLoteDto
+  ): Promise<ClonarPlanoLoteResponseDto> {
+    return this.planosManutencaoService.clonarParaVariosEquipamentos(id, clonarDto);
   }
 
   @Delete(':id')

@@ -1,6 +1,8 @@
 import { ConflictException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { Prisma, StatusProgramacaoOS } from '@prisma/client';
 import { PrismaService } from '../../shared/prisma/prisma.service';
+import { AnomaliasService } from '../anomalias/anomalias.service';
+import { StatusAnomalia } from '../anomalias/dto/create-anomalia.dto';
 import {
   AdicionarTarefasDto,
   AnalisarProgramacaoDto,
@@ -22,7 +24,10 @@ import {
 export class ProgramacaoOSService {
   private readonly logger = new Logger(ProgramacaoOSService.name);
 
-  constructor(private readonly prisma: PrismaService) { }
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly anomaliasService: AnomaliasService,
+  ) { }
 
   async listar(filters: ProgramacaoFiltersDto): Promise<ListarProgramacoesResponseDto> {
 
@@ -314,6 +319,21 @@ export class ProgramacaoOSService {
         StatusProgramacaoOS.PENDENTE,
       );
 
+      // ✅ NOVO: Atualizar status da anomalia para EM_ANALISE
+      if (programacao.anomalia_id) {
+        try {
+          await this.anomaliasService.update(
+            programacao.anomalia_id,
+            { status: StatusAnomalia.EM_ANALISE },
+            usuarioId
+          );
+          this.logger.log(`Anomalia ${programacao.anomalia_id} atualizada para EM_ANALISE`);
+        } catch (error) {
+          this.logger.warn(`Erro ao atualizar status da anomalia: ${error.message}`);
+          // Não interromper o fluxo se houver erro
+        }
+      }
+
       return this.mapearParaResponse(programacao);
     }, {
       timeout: 15000, // 15 seconds timeout
@@ -507,6 +527,21 @@ export class ProgramacaoOSService {
       // Gerar OS automaticamente com status PROGRAMADA
       const osId = await this.gerarOrdemServico(prisma, id);
 
+      // ✅ NOVO: Atualizar status da anomalia para OS_GERADA
+      if (programacao.anomalia_id) {
+        try {
+          await this.anomaliasService.update(
+            programacao.anomalia_id,
+            { status: StatusAnomalia.OS_GERADA },
+            usuarioId
+          );
+          this.logger.log(`Anomalia ${programacao.anomalia_id} atualizada para OS_GERADA`);
+        } catch (error) {
+          this.logger.warn(`Erro ao atualizar status da anomalia: ${error.message}`);
+          // Não interromper o fluxo se houver erro
+        }
+      }
+
       // ✅ CORREÇÃO: Verificar se a programação já tem uma reserva vinculada
       if (programacao.reserva_id) {
         // Buscar reserva vinculada à programação (com trim no ID)
@@ -606,6 +641,21 @@ export class ProgramacaoOSService {
       statusAnterior,
       StatusProgramacaoOS.CANCELADA,
     );
+
+    // ✅ NOVO: Se tiver anomalia vinculada, retornar para AGUARDANDO
+    if (programacao.anomalia_id) {
+      try {
+        await this.anomaliasService.update(
+          programacao.anomalia_id,
+          { status: StatusAnomalia.AGUARDANDO },
+          usuarioId
+        );
+        this.logger.log(`Anomalia ${programacao.anomalia_id} retornada para AGUARDANDO após cancelamento`);
+      } catch (error) {
+        this.logger.warn(`Erro ao atualizar status da anomalia: ${error.message}`);
+        // Não interromper o fluxo se houver erro
+      }
+    }
   }
 
   async criarDeAnomalia(anomaliaId: string, dto: CreateProgramacaoAnomaliaDto, usuarioId?: string): Promise<ProgramacaoResponseDto> {
@@ -641,7 +691,12 @@ export class ProgramacaoOSService {
       },
     };
 
-    return this.criar(createDto, usuarioId);
+    const programacao = await this.criar(createDto, usuarioId);
+
+    // ✅ NOVO: Atualizar status da anomalia para EM_ANALISE
+    // (Não precisa do try-catch aqui pois o método criar() já faz isso)
+
+    return programacao;
   }
 
   async criarDeTarefas(dto: CreateProgramacaoTarefasDto, usuarioId?: string): Promise<ProgramacaoResponseDto> {

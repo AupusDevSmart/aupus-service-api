@@ -1,5 +1,7 @@
-import { Injectable, NotFoundException, BadRequestException, ConflictException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException, ConflictException, Logger } from '@nestjs/common';
 import { PrismaService } from '../../shared/prisma/prisma.service';
+import { AnomaliasService } from '../anomalias/anomalias.service';
+import { StatusAnomalia } from '../anomalias/dto/create-anomalia.dto';
 import {
   OSFiltersDto,
   ProgramarOSDto,
@@ -21,7 +23,12 @@ import { StatusOS, Prisma } from '@prisma/client';
 
 @Injectable()
 export class ExecucaoOSService {
-  constructor(private readonly prisma: PrismaService) {}
+  private readonly logger = new Logger(ExecucaoOSService.name);
+
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly anomaliasService: AnomaliasService,
+  ) {}
 
   async listar(filters: OSFiltersDto): Promise<ListarOSResponseDto> {
     const {
@@ -980,6 +987,25 @@ export class ExecucaoOSService {
         os.status,
         StatusOS.FINALIZADA,
       );
+
+      // ✅ NOVO: Atualizar status da anomalia para RESOLVIDA
+      if (os.anomalia_id) {
+        try {
+          const observacoes = `OS ${os.numero_os} finalizada com sucesso. ` +
+            `Resultado: ${dto.resultado_servico}. ` +
+            `Qualidade: ${dto.avaliacao_qualidade}/5`;
+
+          await this.anomaliasService.resolver(
+            os.anomalia_id,
+            observacoes,
+            usuarioId
+          );
+          this.logger.log(`Anomalia ${os.anomalia_id} marcada como RESOLVIDA após finalização da OS`);
+        } catch (error) {
+          this.logger.warn(`Erro ao atualizar status da anomalia: ${error.message}`);
+          // Não interromper o fluxo se houver erro
+        }
+      }
     });
   }
 
@@ -1033,6 +1059,21 @@ export class ExecucaoOSService {
         statusAnterior,
         StatusOS.CANCELADA,
       );
+
+      // ✅ NOVO: Se tiver anomalia vinculada, retornar para AGUARDANDO
+      if (os.anomalia_id) {
+        try {
+          await this.anomaliasService.update(
+            os.anomalia_id,
+            { status: StatusAnomalia.AGUARDANDO },
+            usuarioId
+          );
+          this.logger.log(`Anomalia ${os.anomalia_id} retornada para AGUARDANDO após cancelamento da OS`);
+        } catch (error) {
+          this.logger.warn(`Erro ao atualizar status da anomalia: ${error.message}`);
+          // Não interromper o fluxo se houver erro
+        }
+      }
     });
   }
 
