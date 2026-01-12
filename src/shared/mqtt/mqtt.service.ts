@@ -485,31 +485,48 @@ export class MqttService extends EventEmitter implements OnModuleInit, OnModuleD
 
         // Dados agregados do Resumo
         Dados: {
-          // Tensões médias (V)
-          Va: resumo.Va_media || 0,
-          Vb: resumo.Vb_media || 0,
-          Vc: resumo.Vc_media || 0,
+          // ✅ CORREÇÃO CRÍTICA: Os campos vêm SEM sufixo _media/_medio
+          // Tensões (V)
+          Va: resumo.Va || 0,
+          Vb: resumo.Vb || 0,
+          Vc: resumo.Vc || 0,
 
-          // Correntes médias (A)
-          Ia: resumo.Ia_media || 0,
-          Ib: resumo.Ib_media || 0,
-          Ic: resumo.Ic_media || 0,
+          // Correntes (A)
+          Ia: resumo.Ia || 0,
+          Ib: resumo.Ib || 0,
+          Ic: resumo.Ic || 0,
 
-          // Potências médias (W)
-          Pa: resumo.Pa_medio || 0,
-          Pb: resumo.Pb_medio || 0,
-          Pc: resumo.Pc_medio || 0,
+          // Potências (W)
+          Pa: resumo.Pa || 0,
+          Pb: resumo.Pb || 0,
+          Pc: resumo.Pc || 0,
+          Pt: resumo.Pt || 0, // Potência total
 
-          // Fatores de potência médios
-          FPA: resumo.FPa_medio || 0,
-          FPB: resumo.FPb_medio || 0,
-          FPC: resumo.FPc_medio || 0,
+          // Fatores de potência
+          FPA: resumo.FPa || 0,
+          FPB: resumo.FPb || 0,
+          FPC: resumo.FPc || 0,
 
-          // Frequência média (Hz)
-          freq: resumo.freq_media || 0,
+          // Frequência (Hz) - não vem no Resumo, deixar zero ou buscar de outro lugar
+          freq: resumo.freq || 0,
 
           // Energia acumulada (kWh) - valores cumulativos
-          phf: resumo.somatorio_phf || 0,
+          phf: resumo.consumo_phf || 0,      // Energia ativa importada
+          phr: resumo.consumo_phr || 0,      // Energia ativa exportada
+          qhfi: resumo.consumo_qhfi || 0,    // Energia reativa indutiva
+          qhfr: resumo.consumo_qhfr || 0,    // Energia reativa capacitiva
+
+          // Potências reativas
+          Qa: resumo.Qa || 0,
+          Qb: resumo.Qb || 0,
+          Qc: resumo.Qc || 0,
+          Qt: resumo.Qt || 0, // Potência reativa total
+
+          // Potências aparentes
+          Sa: resumo.Sa || 0,
+          Sb: resumo.Sb || 0,
+          Sc: resumo.Sc || 0,
+          St: resumo.St || 0, // Potência aparente total
 
           // Timestamp da leitura
           timestamp: resumo.timestamp,
@@ -565,9 +582,17 @@ export class MqttService extends EventEmitter implements OnModuleInit, OnModuleD
         },
       });
 
+      // ✅ LOG COMPACTO (otimizado para performance)
       console.log(
-        `✅ [M-160 Resumo] Salvo - Energia: ${energiaKwh.toFixed(4)} kWh | Potência: ${potenciaMediaKw.toFixed(2)} kW | Leituras: ${resumo.total_leituras || 1}`,
+        `✅ [M-160] ${equipamentoId.substring(0, 8)} | ` +
+        `${energiaKwh.toFixed(4)}kWh | ` +
+        `${(resumo.Pt || 0)}W | ` +
+        `V:${resumo.Va?.toFixed(1)}/${resumo.Vb?.toFixed(1)}/${resumo.Vc?.toFixed(1)} | ` +
+        `I:${resumo.Ia?.toFixed(1)}/${resumo.Ib?.toFixed(1)}/${resumo.Ic?.toFixed(1)}A | ` +
+        `FP:${resumo.FPa?.toFixed(2)}/${resumo.FPb?.toFixed(2)}/${resumo.FPc?.toFixed(2)} | ` +
+        `${resumo.total_leituras || 1}x`,
       );
+
 
       // ✅ NOVO FORMATO: Não precisa processar PHF via MqttIngestionService
       // O novo formato já vem com energia calculada (energia_total) e não tem PHF acumulado

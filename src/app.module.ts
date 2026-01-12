@@ -31,6 +31,7 @@ import { EquipamentosDadosModule } from './modules/equipamentos-dados/equipament
 import { UploadsModule } from './modules/uploads/uploads.module';
 import { ConfiguracaoDemandaModule } from './modules/configuracao-demanda/configuracao-demanda.module';
 import { CoaModule } from './modules/coa/coa.module';
+import { DashboardModule } from './modules/dashboard/dashboard.module';
 
 @Module({
   imports: [
@@ -78,6 +79,7 @@ import { CoaModule } from './modules/coa/coa.module';
     EquipamentosDadosModule,
     ConfiguracaoDemandaModule,
     CoaModule, // Centro de Operações Avançadas
+    DashboardModule, // Dashboard com métricas e estatísticas
     UploadsModule, // Módulo para servir arquivos de upload
   ],
   controllers: [AppController],

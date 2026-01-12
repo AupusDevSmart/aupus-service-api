@@ -320,7 +320,7 @@ export class EquipamentosDiagramaService {
   }
 
   /**
-   * Adiciona múltiplos equipamentos de uma vez
+   * Adiciona múltiplos equipamentos de uma vez - OTIMIZADO
    */
   async addEquipamentosBulk(
     diagramaId: string,
@@ -328,47 +328,146 @@ export class EquipamentosDiagramaService {
   ) {
     const { equipamentos } = dto;
 
-    const resultados = {
-      adicionados: 0,
-      atualizados: 0,
-      erros: 0,
-      equipamentos: [],
-    };
+    console.log(`📦 [addEquipamentosBulk] Processing ${equipamentos.length} equipamentos`);
 
-    for (const equipDto of equipamentos) {
-      try {
-        const resultado = await this.addEquipamento(diagramaId, equipDto);
+    // Usar transação para processar tudo de uma vez
+    // ✅ CRÍTICO: Aumentar timeout para 30 segundos (suficiente para processar muitos equipamentos)
+    return await this.prisma.$transaction(async (tx) => {
+      const resultados = {
+        adicionados: 0,
+        atualizados: 0,
+        erros: 0,
+        equipamentos: [],
+      };
 
-        // Verificar se foi adição ou atualização
-        const equipExistente = await this.prisma.equipamentos.findUnique({
-          where: { id: equipDto.equipamentoId },
-          select: { diagrama_id: true },
-        });
+      // 1. Verificar diagrama existe (uma vez)
+      const diagrama = await tx.diagramas_unitarios.findFirst({
+        where: { id: diagramaId, deleted_at: null },
+      });
 
-        if (equipExistente?.diagrama_id === diagramaId) {
-          resultados.atualizados++;
-          resultados.equipamentos.push({
-            ...resultado,
-            status: 'updated',
+      if (!diagrama) {
+        throw new NotFoundException('Diagrama não encontrado');
+      }
+
+      // 2. Buscar todos os equipamentos de uma vez
+      const equipamentoIds = equipamentos.map(e => e.equipamentoId.trim());
+
+      console.log(`🔍 [addEquipamentosBulk] Buscando equipamentos com IDs:`, equipamentoIds);
+
+      const equipamentosExistentes = await tx.equipamentos.findMany({
+        where: {
+          id: { in: equipamentoIds },
+          deleted_at: null,
+        },
+      });
+
+      console.log(`📋 [addEquipamentosBulk] Encontrados ${equipamentosExistentes.length} equipamentos no banco`);
+      if (equipamentosExistentes.length < equipamentoIds.length) {
+        console.warn(`⚠️ [addEquipamentosBulk] Faltam ${equipamentoIds.length - equipamentosExistentes.length} equipamentos!`);
+        console.warn(`   IDs solicitados:`, equipamentoIds);
+        console.warn(`   IDs encontrados:`, equipamentosExistentes.map(e => e.id.trim()));
+      }
+
+      // Criar mapa para lookup rápido
+      // ✅ CRÍTICO: Fazer trim do ID ao criar o Map para evitar problemas com CHAR vs VARCHAR
+      const equipamentosMap = new Map(
+        equipamentosExistentes.map(e => [e.id.trim(), e])
+      );
+
+      // 3. Processar cada equipamento
+      for (const equipDto of equipamentos) {
+        try {
+          // IMPORTANTE: Trim no lookup também para garantir match!
+          const equipamento = equipamentosMap.get(equipDto.equipamentoId.trim());
+
+          if (!equipamento) {
+            resultados.erros++;
+            resultados.equipamentos.push({
+              equipamentoId: equipDto.equipamentoId,
+              status: 'error',
+              error: 'Equipamento não encontrado',
+            });
+            continue;
+          }
+
+          // Verificar unidade
+          if (equipamento.unidade_id !== diagrama.unidade_id) {
+            resultados.erros++;
+            resultados.equipamentos.push({
+              equipamentoId: equipDto.equipamentoId,
+              status: 'error',
+              error: 'Equipamento não pertence à mesma unidade do diagrama',
+            });
+            continue;
+          }
+
+          // Verificar se já está em outro diagrama
+          const equipamentoDiagramaId = equipamento.diagrama_id?.trim();
+          const targetDiagramaId = diagramaId?.trim();
+
+          if (equipamentoDiagramaId && equipamentoDiagramaId !== targetDiagramaId) {
+            resultados.erros++;
+            resultados.equipamentos.push({
+              equipamentoId: equipDto.equipamentoId,
+              status: 'error',
+              error: 'Equipamento já está posicionado em outro diagrama',
+            });
+            continue;
+          }
+
+          // Preparar propriedades
+          const propriedadesExistentes = (equipamento.propriedades as any) || {};
+          const propriedadesMescladas = {
+            ...propriedadesExistentes,
+            ...equipDto.propriedades,
+            ...(equipDto.labelOffset !== undefined && equipDto.labelOffset !== null
+              ? { labelOffset: equipDto.labelOffset }
+              : {}),
+          };
+
+          // Atualizar equipamento
+          const equipamentoAtualizado = await tx.equipamentos.update({
+            where: { id: equipDto.equipamentoId },
+            data: {
+              diagrama_id: diagramaId,
+              posicao_x: equipDto.posicao.x,
+              posicao_y: equipDto.posicao.y,
+              rotacao: equipDto.rotacao ?? 0,
+              label_position: equipDto.labelPosition || 'bottom',
+              largura_customizada: equipDto.dimensoes?.largura,
+              altura_customizada: equipDto.dimensoes?.altura,
+              propriedades: propriedadesMescladas as any,
+            },
           });
-        } else {
-          resultados.adicionados++;
+
+          const jaNoMesmoDiagrama = equipamentoDiagramaId === targetDiagramaId;
+          if (jaNoMesmoDiagrama) {
+            resultados.atualizados++;
+          } else {
+            resultados.adicionados++;
+          }
+
           resultados.equipamentos.push({
-            ...resultado,
-            status: 'added',
+            ...this.formatEquipamentoResponse(equipamentoAtualizado),
+            status: jaNoMesmoDiagrama ? 'updated' : 'added',
+          });
+        } catch (error) {
+          resultados.erros++;
+          resultados.equipamentos.push({
+            equipamentoId: equipDto.equipamentoId,
+            status: 'error',
+            error: error.message,
           });
         }
-      } catch (error) {
-        resultados.erros++;
-        resultados.equipamentos.push({
-          equipamentoId: equipDto.equipamentoId,
-          status: 'error',
-          error: error.message,
-        });
       }
-    }
 
-    return resultados;
+      console.log(`✅ [addEquipamentosBulk] Results: ${resultados.adicionados} added, ${resultados.atualizados} updated, ${resultados.erros} errors`);
+
+      return resultados;
+    }, {
+      maxWait: 30000, // Máximo 30 segundos esperando para começar a transação
+      timeout: 30000, // Timeout de 30 segundos para executar a transação
+    });
   }
 
   /**
@@ -397,3 +496,4 @@ export class EquipamentosDiagramaService {
     };
   }
 }
+// Force reload
