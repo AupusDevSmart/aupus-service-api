@@ -44,6 +44,7 @@ export interface UnidadeResumo {
   };
   cidade?: string;
   estado?: string;
+  potenciaInstalada: number; // ✅ NOVO: Potência instalada/cadastrada da unidade (kW)
   metricas: {
     potenciaAtual: number;
     energiaHoje: number;
@@ -226,6 +227,7 @@ export class CoaService {
         id: true,
         nome: true,
         tipo: true,
+        potencia: true, // ✅ NOVO: Potência instalada/cadastrada
         latitude: true,
         longitude: true,
         cidade: true,
@@ -529,6 +531,7 @@ export class CoaService {
           } : undefined,
           cidade: unidade.cidade || undefined,
           estado: unidade.estado || undefined,
+          potenciaInstalada: Number(unidade.potencia) || 0, // ✅ Potência instalada em kW
           metricas: {
             potenciaAtual: Math.round(potenciaTotal * 100) / 100,
             energiaHoje: Math.round(energiaTotal * 100) / 100,
