@@ -445,17 +445,16 @@ export class MqttService extends EventEmitter implements OnModuleInit, OnModuleD
           const brazilianDateMatch = tsString.match(/^(\d{2})\/(\d{2})\/(\d{4})\s+(\d{2}):(\d{2}):(\d{2})$/);
           if (brazilianDateMatch) {
             const [_, day, month, year, hour, minute, second] = brazilianDateMatch;
-            // ✅ CORREÇÃO CRÍTICA: Criar data em UTC usando Date.UTC() para evitar conversão de fuso horário
-            // O timestamp do M160 já vem no horário de Brasília, mas new Date() o interpretava como local
-            // causando uma diferença de 3 horas ao salvar no PostgreSQL (que salva em UTC)
-            timestampDados = new Date(Date.UTC(
+            // ✅ CORREÇÃO: O timestamp do M160 já vem no horário correto (Brasília/Local)
+            // Usar new Date() normal que interpreta como horário local do servidor
+            timestampDados = new Date(
               parseInt(year),
               parseInt(month) - 1, // JavaScript months are 0-indexed
               parseInt(day),
               parseInt(hour),
               parseInt(minute),
               parseInt(second)
-            ));
+            );
           } else {
             // Tentar parse ISO ou outros formatos
             const ts = parseInt(tsString);

@@ -278,10 +278,7 @@ export class EquipamentosService {
     // Filtro por MQTT habilitado
     if (mqtt_habilitado !== undefined) {
       where.mqtt_habilitado = mqtt_habilitado;
-      console.log('   🔌 Adicionando filtro mqtt_habilitado =', mqtt_habilitado);
     }
-
-    console.log('   📋 WHERE clause final:', JSON.stringify(where, null, 2));
 
     const [data, total] = await Promise.all([
       this.prisma.equipamentos.findMany({
@@ -411,8 +408,6 @@ export class EquipamentosService {
         dados_tecnicos: true,
       },
     });
-
-    console.log('API: Dados técnicos do banco:', equipamento.dados_tecnicos);
 
     if (!equipamento) {
       throw new NotFoundException('Equipamento não encontrado');
@@ -675,11 +670,6 @@ export class EquipamentosService {
       throw new NotFoundException('Equipamento UC não encontrado');
     }
 
-    console.log('💾 [BACKEND] Salvando componentes UAR em lote');
-    console.log('💾 [BACKEND] UC ID:', ucId);
-    console.log('💾 [BACKEND] Componentes recebidos:', componentes.length);
-    console.log('💾 [BACKEND] IDs recebidos:', componentes.map(c => (c as any).id?.trim()));
-
     // 1. Buscar componentes existentes no banco
     const componentesExistentes = await this.prisma.equipamentos.findMany({
       where: {
@@ -694,13 +684,8 @@ export class EquipamentosService {
       .map(c => (c as any).id?.trim())
       .filter(Boolean); // Remove undefined/null
 
-    console.log('💾 [BACKEND] IDs existentes no banco:', idsExistentes);
-    console.log('💾 [BACKEND] IDs recebidos (limpos):', idsRecebidos);
-
     // 2. Identificar componentes a serem excluídos (soft delete)
     const idsParaExcluir = idsExistentes.filter(id => !idsRecebidos.includes(id));
-
-    console.log('💾 [BACKEND] IDs para EXCLUIR:', idsParaExcluir);
 
     if (idsParaExcluir.length > 0) {
       await this.prisma.equipamentos.updateMany({
@@ -711,7 +696,6 @@ export class EquipamentosService {
           deleted_at: new Date(),
         },
       });
-      console.log(`✅ [BACKEND] ${idsParaExcluir.length} componentes excluídos`);
     }
 
     // 3. Criar/Atualizar componentes
@@ -742,7 +726,6 @@ export class EquipamentosService {
 
       if (componenteId && !componenteId.startsWith('temp_')) {
         // Atualizar componente existente
-        console.log(`🔄 [BACKEND] Atualizando componente ${componenteId}`);
         const atualizado = await this.prisma.equipamentos.update({
           where: { id: componenteId },
           data: baseData,
@@ -750,15 +733,12 @@ export class EquipamentosService {
         resultados.push(atualizado);
       } else {
         // Criar novo componente
-        console.log(`➕ [BACKEND] Criando novo componente`);
         const criado = await this.prisma.equipamentos.create({
           data: baseData as any,
         });
         resultados.push(criado);
       }
     }
-
-    console.log(`✅ [BACKEND] ${resultados.length} componentes processados com sucesso`);
 
     return {
       message: `${resultados.length} componentes processados com sucesso`,
@@ -767,11 +747,6 @@ export class EquipamentosService {
   }
 
   async findByUnidade(unidadeId: string, query: EquipamentoQueryDto) {
-    console.log('🔍 [findByUnidade] Iniciando busca de equipamentos');
-    console.log('   📋 UnidadeId:', unidadeId);
-    console.log('   📋 Query params:', JSON.stringify(query, null, 2));
-    console.log('   🔌 mqtt_habilitado filter:', query.mqtt_habilitado);
-
     // Verificar se unidade existe
     const unidadeExists = await this.prisma.unidades.findFirst({
       where: { id: unidadeId, deleted_at: null },
@@ -787,11 +762,8 @@ export class EquipamentosService {
     });
 
     if (!unidadeExists) {
-      console.log('   ❌ Unidade não encontrada:', unidadeId);
       throw new NotFoundException('Unidade não encontrada');
     }
-
-    console.log('   ✅ Unidade encontrada:', unidadeExists.nome);
 
     // Usar o método findAll existente com filtro de unidade
     // Remove planta_id se existir, pois quando temos unidade_id não precisamos de planta_id
@@ -801,24 +773,7 @@ export class EquipamentosService {
       unidade_id: unidadeId
     };
 
-    console.log('   📋 Query final:', JSON.stringify(queryComUnidade, null, 2));
-
     const resultado = await this.findAll(queryComUnidade);
-
-    console.log('   📊 Resultado:');
-    console.log('      Total de equipamentos:', resultado.pagination.total);
-    console.log('      Equipamentos retornados:', resultado.data.length);
-    console.log('      Total sem diagrama:', resultado.meta?.totalSemDiagrama);
-
-    // Log detalhado dos equipamentos UC
-    const equipamentosUC = resultado.data.filter(e => e.classificacao === 'UC');
-    console.log('      Equipamentos UC:', equipamentosUC.length);
-    equipamentosUC.forEach((eq, idx) => {
-      console.log(`         [${idx + 1}] ${eq.nome}`);
-      console.log(`             - Tipo: ${eq.tipoEquipamento?.codigo || 'SEM TIPO'}`);
-      console.log(`             - ID: ${eq.id.trim()}`);
-      console.log(`             - No diagrama: ${eq.noDiagrama ? 'Sim' : 'Não'}`);
-    });
 
     return {
       ...resultado,
