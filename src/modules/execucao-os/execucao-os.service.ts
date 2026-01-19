@@ -43,6 +43,8 @@ export class ExecucaoOSService {
       data_inicio,
       data_fim,
       atrasadas,
+      sortBy = 'data_hora_programada',
+      sortOrder = 'asc',
     } = filters;
 
     // Construir filtros
@@ -148,7 +150,7 @@ export class ExecucaoOSService {
           },
         },
       },
-      orderBy: { data_hora_programada: 'asc' },
+      orderBy: { [sortBy]: sortOrder },
       skip: (page - 1) * limit,
       take: limit,
     });

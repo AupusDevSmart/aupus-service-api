@@ -64,4 +64,14 @@ export class OSFiltersDto {
   @Type(() => Boolean)
   @IsBoolean()
   atrasadas?: boolean;
+
+  @ApiPropertyOptional({ description: 'Campo para ordenação', example: 'criado_em' })
+  @IsOptional()
+  @IsString()
+  sortBy?: string;
+
+  @ApiPropertyOptional({ description: 'Direção da ordenação', enum: ['asc', 'desc'], example: 'desc' })
+  @IsOptional()
+  @IsEnum(['asc', 'desc'])
+  sortOrder?: 'asc' | 'desc';
 }

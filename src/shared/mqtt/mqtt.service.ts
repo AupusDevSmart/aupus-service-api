@@ -445,16 +445,11 @@ export class MqttService extends EventEmitter implements OnModuleInit, OnModuleD
           const brazilianDateMatch = tsString.match(/^(\d{2})\/(\d{2})\/(\d{4})\s+(\d{2}):(\d{2}):(\d{2})$/);
           if (brazilianDateMatch) {
             const [_, day, month, year, hour, minute, second] = brazilianDateMatch;
-            // ✅ CORREÇÃO: O timestamp do M160 já vem no horário correto (Brasília/Local)
-            // Usar new Date() normal que interpreta como horário local do servidor
-            timestampDados = new Date(
-              parseInt(year),
-              parseInt(month) - 1, // JavaScript months are 0-indexed
-              parseInt(day),
-              parseInt(hour),
-              parseInt(minute),
-              parseInt(second)
-            );
+            // ✅ CORREÇÃO CRÍTICA: O timestamp do M160 vem no horário de Brasília (BRT/BRST = UTC-3)
+            // Precisamos converter para UTC adicionando 3 horas antes de criar o Date
+            // Isso garante que ao salvar no PostgreSQL o timestamp esteja correto em UTC
+            const isoString = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}T${hour.padStart(2, '0')}:${minute.padStart(2, '0')}:${second.padStart(2, '0')}-03:00`;
+            timestampDados = new Date(isoString);
           } else {
             // Tentar parse ISO ou outros formatos
             const ts = parseInt(tsString);
@@ -666,10 +661,19 @@ export class MqttService extends EventEmitter implements OnModuleInit, OnModuleD
     const leiturasSalvar = [...buffer.leituras];
 
     try {
+      // Buscar tópico MQTT do equipamento para o log
+      const equipamento = await this.prisma.equipamentos.findUnique({
+        where: { id: equipamentoId },
+        select: {
+          topico_mqtt: true,
+          nome: true
+        }
+      });
+
       const timestamp_fim = new Date();
 
       // Calcular agregações para inversores
-      const dadosAgregados = this.calcularAgregacoes(leiturasSalvar);
+      const dadosAgregados = this.calcularAgregacoes(leiturasSalvar, equipamento?.topico_mqtt);
 
       // Determinar qualidade geral do período
       const qualidades = leiturasSalvar.map((l) => l.dados._qualidade);
@@ -774,6 +778,7 @@ export class MqttService extends EventEmitter implements OnModuleInit, OnModuleD
    */
   private calcularAgregacoes(
     leituras: Array<{ timestamp: Date; dados: any }>,
+    topicoMqtt?: string,
   ): any {
     if (leituras.length === 0) {
       return {};
@@ -1033,11 +1038,14 @@ export class MqttService extends EventEmitter implements OnModuleInit, OnModuleD
           }, 0);
           agregado.energy.period_energy_kwh = parseFloat(energiaTotal.toFixed(4));
 
-          // LOG para debug da correção
-          console.log(`📊 [INVERSOR] Energia calculada corretamente:`);
-          console.log(`   - ${activePowers.length} leituras no buffer`);
-          console.log(`   - Potência média: ${this.mean(activePowers).toFixed(0)} W`);
-          console.log(`   - Energia total período: ${energiaTotal.toFixed(4)} kWh`);
+          // LOG compacto com tópico MQTT
+          const potenciaMedia = Math.round(this.mean(activePowers));
+          console.log(
+            `✅ [INVERSOR] ${topicoMqtt || 'N/A'} | ` +
+            `${energiaTotal.toFixed(4)}kWh | ` +
+            `${potenciaMedia}W | ` +
+            `${activePowers.length}x leituras`
+          );
         }
       }
 
