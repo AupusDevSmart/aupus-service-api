@@ -70,30 +70,21 @@ export class UsuariosService {
     }
 
     // ============================================================================
-    // FILTRO ESPECIAL PARA PROPRIETÁRIOS
+    // FILTRO ESPECIAL PARA PROPRIETÁRIOS - OTIMIZADO
     // Se o usuário logado é proprietário, mostrar apenas operadores que ele criou
     // ============================================================================
     if (requestingUserId) {
-      // Buscar usuário logado (com role legacy)
-      const requestingUser = await this.prisma.usuarios.findFirst({
-        where: { id: requestingUserId, deleted_at: null }
-      });
-
-      // Buscar role do usuário no sistema Spatie
-      const requestingUserRole = await this.prisma.model_has_roles.findFirst({
-        where: {
-          model_id: requestingUserId,
-          model_type: 'App\\Models\\User'
-        },
-        include: {
-          roles: true
+      // ✅ OTIMIZAÇÃO: Buscar dados do usuário em UMA query com JOIN
+      const requestingUserData = await this.prisma.usuarios.findFirst({
+        where: { id: requestingUserId, deleted_at: null },
+        select: {
+          role: true, // role legacy
         }
       });
 
-      // Verificar se é proprietário (em qualquer um dos sistemas)
-      const isProprietario =
-        requestingUserRole?.roles?.name === 'propietario' ||
-        requestingUser?.role === 'proprietario';
+      // Verificar se é proprietário APENAS pela coluna role (mais rápido)
+      const isProprietario = requestingUserData?.role === 'proprietario' ||
+                            requestingUserData?.role === 'propietario';
 
       if (isProprietario) {
         // Proprietário vê apenas operadores criados por ele + ele mesmo
@@ -159,20 +150,34 @@ export class UsuariosService {
     }
 
     try {
+      const startTime = Date.now();
+
       // Buscar usuários e count separadamente para reduzir carga
+      this.logger.log(`⏱️ [FINDALL] Iniciando query de usuários...`);
       const usuarios = await this.prisma.usuarios.findMany({
         where,
         orderBy: { created_at: 'desc' },
         skip,
         take: limit,
       });
+      const queryTime = Date.now() - startTime;
+      this.logger.log(`✅ [FINDALL] Query completada em ${queryTime}ms - ${usuarios.length} usuários encontrados`);
 
+      const countStart = Date.now();
       const total = await this.prisma.usuarios.count({ where });
+      const countTime = Date.now() - countStart;
+      this.logger.log(`✅ [FINDALL] Count completado em ${countTime}ms - Total: ${total}`);
 
       // Mapear para DTO compatível de forma mais eficiente
+      const mapStart = Date.now();
       const usuariosFormatados = await Promise.all(
         usuarios.map(usuario => this.mapToUsuarioResponseDtoOptimized(usuario))
       );
+      const mapTime = Date.now() - mapStart;
+      this.logger.log(`✅ [FINDALL] Mapeamento completado em ${mapTime}ms`);
+
+      const totalTime = Date.now() - startTime;
+      this.logger.log(`🎯 [FINDALL] TEMPO TOTAL: ${totalTime}ms`);
 
       return {
         data: usuariosFormatados,
@@ -184,7 +189,7 @@ export class UsuariosService {
         },
       };
     } catch (error) {
-      console.error('Erro ao buscar usuários:', error);
+      console.error('❌ Erro ao buscar usuários:', error);
       throw new BadRequestException('Erro ao buscar usuários');
     }
   }
@@ -1637,7 +1642,7 @@ export class UsuariosService {
         manager_id: usuario.manager_id,
         avatar_url: usuario.avatar_url, // ← ADICIONADO
         all_permissions: allPermissions, // Array de objetos com id, name, guard_name, source
-        roles: userPermissions.role ? [userPermissions.role.name] : [],
+        roles: userPermissions.role ? [userPermissions.role] : [], // ✅ CORRIGIDO: retornar objeto completo
         role_details: userPermissions.role || undefined,
         created_at: usuario.created_at,
         updated_at: usuario.updated_at,
