@@ -1,0 +1,44 @@
+[
+  {
+    "id": "cmhti694x000m2foc0badjjy3",
+    "os_id": "cmhti68oa000k2foc1e9xmita",
+    "descricao": "fesfsefes",
+    "quantidade": 1,
+    "confirmada": false,
+    "disponivel": true,
+    "utilizada": false,
+    "condicao_antes": null,
+    "condicao_depois": null,
+    "observacoes": null,
+    "created_at": "2025-11-10T18:55:53.793Z",
+    "updated_at": "2025-11-10T18:55:53.793Z"
+  },
+  {
+    "id": "cmhtj7s2z000v2fcwu4b1ans0",
+    "os_id": "cmhtj7rmv000t2fcw85lwp0m4",
+    "descricao": "aaaaaaaa",
+    "quantidade": 1,
+    "confirmada": false,
+    "disponivel": true,
+    "utilizada": false,
+    "condicao_antes": null,
+    "condicao_depois": null,
+    "observacoes": null,
+    "created_at": "2025-11-10T19:25:04.619Z",
+    "updated_at": "2025-11-10T19:25:04.619Z"
+  },
+  {
+    "id": "cmj0imtz1001r2fr0ph5329t2",
+    "os_id": "cmj0imt2o001m2fr05degyrsp",
+    "descricao": "teste",
+    "quantidade": 2,
+    "confirmada": false,
+    "disponivel": true,
+    "utilizada": true,
+    "condicao_antes": null,
+    "condicao_depois": "Boa",
+    "observacoes": "",
+    "created_at": "2025-12-10T21:22:52.861Z",
+    "updated_at": "2025-12-11T12:08:48.648Z"
+  }
+]

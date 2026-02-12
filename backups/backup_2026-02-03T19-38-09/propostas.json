@@ -1,0 +1,704 @@
+[
+  {
+    "id": "b3222c68-fc26-4540-9ba3-6ed03ccd6478",
+    "numero_proposta": "2025/009",
+    "data_proposta": "2025-08-29T00:00:00.000Z",
+    "nome_cliente": "Arthur",
+    "usuario_id": "01K2CPBYE07B3HWW0CZHHB3ZCR",
+    "recorrencia": "3%",
+    "desconto_tarifa": "20%",
+    "desconto_bandeira": "20%",
+    "observacoes": null,
+    "beneficios": [],
+    "created_at": "2025-08-29T19:26:31.000Z",
+    "updated_at": "2025-08-29T19:29:45.000Z",
+    "deleted_at": null,
+    "unidades_consumidoras": [
+      {
+        "numero_unidade": 324234,
+        "apelido": "Centro",
+        "ligacao": "BIFÁSICA",
+        "distribuidora": "EQUATORIAL GO",
+        "consumo_medio": 5500,
+        "status": "Aguardando"
+      }
+    ],
+    "documentacao": {
+      "324234": {
+        "tipoDocumento": "CPF",
+        "nomeRepresentante": null,
+        "cpf": null,
+        "documentoPessoal": null,
+        "razaoSocial": null,
+        "cnpj": null,
+        "contratoSocial": null,
+        "documentoPessoalRepresentante": null,
+        "enderecoUC": null,
+        "isArrendamento": false,
+        "contratoLocacao": null,
+        "enderecoRepresentante": null,
+        "termoAdesao": null
+      }
+    },
+    "inflacao": "2",
+    "tarifa_tributos": "0.98",
+    "consultor_id": "01K3NW8Q4M6NDEF9XX73TMFGC7"
+  },
+  {
+    "id": "d3710d70-0530-42e3-9ca7-1c34f8961112",
+    "numero_proposta": "2025/001",
+    "data_proposta": "2025-08-29T00:00:00.000Z",
+    "nome_cliente": "TESTE",
+    "usuario_id": "01K2CPBYE07B3HWW0CZHHB3ZCR",
+    "recorrencia": "3%",
+    "desconto_tarifa": "20%",
+    "desconto_bandeira": "20%",
+    "observacoes": null,
+    "beneficios": [],
+    "created_at": "2025-08-29T14:08:43.000Z",
+    "updated_at": "2025-08-29T18:04:50.000Z",
+    "deleted_at": null,
+    "unidades_consumidoras": [
+      {
+        "numero_unidade": 12334406,
+        "apelido": "TS - EMPRESA2",
+        "ligacao": "BIFÁSICA",
+        "distribuidora": "EQUATORIAL GO",
+        "consumo_medio": 4564,
+        "status": "Aguardando"
+      },
+      {
+        "numero_unidade": 654654,
+        "apelido": "TS - CASA",
+        "ligacao": "BIFÁSICA",
+        "distribuidora": "EQUATORIAL GO",
+        "consumo_medio": 5454,
+        "status": "Aguardando"
+      }
+    ],
+    "documentacao": {
+      "654654": {
+        "tipoDocumento": "CPF",
+        "nomeRepresentante": null,
+        "cpf": null,
+        "documentoPessoal": null,
+        "razaoSocial": null,
+        "cnpj": null,
+        "contratoSocial": null,
+        "documentoPessoalRepresentante": null,
+        "enderecoUC": null,
+        "isArrendamento": false,
+        "contratoLocacao": null,
+        "enderecoRepresentante": null,
+        "termoAdesao": null
+      },
+      "12334406": {
+        "tipoDocumento": "CPF",
+        "nomeRepresentante": null,
+        "cpf": null,
+        "documentoPessoal": null,
+        "razaoSocial": null,
+        "cnpj": null,
+        "contratoSocial": null,
+        "documentoPessoalRepresentante": null,
+        "enderecoUC": null,
+        "isArrendamento": false,
+        "contratoLocacao": null,
+        "enderecoRepresentante": null,
+        "termoAdesao": null
+      }
+    },
+    "inflacao": "2",
+    "tarifa_tributos": "0.98",
+    "consultor_id": null
+  },
+  {
+    "id": "d18465d7-8329-4baf-b9f9-b38e3823dfac",
+    "numero_proposta": "2025/002",
+    "data_proposta": "2025-08-29T00:00:00.000Z",
+    "nome_cliente": "TESTE",
+    "usuario_id": "01K2CPBYE07B3HWW0CZHHB3ZCR",
+    "recorrencia": "3%",
+    "desconto_tarifa": "20%",
+    "desconto_bandeira": "20%",
+    "observacoes": "Proposta criada via sistema web.",
+    "beneficios": [
+      "Os benefícios economicos foram calculados com base nas tarifas de energia, sem impostos",
+      "A titularidade da fatura será transferida para o Consorcio Clube Aupus",
+      "A Aupus Energia fornecerá consultoria energética para o condomínio",
+      "Todo o processo será conduzido pela Aupus Energia, não se preocupe",
+      "Você irá pagar DOIS boletos, sendo um boleto mínimo para Equatorial e o outro sendo Aluguel da Usina para Aupus Energia",
+      "Contamos com uma moderna plataforma para te oferecer uma experiencia única!",
+      "A proposta se aplica para todos os condominos que tiverem interesse"
+    ],
+    "created_at": "2025-08-29T18:07:12.000Z",
+    "updated_at": "2025-08-29T18:07:12.000Z",
+    "deleted_at": null,
+    "unidades_consumidoras": [
+      {
+        "numero_unidade": 4323423,
+        "apelido": "432432",
+        "ligacao": "TRIFÁSICA",
+        "distribuidora": "EQUATORIAL GO",
+        "consumo_medio": 54543,
+        "status": "Aguardando"
+      }
+    ],
+    "documentacao": null,
+    "inflacao": "2",
+    "tarifa_tributos": "0.98",
+    "consultor_id": null
+  },
+  {
+    "id": "049bbd2a-d8cf-4b5e-9811-1d7d936f1e93",
+    "numero_proposta": "2025/003",
+    "data_proposta": "2025-08-29T00:00:00.000Z",
+    "nome_cliente": "TESTE",
+    "usuario_id": "01K2CPBYE07B3HWW0CZHHB3ZCR",
+    "recorrencia": "3%",
+    "desconto_tarifa": "20%",
+    "desconto_bandeira": "20%",
+    "observacoes": null,
+    "beneficios": [],
+    "created_at": "2025-08-29T18:19:17.000Z",
+    "updated_at": "2025-08-29T18:44:11.000Z",
+    "deleted_at": null,
+    "unidades_consumidoras": [
+      {
+        "numero_unidade": 5435345,
+        "apelido": "TS - EMPRESA",
+        "ligacao": "TRIFÁSICA",
+        "distribuidora": "EQUATORIAL GO",
+        "consumo_medio": 500,
+        "status": "Aguardando"
+      }
+    ],
+    "documentacao": {
+      "5435345": {
+        "tipoDocumento": "CPF",
+        "nomeRepresentante": null,
+        "cpf": null,
+        "documentoPessoal": null,
+        "razaoSocial": null,
+        "cnpj": null,
+        "contratoSocial": null,
+        "documentoPessoalRepresentante": null,
+        "enderecoUC": null,
+        "isArrendamento": false,
+        "contratoLocacao": null,
+        "enderecoRepresentante": null,
+        "termoAdesao": null
+      }
+    },
+    "inflacao": "2",
+    "tarifa_tributos": "0.98",
+    "consultor_id": "01K3NW8NHDVCYDG09AAWSHRZC8"
+  },
+  {
+    "id": "8778111e-ce5f-4141-b18e-413ee09cb309",
+    "numero_proposta": "2025/004",
+    "data_proposta": "2025-08-29T00:00:00.000Z",
+    "nome_cliente": "WP Cirurgia Plastica",
+    "usuario_id": "01K2CPBYE07B3HWW0CZHHB3ZCR",
+    "recorrencia": "3%",
+    "desconto_tarifa": "20%",
+    "desconto_bandeira": "20%",
+    "observacoes": "Proposta criada via sistema web.",
+    "beneficios": [
+      "Os benefícios economicos foram calculados com base nas tarifas de energia, sem impostos",
+      "A titularidade da fatura será transferida para o Consorcio Clube Aupus",
+      "A Aupus Energia fornecerá consultoria energética para o condomínio",
+      "Todo o processo será conduzido pela Aupus Energia, não se preocupe",
+      "Você irá pagar DOIS boletos, sendo um boleto mínimo para Equatorial e o outro sendo Aluguel da Usina para Aupus Energia",
+      "Contamos com uma moderna plataforma para te oferecer uma experiencia única!",
+      "A proposta se aplica para todos os condominos que tiverem interesse"
+    ],
+    "created_at": "2025-08-29T18:44:40.000Z",
+    "updated_at": "2025-08-29T18:44:40.000Z",
+    "deleted_at": null,
+    "unidades_consumidoras": [
+      {
+        "numero_unidade": null,
+        "apelido": "Centro",
+        "ligacao": "TRIFÁSICA",
+        "distribuidora": "EQUATORIAL GO",
+        "consumo_medio": 5454,
+        "status": "Aguardando"
+      }
+    ],
+    "documentacao": null,
+    "inflacao": "2",
+    "tarifa_tributos": "0.98",
+    "consultor_id": null
+  },
+  {
+    "id": "9561e399-4801-4d6e-8016-f005c6af4267",
+    "numero_proposta": "2025/005",
+    "data_proposta": "2025-08-29T00:00:00.000Z",
+    "nome_cliente": "fdfsfsd",
+    "usuario_id": "01K2CPBYE07B3HWW0CZHHB3ZCR",
+    "recorrencia": "3%",
+    "desconto_tarifa": "20%",
+    "desconto_bandeira": "20%",
+    "observacoes": "Proposta criada via sistema web.",
+    "beneficios": [
+      "Os benefícios economicos foram calculados com base nas tarifas de energia, sem impostos",
+      "A titularidade da fatura será transferida para o Consorcio Clube Aupus",
+      "A Aupus Energia fornecerá consultoria energética para o condomínio",
+      "Todo o processo será conduzido pela Aupus Energia, não se preocupe",
+      "Você irá pagar DOIS boletos, sendo um boleto mínimo para Equatorial e o outro sendo Aluguel da Usina para Aupus Energia",
+      "Contamos com uma moderna plataforma para te oferecer uma experiencia única!",
+      "A proposta se aplica para todos os condominos que tiverem interesse"
+    ],
+    "created_at": "2025-08-29T18:45:56.000Z",
+    "updated_at": "2025-08-29T18:45:56.000Z",
+    "deleted_at": null,
+    "unidades_consumidoras": [
+      {
+        "numero_unidade": 4543534,
+        "apelido": "fgfd",
+        "ligacao": "MONOFÁSICA",
+        "distribuidora": "EQUATORIAL GO",
+        "consumo_medio": 543345,
+        "status": "Aguardando"
+      }
+    ],
+    "documentacao": null,
+    "inflacao": "2",
+    "tarifa_tributos": "0.98",
+    "consultor_id": null
+  },
+  {
+    "id": "0863ed40-24af-4fa9-806b-b46b2814d00f",
+    "numero_proposta": "2025/008",
+    "data_proposta": "2025-08-29T00:00:00.000Z",
+    "nome_cliente": "fsdgd",
+    "usuario_id": "01K2CPBYE07B3HWW0CZHHB3ZCR",
+    "recorrencia": "3%",
+    "desconto_tarifa": "20%",
+    "desconto_bandeira": "20%",
+    "observacoes": null,
+    "beneficios": [],
+    "created_at": "2025-08-29T19:12:44.000Z",
+    "updated_at": "2025-08-29T19:31:09.000Z",
+    "deleted_at": null,
+    "unidades_consumidoras": [
+      {
+        "numero_unidade": 35345,
+        "apelido": "fdgdfg",
+        "ligacao": "BIFÁSICA",
+        "distribuidora": "NEOENERGIA",
+        "consumo_medio": 5656,
+        "status": "Aguardando"
+      }
+    ],
+    "documentacao": {
+      "35345": {
+        "tipoDocumento": "CPF",
+        "nomeRepresentante": null,
+        "cpf": null,
+        "documentoPessoal": null,
+        "razaoSocial": null,
+        "cnpj": null,
+        "contratoSocial": null,
+        "documentoPessoalRepresentante": null,
+        "enderecoUC": null,
+        "isArrendamento": false,
+        "contratoLocacao": null,
+        "enderecoRepresentante": null,
+        "termoAdesao": null
+      }
+    },
+    "inflacao": "2",
+    "tarifa_tributos": "0.98",
+    "consultor_id": "01K3RZ36QCJG099FRW6A3PYRW6"
+  },
+  {
+    "id": "3aff95c1-e8af-4acd-ad68-ea8969ec1240",
+    "numero_proposta": "2025/007",
+    "data_proposta": "2025-08-29T00:00:00.000Z",
+    "nome_cliente": "sfgdds",
+    "usuario_id": "01K2CPBYE07B3HWW0CZHHB3ZCR",
+    "recorrencia": "3%",
+    "desconto_tarifa": "20%",
+    "desconto_bandeira": "20%",
+    "observacoes": null,
+    "beneficios": [],
+    "created_at": "2025-08-29T19:11:18.000Z",
+    "updated_at": "2025-08-29T19:35:42.000Z",
+    "deleted_at": null,
+    "unidades_consumidoras": [
+      {
+        "numero_unidade": 545454,
+        "apelido": "gfgfd",
+        "ligacao": "BIFÁSICA",
+        "distribuidora": "EQUATORIAL GO",
+        "consumo_medio": 4543,
+        "status": "Aguardando"
+      }
+    ],
+    "documentacao": {
+      "545454": {
+        "tipoDocumento": "CPF",
+        "nomeRepresentante": null,
+        "cpf": null,
+        "documentoPessoal": null,
+        "razaoSocial": null,
+        "cnpj": null,
+        "contratoSocial": null,
+        "documentoPessoalRepresentante": null,
+        "enderecoUC": null,
+        "isArrendamento": false,
+        "contratoLocacao": null,
+        "enderecoRepresentante": null,
+        "termoAdesao": null
+      }
+    },
+    "inflacao": "2",
+    "tarifa_tributos": "0.98",
+    "consultor_id": "01K3RAE45EX8VQTA4A5YDJWMSC"
+  },
+  {
+    "id": "328d1ebd-6437-4c07-b06a-5c20376ca68c",
+    "numero_proposta": "2025/010",
+    "data_proposta": "2025-08-29T00:00:00.000Z",
+    "nome_cliente": "TESTE",
+    "usuario_id": "01K2CPBYE07B3HWW0CZHHB3ZCR",
+    "recorrencia": "3%",
+    "desconto_tarifa": "20%",
+    "desconto_bandeira": "20%",
+    "observacoes": "Proposta criada via sistema web.",
+    "beneficios": [
+      "Os benefícios economicos foram calculados com base nas tarifas de energia, sem impostos",
+      "A titularidade da fatura será transferida para o Consorcio Clube Aupus",
+      "A Aupus Energia fornecerá consultoria energética para o condomínio",
+      "Todo o processo será conduzido pela Aupus Energia, não se preocupe",
+      "Você irá pagar DOIS boletos, sendo um boleto mínimo para Equatorial e o outro sendo Aluguel da Usina para Aupus Energia",
+      "Contamos com uma moderna plataforma para te oferecer uma experiencia única!",
+      "A proposta se aplica para todos os condominos que tiverem interesse"
+    ],
+    "created_at": "2025-08-29T19:50:20.000Z",
+    "updated_at": "2025-08-29T19:50:20.000Z",
+    "deleted_at": null,
+    "unidades_consumidoras": [
+      {
+        "numero_unidade": 5435345,
+        "apelido": "Centro",
+        "ligacao": "TRIFÁSICA",
+        "distribuidora": "EQUATORIAL GO",
+        "consumo_medio": 3434,
+        "status": "Aguardando"
+      }
+    ],
+    "documentacao": null,
+    "inflacao": "2",
+    "tarifa_tributos": "0.98",
+    "consultor_id": null
+  },
+  {
+    "id": "d7f64273-465a-4e83-be20-677b9f10424d",
+    "numero_proposta": "2025/006",
+    "data_proposta": "2025-08-29T00:00:00.000Z",
+    "nome_cliente": "TESTE",
+    "usuario_id": "01K2CPBYE07B3HWW0CZHHB3ZCR",
+    "recorrencia": "3%",
+    "desconto_tarifa": "20%",
+    "desconto_bandeira": "20%",
+    "observacoes": null,
+    "beneficios": [],
+    "created_at": "2025-08-29T19:01:53.000Z",
+    "updated_at": "2025-09-01T12:21:38.000Z",
+    "deleted_at": null,
+    "unidades_consumidoras": [
+      {
+        "numero_unidade": 546546,
+        "apelido": "dffdss",
+        "ligacao": "TRIFÁSICA",
+        "distribuidora": "EQUATORIAL GO",
+        "consumo_medio": 55004,
+        "status": "Aguardando"
+      }
+    ],
+    "documentacao": {
+      "546546": {
+        "tipoDocumento": "CPF",
+        "nomeRepresentante": null,
+        "cpf": null,
+        "documentoPessoal": null,
+        "razaoSocial": null,
+        "cnpj": null,
+        "contratoSocial": null,
+        "documentoPessoalRepresentante": null,
+        "enderecoUC": null,
+        "isArrendamento": false,
+        "contratoLocacao": null,
+        "enderecoRepresentante": null,
+        "termoAdesao": null
+      }
+    },
+    "inflacao": "2",
+    "tarifa_tributos": "0.98",
+    "consultor_id": "01K3RZ12YHHFBWBWKNBDDM6A08"
+  },
+  {
+    "id": "94f36de5-7e15-4b33-8e67-e17ed7979c25",
+    "numero_proposta": "2025/011",
+    "data_proposta": "2025-09-01T00:00:00.000Z",
+    "nome_cliente": "ORLA NUTRIEX",
+    "usuario_id": "01K2CPBYE07B3HWW0CZHHB3ZCR",
+    "recorrencia": "3%",
+    "desconto_tarifa": "20%",
+    "desconto_bandeira": "20%",
+    "observacoes": "Proposta criada via sistema web.",
+    "beneficios": [
+      "Os benefícios economicos foram calculados com base nas tarifas de energia, sem impostos",
+      "A titularidade da fatura será transferida para o Consorcio Clube Aupus",
+      "Todo o processo será conduzido pela Aupus Energia, não se preocupe",
+      "Contamos com uma moderna plataforma para te oferecer uma experiencia única!",
+      "A proposta se aplica para todos os condominos que tiverem interesse"
+    ],
+    "created_at": "2025-09-01T12:35:06.000Z",
+    "updated_at": "2025-09-01T12:35:06.000Z",
+    "deleted_at": null,
+    "unidades_consumidoras": [
+      {
+        "numero_unidade": 5435345,
+        "apelido": "Centro",
+        "ligacao": "TRIFÁSICA",
+        "distribuidora": "EQUATORIAL GO",
+        "consumo_medio": 544,
+        "status": "Aguardando"
+      }
+    ],
+    "documentacao": null,
+    "inflacao": "2",
+    "tarifa_tributos": "0.98",
+    "consultor_id": null
+  },
+  {
+    "id": "62bf593e-ca89-4413-a0cb-fce6dd0b246e",
+    "numero_proposta": "2025/012",
+    "data_proposta": "2025-09-01T00:00:00.000Z",
+    "nome_cliente": "ORLA NUTRIEX",
+    "usuario_id": "01K2CPBYE07B3HWW0CZHHB3ZCR",
+    "recorrencia": "3%",
+    "desconto_tarifa": "20%",
+    "desconto_bandeira": "20%",
+    "observacoes": "Proposta criada via sistema web.",
+    "beneficios": [
+      "Os benefícios economicos foram calculados com base nas tarifas de energia, sem impostos",
+      "A titularidade da fatura será transferida para o Consorcio Clube Aupus",
+      "Todo o processo será conduzido pela Aupus Energia, não se preocupe",
+      "Contamos com uma moderna plataforma para te oferecer uma experiencia única!",
+      "Você irá pagar DOIS boletos, sendo um boleto mínimo para Equatorial e o outro sendo Aluguel da Usina para Aupus Energia",
+      "Contamos com uma moderna plataforma para te oferecer uma experiencia única!",
+      "A proposta se aplica para todos os condominos que tiverem interesse"
+    ],
+    "created_at": "2025-09-01T12:40:57.000Z",
+    "updated_at": "2025-09-01T12:40:57.000Z",
+    "deleted_at": null,
+    "unidades_consumidoras": [
+      {
+        "numero_unidade": 545435345,
+        "apelido": "MARISTA",
+        "ligacao": "BIFÁSICA",
+        "distribuidora": "EQUATORIAL GO",
+        "consumo_medio": 4000,
+        "status": "Aguardando"
+      },
+      {
+        "numero_unidade": 6565656,
+        "apelido": "EBM",
+        "ligacao": "TRIFÁSICA",
+        "distribuidora": "EQUATORIAL GO",
+        "consumo_medio": 2000,
+        "status": "Aguardando"
+      }
+    ],
+    "documentacao": null,
+    "inflacao": "2",
+    "tarifa_tributos": "0.98",
+    "consultor_id": "01K3MKDVZHG6MNPCY2N7FRCZ26"
+  },
+  {
+    "id": "e6c003ad-422a-425f-8148-0ea52f0d3d03",
+    "numero_proposta": "2025/013",
+    "data_proposta": "2025-09-01T00:00:00.000Z",
+    "nome_cliente": "TESTE",
+    "usuario_id": "01K2CPBYE07B3HWW0CZHHB3ZCR",
+    "recorrencia": "3%",
+    "desconto_tarifa": "20.02%",
+    "desconto_bandeira": "20.02%",
+    "observacoes": "Proposta criada via sistema web.",
+    "beneficios": [
+      "Os benefícios economicos foram calculados com base nas tarifas de energia, com impostos",
+      "A titularidade da fatura será transferida para o Consorcio Clube Aupus",
+      "Contamos com uma moderna plataforma para te oferecer uma experiencia única!",
+      "Contamos com uma moderna plataforma para te oferecer uma experiencia única!"
+    ],
+    "created_at": "2025-09-01T18:04:36.000Z",
+    "updated_at": "2025-09-01T18:04:36.000Z",
+    "deleted_at": null,
+    "unidades_consumidoras": [
+      {
+        "numero_unidade": 55555,
+        "apelido": "fds",
+        "ligacao": "BIFÁSICA",
+        "distribuidora": "EQUATORIAL GO",
+        "consumo_medio": 566,
+        "status": "Aguardando"
+      }
+    ],
+    "documentacao": null,
+    "inflacao": "2",
+    "tarifa_tributos": "0.98",
+    "consultor_id": "01K3RAE45EX8VQTA4A5YDJWMSC"
+  },
+  {
+    "id": "dc837e5f-72e7-48e8-9d69-321b22901dea",
+    "numero_proposta": "2025/014",
+    "data_proposta": "2025-09-01T00:00:00.000Z",
+    "nome_cliente": "TESTE3",
+    "usuario_id": "01K2CPBYE07B3HWW0CZHHB3ZCR",
+    "recorrencia": "3%",
+    "desconto_tarifa": "22%",
+    "desconto_bandeira": "22%",
+    "observacoes": "Proposta criada via sistema web.",
+    "beneficios": [
+      "Os benefícios economicos foram calculados com base nas tarifas de energia, com impostos",
+      "A titularidade da fatura será transferida para o Consorcio Clube Aupus",
+      "Contamos com uma moderna plataforma para te oferecer uma experiencia única!",
+      "Contamos com uma moderna plataforma para te oferecer uma experiencia única!"
+    ],
+    "created_at": "2025-09-01T18:14:32.000Z",
+    "updated_at": "2025-09-01T18:14:32.000Z",
+    "deleted_at": null,
+    "unidades_consumidoras": [
+      {
+        "numero_unidade": 54534,
+        "apelido": "TS - EMPRESA",
+        "ligacao": "BIFÁSICA",
+        "distribuidora": "EQUATORIAL GO",
+        "consumo_medio": 4343,
+        "status": "Aguardando"
+      }
+    ],
+    "documentacao": null,
+    "inflacao": "2",
+    "tarifa_tributos": "0.98",
+    "consultor_id": "01K3RAE45EX8VQTA4A5YDJWMSC"
+  },
+  {
+    "id": "544b2c61-34e4-4b4c-95d6-9a81dbfc388e",
+    "numero_proposta": "2025/016",
+    "data_proposta": "2025-09-02T00:00:00.000Z",
+    "nome_cliente": "Teste",
+    "usuario_id": "01K2CPBYE07B3HWW0CZHHB3ZCR",
+    "recorrencia": "0%",
+    "desconto_tarifa": "20%",
+    "desconto_bandeira": "20%",
+    "observacoes": "Proposta criada via sistema web.",
+    "beneficios": [
+      "Os benefícios economicos foram calculados com base nas tarifas de energia, com impostos",
+      "A titularidade da fatura será transferida para o Consorcio Clube Aupus",
+      "Contamos com uma moderna plataforma para te oferecer uma experiencia única!",
+      "Contamos com uma moderna plataforma para te oferecer uma experiencia única!"
+    ],
+    "created_at": "2025-09-02T18:15:08.000Z",
+    "updated_at": "2025-09-02T18:15:08.000Z",
+    "deleted_at": null,
+    "unidades_consumidoras": [
+      {
+        "numero_unidade": 12334406,
+        "apelido": "Centro",
+        "ligacao": "TRIFÁSICA",
+        "distribuidora": "EQUATORIAL GO",
+        "consumo_medio": 54543,
+        "status": "Aguardando"
+      }
+    ],
+    "documentacao": null,
+    "inflacao": "2",
+    "tarifa_tributos": "0.98",
+    "consultor_id": null
+  },
+  {
+    "id": "52ffd328-2e0b-49fe-8a1a-b080b01a3990",
+    "numero_proposta": "2025/017",
+    "data_proposta": "2025-09-02T00:00:00.000Z",
+    "nome_cliente": "OLI ANTONIO FIORESE",
+    "usuario_id": "01K2CPBYE07B3HWW0CZHHB3ZCR",
+    "recorrencia": "0%",
+    "desconto_tarifa": "20%",
+    "desconto_bandeira": "20%",
+    "observacoes": "Proposta criada via sistema web.",
+    "beneficios": [
+      "Os benefícios economicos foram calculados com base nas tarifas de energia, com impostos",
+      "A titularidade da fatura será transferida para o Consorcio Clube Aupus",
+      "Contamos com uma moderna plataforma para te oferecer uma experiencia única!",
+      "Contamos com uma moderna plataforma para te oferecer uma experiencia única!"
+    ],
+    "created_at": "2025-09-02T18:17:54.000Z",
+    "updated_at": "2025-09-02T18:17:54.000Z",
+    "deleted_at": null,
+    "unidades_consumidoras": [
+      {
+        "numero_unidade": 610102709,
+        "apelido": "FAZENDA JAPONESA",
+        "ligacao": "MONOFÁSICA",
+        "distribuidora": "EQUATORIAL GO",
+        "consumo_medio": 2300,
+        "status": "Aguardando"
+      }
+    ],
+    "documentacao": null,
+    "inflacao": "2",
+    "tarifa_tributos": "0.98",
+    "consultor_id": null
+  },
+  {
+    "id": "31a93ed2-8736-4080-9804-7b5e52d3f072",
+    "numero_proposta": "2025/015",
+    "data_proposta": "2025-09-01T00:00:00.000Z",
+    "nome_cliente": "teste5",
+    "usuario_id": "01K2CPBYE07B3HWW0CZHHB3ZCR",
+    "recorrencia": "3%",
+    "desconto_tarifa": "20.5%",
+    "desconto_bandeira": "22%",
+    "observacoes": null,
+    "beneficios": [],
+    "created_at": "2025-09-01T18:23:28.000Z",
+    "updated_at": "2025-09-02T12:34:22.000Z",
+    "deleted_at": null,
+    "unidades_consumidoras": [
+      {
+        "numero_unidade": 453543,
+        "apelido": "Centro2",
+        "ligacao": "TRIFÁSICA",
+        "distribuidora": "EQUATORIAL GO",
+        "consumo_medio": 4554,
+        "status": "Fechada"
+      }
+    ],
+    "documentacao": {
+      "453543": {
+        "tipoDocumento": "CPF",
+        "nomeRepresentante": null,
+        "cpf": null,
+        "documentoPessoal": null,
+        "razaoSocial": null,
+        "cnpj": null,
+        "contratoSocial": null,
+        "documentoPessoalRepresentante": null,
+        "enderecoUC": null,
+        "isArrendamento": false,
+        "contratoLocacao": null,
+        "enderecoRepresentante": null,
+        "termoAdesao": null
+      }
+    },
+    "inflacao": "2",
+    "tarifa_tributos": "0.98",
+    "consultor_id": "01K3RAE45EX8VQTA4A5YDJWMSC"
+  }
+]

@@ -1,0 +1,70 @@
+[
+  {
+    "id": "fa2c0c2b861e4b5a8e87e33825",
+    "nome": "Transformador de Potência"
+  },
+  {
+    "id": "8645979274994b388685ba4cfa",
+    "nome": "Transformador de Potencial (TP)"
+  },
+  {
+    "id": "b96542ed949d4980b2706b001f",
+    "nome": "Transformador de Corrente (TC)"
+  },
+  {
+    "id": "dca628d31635437e957f2598a9",
+    "nome": "Banco Capacitor"
+  },
+  {
+    "id": "aa949f74ff6247949a9b9bdb2e",
+    "nome": "Disjuntor MT"
+  },
+  {
+    "id": "502e36ab06f54aeface2637156",
+    "nome": "Disjuntor BT"
+  },
+  {
+    "id": "3605964d663b40d986df754ced",
+    "nome": "Chave"
+  },
+  {
+    "id": "c5be08ecc2304fcd8a9bbb2fee",
+    "nome": "Pivô"
+  },
+  {
+    "id": "aadc85d440f24829aa59911725",
+    "nome": "Motor Elétrico"
+  },
+  {
+    "id": "21ff276d901d417b9fbaa54357",
+    "nome": "Módulos PV"
+  },
+  {
+    "id": "9956da3a54a240398df9a75e06",
+    "nome": "Power Meter (PM)"
+  },
+  {
+    "id": "1a023241b14747f3ba18818627",
+    "nome": "Inversor PV"
+  },
+  {
+    "id": "e042b107f3a744e6b9be75e93a",
+    "nome": "Medidor SSU"
+  },
+  {
+    "id": "fc7b9f5e1a9c44beaef8b3de02",
+    "nome": "Relê Proteção"
+  },
+  {
+    "id": "76fb81b323cb4b79a0d61a1d82",
+    "nome": "Inversor Frequência"
+  },
+  {
+    "id": "6ecd1c4752f347a38de6aa4747",
+    "nome": "SoftStarter"
+  },
+  {
+    "id": "f668041b813c41758f1d352597",
+    "nome": "RTU"
+  }
+]

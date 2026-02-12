@@ -1,0 +1,62 @@
+[
+  {
+    "id": "cmhti69d5000n2foculwhd5vx",
+    "os_id": "cmhti68oa000k2foc1e9xmita",
+    "nome": "fsefsefsefse",
+    "especialidade": "Técnico Mecânico",
+    "horas_estimadas": "8",
+    "horas_trabalhadas": null,
+    "custo_hora": "78",
+    "custo_total": "624",
+    "disponivel": true,
+    "presente": false,
+    "tecnico_id": null,
+    "created_at": "2025-11-10T18:55:54.089Z",
+    "updated_at": "2025-11-10T18:55:54.089Z"
+  },
+  {
+    "id": "cmhtj7sb3000w2fcw3k2z2t3x",
+    "os_id": "cmhtj7rmv000t2fcw85lwp0m4",
+    "nome": "aaaaaaaaaaa",
+    "especialidade": "Técnico Elétrico",
+    "horas_estimadas": "8",
+    "horas_trabalhadas": null,
+    "custo_hora": "54",
+    "custo_total": "432",
+    "disponivel": true,
+    "presente": false,
+    "tecnico_id": null,
+    "created_at": "2025-11-10T19:25:04.911Z",
+    "updated_at": "2025-11-10T19:25:04.911Z"
+  },
+  {
+    "id": "cmj0imu79001s2fr0rf3rylh1",
+    "os_id": "cmj0imt2o001m2fr05degyrsp",
+    "nome": "eu",
+    "especialidade": "Técnico Elétrico",
+    "horas_estimadas": "8",
+    "horas_trabalhadas": null,
+    "custo_hora": "7",
+    "custo_total": "56",
+    "disponivel": true,
+    "presente": false,
+    "tecnico_id": null,
+    "created_at": "2025-12-10T21:22:53.157Z",
+    "updated_at": "2025-12-10T21:22:53.157Z"
+  },
+  {
+    "id": "cmj0imu79001t2fr0eyt8t3mk",
+    "os_id": "cmj0imt2o001m2fr05degyrsp",
+    "nome": "art",
+    "especialidade": "Outros",
+    "horas_estimadas": "8",
+    "horas_trabalhadas": null,
+    "custo_hora": "6",
+    "custo_total": "48",
+    "disponivel": true,
+    "presente": false,
+    "tecnico_id": null,
+    "created_at": "2025-12-10T21:22:53.157Z",
+    "updated_at": "2025-12-10T21:22:53.157Z"
+  }
+]

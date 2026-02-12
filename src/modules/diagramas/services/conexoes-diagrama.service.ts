@@ -1,16 +1,17 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../../../shared/prisma/prisma.service';
-import { CreateConexaoDto, UpdateConexaoDto, CreateConexoesBulkDto } from '../dto/create-conexao.dto';
+import { CreateConexaoDto, CreateConexoesBulkDto } from '../dto/create-conexao.dto';
 
 @Injectable()
 export class ConexoesDiagramaService {
   constructor(private readonly prisma: PrismaService) {}
 
   /**
-   * Cria uma conexão entre dois equipamentos
+   * Cria uma conexão entre dois equipamentos (V2 - Simplificado)
+   * Sem customização visual - tudo usa padrão
    */
   async create(diagramaId: string, dto: CreateConexaoDto) {
-    const { origem, destino, visual, pontosIntermediarios, rotulo, ordem } = dto;
+    const { origem, destino } = dto;
 
     // 1. Verificar se o diagrama existe
     const diagrama = await this.prisma.diagramas_unitarios.findFirst({
@@ -60,22 +61,7 @@ export class ConexoesDiagramaService {
       throw new BadRequestException('Porta de destino inválida');
     }
 
-    // 5. Validar tipo de linha se fornecido
-    if (visual?.tipoLinha) {
-      const tiposValidos = ['solida', 'tracejada', 'pontilhada'];
-      if (!tiposValidos.includes(visual.tipoLinha)) {
-        throw new BadRequestException('Tipo de linha inválido');
-      }
-    }
-
-    // 6. Validar espessura se fornecida
-    if (visual?.espessura !== undefined) {
-      if (visual.espessura < 1 || visual.espessura > 10) {
-        throw new BadRequestException('Espessura deve estar entre 1 e 10');
-      }
-    }
-
-    // 7. Criar conexão
+    // 5. Criar conexão (sem campos de customização visual)
     const conexao = await this.prisma.equipamentos_conexoes.create({
       data: {
         diagrama_id: diagramaId,
@@ -83,12 +69,6 @@ export class ConexoesDiagramaService {
         porta_origem: origem.porta,
         equipamento_destino_id: destino.equipamentoId,
         porta_destino: destino.porta,
-        tipo_linha: visual?.tipoLinha || 'solida',
-        cor: visual?.cor,
-        espessura: visual?.espessura ?? 2,
-        pontos_intermediarios: pontosIntermediarios as any,
-        rotulo,
-        ordem,
       },
       include: {
         equipamento_origem: {
@@ -104,67 +84,14 @@ export class ConexoesDiagramaService {
   }
 
   /**
-   * Atualiza uma conexão
+   * @deprecated V2 - Não usar mais. Use PUT /diagramas/:id/layout
+   * Atualizar conexões individualmente não é eficiente.
+   * Use o salvamento atômico completo do layout.
    */
-  async update(
-    diagramaId: string,
-    conexaoId: string,
-    dto: UpdateConexaoDto,
-  ) {
-    const { visual, pontosIntermediarios, rotulo, ordem } = dto;
-
-    // 1. Verificar se a conexão existe e pertence ao diagrama
-    const conexao = await this.prisma.equipamentos_conexoes.findFirst({
-      where: {
-        id: conexaoId,
-        diagrama_id: diagramaId,
-        deleted_at: null,
-      },
-    });
-
-    if (!conexao) {
-      throw new NotFoundException(
-        'Conexão não encontrada ou não pertence ao diagrama',
-      );
-    }
-
-    // 2. Validar tipo de linha se fornecido
-    if (visual?.tipoLinha) {
-      const tiposValidos = ['solida', 'tracejada', 'pontilhada'];
-      if (!tiposValidos.includes(visual.tipoLinha)) {
-        throw new BadRequestException('Tipo de linha inválido');
-      }
-    }
-
-    // 3. Validar espessura se fornecida
-    if (visual?.espessura !== undefined) {
-      if (visual.espessura < 1 || visual.espessura > 10) {
-        throw new BadRequestException('Espessura deve estar entre 1 e 10');
-      }
-    }
-
-    // 4. Atualizar conexão
-    const conexaoAtualizada = await this.prisma.equipamentos_conexoes.update({
-      where: { id: conexaoId },
-      data: {
-        tipo_linha: visual?.tipoLinha,
-        cor: visual?.cor,
-        espessura: visual?.espessura,
-        pontos_intermediarios: pontosIntermediarios as any,
-        rotulo,
-        ordem,
-      },
-      include: {
-        equipamento_origem: {
-          select: { id: true, nome: true, tag: true },
-        },
-        equipamento_destino: {
-          select: { id: true, nome: true, tag: true },
-        },
-      },
-    });
-
-    return this.formatConexaoResponse(conexaoAtualizada);
+  async update(diagramaId: string, conexaoId: string, _dto: any) {
+    throw new BadRequestException(
+      'Endpoint descontinuado. Use PUT /diagramas/:id/layout para salvar o layout completo.'
+    );
   }
 
   /**
@@ -299,7 +226,7 @@ export class ConexoesDiagramaService {
   }
 
   /**
-   * Formata a resposta da conexão
+   * Formata a resposta da conexão (V2 - Simplificado)
    */
   private formatConexaoResponse(conexao: any) {
     return {
@@ -315,14 +242,6 @@ export class ConexoesDiagramaService {
         equipamento: conexao.equipamento_destino,
         porta: conexao.porta_destino,
       },
-      visual: {
-        tipoLinha: conexao.tipo_linha,
-        cor: conexao.cor,
-        espessura: conexao.espessura,
-      },
-      pontosIntermediarios: conexao.pontos_intermediarios,
-      rotulo: conexao.rotulo,
-      ordem: conexao.ordem,
       createdAt: conexao.created_at,
       updatedAt: conexao.updated_at,
     };

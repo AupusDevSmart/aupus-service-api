@@ -1,0 +1,26 @@
+[
+  {
+    "id": "cmhl10gd600002f9scnek0gva ",
+    "nome": "Equatorial",
+    "estado": "GO",
+    "data_inicio": "2025-11-04T00:00:00.000Z",
+    "data_validade": "2026-10-31T00:00:00.000Z",
+    "a4_verde_tusd_d": "0.9",
+    "a4_verde_tusd_p": "0.9",
+    "a4_verde_tusd_fp": "0.3",
+    "a4_verde_te_d": "0.5",
+    "a4_verde_te_p": "0.7",
+    "a4_verde_te_fp": "0.4",
+    "a3a_verde_tusd_d": null,
+    "a3a_verde_tusd_p": null,
+    "a3a_verde_tusd_fp": null,
+    "a3a_verde_te_d": null,
+    "a3a_verde_te_p": null,
+    "a3a_verde_te_fp": null,
+    "b_tusd_valor": null,
+    "b_te_valor": null,
+    "created_at": "2025-11-04T20:33:20.000Z",
+    "updated_at": "2025-11-04T22:19:37.000Z",
+    "deleted_at": null
+  }
+]

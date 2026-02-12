@@ -9,6 +9,7 @@ import {
   Query,
   HttpCode,
   HttpStatus,
+  Put,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -29,9 +30,9 @@ import {
 } from './dto/add-equipamento-diagrama.dto';
 import {
   CreateConexaoDto,
-  UpdateConexaoDto,
   CreateConexoesBulkDto,
 } from './dto/create-conexao.dto';
+import { SaveLayoutDto } from './dto/save-layout.dto';
 import { UserProprietarioId } from '../auth/decorators/user-proprietario.decorator';
 
 @ApiTags('Diagramas Sinópticos')
@@ -339,23 +340,23 @@ export class DiagramasController {
   }
 
   @Patch(':diagramaId/conexoes/:conexaoId')
-  @ApiOperation({ summary: 'Atualizar conexão' })
+  @ApiOperation({
+    summary: 'Atualizar conexão',
+    deprecated: true,
+    description: 'DESCONTINUADO: Use PUT /diagramas/:id/layout para salvar o layout completo.'
+  })
   @ApiParam({ name: 'diagramaId', description: 'ID do diagrama' })
   @ApiParam({ name: 'conexaoId', description: 'ID da conexão' })
-  @ApiResponse({
-    status: 200,
-    description: 'Conexão atualizada com sucesso',
-  })
-  @ApiResponse({ status: 404, description: 'Conexão não encontrada' })
+  @ApiResponse({ status: 400, description: 'Endpoint descontinuado' })
   async updateConexao(
     @Param('diagramaId') diagramaId: string,
     @Param('conexaoId') conexaoId: string,
-    @Body() dto: UpdateConexaoDto,
+    @Body() _dto: any,
   ) {
     const conexao = await this.conexoesDiagramaService.update(
       diagramaId,
       conexaoId,
-      dto,
+      _dto,
     );
     return {
       success: true,
@@ -462,6 +463,64 @@ export class DiagramasController {
       success: true,
       message: resultado.message,
       data: resultado,
+      meta: {
+        timestamp: new Date().toISOString(),
+      },
+    };
+  }
+
+  // ==================== ROTA ATÔMICA DE LAYOUT (V2) ====================
+
+  @Put(':id/layout')
+  @ApiOperation({
+    summary: 'Salvar layout completo do diagrama (V2 - Atômico)',
+    description: 'Substitui todo o layout (equipamentos + conexões) em uma única transação. ' +
+      'Estratégia: DELETE ALL + INSERT ALL. ~10x mais rápido que múltiplas requisições PATCH.'
+  })
+  @ApiParam({ name: 'id', description: 'ID do diagrama' })
+  @ApiResponse({
+    status: 200,
+    description: 'Layout salvo com sucesso',
+    schema: {
+      example: {
+        success: true,
+        data: {
+          equipamentosAtualizados: 15,
+          conexoesCriadas: 20,
+          tempoMs: 234
+        },
+        meta: {
+          timestamp: '2026-01-23T18:00:00.000Z'
+        }
+      }
+    }
+  })
+  @ApiResponse({ status: 404, description: 'Diagrama não encontrado' })
+  @ApiResponse({ status: 400, description: 'Dados inválidos' })
+  async saveLayout(
+    @Param('id') diagramaId: string,
+    @Body() dto: SaveLayoutDto,
+  ) {
+    const startTime = Date.now();
+
+    console.log('💾 [DiagramasController] SAVE_LAYOUT - Salvamento atômico');
+    console.log('   📋 Diagrama ID:', diagramaId);
+    console.log('   📋 Equipamentos:', dto.equipamentos?.length || 0);
+    console.log('   📋 Conexões:', dto.conexoes?.length || 0);
+
+    const resultado = await this.diagramasService.saveLayout(diagramaId, dto);
+
+    const tempoMs = Date.now() - startTime;
+    console.log(`   ✅ Layout salvo em ${tempoMs}ms`);
+    console.log(`      Equipamentos atualizados: ${resultado.equipamentosAtualizados}`);
+    console.log(`      Conexões criadas: ${resultado.conexoesCriadas}`);
+
+    return {
+      success: true,
+      data: {
+        ...resultado,
+        tempoMs
+      },
       meta: {
         timestamp: new Date().toISOString(),
       },

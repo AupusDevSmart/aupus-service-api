@@ -11,12 +11,6 @@ enum PortaEnum {
   RIGHT = 'right',
 }
 
-enum TipoLinhaEnum {
-  SOLIDA = 'solida',
-  TRACEJADA = 'tracejada',
-  PONTILHADA = 'pontilhada',
-}
-
 describe('ConexoesDiagramaService', () => {
   let service: ConexoesDiagramaService;
   let prismaService: PrismaService;
@@ -86,17 +80,6 @@ describe('ConexoesDiagramaService', () => {
         equipamentoId: 'equip-destino',
         porta: PortaEnum.LEFT,
       },
-      visual: {
-        tipoLinha: TipoLinhaEnum.SOLIDA,
-        cor: '#22c55e',
-        espessura: 2,
-      },
-      pontosIntermediarios: [
-        { x: 164, y: 200 },
-        { x: 220, y: 200 },
-      ],
-      rotulo: '380V',
-      ordem: 1,
     };
 
     it('deve criar conexão entre equipamentos com sucesso', async () => {
@@ -113,15 +96,6 @@ describe('ConexoesDiagramaService', () => {
         porta_origem: 'right',
         equipamento_destino_id: 'equip-destino',
         porta_destino: 'left',
-        tipo_linha: 'solida',
-        cor: '#22c55e',
-        espessura: 2,
-        pontos_intermediarios: [
-          { x: 164, y: 200 },
-          { x: 220, y: 200 },
-        ],
-        rotulo: '380V',
-        ordem: 1,
         created_at: new Date(),
         updated_at: new Date(),
         equipamento_origem: mockEquipOrigem,
@@ -137,9 +111,6 @@ describe('ConexoesDiagramaService', () => {
           porta_origem: 'right',
           equipamento_destino_id: 'equip-destino',
           porta_destino: 'left',
-          tipo_linha: 'solida',
-          cor: '#22c55e',
-          espessura: 2,
         }),
         include: expect.any(Object),
       });
@@ -210,187 +181,16 @@ describe('ConexoesDiagramaService', () => {
       ).rejects.toThrow('Porta de origem inválida');
     });
 
-    it('deve validar tipo de linha', async () => {
-      mockPrismaService.diagramas_unitarios.findFirst.mockResolvedValue(
-        mockDiagrama,
-      );
-      mockPrismaService.equipamentos.findFirst
-        .mockResolvedValueOnce(mockEquipOrigem)
-        .mockResolvedValueOnce(mockEquipDestino);
-
-      const dtoComTipoLinhaInvalido = {
-        ...createDto,
-        visual: { tipoLinha: 'invalido', cor: '#22c55e', espessura: 2 },
-      };
-
-      await expect(
-        service.create('diagrama-123', dtoComTipoLinhaInvalido as any),
-      ).rejects.toThrow(BadRequestException);
-      await expect(
-        service.create('diagrama-123', dtoComTipoLinhaInvalido as any),
-      ).rejects.toThrow('Tipo de linha inválido');
-    });
-
-    it('deve validar espessura entre 1 e 10', async () => {
-      mockPrismaService.diagramas_unitarios.findFirst.mockResolvedValue(
-        mockDiagrama,
-      );
-      mockPrismaService.equipamentos.findFirst
-        .mockResolvedValueOnce(mockEquipOrigem)
-        .mockResolvedValueOnce(mockEquipDestino);
-
-      const dtoComEspessuraInvalida = {
-        ...createDto,
-        visual: { tipoLinha: TipoLinhaEnum.SOLIDA, cor: '#22c55e', espessura: 15 },
-      };
-
-      await expect(
-        service.create('diagrama-123', dtoComEspessuraInvalida),
-      ).rejects.toThrow(BadRequestException);
-      await expect(
-        service.create('diagrama-123', dtoComEspessuraInvalida),
-      ).rejects.toThrow('Espessura deve estar entre 1 e 10');
-    });
-
-    it('deve usar valores padrão se visual não fornecido', async () => {
-      mockPrismaService.diagramas_unitarios.findFirst.mockResolvedValue(
-        mockDiagrama,
-      );
-      mockPrismaService.equipamentos.findFirst
-        .mockResolvedValueOnce(mockEquipOrigem)
-        .mockResolvedValueOnce(mockEquipDestino);
-      mockPrismaService.equipamentos_conexoes.create.mockResolvedValue({
-        id: 'conexao-123',
-        diagrama_id: 'diagrama-123',
-        equipamento_origem_id: 'equip-origem',
-        porta_origem: 'right',
-        equipamento_destino_id: 'equip-destino',
-        porta_destino: 'left',
-        tipo_linha: 'solida',
-        cor: null,
-        espessura: 2,
-        equipamento_origem: mockEquipOrigem,
-        equipamento_destino: mockEquipDestino,
-      });
-
-      const dtoSemVisual = {
-        origem: createDto.origem,
-        destino: createDto.destino,
-      };
-
-      await service.create('diagrama-123', dtoSemVisual);
-
-      expect(prismaService.equipamentos_conexoes.create).toHaveBeenCalledWith(
-        expect.objectContaining({
-          data: expect.objectContaining({
-            tipo_linha: TipoLinhaEnum.SOLIDA, // Valor padrão
-            espessura: 2, // Valor padrão
-          }),
-        }),
-      );
-    });
   });
 
   describe('update', () => {
-    const mockConexao = {
-      id: 'conexao-123',
-      diagrama_id: 'diagrama-123',
-      equipamento_origem_id: 'equip-origem',
-      porta_origem: 'right',
-      equipamento_destino_id: 'equip-destino',
-      porta_destino: 'left',
-      deleted_at: null,
-    };
-
-    const updateDto = {
-      visual: {
-        tipoLinha: TipoLinhaEnum.TRACEJADA,
-        cor: '#3b82f6',
-        espessura: 3,
-      },
-      pontosIntermediarios: [
-        { x: 170, y: 205 },
-        { x: 170, y: 260 },
-      ],
-      rotulo: '380V AC',
-      ordem: 2,
-    };
-
-    it('deve atualizar conexão com sucesso', async () => {
-      mockPrismaService.equipamentos_conexoes.findFirst.mockResolvedValue(
-        mockConexao,
-      );
-      mockPrismaService.equipamentos_conexoes.update.mockResolvedValue({
-        ...mockConexao,
-        tipo_linha: 'tracejada',
-        cor: '#3b82f6',
-        espessura: 3,
-        pontos_intermediarios: updateDto.pontosIntermediarios,
-        rotulo: '380V AC',
-        ordem: 2,
-        equipamento_origem: { id: 'equip-origem', nome: 'Inversor 01', tag: 'INV-01' },
-        equipamento_destino: { id: 'equip-destino', nome: 'Transformador 01', tag: 'TRF-01' },
-      });
-
-      const result = await service.update(
-        'diagrama-123',
-        'conexao-123',
-        updateDto,
-      );
-
-      expect(prismaService.equipamentos_conexoes.update).toHaveBeenCalledWith({
-        where: { id: 'conexao-123' },
-        data: expect.objectContaining({
-          tipo_linha: 'tracejada',
-          cor: '#3b82f6',
-          espessura: 3,
-        }),
-        include: expect.any(Object),
-      });
-      expect(result.visual).toEqual({
-        tipoLinha: TipoLinhaEnum.TRACEJADA,
-        cor: '#3b82f6',
-        espessura: 3,
-      });
-    });
-
-    it('deve lançar NotFoundException se conexão não existir', async () => {
-      mockPrismaService.equipamentos_conexoes.findFirst.mockResolvedValue(null);
-
+    it('deve lançar BadRequestException informando endpoint descontinuado', async () => {
       await expect(
-        service.update('diagrama-123', 'conexao-inexistente', updateDto),
-      ).rejects.toThrow(NotFoundException);
-      await expect(
-        service.update('diagrama-123', 'conexao-inexistente', updateDto),
-      ).rejects.toThrow('Conexão não encontrada ou não pertence ao diagrama');
-    });
-
-    it('deve validar tipo de linha ao atualizar', async () => {
-      mockPrismaService.equipamentos_conexoes.findFirst.mockResolvedValue(
-        mockConexao,
-      );
-
-      const updateComTipoInvalido = {
-        visual: { tipoLinha: 'invalido' },
-      };
-
-      await expect(
-        service.update('diagrama-123', 'conexao-123', updateComTipoInvalido as any),
+        service.update('diagrama-123', 'conexao-123', {}),
       ).rejects.toThrow(BadRequestException);
-    });
-
-    it('deve validar espessura ao atualizar', async () => {
-      mockPrismaService.equipamentos_conexoes.findFirst.mockResolvedValue(
-        mockConexao,
-      );
-
-      const updateComEspessuraInvalida = {
-        visual: { espessura: 20 },
-      };
-
       await expect(
-        service.update('diagrama-123', 'conexao-123', updateComEspessuraInvalida),
-      ).rejects.toThrow(BadRequestException);
+        service.update('diagrama-123', 'conexao-123', {}),
+      ).rejects.toThrow('Endpoint descontinuado');
     });
   });
 
@@ -435,17 +235,14 @@ describe('ConexoesDiagramaService', () => {
         {
           origem: { equipamentoId: 'equip-1', porta: PortaEnum.RIGHT },
           destino: { equipamentoId: 'equip-2', porta: PortaEnum.LEFT },
-          visual: { tipoLinha: TipoLinhaEnum.SOLIDA, cor: '#22c55e' },
         },
         {
           origem: { equipamentoId: 'equip-2', porta: PortaEnum.RIGHT },
           destino: { equipamentoId: 'equip-3', porta: PortaEnum.LEFT },
-          visual: { tipoLinha: TipoLinhaEnum.SOLIDA, cor: '#22c55e' },
         },
         {
           origem: { equipamentoId: 'equip-inexistente', porta: PortaEnum.RIGHT },
           destino: { equipamentoId: 'equip-4', porta: PortaEnum.LEFT },
-          visual: { tipoLinha: TipoLinhaEnum.SOLIDA, cor: '#22c55e' },
         },
       ],
     };
@@ -458,14 +255,12 @@ describe('ConexoesDiagramaService', () => {
           diagramaId: 'diagrama-123',
           origem: { equipamentoId: 'equip-1', porta: PortaEnum.RIGHT },
           destino: { equipamentoId: 'equip-2', porta: PortaEnum.LEFT },
-          visual: { tipoLinha: TipoLinhaEnum.SOLIDA, cor: '#22c55e', espessura: 2 },
         } as any)
         .mockResolvedValueOnce({
           id: 'conexao-2',
           diagramaId: 'diagrama-123',
           origem: { equipamentoId: 'equip-2', porta: PortaEnum.RIGHT },
           destino: { equipamentoId: 'equip-3', porta: PortaEnum.LEFT },
-          visual: { tipoLinha: TipoLinhaEnum.SOLIDA, cor: '#22c55e', espessura: 2 },
         } as any)
         .mockRejectedValueOnce(
           new BadRequestException('Equipamento de origem não encontrado'),

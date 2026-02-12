@@ -1,0 +1,17 @@
+[
+  {
+    "id": "01K456QQWC3W8XBTPKG9DEDZM4",
+    "proposta_id": "31a93ed2-8736-4080-9804-7b5e52d3f072",
+    "uc_id": "01K456QPTA9DMZEMZZDT9JFHHP",
+    "ug_id": null,
+    "observacoes": null,
+    "data_entrada_controle": "2025-09-02T12:34:22.000Z",
+    "created_at": "2025-09-02T12:34:22.000Z",
+    "updated_at": "2025-09-02T12:34:22.000Z",
+    "deleted_at": null,
+    "calibragem": "0",
+    "valor_calibrado": null,
+    "status_troca": "Aguardando",
+    "data_titularidade": "2025-08-20T00:00:00.000Z"
+  }
+]

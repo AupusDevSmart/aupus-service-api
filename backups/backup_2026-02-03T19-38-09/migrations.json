@@ -1,0 +1,282 @@
+[
+  {
+    "id": 1,
+    "migration": "0001_01_01_000000_create_enderecos_table",
+    "batch": 1
+  },
+  {
+    "id": 2,
+    "migration": "0001_01_01_000001_create_concessionarias_table",
+    "batch": 1
+  },
+  {
+    "id": 3,
+    "migration": "0001_01_02_000001_create_organizacoes_table",
+    "batch": 1
+  },
+  {
+    "id": 4,
+    "migration": "0001_01_02_000002_create_usuarios_table",
+    "batch": 1
+  },
+  {
+    "id": 5,
+    "migration": "0001_01_02_000003_create_organizacao_usuario_table",
+    "batch": 1
+  },
+  {
+    "id": 6,
+    "migration": "2024_06_06_121058_create_personal_access_tokens_table",
+    "batch": 1
+  },
+  {
+    "id": 7,
+    "migration": "2024_06_06_195513_create_permission_tables",
+    "batch": 1
+  },
+  {
+    "id": 8,
+    "migration": "2024_06_06_205707_alter_model_id_in_model_has_roles_and_permissions",
+    "batch": 1
+  },
+  {
+    "id": 9,
+    "migration": "2024_06_11_000728_create_telescope_entries_table",
+    "batch": 1
+  },
+  {
+    "id": 10,
+    "migration": "2024_06_23_215528_create_telefones_table",
+    "batch": 1
+  },
+  {
+    "id": 11,
+    "migration": "2025_01_02_160828_create_failed_jobs_table",
+    "batch": 1
+  },
+  {
+    "id": 12,
+    "migration": "2025_01_22_140855_create_concessionaria_usuario_table",
+    "batch": 1
+  },
+  {
+    "id": 13,
+    "migration": "2025_01_22_140856_create_unidades_consumidoras_table",
+    "batch": 1
+  },
+  {
+    "id": 14,
+    "migration": "2025_01_22_143251_create_faturas_table",
+    "batch": 1
+  },
+  {
+    "id": 15,
+    "migration": "2025_01_22_143827_create_consorcios_table",
+    "batch": 1
+  },
+  {
+    "id": 16,
+    "migration": "2025_01_22_143942_create_rateios_table",
+    "batch": 1
+  },
+  {
+    "id": 17,
+    "migration": "2025_01_22_194449_create_historicos_faturamento_table",
+    "batch": 1
+  },
+  {
+    "id": 18,
+    "migration": "2025_01_28_211756_create_oportunidades_table",
+    "batch": 1
+  },
+  {
+    "id": 19,
+    "migration": "2025_02_18_210221_create_prospects_table",
+    "batch": 1
+  },
+  {
+    "id": 20,
+    "migration": "2025_02_19_160854_rename_uc_to_ucs_in_prospects",
+    "batch": 1
+  },
+  {
+    "id": 21,
+    "migration": "2025_03_11_161602_create_feedbacks_table",
+    "batch": 1
+  },
+  {
+    "id": 22,
+    "migration": "2025_03_11_162840_add_deleted_by_to_organizacoes_table",
+    "batch": 1
+  },
+  {
+    "id": 23,
+    "migration": "2025_03_11_201347_create_notificacoes_table",
+    "batch": 1
+  },
+  {
+    "id": 24,
+    "migration": "2025_06_03_161428_create_documentos_table",
+    "batch": 1
+  },
+  {
+    "id": 25,
+    "migration": "0001_01_01_000000_create_users_table",
+    "batch": 1
+  },
+  {
+    "id": 26,
+    "migration": "0001_01_01_000001_create_cache_table",
+    "batch": 1
+  },
+  {
+    "id": 27,
+    "migration": "0001_01_01_000002_create_jobs_table",
+    "batch": 1
+  },
+  {
+    "id": 28,
+    "migration": "2025_08_05_135005_create_permission_tables",
+    "batch": 1
+  },
+  {
+    "id": 29,
+    "migration": "2025_08_05_120001_add_hierarchy_to_usuarios_table",
+    "batch": 2
+  },
+  {
+    "id": 30,
+    "migration": "2025_08_05_120002_expand_unidades_consumidoras_for_ugs",
+    "batch": 2
+  },
+  {
+    "id": 31,
+    "migration": "2025_08_05_120003_create_propostas_table",
+    "batch": 2
+  },
+  {
+    "id": 32,
+    "migration": "2025_08_05_120004_create_controle_clube_table",
+    "batch": 2
+  },
+  {
+    "id": 33,
+    "migration": "2025_08_05_120005_create_configuracoes_table",
+    "batch": 2
+  },
+  {
+    "id": 34,
+    "migration": "2025_08_05_120006_add_foreign_keys_and_constraints",
+    "batch": 2
+  },
+  {
+    "id": 35,
+    "migration": "2025_08_05_120007_add_aupus_permissions",
+    "batch": 2
+  },
+  {
+    "id": 36,
+    "migration": "2025_08_05_142244_create_cache_table",
+    "batch": 2
+  },
+  {
+    "id": 37,
+    "migration": "2025_08_12_120959_create_propostas_table",
+    "batch": 3
+  },
+  {
+    "id": 38,
+    "migration": "2025_08_12_135905_add_all_frontend_fields_to_propostas_table",
+    "batch": 4
+  },
+  {
+    "id": 39,
+    "migration": "2025_08_12_165425_fix_unidades_consumidoras_column_type",
+    "batch": 5
+  },
+  {
+    "id": 40,
+    "migration": "2025_08_12_172900_delete_columns_propostas",
+    "batch": 6
+  },
+  {
+    "id": 41,
+    "migration": "2025_08_12_192523_delete_columns_proposta_2",
+    "batch": 7
+  },
+  {
+    "id": 42,
+    "migration": "2025_08_13_144438_rename_economia_bandeira_to_desconto_fields",
+    "batch": 8
+  },
+  {
+    "id": 43,
+    "migration": "2025_08_14_123001_update_propostas_status_constraint",
+    "batch": 9
+  },
+  {
+    "id": 44,
+    "migration": "2025_08_14_133422_remove_status_from_propostas_table",
+    "batch": 10
+  },
+  {
+    "id": 45,
+    "migration": "2025_08_14_172725_add_documentacao_to_propostas_table",
+    "batch": 11
+  },
+  {
+    "id": 47,
+    "migration": "2025_08_15_173845_remove_tipo_ligacao_column",
+    "batch": 12
+  },
+  {
+    "id": 49,
+    "migration": "2025_08_18_125207_remove_calibragem_from_controle_and_add_to_config",
+    "batch": 13
+  },
+  {
+    "id": 50,
+    "migration": "2025_08_18_140332_remove_is_ug_from_unidades_consumidoras_table",
+    "batch": 13
+  },
+  {
+    "id": 51,
+    "migration": "2025_08_18_141556_update_trigger_calculate_capacidade_ug",
+    "batch": 14
+  },
+  {
+    "id": 52,
+    "migration": "2025_08_20_195940_add_status_troca_and_ucs_detalhes_fields",
+    "batch": 15
+  },
+  {
+    "id": 53,
+    "migration": "2025_08_21_174206_fix_constraints_to_use_gerador",
+    "batch": 16
+  },
+  {
+    "id": 54,
+    "migration": "2025_08_21_201403_add_deleted_by_to_unidades_consumidoras",
+    "batch": 17
+  },
+  {
+    "id": 55,
+    "migration": "2025_08_25_173208_add_columns_tarifa_and_inflacao_proposta",
+    "batch": 18
+  },
+  {
+    "id": 56,
+    "migration": "2025_08_27_013659_add_pix_to_usuarios_table",
+    "batch": 19
+  },
+  {
+    "id": 57,
+    "migration": "2025_08_27_134217_insert_novos_consultores",
+    "batch": 20
+  },
+  {
+    "id": 58,
+    "migration": "2025_08_28_204121_update_propostas_and_unidades_consumidoras_fields",
+    "batch": 21
+  }
+]

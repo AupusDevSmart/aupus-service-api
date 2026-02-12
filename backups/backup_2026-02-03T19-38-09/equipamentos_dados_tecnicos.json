@@ -1,0 +1,2772 @@
+[
+  {
+    "id": "cmhax5iio00022f64ntjh2stm ",
+    "equipamento_id": "cmhax5hj300012f648onzabwh ",
+    "campo": "Potência nominal",
+    "valor": "2323",
+    "tipo": "number",
+    "unidade": "kW",
+    "created_at": "2025-10-28T18:47:36.000Z",
+    "updated_at": "2025-10-28T18:47:36.000Z"
+  },
+  {
+    "id": "cmhax5iio00032f641gcfn3pa ",
+    "equipamento_id": "cmhax5hj300012f648onzabwh ",
+    "campo": "Tensão de entrada (CC)",
+    "valor": "23232",
+    "tipo": "text",
+    "unidade": "V",
+    "created_at": "2025-10-28T18:47:36.000Z",
+    "updated_at": "2025-10-28T18:47:36.000Z"
+  },
+  {
+    "id": "cmhax5iio00042f64uv36c9yy ",
+    "equipamento_id": "cmhax5hj300012f648onzabwh ",
+    "campo": "Tensão de saída (CA)",
+    "valor": "3232",
+    "tipo": "text",
+    "unidade": "V",
+    "created_at": "2025-10-28T18:47:36.000Z",
+    "updated_at": "2025-10-28T18:47:36.000Z"
+  },
+  {
+    "id": "cmhax5iio00052f64lf8azlmo ",
+    "equipamento_id": "cmhax5hj300012f648onzabwh ",
+    "campo": "Rendimento",
+    "valor": "32323",
+    "tipo": "number",
+    "unidade": "%",
+    "created_at": "2025-10-28T18:47:36.000Z",
+    "updated_at": "2025-10-28T18:47:36.000Z"
+  },
+  {
+    "id": "cmhax5iio00062f64rfsb5c2o ",
+    "equipamento_id": "cmhax5hj300012f648onzabwh ",
+    "campo": "Número de MPPTs",
+    "valor": "232323",
+    "tipo": "number",
+    "unidade": "",
+    "created_at": "2025-10-28T18:47:36.000Z",
+    "updated_at": "2025-10-28T18:47:36.000Z"
+  },
+  {
+    "id": "cmhax5iio00072f64pilhvkcg ",
+    "equipamento_id": "cmhax5hj300012f648onzabwh ",
+    "campo": "Tipo de comunicação",
+    "valor": "Ethernet",
+    "tipo": "select",
+    "unidade": "",
+    "created_at": "2025-10-28T18:47:36.000Z",
+    "updated_at": "2025-10-28T18:47:36.000Z"
+  },
+  {
+    "id": "cmidlh358010zjq0tklgvx6jm ",
+    "equipamento_id": "cmidl3mjn00xdjq0traohhg19 ",
+    "campo": "tensao_nominal",
+    "valor": "0",
+    "tipo": "number",
+    "unidade": "V",
+    "created_at": "2025-11-24T20:23:42.000Z",
+    "updated_at": "2025-11-24T20:23:42.000Z"
+  },
+  {
+    "id": "cmhdfng7p004xjqo831qkhijn ",
+    "equipamento_id": "cmhdfmyr3004njqo8ufvexfyf ",
+    "campo": "potencia_pico",
+    "valor": "650",
+    "tipo": "number",
+    "unidade": "W",
+    "created_at": "2025-10-30T13:00:58.000Z",
+    "updated_at": "2025-10-30T13:00:58.000Z"
+  },
+  {
+    "id": "cmhdfng7p004yjqo8szoa4myq ",
+    "equipamento_id": "cmhdfmyr3004njqo8ufvexfyf ",
+    "campo": "tensao_circuito_aberto",
+    "valor": "45",
+    "tipo": "number",
+    "unidade": "V",
+    "created_at": "2025-10-30T13:00:58.000Z",
+    "updated_at": "2025-10-30T13:00:58.000Z"
+  },
+  {
+    "id": "cmhdfng7p004zjqo8yuk4x98y ",
+    "equipamento_id": "cmhdfmyr3004njqo8ufvexfyf ",
+    "campo": "corrente_curto_circuito",
+    "valor": "18.39",
+    "tipo": "number",
+    "unidade": "A",
+    "created_at": "2025-10-30T13:00:58.000Z",
+    "updated_at": "2025-10-30T13:00:58.000Z"
+  },
+  {
+    "id": "cmhdfng7p0050jqo8grykbual ",
+    "equipamento_id": "cmhdfmyr3004njqo8ufvexfyf ",
+    "campo": "tensao_max_potencia",
+    "valor": "37.9",
+    "tipo": "number",
+    "unidade": "V",
+    "created_at": "2025-10-30T13:00:58.000Z",
+    "updated_at": "2025-10-30T13:00:58.000Z"
+  },
+  {
+    "id": "cmhdfng7p0051jqo8ebhxqnm1 ",
+    "equipamento_id": "cmhdfmyr3004njqo8ufvexfyf ",
+    "campo": "corrente_max_potencia",
+    "valor": "17.16",
+    "tipo": "number",
+    "unidade": "A",
+    "created_at": "2025-10-30T13:00:58.000Z",
+    "updated_at": "2025-10-30T13:00:58.000Z"
+  },
+  {
+    "id": "cmhdfng7p0052jqo8njyg1c91 ",
+    "equipamento_id": "cmhdfmyr3004njqo8ufvexfyf ",
+    "campo": "eficiencia",
+    "valor": "20.9",
+    "tipo": "number",
+    "unidade": "%",
+    "created_at": "2025-10-30T13:00:58.000Z",
+    "updated_at": "2025-10-30T13:00:58.000Z"
+  },
+  {
+    "id": "cmhdfng7p0053jqo8b25uk385 ",
+    "equipamento_id": "cmhdfmyr3004njqo8ufvexfyf ",
+    "campo": "tecnologia",
+    "valor": "Monocristalino",
+    "tipo": "select",
+    "unidade": "",
+    "created_at": "2025-10-30T13:00:58.000Z",
+    "updated_at": "2025-10-30T13:00:58.000Z"
+  },
+  {
+    "id": "cmhdfng7p0054jqo8dsk2dpb7 ",
+    "equipamento_id": "cmhdfmyr3004njqo8ufvexfyf ",
+    "campo": "quantidade_celulas",
+    "valor": "648",
+    "tipo": "number",
+    "unidade": "",
+    "created_at": "2025-10-30T13:00:58.000Z",
+    "updated_at": "2025-10-30T13:00:58.000Z"
+  },
+  {
+    "id": "cmhdfng7p0055jqo84aw8t2ll ",
+    "equipamento_id": "cmhdfmyr3004njqo8ufvexfyf ",
+    "campo": "dimensoes",
+    "valor": "2384 x 1303 x 35 mm",
+    "tipo": "text",
+    "unidade": "",
+    "created_at": "2025-10-30T13:00:58.000Z",
+    "updated_at": "2025-10-30T13:00:58.000Z"
+  },
+  {
+    "id": "cmhdfqfwa0058jqo8nii9lf0u ",
+    "equipamento_id": "cmhdfqf0q0057jqo8jucwfjwo ",
+    "campo": "potencia_pico",
+    "valor": "650",
+    "tipo": "number",
+    "unidade": "W",
+    "created_at": "2025-10-30T13:03:18.000Z",
+    "updated_at": "2025-10-30T13:03:18.000Z"
+  },
+  {
+    "id": "cmhdfqfwa0059jqo82pto4qwv ",
+    "equipamento_id": "cmhdfqf0q0057jqo8jucwfjwo ",
+    "campo": "tensao_circuito_aberto",
+    "valor": "45",
+    "tipo": "number",
+    "unidade": "V",
+    "created_at": "2025-10-30T13:03:18.000Z",
+    "updated_at": "2025-10-30T13:03:18.000Z"
+  },
+  {
+    "id": "cmhdfqfwa005ajqo8xastfq9s ",
+    "equipamento_id": "cmhdfqf0q0057jqo8jucwfjwo ",
+    "campo": "corrente_curto_circuito",
+    "valor": "18.39",
+    "tipo": "number",
+    "unidade": "A",
+    "created_at": "2025-10-30T13:03:18.000Z",
+    "updated_at": "2025-10-30T13:03:18.000Z"
+  },
+  {
+    "id": "cmhdfqfwa005bjqo8fp3bykqj ",
+    "equipamento_id": "cmhdfqf0q0057jqo8jucwfjwo ",
+    "campo": "tensao_max_potencia",
+    "valor": "37.9",
+    "tipo": "number",
+    "unidade": "V",
+    "created_at": "2025-10-30T13:03:18.000Z",
+    "updated_at": "2025-10-30T13:03:18.000Z"
+  },
+  {
+    "id": "cmhdfqfwa005cjqo8kzofejh7 ",
+    "equipamento_id": "cmhdfqf0q0057jqo8jucwfjwo ",
+    "campo": "corrente_max_potencia",
+    "valor": "17.16",
+    "tipo": "number",
+    "unidade": "A",
+    "created_at": "2025-10-30T13:03:18.000Z",
+    "updated_at": "2025-10-30T13:03:18.000Z"
+  },
+  {
+    "id": "cmhdfqfwa005djqo8cpwr3eei ",
+    "equipamento_id": "cmhdfqf0q0057jqo8jucwfjwo ",
+    "campo": "eficiencia",
+    "valor": "220.9",
+    "tipo": "number",
+    "unidade": "%",
+    "created_at": "2025-10-30T13:03:18.000Z",
+    "updated_at": "2025-10-30T13:03:18.000Z"
+  },
+  {
+    "id": "cmhdfqfwa005ejqo8qfracuqk ",
+    "equipamento_id": "cmhdfqf0q0057jqo8jucwfjwo ",
+    "campo": "tecnologia",
+    "valor": "Monocristalino",
+    "tipo": "select",
+    "unidade": "",
+    "created_at": "2025-10-30T13:03:18.000Z",
+    "updated_at": "2025-10-30T13:03:18.000Z"
+  },
+  {
+    "id": "cmhdfqfwa005fjqo8j8mba9ah ",
+    "equipamento_id": "cmhdfqf0q0057jqo8jucwfjwo ",
+    "campo": "quantidade_celulas",
+    "valor": "648",
+    "tipo": "number",
+    "unidade": "",
+    "created_at": "2025-10-30T13:03:18.000Z",
+    "updated_at": "2025-10-30T13:03:18.000Z"
+  },
+  {
+    "id": "cmhdfqfwa005gjqo8gtqbf8t3 ",
+    "equipamento_id": "cmhdfqf0q0057jqo8jucwfjwo ",
+    "campo": "dimensoes",
+    "valor": "2384 x 1303 x 35 mm",
+    "tipo": "text",
+    "unidade": "",
+    "created_at": "2025-10-30T13:03:18.000Z",
+    "updated_at": "2025-10-30T13:03:18.000Z"
+  },
+  {
+    "id": "cmhc2wy1n00002fg022kcr5dt ",
+    "equipamento_id": "cmhc0ptu300012fccuj5o1i22 ",
+    "campo": "potencia_nominal",
+    "valor": "343",
+    "tipo": "number",
+    "unidade": "kW",
+    "created_at": "2025-10-29T14:16:40.000Z",
+    "updated_at": "2025-10-29T14:16:40.000Z"
+  },
+  {
+    "id": "cmhc2wy1n00012fg0mjh7mlft ",
+    "equipamento_id": "cmhc0ptu300012fccuj5o1i22 ",
+    "campo": "tensao_entrada_max",
+    "valor": "8989",
+    "tipo": "number",
+    "unidade": "V",
+    "created_at": "2025-10-29T14:16:40.000Z",
+    "updated_at": "2025-10-29T14:16:40.000Z"
+  },
+  {
+    "id": "cmhc2wy1n00022fg0aslmaqax ",
+    "equipamento_id": "cmhc0ptu300012fccuj5o1i22 ",
+    "campo": "tensao_saida",
+    "valor": "4323",
+    "tipo": "number",
+    "unidade": "V",
+    "created_at": "2025-10-29T14:16:40.000Z",
+    "updated_at": "2025-10-29T14:16:40.000Z"
+  },
+  {
+    "id": "cmhc2wy1n00032fg0d42t7rbm ",
+    "equipamento_id": "cmhc0ptu300012fccuj5o1i22 ",
+    "campo": "corrente_maxima_entrada",
+    "valor": "8989",
+    "tipo": "number",
+    "unidade": "A",
+    "created_at": "2025-10-29T14:16:40.000Z",
+    "updated_at": "2025-10-29T14:16:40.000Z"
+  },
+  {
+    "id": "cmhc2wy1n00042fg0byzrappu ",
+    "equipamento_id": "cmhc0ptu300012fccuj5o1i22 ",
+    "campo": "corrente_maxima_saida",
+    "valor": "89898",
+    "tipo": "number",
+    "unidade": "A",
+    "created_at": "2025-10-29T14:16:40.000Z",
+    "updated_at": "2025-10-29T14:16:40.000Z"
+  },
+  {
+    "id": "cmhc2wy1n00052fg035vyon5q ",
+    "equipamento_id": "cmhc0ptu300012fccuj5o1i22 ",
+    "campo": "mppt_trackers",
+    "valor": "9",
+    "tipo": "number",
+    "unidade": "",
+    "created_at": "2025-10-29T14:16:40.000Z",
+    "updated_at": "2025-10-29T14:16:40.000Z"
+  },
+  {
+    "id": "cmhc2wy1n00062fg0nwvoy2y1 ",
+    "equipamento_id": "cmhc0ptu300012fccuj5o1i22 ",
+    "campo": "topologia",
+    "valor": "Central",
+    "tipo": "select",
+    "unidade": "",
+    "created_at": "2025-10-29T14:16:40.000Z",
+    "updated_at": "2025-10-29T14:16:40.000Z"
+  },
+  {
+    "id": "cmhdfsiml005hjqo8xryjowhw ",
+    "equipamento_id": "cmhdfil4d004cjqo8h91hc0gc ",
+    "campo": "potencia_pico",
+    "valor": "650",
+    "tipo": "number",
+    "unidade": "W",
+    "created_at": "2025-10-30T13:04:55.000Z",
+    "updated_at": "2025-10-30T13:04:55.000Z"
+  },
+  {
+    "id": "cmhdfsiml005ijqo838q37n53 ",
+    "equipamento_id": "cmhdfil4d004cjqo8h91hc0gc ",
+    "campo": "tensao_circuito_aberto",
+    "valor": "45",
+    "tipo": "number",
+    "unidade": "V",
+    "created_at": "2025-10-30T13:04:55.000Z",
+    "updated_at": "2025-10-30T13:04:55.000Z"
+  },
+  {
+    "id": "cmhdfsiml005jjqo8ke84g9tn ",
+    "equipamento_id": "cmhdfil4d004cjqo8h91hc0gc ",
+    "campo": "corrente_curto_circuito",
+    "valor": "18.39",
+    "tipo": "number",
+    "unidade": "A",
+    "created_at": "2025-10-30T13:04:55.000Z",
+    "updated_at": "2025-10-30T13:04:55.000Z"
+  },
+  {
+    "id": "cmhdfsiml005kjqo8mkkkkoyv ",
+    "equipamento_id": "cmhdfil4d004cjqo8h91hc0gc ",
+    "campo": "tensao_max_potencia",
+    "valor": "37.9",
+    "tipo": "number",
+    "unidade": "V",
+    "created_at": "2025-10-30T13:04:55.000Z",
+    "updated_at": "2025-10-30T13:04:55.000Z"
+  },
+  {
+    "id": "cmhdfsiml005ljqo8ny60wbk4 ",
+    "equipamento_id": "cmhdfil4d004cjqo8h91hc0gc ",
+    "campo": "corrente_max_potencia",
+    "valor": "17.16",
+    "tipo": "number",
+    "unidade": "A",
+    "created_at": "2025-10-30T13:04:55.000Z",
+    "updated_at": "2025-10-30T13:04:55.000Z"
+  },
+  {
+    "id": "cmhdfsiml005mjqo8nhlwd5ea ",
+    "equipamento_id": "cmhdfil4d004cjqo8h91hc0gc ",
+    "campo": "eficiencia",
+    "valor": "20.9",
+    "tipo": "number",
+    "unidade": "%",
+    "created_at": "2025-10-30T13:04:55.000Z",
+    "updated_at": "2025-10-30T13:04:55.000Z"
+  },
+  {
+    "id": "cmhdfsiml005njqo8hx0ueb58 ",
+    "equipamento_id": "cmhdfil4d004cjqo8h91hc0gc ",
+    "campo": "tecnologia",
+    "valor": "Monocristalino",
+    "tipo": "select",
+    "unidade": "",
+    "created_at": "2025-10-30T13:04:55.000Z",
+    "updated_at": "2025-10-30T13:04:55.000Z"
+  },
+  {
+    "id": "cmhdfsiml005ojqo8ui023iq4 ",
+    "equipamento_id": "cmhdfil4d004cjqo8h91hc0gc ",
+    "campo": "quantidade_celulas",
+    "valor": "648",
+    "tipo": "number",
+    "unidade": "",
+    "created_at": "2025-10-30T13:04:55.000Z",
+    "updated_at": "2025-10-30T13:04:55.000Z"
+  },
+  {
+    "id": "cmhdfsiml005pjqo8kw6ldc7t ",
+    "equipamento_id": "cmhdfil4d004cjqo8h91hc0gc ",
+    "campo": "dimensoes",
+    "valor": "2384 x 1303 x 35 mm",
+    "tipo": "text",
+    "unidade": "",
+    "created_at": "2025-10-30T13:04:55.000Z",
+    "updated_at": "2025-10-30T13:04:55.000Z"
+  },
+  {
+    "id": "cmhcg3jit000qjqo8dbz955mp ",
+    "equipamento_id": "cmhcg3iqt000pjqo8p05xpfqi ",
+    "campo": "tensao_nominal",
+    "valor": "800",
+    "tipo": "number",
+    "unidade": "V",
+    "created_at": "2025-10-29T20:25:43.000Z",
+    "updated_at": "2025-10-29T20:25:43.000Z"
+  },
+  {
+    "id": "cmhcg3jit000rjqo8ex17k4px ",
+    "equipamento_id": "cmhcg3iqt000pjqo8p05xpfqi ",
+    "campo": "corrente_nominal",
+    "valor": "1250",
+    "tipo": "number",
+    "unidade": "A",
+    "created_at": "2025-10-29T20:25:43.000Z",
+    "updated_at": "2025-10-29T20:25:43.000Z"
+  },
+  {
+    "id": "cmhcg3jit000sjqo8tro5t5yi ",
+    "equipamento_id": "cmhcg3iqt000pjqo8p05xpfqi ",
+    "campo": "capacidade_ruptura",
+    "valor": "40",
+    "tipo": "number",
+    "unidade": "kA",
+    "created_at": "2025-10-29T20:25:43.000Z",
+    "updated_at": "2025-10-29T20:25:43.000Z"
+  },
+  {
+    "id": "cmhcg3jit000tjqo83p1l4si4 ",
+    "equipamento_id": "cmhcg3iqt000pjqo8p05xpfqi ",
+    "campo": "numero_polos",
+    "valor": "3",
+    "tipo": "select",
+    "unidade": "",
+    "created_at": "2025-10-29T20:25:43.000Z",
+    "updated_at": "2025-10-29T20:25:43.000Z"
+  },
+  {
+    "id": "cmhcg3jit000ujqo8chri7wxa ",
+    "equipamento_id": "cmhcg3iqt000pjqo8p05xpfqi ",
+    "campo": "tipo_acionamento",
+    "valor": "Motorizado",
+    "tipo": "select",
+    "unidade": "",
+    "created_at": "2025-10-29T20:25:43.000Z",
+    "updated_at": "2025-10-29T20:25:43.000Z"
+  },
+  {
+    "id": "cmhcg3jit000vjqo8biq5ui0g ",
+    "equipamento_id": "cmhcg3iqt000pjqo8p05xpfqi ",
+    "campo": "categoria_utilizacao",
+    "valor": "A",
+    "tipo": "select",
+    "unidade": "",
+    "created_at": "2025-10-29T20:25:43.000Z",
+    "updated_at": "2025-10-29T20:25:43.000Z"
+  },
+  {
+    "id": "cmidlh3580110jq0tb1p8vd3d ",
+    "equipamento_id": "cmidl3mjn00xdjq0traohhg19 ",
+    "campo": "corrente_nominal",
+    "valor": "0",
+    "tipo": "number",
+    "unidade": "A",
+    "created_at": "2025-11-24T20:23:42.000Z",
+    "updated_at": "2025-11-24T20:23:42.000Z"
+  },
+  {
+    "id": "cmidlh3580111jq0trt3a7xyp ",
+    "equipamento_id": "cmidl3mjn00xdjq0traohhg19 ",
+    "campo": "frequencia",
+    "valor": "0",
+    "tipo": "number",
+    "unidade": "Hz",
+    "created_at": "2025-11-24T20:23:42.000Z",
+    "updated_at": "2025-11-24T20:23:42.000Z"
+  },
+  {
+    "id": "cmidlh3580112jq0twz8kyz31 ",
+    "equipamento_id": "cmidl3mjn00xdjq0traohhg19 ",
+    "campo": "classe_precisao",
+    "valor": "0",
+    "tipo": "text",
+    "unidade": "",
+    "created_at": "2025-11-24T20:23:42.000Z",
+    "updated_at": "2025-11-24T20:23:42.000Z"
+  },
+  {
+    "id": "cmidlh3580113jq0txfxah8wh ",
+    "equipamento_id": "cmidl3mjn00xdjq0traohhg19 ",
+    "campo": "protocolo_comunicacao",
+    "valor": "Modbus RTU",
+    "tipo": "select",
+    "unidade": "",
+    "created_at": "2025-11-24T20:23:42.000Z",
+    "updated_at": "2025-11-24T20:23:42.000Z"
+  },
+  {
+    "id": "cmidlh3580114jq0tkglldck4 ",
+    "equipamento_id": "cmidl3mjn00xdjq0traohhg19 ",
+    "campo": "endereco_modbus",
+    "valor": "0",
+    "tipo": "number",
+    "unidade": "",
+    "created_at": "2025-11-24T20:23:42.000Z",
+    "updated_at": "2025-11-24T20:23:42.000Z"
+  },
+  {
+    "id": "cmidlh3580115jq0t1vo03vsx ",
+    "equipamento_id": "cmidl3mjn00xdjq0traohhg19 ",
+    "campo": "taxa_comunicacao",
+    "valor": "9600",
+    "tipo": "select",
+    "unidade": "",
+    "created_at": "2025-11-24T20:23:42.000Z",
+    "updated_at": "2025-11-24T20:23:42.000Z"
+  },
+  {
+    "id": "cmk4g2pp800132fz0nqsf3sq7 ",
+    "equipamento_id": "cmk4g2oyn000p2fz01l57gr2q ",
+    "campo": "Peso Total",
+    "valor": "656565",
+    "tipo": "number",
+    "unidade": "kg",
+    "created_at": "2026-01-07T20:02:02.000Z",
+    "updated_at": "2026-01-07T20:02:02.000Z"
+  },
+  {
+    "id": "cmk4g2pp800142fz0fcr3u0x0 ",
+    "equipamento_id": "cmk4g2oyn000p2fz01l57gr2q ",
+    "campo": "Volume de Óleo",
+    "valor": "6564",
+    "tipo": "number",
+    "unidade": "L",
+    "created_at": "2026-01-07T20:02:02.000Z",
+    "updated_at": "2026-01-07T20:02:02.000Z"
+  },
+  {
+    "id": "cmhde7gd80037jqo8pwboftyg ",
+    "equipamento_id": "cmhde7fuo0036jqo8p414ge4c ",
+    "campo": "tensao_nominal",
+    "valor": "800",
+    "tipo": "number",
+    "unidade": "V",
+    "created_at": "2025-10-30T12:20:33.000Z",
+    "updated_at": "2025-10-30T12:20:33.000Z"
+  },
+  {
+    "id": "cmhde7gd80038jqo8d3whi6f5 ",
+    "equipamento_id": "cmhde7fuo0036jqo8p414ge4c ",
+    "campo": "corrente_nominal",
+    "valor": "250",
+    "tipo": "number",
+    "unidade": "A",
+    "created_at": "2025-10-30T12:20:33.000Z",
+    "updated_at": "2025-10-30T12:20:33.000Z"
+  },
+  {
+    "id": "cmhde7gd80039jqo8co0cdvio ",
+    "equipamento_id": "cmhde7fuo0036jqo8p414ge4c ",
+    "campo": "capacidade_ruptura",
+    "valor": "1",
+    "tipo": "number",
+    "unidade": "kA",
+    "created_at": "2025-10-30T12:20:33.000Z",
+    "updated_at": "2025-10-30T12:20:33.000Z"
+  },
+  {
+    "id": "cmhde7gd8003ajqo89bccgcla ",
+    "equipamento_id": "cmhde7fuo0036jqo8p414ge4c ",
+    "campo": "numero_polos",
+    "valor": "4",
+    "tipo": "select",
+    "unidade": "",
+    "created_at": "2025-10-30T12:20:33.000Z",
+    "updated_at": "2025-10-30T12:20:33.000Z"
+  },
+  {
+    "id": "cmhde7uhp003bjqo8cpr5u9t1 ",
+    "equipamento_id": "cmhde2va3002qjqo84cz11y2z ",
+    "campo": "tensao_nominal",
+    "valor": "800",
+    "tipo": "number",
+    "unidade": "V",
+    "created_at": "2025-10-30T12:20:51.000Z",
+    "updated_at": "2025-10-30T12:20:51.000Z"
+  },
+  {
+    "id": "cmhde7uhp003cjqo824nlpbwe ",
+    "equipamento_id": "cmhde2va3002qjqo84cz11y2z ",
+    "campo": "corrente_nominal",
+    "valor": "250",
+    "tipo": "number",
+    "unidade": "A",
+    "created_at": "2025-10-30T12:20:51.000Z",
+    "updated_at": "2025-10-30T12:20:51.000Z"
+  },
+  {
+    "id": "cmhde7uhp003djqo83dqcm0zq ",
+    "equipamento_id": "cmhde2va3002qjqo84cz11y2z ",
+    "campo": "capacidade_ruptura",
+    "valor": "1",
+    "tipo": "number",
+    "unidade": "kA",
+    "created_at": "2025-10-30T12:20:51.000Z",
+    "updated_at": "2025-10-30T12:20:51.000Z"
+  },
+  {
+    "id": "cmhde7uhp003ejqo8r44lkdjz ",
+    "equipamento_id": "cmhde2va3002qjqo84cz11y2z ",
+    "campo": "numero_polos",
+    "valor": "4",
+    "tipo": "select",
+    "unidade": "",
+    "created_at": "2025-10-30T12:20:51.000Z",
+    "updated_at": "2025-10-30T12:20:51.000Z"
+  },
+  {
+    "id": "cmhde7uhp003fjqo8ehhjjnqr ",
+    "equipamento_id": "cmhde2va3002qjqo84cz11y2z ",
+    "campo": "tipo_acionamento",
+    "valor": "Manual",
+    "tipo": "select",
+    "unidade": "",
+    "created_at": "2025-10-30T12:20:51.000Z",
+    "updated_at": "2025-10-30T12:20:51.000Z"
+  },
+  {
+    "id": "cmhde82yw003gjqo8epjipisy ",
+    "equipamento_id": "cmhddxhld002ojqo81j796hsv ",
+    "campo": "tensao_nominal",
+    "valor": "800",
+    "tipo": "number",
+    "unidade": "V",
+    "created_at": "2025-10-30T12:21:02.000Z",
+    "updated_at": "2025-10-30T12:21:02.000Z"
+  },
+  {
+    "id": "cmhde82yw003hjqo85d9m3tk0 ",
+    "equipamento_id": "cmhddxhld002ojqo81j796hsv ",
+    "campo": "corrente_nominal",
+    "valor": "250",
+    "tipo": "number",
+    "unidade": "A",
+    "created_at": "2025-10-30T12:21:02.000Z",
+    "updated_at": "2025-10-30T12:21:02.000Z"
+  },
+  {
+    "id": "cmhde82yx003ijqo8pp0p0uod ",
+    "equipamento_id": "cmhddxhld002ojqo81j796hsv ",
+    "campo": "capacidade_ruptura",
+    "valor": "1",
+    "tipo": "number",
+    "unidade": "kA",
+    "created_at": "2025-10-30T12:21:02.000Z",
+    "updated_at": "2025-10-30T12:21:02.000Z"
+  },
+  {
+    "id": "cmhde82yx003jjqo8p3i7j2ae ",
+    "equipamento_id": "cmhddxhld002ojqo81j796hsv ",
+    "campo": "numero_polos",
+    "valor": "4",
+    "tipo": "select",
+    "unidade": "",
+    "created_at": "2025-10-30T12:21:02.000Z",
+    "updated_at": "2025-10-30T12:21:02.000Z"
+  },
+  {
+    "id": "cmhdgiake008cjqo8i5pca9po ",
+    "equipamento_id": "cmhdgi9sl008bjqo8gsjzc3hi ",
+    "campo": "tensao_alimentacao",
+    "valor": "220",
+    "tipo": "number",
+    "unidade": "V",
+    "created_at": "2025-10-30T13:24:57.000Z",
+    "updated_at": "2025-10-30T13:24:57.000Z"
+  },
+  {
+    "id": "cmhdgiake008djqo8timxtite ",
+    "equipamento_id": "cmhdgi9sl008bjqo8gsjzc3hi ",
+    "campo": "ip_address",
+    "valor": "192.168.1.50",
+    "tipo": "text",
+    "unidade": "",
+    "created_at": "2025-10-30T13:24:57.000Z",
+    "updated_at": "2025-10-30T13:24:57.000Z"
+  },
+  {
+    "id": "cmhdgiake008ejqo85l2y54bu ",
+    "equipamento_id": "cmhdgi9sl008bjqo8gsjzc3hi ",
+    "campo": "mascara_rede",
+    "valor": "255.255.255.255",
+    "tipo": "text",
+    "unidade": "",
+    "created_at": "2025-10-30T13:24:57.000Z",
+    "updated_at": "2025-10-30T13:24:57.000Z"
+  },
+  {
+    "id": "cmhdgiake008fjqo8ch6blaiy ",
+    "equipamento_id": "cmhdgi9sl008bjqo8gsjzc3hi ",
+    "campo": "gateway",
+    "valor": "gateway",
+    "tipo": "text",
+    "unidade": "",
+    "created_at": "2025-10-30T13:24:57.000Z",
+    "updated_at": "2025-10-30T13:24:57.000Z"
+  },
+  {
+    "id": "cmhdgiake008gjqo8ln0pnhoe ",
+    "equipamento_id": "cmhdgi9sl008bjqo8gsjzc3hi ",
+    "campo": "protocolo_upstream",
+    "valor": "MQTT",
+    "tipo": "select",
+    "unidade": "",
+    "created_at": "2025-10-30T13:24:57.000Z",
+    "updated_at": "2025-10-30T13:24:57.000Z"
+  },
+  {
+    "id": "cmhdgiake008hjqo8iau6gbyz ",
+    "equipamento_id": "cmhdgi9sl008bjqo8gsjzc3hi ",
+    "campo": "numero_serie",
+    "valor": "sn",
+    "tipo": "text",
+    "unidade": "",
+    "created_at": "2025-10-30T13:24:57.000Z",
+    "updated_at": "2025-10-30T13:24:57.000Z"
+  },
+  {
+    "id": "cmhdhaxkq00bijqo85s1hjsp2 ",
+    "equipamento_id": "cmhdhak3r00bfjqo84ubgtvw8 ",
+    "campo": "tensao_nominal",
+    "valor": "-5",
+    "tipo": "number",
+    "unidade": "V",
+    "created_at": "2025-10-30T13:47:14.000Z",
+    "updated_at": "2025-10-30T13:47:14.000Z"
+  },
+  {
+    "id": "cmhz40kcu000m4jbwh5v5jjhg ",
+    "equipamento_id": "cmhz40jf9000l4jbwri14sp9o ",
+    "campo": "tensao_nominal",
+    "valor": "1",
+    "tipo": "number",
+    "unidade": "V",
+    "created_at": "2025-11-14T17:06:11.000Z",
+    "updated_at": "2025-11-14T17:06:11.000Z"
+  },
+  {
+    "id": "cmhz40kcu000n4jbwfwj7xcdl ",
+    "equipamento_id": "cmhz40jf9000l4jbwri14sp9o ",
+    "campo": "corrente_nominal",
+    "valor": "1",
+    "tipo": "number",
+    "unidade": "A",
+    "created_at": "2025-11-14T17:06:11.000Z",
+    "updated_at": "2025-11-14T17:06:11.000Z"
+  },
+  {
+    "id": "cmhz40kcu000o4jbwmsnyq2cy ",
+    "equipamento_id": "cmhz40jf9000l4jbwri14sp9o ",
+    "campo": "material",
+    "valor": "Cobre",
+    "tipo": "select",
+    "unidade": "",
+    "created_at": "2025-11-14T17:06:11.000Z",
+    "updated_at": "2025-11-14T17:06:11.000Z"
+  },
+  {
+    "id": "cmhz40kcu000p4jbwezoowdso ",
+    "equipamento_id": "cmhz40jf9000l4jbwri14sp9o ",
+    "campo": "configuracao",
+    "valor": "Monofásico",
+    "tipo": "select",
+    "unidade": "",
+    "created_at": "2025-11-14T17:06:11.000Z",
+    "updated_at": "2025-11-14T17:06:11.000Z"
+  },
+  {
+    "id": "cmhz40kcu000q4jbw7y6xg3gj ",
+    "equipamento_id": "cmhz40jf9000l4jbwri14sp9o ",
+    "campo": "tipo_isolamento",
+    "valor": "Ar",
+    "tipo": "select",
+    "unidade": "",
+    "created_at": "2025-11-14T17:06:11.000Z",
+    "updated_at": "2025-11-14T17:06:11.000Z"
+  },
+  {
+    "id": "cmidjevbs00cejq0to1nassw5 ",
+    "equipamento_id": "cmidjeuw800cdjq0tqtaw0vqf ",
+    "campo": "potencia_pico",
+    "valor": "650",
+    "tipo": "number",
+    "unidade": "W",
+    "created_at": "2025-11-24T19:25:59.000Z",
+    "updated_at": "2025-11-24T19:25:59.000Z"
+  },
+  {
+    "id": "cmidjevbt00cfjq0tnq9a7ddg ",
+    "equipamento_id": "cmidjeuw800cdjq0tqtaw0vqf ",
+    "campo": "tensao_circuito_aberto",
+    "valor": "37",
+    "tipo": "number",
+    "unidade": "V",
+    "created_at": "2025-11-24T19:25:59.000Z",
+    "updated_at": "2025-11-24T19:25:59.000Z"
+  },
+  {
+    "id": "cmidjevbt00cgjq0tey9ier22 ",
+    "equipamento_id": "cmidjeuw800cdjq0tqtaw0vqf ",
+    "campo": "corrente_curto_circuito",
+    "valor": "40",
+    "tipo": "number",
+    "unidade": "A",
+    "created_at": "2025-11-24T19:25:59.000Z",
+    "updated_at": "2025-11-24T19:25:59.000Z"
+  },
+  {
+    "id": "cmidjevbt00chjq0tapcimody ",
+    "equipamento_id": "cmidjeuw800cdjq0tqtaw0vqf ",
+    "campo": "tensao_max_potencia",
+    "valor": "35",
+    "tipo": "number",
+    "unidade": "V",
+    "created_at": "2025-11-24T19:25:59.000Z",
+    "updated_at": "2025-11-24T19:25:59.000Z"
+  },
+  {
+    "id": "cmidjevbt00cijq0tlmfsbqb4 ",
+    "equipamento_id": "cmidjeuw800cdjq0tqtaw0vqf ",
+    "campo": "corrente_max_potencia",
+    "valor": "37",
+    "tipo": "number",
+    "unidade": "A",
+    "created_at": "2025-11-24T19:25:59.000Z",
+    "updated_at": "2025-11-24T19:25:59.000Z"
+  },
+  {
+    "id": "cmidjevbt00cjjq0tozpvvg13 ",
+    "equipamento_id": "cmidjeuw800cdjq0tqtaw0vqf ",
+    "campo": "tecnologia",
+    "valor": "Monocristalino",
+    "tipo": "select",
+    "unidade": "",
+    "created_at": "2025-11-24T19:25:59.000Z",
+    "updated_at": "2025-11-24T19:25:59.000Z"
+  },
+  {
+    "id": "cmidjfb1q00cmjq0t1ehgno0m ",
+    "equipamento_id": "cmidjfafy00cljq0tzfazpl2s ",
+    "campo": "tensao_nominal",
+    "valor": "34500",
+    "tipo": "number",
+    "unidade": "V",
+    "created_at": "2025-11-24T19:26:19.000Z",
+    "updated_at": "2025-11-24T19:26:19.000Z"
+  },
+  {
+    "id": "cmidjfb1q00cnjq0tzmh8godj ",
+    "equipamento_id": "cmidjfafy00cljq0tzfazpl2s ",
+    "campo": "corrente_nominal",
+    "valor": "2500",
+    "tipo": "number",
+    "unidade": "A",
+    "created_at": "2025-11-24T19:26:19.000Z",
+    "updated_at": "2025-11-24T19:26:19.000Z"
+  },
+  {
+    "id": "cmidjfb1q00cojq0t2iv4ddd6 ",
+    "equipamento_id": "cmidjfafy00cljq0tzfazpl2s ",
+    "campo": "capacidade_ruptura",
+    "valor": "0.01",
+    "tipo": "number",
+    "unidade": "kA",
+    "created_at": "2025-11-24T19:26:19.000Z",
+    "updated_at": "2025-11-24T19:26:19.000Z"
+  },
+  {
+    "id": "cmidjfb1q00cpjq0ti14opsvb ",
+    "equipamento_id": "cmidjfafy00cljq0tzfazpl2s ",
+    "campo": "numero_polos",
+    "valor": "3",
+    "tipo": "select",
+    "unidade": "",
+    "created_at": "2025-11-24T19:26:19.000Z",
+    "updated_at": "2025-11-24T19:26:19.000Z"
+  },
+  {
+    "id": "cmidjfb1q00cqjq0tawaetau9 ",
+    "equipamento_id": "cmidjfafy00cljq0tzfazpl2s ",
+    "campo": "tipo_acionamento",
+    "valor": "Remoto",
+    "tipo": "select",
+    "unidade": "",
+    "created_at": "2025-11-24T19:26:19.000Z",
+    "updated_at": "2025-11-24T19:26:19.000Z"
+  },
+  {
+    "id": "cmidjgiz400czjq0tbcukvnz3 ",
+    "equipamento_id": "cmidjgijh00cyjq0t4g1zoahc ",
+    "campo": "potencia_pico",
+    "valor": "650",
+    "tipo": "number",
+    "unidade": "W",
+    "created_at": "2025-11-24T19:27:16.000Z",
+    "updated_at": "2025-11-24T19:27:16.000Z"
+  },
+  {
+    "id": "cmidjgiz400d0jq0td5h5i8r7 ",
+    "equipamento_id": "cmidjgijh00cyjq0t4g1zoahc ",
+    "campo": "tensao_circuito_aberto",
+    "valor": "37",
+    "tipo": "number",
+    "unidade": "V",
+    "created_at": "2025-11-24T19:27:16.000Z",
+    "updated_at": "2025-11-24T19:27:16.000Z"
+  },
+  {
+    "id": "cmidjgiz400d1jq0t41epwwet ",
+    "equipamento_id": "cmidjgijh00cyjq0t4g1zoahc ",
+    "campo": "corrente_curto_circuito",
+    "valor": "40",
+    "tipo": "number",
+    "unidade": "A",
+    "created_at": "2025-11-24T19:27:16.000Z",
+    "updated_at": "2025-11-24T19:27:16.000Z"
+  },
+  {
+    "id": "cmidjgiz400d2jq0tdao3hyzu ",
+    "equipamento_id": "cmidjgijh00cyjq0t4g1zoahc ",
+    "campo": "tensao_max_potencia",
+    "valor": "35",
+    "tipo": "number",
+    "unidade": "V",
+    "created_at": "2025-11-24T19:27:16.000Z",
+    "updated_at": "2025-11-24T19:27:16.000Z"
+  },
+  {
+    "id": "cmidjgiz400d3jq0tje8d4h7d ",
+    "equipamento_id": "cmidjgijh00cyjq0t4g1zoahc ",
+    "campo": "corrente_max_potencia",
+    "valor": "37",
+    "tipo": "number",
+    "unidade": "A",
+    "created_at": "2025-11-24T19:27:16.000Z",
+    "updated_at": "2025-11-24T19:27:16.000Z"
+  },
+  {
+    "id": "cmidjgiz400d4jq0te07pc5ax ",
+    "equipamento_id": "cmidjgijh00cyjq0t4g1zoahc ",
+    "campo": "tecnologia",
+    "valor": "Monocristalino",
+    "tipo": "select",
+    "unidade": "",
+    "created_at": "2025-11-24T19:27:16.000Z",
+    "updated_at": "2025-11-24T19:27:16.000Z"
+  },
+  {
+    "id": "cmidltczx013ljq0tv3akwbng ",
+    "equipamento_id": "cmidltc4y013kjq0t4ig0mxqs ",
+    "campo": "tensao_nominal",
+    "valor": "0",
+    "tipo": "number",
+    "unidade": "V",
+    "created_at": "2025-11-24T20:33:14.000Z",
+    "updated_at": "2025-11-24T20:33:14.000Z"
+  },
+  {
+    "id": "cmidltczx013mjq0tq269epr7 ",
+    "equipamento_id": "cmidltc4y013kjq0t4ig0mxqs ",
+    "campo": "corrente_nominal",
+    "valor": "0",
+    "tipo": "number",
+    "unidade": "A",
+    "created_at": "2025-11-24T20:33:14.000Z",
+    "updated_at": "2025-11-24T20:33:14.000Z"
+  },
+  {
+    "id": "cmidltczx013njq0tywloy3ed ",
+    "equipamento_id": "cmidltc4y013kjq0t4ig0mxqs ",
+    "campo": "capacidade_ruptura",
+    "valor": "0",
+    "tipo": "number",
+    "unidade": "kA",
+    "created_at": "2025-11-24T20:33:14.000Z",
+    "updated_at": "2025-11-24T20:33:14.000Z"
+  },
+  {
+    "id": "cmidltczx013ojq0te3d8tvj3 ",
+    "equipamento_id": "cmidltc4y013kjq0t4ig0mxqs ",
+    "campo": "numero_polos",
+    "valor": "3",
+    "tipo": "select",
+    "unidade": "",
+    "created_at": "2025-11-24T20:33:14.000Z",
+    "updated_at": "2025-11-24T20:33:14.000Z"
+  },
+  {
+    "id": "cmidluxyb013xjq0t5vzgtlmn ",
+    "equipamento_id": "cmidluxis013wjq0t848jzm5i ",
+    "campo": "tensao_nominal",
+    "valor": "0",
+    "tipo": "number",
+    "unidade": "V",
+    "created_at": "2025-11-24T20:34:28.000Z",
+    "updated_at": "2025-11-24T20:34:28.000Z"
+  },
+  {
+    "id": "cmidluxyb013yjq0td5alpjc3 ",
+    "equipamento_id": "cmidluxis013wjq0t848jzm5i ",
+    "campo": "corrente_nominal",
+    "valor": "0",
+    "tipo": "number",
+    "unidade": "A",
+    "created_at": "2025-11-24T20:34:28.000Z",
+    "updated_at": "2025-11-24T20:34:28.000Z"
+  },
+  {
+    "id": "cmidluxyb013zjq0ttidemkwk ",
+    "equipamento_id": "cmidluxis013wjq0t848jzm5i ",
+    "campo": "capacidade_ruptura",
+    "valor": "0",
+    "tipo": "number",
+    "unidade": "kA",
+    "created_at": "2025-11-24T20:34:28.000Z",
+    "updated_at": "2025-11-24T20:34:28.000Z"
+  },
+  {
+    "id": "cmidluxyb0140jq0tgm7z758c ",
+    "equipamento_id": "cmidluxis013wjq0t848jzm5i ",
+    "campo": "numero_polos",
+    "valor": "3",
+    "tipo": "select",
+    "unidade": "",
+    "created_at": "2025-11-24T20:34:28.000Z",
+    "updated_at": "2025-11-24T20:34:28.000Z"
+  },
+  {
+    "id": "cmjadh7ef00202f3w7gndtoy7 ",
+    "equipamento_id": "cmhddtv0h0024jqo8h4dzm4gq ",
+    "campo": "potencia_nominal",
+    "valor": "333",
+    "tipo": "number",
+    "unidade": "kW",
+    "created_at": "2025-12-17T18:56:14.000Z",
+    "updated_at": "2025-12-17T18:56:14.000Z"
+  },
+  {
+    "id": "cmjadh7ef00212f3ww1qubchf ",
+    "equipamento_id": "cmhddtv0h0024jqo8h4dzm4gq ",
+    "campo": "tensao_entrada_max",
+    "valor": "1500",
+    "tipo": "number",
+    "unidade": "V",
+    "created_at": "2025-12-17T18:56:14.000Z",
+    "updated_at": "2025-12-17T18:56:14.000Z"
+  },
+  {
+    "id": "cmidjnes000f1jq0tv8vxs85s ",
+    "equipamento_id": "cmidjk5wi00dvjq0tc07zhqd5 ",
+    "campo": "potencia_nominal",
+    "valor": "0",
+    "tipo": "number",
+    "unidade": "kW",
+    "created_at": "2025-11-24T19:32:37.000Z",
+    "updated_at": "2025-11-24T19:32:37.000Z"
+  },
+  {
+    "id": "cmidjnes000f2jq0tilnq0h2a ",
+    "equipamento_id": "cmidjk5wi00dvjq0tc07zhqd5 ",
+    "campo": "tensao_entrada_max",
+    "valor": "0",
+    "tipo": "number",
+    "unidade": "V",
+    "created_at": "2025-11-24T19:32:37.000Z",
+    "updated_at": "2025-11-24T19:32:37.000Z"
+  },
+  {
+    "id": "cmidjnes000f3jq0t5n91zb0x ",
+    "equipamento_id": "cmidjk5wi00dvjq0tc07zhqd5 ",
+    "campo": "tensao_saida",
+    "valor": "0",
+    "tipo": "number",
+    "unidade": "V",
+    "created_at": "2025-11-24T19:32:37.000Z",
+    "updated_at": "2025-11-24T19:32:37.000Z"
+  },
+  {
+    "id": "cmidjnes000f4jq0th4nmlpep ",
+    "equipamento_id": "cmidjk5wi00dvjq0tc07zhqd5 ",
+    "campo": "corrente_maxima_entrada",
+    "valor": "0",
+    "tipo": "number",
+    "unidade": "A",
+    "created_at": "2025-11-24T19:32:37.000Z",
+    "updated_at": "2025-11-24T19:32:37.000Z"
+  },
+  {
+    "id": "cmidjnes000f5jq0t90l3but8 ",
+    "equipamento_id": "cmidjk5wi00dvjq0tc07zhqd5 ",
+    "campo": "corrente_maxima_saida",
+    "valor": "0",
+    "tipo": "number",
+    "unidade": "A",
+    "created_at": "2025-11-24T19:32:37.000Z",
+    "updated_at": "2025-11-24T19:32:37.000Z"
+  },
+  {
+    "id": "cmidjnes000f6jq0t9rlds8at ",
+    "equipamento_id": "cmidjk5wi00dvjq0tc07zhqd5 ",
+    "campo": "mppt_trackers",
+    "valor": "0",
+    "tipo": "number",
+    "unidade": "",
+    "created_at": "2025-11-24T19:32:37.000Z",
+    "updated_at": "2025-11-24T19:32:37.000Z"
+  },
+  {
+    "id": "cmidjnes000f7jq0tpg34dt1e ",
+    "equipamento_id": "cmidjk5wi00dvjq0tc07zhqd5 ",
+    "campo": "topologia",
+    "valor": "String",
+    "tipo": "select",
+    "unidade": "",
+    "created_at": "2025-11-24T19:32:37.000Z",
+    "updated_at": "2025-11-24T19:32:37.000Z"
+  },
+  {
+    "id": "cmidjou6n00fejq0t5xvzlgcq ",
+    "equipamento_id": "cmidjmdaj00enjq0tye2mdd6g ",
+    "campo": "potencia_nominal",
+    "valor": "0",
+    "tipo": "number",
+    "unidade": "kW",
+    "created_at": "2025-11-24T19:33:44.000Z",
+    "updated_at": "2025-11-24T19:33:44.000Z"
+  },
+  {
+    "id": "cmidjou6o00ffjq0tvmnrmi6o ",
+    "equipamento_id": "cmidjmdaj00enjq0tye2mdd6g ",
+    "campo": "tensao_entrada_max",
+    "valor": "0",
+    "tipo": "number",
+    "unidade": "V",
+    "created_at": "2025-11-24T19:33:44.000Z",
+    "updated_at": "2025-11-24T19:33:44.000Z"
+  },
+  {
+    "id": "cmidjou6o00fgjq0t0iegzkzt ",
+    "equipamento_id": "cmidjmdaj00enjq0tye2mdd6g ",
+    "campo": "tensao_saida",
+    "valor": "0",
+    "tipo": "number",
+    "unidade": "V",
+    "created_at": "2025-11-24T19:33:44.000Z",
+    "updated_at": "2025-11-24T19:33:44.000Z"
+  },
+  {
+    "id": "cmidjou6o00fhjq0tp50axw5r ",
+    "equipamento_id": "cmidjmdaj00enjq0tye2mdd6g ",
+    "campo": "corrente_maxima_entrada",
+    "valor": "0",
+    "tipo": "number",
+    "unidade": "A",
+    "created_at": "2025-11-24T19:33:44.000Z",
+    "updated_at": "2025-11-24T19:33:44.000Z"
+  },
+  {
+    "id": "cmidjou6o00fijq0twrmjsixb ",
+    "equipamento_id": "cmidjmdaj00enjq0tye2mdd6g ",
+    "campo": "corrente_maxima_saida",
+    "valor": "0",
+    "tipo": "number",
+    "unidade": "A",
+    "created_at": "2025-11-24T19:33:44.000Z",
+    "updated_at": "2025-11-24T19:33:44.000Z"
+  },
+  {
+    "id": "cmidjou6o00fjjq0tqgvikixc ",
+    "equipamento_id": "cmidjmdaj00enjq0tye2mdd6g ",
+    "campo": "mppt_trackers",
+    "valor": "0",
+    "tipo": "number",
+    "unidade": "",
+    "created_at": "2025-11-24T19:33:44.000Z",
+    "updated_at": "2025-11-24T19:33:44.000Z"
+  },
+  {
+    "id": "cmidjou6o00fkjq0tefeie0cl ",
+    "equipamento_id": "cmidjmdaj00enjq0tye2mdd6g ",
+    "campo": "topologia",
+    "valor": "String",
+    "tipo": "select",
+    "unidade": "",
+    "created_at": "2025-11-24T19:33:44.000Z",
+    "updated_at": "2025-11-24T19:33:44.000Z"
+  },
+  {
+    "id": "cmjadh7ef00222f3wq14wyyh2 ",
+    "equipamento_id": "cmhddtv0h0024jqo8h4dzm4gq ",
+    "campo": "tensao_saida",
+    "valor": "800",
+    "tipo": "number",
+    "unidade": "V",
+    "created_at": "2025-12-17T18:56:14.000Z",
+    "updated_at": "2025-12-17T18:56:14.000Z"
+  },
+  {
+    "id": "cmjadh7ef00232f3ww1wny5fk ",
+    "equipamento_id": "cmhddtv0h0024jqo8h4dzm4gq ",
+    "campo": "corrente_maxima_entrada",
+    "valor": "40",
+    "tipo": "number",
+    "unidade": "A",
+    "created_at": "2025-12-17T18:56:14.000Z",
+    "updated_at": "2025-12-17T18:56:14.000Z"
+  },
+  {
+    "id": "cmjadh7ef00242f3wm5gdsmip ",
+    "equipamento_id": "cmhddtv0h0024jqo8h4dzm4gq ",
+    "campo": "corrente_maxima_saida",
+    "valor": "240.5",
+    "tipo": "number",
+    "unidade": "A",
+    "created_at": "2025-12-17T18:56:14.000Z",
+    "updated_at": "2025-12-17T18:56:14.000Z"
+  },
+  {
+    "id": "cmjadh7ef00252f3wvrn8msyn ",
+    "equipamento_id": "cmhddtv0h0024jqo8h4dzm4gq ",
+    "campo": "eficiencia",
+    "valor": "99",
+    "tipo": "number",
+    "unidade": "%",
+    "created_at": "2025-12-17T18:56:14.000Z",
+    "updated_at": "2025-12-17T18:56:14.000Z"
+  },
+  {
+    "id": "cmjadh7ef00262f3wp30c7azk ",
+    "equipamento_id": "cmhddtv0h0024jqo8h4dzm4gq ",
+    "campo": "mppt_trackers",
+    "valor": "12",
+    "tipo": "number",
+    "unidade": "",
+    "created_at": "2025-12-17T18:56:14.000Z",
+    "updated_at": "2025-12-17T18:56:14.000Z"
+  },
+  {
+    "id": "cmidk09rs00hajq0tigplqkx3 ",
+    "equipamento_id": "cmidj34zj00afjq0twoyhbxhq ",
+    "campo": "tensao_nominal",
+    "valor": "34500",
+    "tipo": "number",
+    "unidade": "V",
+    "created_at": "2025-11-24T19:42:37.000Z",
+    "updated_at": "2025-11-24T19:42:37.000Z"
+  },
+  {
+    "id": "cmidk09rs00hbjq0tdpdisk2w ",
+    "equipamento_id": "cmidj34zj00afjq0twoyhbxhq ",
+    "campo": "corrente_nominal",
+    "valor": "2500",
+    "tipo": "number",
+    "unidade": "A",
+    "created_at": "2025-11-24T19:42:37.000Z",
+    "updated_at": "2025-11-24T19:42:37.000Z"
+  },
+  {
+    "id": "cmidk09rs00hcjq0t8ftn4kgm ",
+    "equipamento_id": "cmidj34zj00afjq0twoyhbxhq ",
+    "campo": "material",
+    "valor": "Alumínio",
+    "tipo": "select",
+    "unidade": "",
+    "created_at": "2025-11-24T19:42:37.000Z",
+    "updated_at": "2025-11-24T19:42:37.000Z"
+  },
+  {
+    "id": "cmidk09rs00hdjq0tig3vlmrh ",
+    "equipamento_id": "cmidj34zj00afjq0twoyhbxhq ",
+    "campo": "configuracao",
+    "valor": "Trifásico",
+    "tipo": "select",
+    "unidade": "",
+    "created_at": "2025-11-24T19:42:37.000Z",
+    "updated_at": "2025-11-24T19:42:37.000Z"
+  },
+  {
+    "id": "cmjadh7ef00272f3wj96k8292 ",
+    "equipamento_id": "cmhddtv0h0024jqo8h4dzm4gq ",
+    "campo": "protocolo_comunicacao",
+    "valor": "Modbus RTU",
+    "tipo": "select",
+    "unidade": "",
+    "created_at": "2025-12-17T18:56:14.000Z",
+    "updated_at": "2025-12-17T18:56:14.000Z"
+  },
+  {
+    "id": "cmjadh7eg00282f3wurj95z44 ",
+    "equipamento_id": "cmhddtv0h0024jqo8h4dzm4gq ",
+    "campo": "topologia",
+    "valor": "String",
+    "tipo": "select",
+    "unidade": "",
+    "created_at": "2025-12-17T18:56:14.000Z",
+    "updated_at": "2025-12-17T18:56:14.000Z"
+  },
+  {
+    "id": "cmjhiyq3q005s2fa45g0cwtl5 ",
+    "equipamento_id": "cmhnk06ka009l2fbkd1o2tyua ",
+    "campo": "tensao_nominal",
+    "valor": "160",
+    "tipo": "number",
+    "unidade": "V",
+    "created_at": "2025-12-22T19:04:13.000Z",
+    "updated_at": "2025-12-22T19:04:13.000Z"
+  },
+  {
+    "id": "cmjhiyq3q005t2fa4ohpoalrw ",
+    "equipamento_id": "cmhnk06ka009l2fbkd1o2tyua ",
+    "campo": "corrente_nominal",
+    "valor": "50",
+    "tipo": "number",
+    "unidade": "A",
+    "created_at": "2025-12-22T19:04:13.000Z",
+    "updated_at": "2025-12-22T19:04:13.000Z"
+  },
+  {
+    "id": "cmjhiyq3q005u2fa4p2xjftdi ",
+    "equipamento_id": "cmhnk06ka009l2fbkd1o2tyua ",
+    "campo": "frequencia",
+    "valor": "60",
+    "tipo": "number",
+    "unidade": "Hz",
+    "created_at": "2025-12-22T19:04:13.000Z",
+    "updated_at": "2025-12-22T19:04:13.000Z"
+  },
+  {
+    "id": "cmjhiyq3r005v2fa4krv8240w ",
+    "equipamento_id": "cmhnk06ka009l2fbkd1o2tyua ",
+    "campo": "protocolo_comunicacao",
+    "valor": "Modbus TCP",
+    "tipo": "select",
+    "unidade": "",
+    "created_at": "2025-12-22T19:04:13.000Z",
+    "updated_at": "2025-12-22T19:04:13.000Z"
+  },
+  {
+    "id": "cmjhiyq3r005w2fa4mhev25o2 ",
+    "equipamento_id": "cmhnk06ka009l2fbkd1o2tyua ",
+    "campo": "endereco_modbus",
+    "valor": "655",
+    "tipo": "number",
+    "unidade": "",
+    "created_at": "2025-12-22T19:04:13.000Z",
+    "updated_at": "2025-12-22T19:04:13.000Z"
+  },
+  {
+    "id": "cmidk2skm00hzjq0tdmlixi2y ",
+    "equipamento_id": "cmidk2s1x00hsjq0tuzvk1hed ",
+    "campo": "tensao_nominal",
+    "valor": "0",
+    "tipo": "number",
+    "unidade": "V",
+    "created_at": "2025-11-24T19:44:35.000Z",
+    "updated_at": "2025-11-24T19:44:35.000Z"
+  },
+  {
+    "id": "cmidk2skm00i0jq0tsgtx8jpr ",
+    "equipamento_id": "cmidk2s1x00hsjq0tuzvk1hed ",
+    "campo": "corrente_nominal",
+    "valor": "0",
+    "tipo": "number",
+    "unidade": "A",
+    "created_at": "2025-11-24T19:44:35.000Z",
+    "updated_at": "2025-11-24T19:44:35.000Z"
+  },
+  {
+    "id": "cmidk2skm00i1jq0ti01nwbyo ",
+    "equipamento_id": "cmidk2s1x00hsjq0tuzvk1hed ",
+    "campo": "capacidade_ruptura",
+    "valor": "0",
+    "tipo": "number",
+    "unidade": "kA",
+    "created_at": "2025-11-24T19:44:35.000Z",
+    "updated_at": "2025-11-24T19:44:35.000Z"
+  },
+  {
+    "id": "cmidk2skm00i2jq0tabk98nz4 ",
+    "equipamento_id": "cmidk2s1x00hsjq0tuzvk1hed ",
+    "campo": "numero_polos",
+    "valor": "1",
+    "tipo": "select",
+    "unidade": "",
+    "created_at": "2025-11-24T19:44:35.000Z",
+    "updated_at": "2025-11-24T19:44:35.000Z"
+  },
+  {
+    "id": "cmidk3ntj00i5jq0tpo5q4mb7 ",
+    "equipamento_id": "cmidk3nau00i4jq0tc23zcbak ",
+    "campo": "tensao_nominal",
+    "valor": "0",
+    "tipo": "number",
+    "unidade": "V",
+    "created_at": "2025-11-24T19:45:16.000Z",
+    "updated_at": "2025-11-24T19:45:16.000Z"
+  },
+  {
+    "id": "cmidk3ntj00i6jq0tq7e7w6yc ",
+    "equipamento_id": "cmidk3nau00i4jq0tc23zcbak ",
+    "campo": "corrente_nominal",
+    "valor": "0",
+    "tipo": "number",
+    "unidade": "A",
+    "created_at": "2025-11-24T19:45:16.000Z",
+    "updated_at": "2025-11-24T19:45:16.000Z"
+  },
+  {
+    "id": "cmidk3ntj00i7jq0t2ppk5qbd ",
+    "equipamento_id": "cmidk3nau00i4jq0tc23zcbak ",
+    "campo": "capacidade_ruptura",
+    "valor": "0",
+    "tipo": "number",
+    "unidade": "kA",
+    "created_at": "2025-11-24T19:45:16.000Z",
+    "updated_at": "2025-11-24T19:45:16.000Z"
+  },
+  {
+    "id": "cmidk3ntj00i8jq0tipxhx0uk ",
+    "equipamento_id": "cmidk3nau00i4jq0tc23zcbak ",
+    "campo": "numero_polos",
+    "valor": "1",
+    "tipo": "select",
+    "unidade": "",
+    "created_at": "2025-11-24T19:45:16.000Z",
+    "updated_at": "2025-11-24T19:45:16.000Z"
+  },
+  {
+    "id": "cmidk5n8w00injq0t83dz1yg1 ",
+    "equipamento_id": "cmidk5mdw00imjq0t27ccjkp4 ",
+    "campo": "tensao_nominal",
+    "valor": "0",
+    "tipo": "number",
+    "unidade": "V",
+    "created_at": "2025-11-24T19:46:48.000Z",
+    "updated_at": "2025-11-24T19:46:48.000Z"
+  },
+  {
+    "id": "cmidk5n8w00iojq0t31i2pbja ",
+    "equipamento_id": "cmidk5mdw00imjq0t27ccjkp4 ",
+    "campo": "corrente_nominal",
+    "valor": "0",
+    "tipo": "number",
+    "unidade": "A",
+    "created_at": "2025-11-24T19:46:48.000Z",
+    "updated_at": "2025-11-24T19:46:48.000Z"
+  },
+  {
+    "id": "cmidk5n8w00ipjq0t8gf1wpti ",
+    "equipamento_id": "cmidk5mdw00imjq0t27ccjkp4 ",
+    "campo": "capacidade_ruptura",
+    "valor": "0",
+    "tipo": "number",
+    "unidade": "kA",
+    "created_at": "2025-11-24T19:46:48.000Z",
+    "updated_at": "2025-11-24T19:46:48.000Z"
+  },
+  {
+    "id": "cmidk5n8w00iqjq0tn6mgmpb6 ",
+    "equipamento_id": "cmidk5mdw00imjq0t27ccjkp4 ",
+    "campo": "numero_polos",
+    "valor": "1",
+    "tipo": "select",
+    "unidade": "",
+    "created_at": "2025-11-24T19:46:48.000Z",
+    "updated_at": "2025-11-24T19:46:48.000Z"
+  },
+  {
+    "id": "cmidk8b3w00j5jq0tx9g72jqd ",
+    "equipamento_id": "cmidk8ac100j4jq0t95ndt5kg ",
+    "campo": "tensao_nominal",
+    "valor": "0",
+    "tipo": "number",
+    "unidade": "V",
+    "created_at": "2025-11-24T19:48:52.000Z",
+    "updated_at": "2025-11-24T19:48:52.000Z"
+  },
+  {
+    "id": "cmidk8b3w00j6jq0ta8tqdcl6 ",
+    "equipamento_id": "cmidk8ac100j4jq0t95ndt5kg ",
+    "campo": "corrente_nominal",
+    "valor": "0",
+    "tipo": "number",
+    "unidade": "A",
+    "created_at": "2025-11-24T19:48:52.000Z",
+    "updated_at": "2025-11-24T19:48:52.000Z"
+  },
+  {
+    "id": "cmidk8b3w00j7jq0tg6o733a6 ",
+    "equipamento_id": "cmidk8ac100j4jq0t95ndt5kg ",
+    "campo": "capacidade_ruptura",
+    "valor": "0",
+    "tipo": "number",
+    "unidade": "kA",
+    "created_at": "2025-11-24T19:48:52.000Z",
+    "updated_at": "2025-11-24T19:48:52.000Z"
+  },
+  {
+    "id": "cmidk8b3w00j8jq0tug4bufs0 ",
+    "equipamento_id": "cmidk8ac100j4jq0t95ndt5kg ",
+    "campo": "numero_polos",
+    "valor": "1",
+    "tipo": "select",
+    "unidade": "",
+    "created_at": "2025-11-24T19:48:52.000Z",
+    "updated_at": "2025-11-24T19:48:52.000Z"
+  },
+  {
+    "id": "cmidk9s3c00jhjq0t8grvl0cq ",
+    "equipamento_id": "cmidk9rno00jgjq0tiu2rt44j ",
+    "campo": "tensao_nominal",
+    "valor": "0",
+    "tipo": "number",
+    "unidade": "V",
+    "created_at": "2025-11-24T19:50:01.000Z",
+    "updated_at": "2025-11-24T19:50:01.000Z"
+  },
+  {
+    "id": "cmidk9s3c00jijq0tesac1xty ",
+    "equipamento_id": "cmidk9rno00jgjq0tiu2rt44j ",
+    "campo": "corrente_nominal",
+    "valor": "0",
+    "tipo": "number",
+    "unidade": "A",
+    "created_at": "2025-11-24T19:50:01.000Z",
+    "updated_at": "2025-11-24T19:50:01.000Z"
+  },
+  {
+    "id": "cmidk9s3c00jjjq0t0s8ucwev ",
+    "equipamento_id": "cmidk9rno00jgjq0tiu2rt44j ",
+    "campo": "capacidade_ruptura",
+    "valor": "0",
+    "tipo": "number",
+    "unidade": "kA",
+    "created_at": "2025-11-24T19:50:01.000Z",
+    "updated_at": "2025-11-24T19:50:01.000Z"
+  },
+  {
+    "id": "cmidk9s3c00jkjq0twsef0q5f ",
+    "equipamento_id": "cmidk9rno00jgjq0tiu2rt44j ",
+    "campo": "numero_polos",
+    "valor": "1",
+    "tipo": "select",
+    "unidade": "",
+    "created_at": "2025-11-24T19:50:01.000Z",
+    "updated_at": "2025-11-24T19:50:01.000Z"
+  },
+  {
+    "id": "cmidkblis00jtjq0t87df73zl ",
+    "equipamento_id": "cmidkbl3800jsjq0tguvz7ais ",
+    "campo": "potencia_nominal",
+    "valor": "0",
+    "tipo": "number",
+    "unidade": "kVA",
+    "created_at": "2025-11-24T19:51:26.000Z",
+    "updated_at": "2025-11-24T19:51:26.000Z"
+  },
+  {
+    "id": "cmidkblit00jujq0t3fomx11n ",
+    "equipamento_id": "cmidkbl3800jsjq0tguvz7ais ",
+    "campo": "tensao_primaria",
+    "valor": "0",
+    "tipo": "number",
+    "unidade": "V",
+    "created_at": "2025-11-24T19:51:26.000Z",
+    "updated_at": "2025-11-24T19:51:26.000Z"
+  },
+  {
+    "id": "cmidkblit00jvjq0trpdia9ew ",
+    "equipamento_id": "cmidkbl3800jsjq0tguvz7ais ",
+    "campo": "tensao_secundaria",
+    "valor": "0",
+    "tipo": "number",
+    "unidade": "V",
+    "created_at": "2025-11-24T19:51:26.000Z",
+    "updated_at": "2025-11-24T19:51:26.000Z"
+  },
+  {
+    "id": "cmidkblit00jwjq0tfsdyeoad ",
+    "equipamento_id": "cmidkbl3800jsjq0tguvz7ais ",
+    "campo": "corrente_primaria",
+    "valor": "0",
+    "tipo": "number",
+    "unidade": "A",
+    "created_at": "2025-11-24T19:51:26.000Z",
+    "updated_at": "2025-11-24T19:51:26.000Z"
+  },
+  {
+    "id": "cmidkblit00jxjq0t4q68mp1e ",
+    "equipamento_id": "cmidkbl3800jsjq0tguvz7ais ",
+    "campo": "corrente_secundaria",
+    "valor": "0",
+    "tipo": "number",
+    "unidade": "A",
+    "created_at": "2025-11-24T19:51:26.000Z",
+    "updated_at": "2025-11-24T19:51:26.000Z"
+  },
+  {
+    "id": "cmidkblit00jyjq0twskisbmq ",
+    "equipamento_id": "cmidkbl3800jsjq0tguvz7ais ",
+    "campo": "tipo_ligacao",
+    "valor": "Delta-Estrela",
+    "tipo": "select",
+    "unidade": "",
+    "created_at": "2025-11-24T19:51:26.000Z",
+    "updated_at": "2025-11-24T19:51:26.000Z"
+  },
+  {
+    "id": "cmidkblit00jzjq0t2tfxgywb ",
+    "equipamento_id": "cmidkbl3800jsjq0tguvz7ais ",
+    "campo": "tipo_resfriamento",
+    "valor": "Seco",
+    "tipo": "select",
+    "unidade": "",
+    "created_at": "2025-11-24T19:51:26.000Z",
+    "updated_at": "2025-11-24T19:51:26.000Z"
+  },
+  {
+    "id": "cmidkblit00k0jq0tak4vw55n ",
+    "equipamento_id": "cmidkbl3800jsjq0tguvz7ais ",
+    "campo": "frequencia",
+    "valor": "0",
+    "tipo": "number",
+    "unidade": "Hz",
+    "created_at": "2025-11-24T19:51:26.000Z",
+    "updated_at": "2025-11-24T19:51:26.000Z"
+  },
+  {
+    "id": "cmidlw32v0149jq0tlr9o9ara ",
+    "equipamento_id": "cmidlw2h10148jq0tg6pyx9ki ",
+    "campo": "tensao_nominal",
+    "valor": "0",
+    "tipo": "number",
+    "unidade": "V",
+    "created_at": "2025-11-24T20:35:21.000Z",
+    "updated_at": "2025-11-24T20:35:21.000Z"
+  },
+  {
+    "id": "cmidlw32v014ajq0t8sdwce5h ",
+    "equipamento_id": "cmidlw2h10148jq0tg6pyx9ki ",
+    "campo": "corrente_nominal",
+    "valor": "0",
+    "tipo": "number",
+    "unidade": "A",
+    "created_at": "2025-11-24T20:35:21.000Z",
+    "updated_at": "2025-11-24T20:35:21.000Z"
+  },
+  {
+    "id": "cmidlw32v014bjq0twyy4smgc ",
+    "equipamento_id": "cmidlw2h10148jq0tg6pyx9ki ",
+    "campo": "capacidade_ruptura",
+    "valor": "0",
+    "tipo": "number",
+    "unidade": "kA",
+    "created_at": "2025-11-24T20:35:21.000Z",
+    "updated_at": "2025-11-24T20:35:21.000Z"
+  },
+  {
+    "id": "cmidlw32v014cjq0tfkbj4ua7 ",
+    "equipamento_id": "cmidlw2h10148jq0tg6pyx9ki ",
+    "campo": "numero_polos",
+    "valor": "3",
+    "tipo": "select",
+    "unidade": "",
+    "created_at": "2025-11-24T20:35:21.000Z",
+    "updated_at": "2025-11-24T20:35:21.000Z"
+  },
+  {
+    "id": "cmjadi3vt002h2f3w9x12lyxz ",
+    "equipamento_id": "cmhdd6wkv001kjqo8rl39taa6 ",
+    "campo": "potencia_nominal",
+    "valor": "333",
+    "tipo": "number",
+    "unidade": "kW",
+    "created_at": "2025-12-17T18:56:56.000Z",
+    "updated_at": "2025-12-17T18:56:56.000Z"
+  },
+  {
+    "id": "cmjadi3vt002i2f3wh474ipl0 ",
+    "equipamento_id": "cmhdd6wkv001kjqo8rl39taa6 ",
+    "campo": "tensao_entrada_max",
+    "valor": "1500",
+    "tipo": "number",
+    "unidade": "V",
+    "created_at": "2025-12-17T18:56:56.000Z",
+    "updated_at": "2025-12-17T18:56:56.000Z"
+  },
+  {
+    "id": "cmjadi3vt002j2f3wfljltwr2 ",
+    "equipamento_id": "cmhdd6wkv001kjqo8rl39taa6 ",
+    "campo": "tensao_saida",
+    "valor": "800",
+    "tipo": "number",
+    "unidade": "V",
+    "created_at": "2025-12-17T18:56:56.000Z",
+    "updated_at": "2025-12-17T18:56:56.000Z"
+  },
+  {
+    "id": "cmjadi3vt002k2f3wpm0thdo7 ",
+    "equipamento_id": "cmhdd6wkv001kjqo8rl39taa6 ",
+    "campo": "corrente_maxima_entrada",
+    "valor": "22",
+    "tipo": "number",
+    "unidade": "A",
+    "created_at": "2025-12-17T18:56:56.000Z",
+    "updated_at": "2025-12-17T18:56:56.000Z"
+  },
+  {
+    "id": "cmidkr92y00rnjq0trkir6ps2 ",
+    "equipamento_id": "cmidkr8ay00rmjq0t71x52owx ",
+    "campo": "tensao_nominal",
+    "valor": "0",
+    "tipo": "number",
+    "unidade": "V",
+    "created_at": "2025-11-24T20:03:36.000Z",
+    "updated_at": "2025-11-24T20:03:36.000Z"
+  },
+  {
+    "id": "cmidkr92y00rojq0tap0rso4y ",
+    "equipamento_id": "cmidkr8ay00rmjq0t71x52owx ",
+    "campo": "corrente_nominal",
+    "valor": "0",
+    "tipo": "number",
+    "unidade": "A",
+    "created_at": "2025-11-24T20:03:36.000Z",
+    "updated_at": "2025-11-24T20:03:36.000Z"
+  },
+  {
+    "id": "cmidkr92y00rpjq0ta4o44k1u ",
+    "equipamento_id": "cmidkr8ay00rmjq0t71x52owx ",
+    "campo": "frequencia",
+    "valor": "0",
+    "tipo": "number",
+    "unidade": "Hz",
+    "created_at": "2025-11-24T20:03:36.000Z",
+    "updated_at": "2025-11-24T20:03:36.000Z"
+  },
+  {
+    "id": "cmidkr92y00rqjq0thevj7h36 ",
+    "equipamento_id": "cmidkr8ay00rmjq0t71x52owx ",
+    "campo": "protocolo_comunicacao",
+    "valor": "Modbus RTU",
+    "tipo": "select",
+    "unidade": "",
+    "created_at": "2025-11-24T20:03:36.000Z",
+    "updated_at": "2025-11-24T20:03:36.000Z"
+  },
+  {
+    "id": "cmidkr92y00rrjq0t3diyvb5y ",
+    "equipamento_id": "cmidkr8ay00rmjq0t71x52owx ",
+    "campo": "endereco_modbus",
+    "valor": "0",
+    "tipo": "number",
+    "unidade": "",
+    "created_at": "2025-11-24T20:03:36.000Z",
+    "updated_at": "2025-11-24T20:03:36.000Z"
+  },
+  {
+    "id": "cmidkr92y00rsjq0tspohdu35 ",
+    "equipamento_id": "cmidkr8ay00rmjq0t71x52owx ",
+    "campo": "taxa_comunicacao",
+    "valor": "115200",
+    "tipo": "select",
+    "unidade": "",
+    "created_at": "2025-11-24T20:03:36.000Z",
+    "updated_at": "2025-11-24T20:03:36.000Z"
+  },
+  {
+    "id": "cmjadi3vt002l2f3wzrgrhzl1 ",
+    "equipamento_id": "cmhdd6wkv001kjqo8rl39taa6 ",
+    "campo": "corrente_maxima_saida",
+    "valor": "250",
+    "tipo": "number",
+    "unidade": "A",
+    "created_at": "2025-12-17T18:56:56.000Z",
+    "updated_at": "2025-12-17T18:56:56.000Z"
+  },
+  {
+    "id": "cmjadi3vt002m2f3w780ba9so ",
+    "equipamento_id": "cmhdd6wkv001kjqo8rl39taa6 ",
+    "campo": "eficiencia",
+    "valor": "98",
+    "tipo": "number",
+    "unidade": "%",
+    "created_at": "2025-12-17T18:56:56.000Z",
+    "updated_at": "2025-12-17T18:56:56.000Z"
+  },
+  {
+    "id": "cmjadi3vt002n2f3weukf4ygx ",
+    "equipamento_id": "cmhdd6wkv001kjqo8rl39taa6 ",
+    "campo": "mppt_trackers",
+    "valor": "12",
+    "tipo": "number",
+    "unidade": "",
+    "created_at": "2025-12-17T18:56:56.000Z",
+    "updated_at": "2025-12-17T18:56:56.000Z"
+  },
+  {
+    "id": "cmjadi3vt002o2f3wlf6lawhi ",
+    "equipamento_id": "cmhdd6wkv001kjqo8rl39taa6 ",
+    "campo": "protocolo_comunicacao",
+    "valor": "Modbus RTU",
+    "tipo": "select",
+    "unidade": "",
+    "created_at": "2025-12-17T18:56:56.000Z",
+    "updated_at": "2025-12-17T18:56:56.000Z"
+  },
+  {
+    "id": "cmjadi3vt002p2f3w37o08uor ",
+    "equipamento_id": "cmhdd6wkv001kjqo8rl39taa6 ",
+    "campo": "topologia",
+    "valor": "Central",
+    "tipo": "select",
+    "unidade": "",
+    "created_at": "2025-12-17T18:56:56.000Z",
+    "updated_at": "2025-12-17T18:56:56.000Z"
+  },
+  {
+    "id": "cmjadihs4002q2f3w8ym5dagg ",
+    "equipamento_id": "cmhcfyoj30003jqo8bhhaexlp ",
+    "campo": "potencia_nominal",
+    "valor": "333",
+    "tipo": "number",
+    "unidade": "kW",
+    "created_at": "2025-12-17T18:57:14.000Z",
+    "updated_at": "2025-12-17T18:57:14.000Z"
+  },
+  {
+    "id": "cmjadihs4002r2f3wov0fv0yl ",
+    "equipamento_id": "cmhcfyoj30003jqo8bhhaexlp ",
+    "campo": "tensao_entrada_max",
+    "valor": "1500",
+    "tipo": "number",
+    "unidade": "V",
+    "created_at": "2025-12-17T18:57:14.000Z",
+    "updated_at": "2025-12-17T18:57:14.000Z"
+  },
+  {
+    "id": "cmjadihs4002s2f3wisks0lg0 ",
+    "equipamento_id": "cmhcfyoj30003jqo8bhhaexlp ",
+    "campo": "tensao_saida",
+    "valor": "800",
+    "tipo": "number",
+    "unidade": "V",
+    "created_at": "2025-12-17T18:57:14.000Z",
+    "updated_at": "2025-12-17T18:57:14.000Z"
+  },
+  {
+    "id": "cmjadihs4002t2f3w87wg21hf ",
+    "equipamento_id": "cmhcfyoj30003jqo8bhhaexlp ",
+    "campo": "corrente_maxima_entrada",
+    "valor": "20",
+    "tipo": "number",
+    "unidade": "A",
+    "created_at": "2025-12-17T18:57:14.000Z",
+    "updated_at": "2025-12-17T18:57:14.000Z"
+  },
+  {
+    "id": "cmjadihs4002u2f3wo0smuqlf ",
+    "equipamento_id": "cmhcfyoj30003jqo8bhhaexlp ",
+    "campo": "corrente_maxima_saida",
+    "valor": "500",
+    "tipo": "number",
+    "unidade": "A",
+    "created_at": "2025-12-17T18:57:14.000Z",
+    "updated_at": "2025-12-17T18:57:14.000Z"
+  },
+  {
+    "id": "cmjadihs4002v2f3w1ogh26yw ",
+    "equipamento_id": "cmhcfyoj30003jqo8bhhaexlp ",
+    "campo": "eficiencia",
+    "valor": "99",
+    "tipo": "number",
+    "unidade": "%",
+    "created_at": "2025-12-17T18:57:14.000Z",
+    "updated_at": "2025-12-17T18:57:14.000Z"
+  },
+  {
+    "id": "cmjadihs4002w2f3wivn39q1l ",
+    "equipamento_id": "cmhcfyoj30003jqo8bhhaexlp ",
+    "campo": "mppt_trackers",
+    "valor": "12",
+    "tipo": "number",
+    "unidade": "",
+    "created_at": "2025-12-17T18:57:14.000Z",
+    "updated_at": "2025-12-17T18:57:14.000Z"
+  },
+  {
+    "id": "cmjadihs4002x2f3w3vab0715 ",
+    "equipamento_id": "cmhcfyoj30003jqo8bhhaexlp ",
+    "campo": "protocolo_comunicacao",
+    "valor": "Modbus RTU",
+    "tipo": "select",
+    "unidade": "",
+    "created_at": "2025-12-17T18:57:14.000Z",
+    "updated_at": "2025-12-17T18:57:14.000Z"
+  },
+  {
+    "id": "cmjadihs4002y2f3w9ii078wk ",
+    "equipamento_id": "cmhcfyoj30003jqo8bhhaexlp ",
+    "campo": "topologia",
+    "valor": "String",
+    "tipo": "select",
+    "unidade": "",
+    "created_at": "2025-12-17T18:57:14.000Z",
+    "updated_at": "2025-12-17T18:57:14.000Z"
+  },
+  {
+    "id": "cmjhiyq3r005x2fa4xho5xnyw ",
+    "equipamento_id": "cmhnk06ka009l2fbkd1o2tyua ",
+    "campo": "taxa_comunicacao",
+    "valor": "57600",
+    "tipo": "select",
+    "unidade": "",
+    "created_at": "2025-12-22T19:04:13.000Z",
+    "updated_at": "2025-12-22T19:04:13.000Z"
+  },
+  {
+    "id": "cmjhiyq3r005y2fa43csmqbp4 ",
+    "equipamento_id": "cmhnk06ka009l2fbkd1o2tyua ",
+    "campo": "porta_tcp",
+    "valor": "95",
+    "tipo": "number",
+    "unidade": "",
+    "created_at": "2025-12-22T19:04:13.000Z",
+    "updated_at": "2025-12-22T19:04:13.000Z"
+  },
+  {
+    "id": "cmidksq4100sjjq0t75xjcuw2 ",
+    "equipamento_id": "cmidkq6zp00qujq0thqpb1wkk ",
+    "campo": "potencia_nominal",
+    "valor": "300",
+    "tipo": "number",
+    "unidade": "kVA",
+    "created_at": "2025-11-24T20:04:45.000Z",
+    "updated_at": "2025-11-24T20:04:45.000Z"
+  },
+  {
+    "id": "cmidksq4100skjq0twfhhz0rr ",
+    "equipamento_id": "cmidkq6zp00qujq0thqpb1wkk ",
+    "campo": "tensao_primaria",
+    "valor": "0",
+    "tipo": "number",
+    "unidade": "V",
+    "created_at": "2025-11-24T20:04:45.000Z",
+    "updated_at": "2025-11-24T20:04:45.000Z"
+  },
+  {
+    "id": "cmidksq4100sljq0tcfzkhary ",
+    "equipamento_id": "cmidkq6zp00qujq0thqpb1wkk ",
+    "campo": "tensao_secundaria",
+    "valor": "0",
+    "tipo": "number",
+    "unidade": "V",
+    "created_at": "2025-11-24T20:04:45.000Z",
+    "updated_at": "2025-11-24T20:04:45.000Z"
+  },
+  {
+    "id": "cmidksq4100smjq0t6anzty5k ",
+    "equipamento_id": "cmidkq6zp00qujq0thqpb1wkk ",
+    "campo": "corrente_primaria",
+    "valor": "0",
+    "tipo": "number",
+    "unidade": "A",
+    "created_at": "2025-11-24T20:04:45.000Z",
+    "updated_at": "2025-11-24T20:04:45.000Z"
+  },
+  {
+    "id": "cmidksq4100snjq0t2kukla59 ",
+    "equipamento_id": "cmidkq6zp00qujq0thqpb1wkk ",
+    "campo": "corrente_secundaria",
+    "valor": "0",
+    "tipo": "number",
+    "unidade": "A",
+    "created_at": "2025-11-24T20:04:45.000Z",
+    "updated_at": "2025-11-24T20:04:45.000Z"
+  },
+  {
+    "id": "cmidksq4100sojq0t7h75fhom ",
+    "equipamento_id": "cmidkq6zp00qujq0thqpb1wkk ",
+    "campo": "tipo_ligacao",
+    "valor": "Delta-Estrela",
+    "tipo": "select",
+    "unidade": "",
+    "created_at": "2025-11-24T20:04:45.000Z",
+    "updated_at": "2025-11-24T20:04:45.000Z"
+  },
+  {
+    "id": "cmidksq4100spjq0tx32tsyuq ",
+    "equipamento_id": "cmidkq6zp00qujq0thqpb1wkk ",
+    "campo": "tipo_resfriamento",
+    "valor": "Seco",
+    "tipo": "select",
+    "unidade": "",
+    "created_at": "2025-11-24T20:04:45.000Z",
+    "updated_at": "2025-11-24T20:04:45.000Z"
+  },
+  {
+    "id": "cmidksq4100sqjq0tvgof8w16 ",
+    "equipamento_id": "cmidkq6zp00qujq0thqpb1wkk ",
+    "campo": "frequencia",
+    "valor": "60",
+    "tipo": "number",
+    "unidade": "Hz",
+    "created_at": "2025-11-24T20:04:45.000Z",
+    "updated_at": "2025-11-24T20:04:45.000Z"
+  },
+  {
+    "id": "cmidkt1ed00srjq0ttmyjbwuu ",
+    "equipamento_id": "cmidkrh9q00rujq0t7shzod2s ",
+    "campo": "potencia_nominal",
+    "valor": "300",
+    "tipo": "number",
+    "unidade": "kVA",
+    "created_at": "2025-11-24T20:05:00.000Z",
+    "updated_at": "2025-11-24T20:05:00.000Z"
+  },
+  {
+    "id": "cmidkt1ed00ssjq0tognj0rfh ",
+    "equipamento_id": "cmidkrh9q00rujq0t7shzod2s ",
+    "campo": "tensao_primaria",
+    "valor": "0",
+    "tipo": "number",
+    "unidade": "V",
+    "created_at": "2025-11-24T20:05:00.000Z",
+    "updated_at": "2025-11-24T20:05:00.000Z"
+  },
+  {
+    "id": "cmidkt1ed00stjq0tejowv1ss ",
+    "equipamento_id": "cmidkrh9q00rujq0t7shzod2s ",
+    "campo": "tensao_secundaria",
+    "valor": "0",
+    "tipo": "number",
+    "unidade": "V",
+    "created_at": "2025-11-24T20:05:00.000Z",
+    "updated_at": "2025-11-24T20:05:00.000Z"
+  },
+  {
+    "id": "cmidkt1ee00sujq0tv7y6fbyf ",
+    "equipamento_id": "cmidkrh9q00rujq0t7shzod2s ",
+    "campo": "corrente_primaria",
+    "valor": "0",
+    "tipo": "number",
+    "unidade": "A",
+    "created_at": "2025-11-24T20:05:00.000Z",
+    "updated_at": "2025-11-24T20:05:00.000Z"
+  },
+  {
+    "id": "cmidkt1ee00svjq0tvhp79ron ",
+    "equipamento_id": "cmidkrh9q00rujq0t7shzod2s ",
+    "campo": "corrente_secundaria",
+    "valor": "0",
+    "tipo": "number",
+    "unidade": "A",
+    "created_at": "2025-11-24T20:05:00.000Z",
+    "updated_at": "2025-11-24T20:05:00.000Z"
+  },
+  {
+    "id": "cmidkt1ee00swjq0tfc6zoa8k ",
+    "equipamento_id": "cmidkrh9q00rujq0t7shzod2s ",
+    "campo": "tipo_ligacao",
+    "valor": "Delta-Estrela",
+    "tipo": "select",
+    "unidade": "",
+    "created_at": "2025-11-24T20:05:00.000Z",
+    "updated_at": "2025-11-24T20:05:00.000Z"
+  },
+  {
+    "id": "cmidkt1ee00sxjq0tnbq4bq6u ",
+    "equipamento_id": "cmidkrh9q00rujq0t7shzod2s ",
+    "campo": "tipo_resfriamento",
+    "valor": "Seco",
+    "tipo": "select",
+    "unidade": "",
+    "created_at": "2025-11-24T20:05:00.000Z",
+    "updated_at": "2025-11-24T20:05:00.000Z"
+  },
+  {
+    "id": "cmidkt1ee00syjq0tyscqlovd ",
+    "equipamento_id": "cmidkrh9q00rujq0t7shzod2s ",
+    "campo": "frequencia",
+    "valor": "60",
+    "tipo": "number",
+    "unidade": "Hz",
+    "created_at": "2025-11-24T20:05:00.000Z",
+    "updated_at": "2025-11-24T20:05:00.000Z"
+  },
+  {
+    "id": "cmidkthz500t1jq0tybngrguo ",
+    "equipamento_id": "cmidks97w00s4jq0t3iskkyrs ",
+    "campo": "potencia_nominal",
+    "valor": "300",
+    "tipo": "number",
+    "unidade": "kVA",
+    "created_at": "2025-11-24T20:05:21.000Z",
+    "updated_at": "2025-11-24T20:05:21.000Z"
+  },
+  {
+    "id": "cmidkthz500t2jq0t0d3xdviw ",
+    "equipamento_id": "cmidks97w00s4jq0t3iskkyrs ",
+    "campo": "tensao_primaria",
+    "valor": "0",
+    "tipo": "number",
+    "unidade": "V",
+    "created_at": "2025-11-24T20:05:21.000Z",
+    "updated_at": "2025-11-24T20:05:21.000Z"
+  },
+  {
+    "id": "cmidkthz500t3jq0tcu1oswsv ",
+    "equipamento_id": "cmidks97w00s4jq0t3iskkyrs ",
+    "campo": "tensao_secundaria",
+    "valor": "0",
+    "tipo": "number",
+    "unidade": "V",
+    "created_at": "2025-11-24T20:05:21.000Z",
+    "updated_at": "2025-11-24T20:05:21.000Z"
+  },
+  {
+    "id": "cmidkthz500t4jq0tvtpo66pc ",
+    "equipamento_id": "cmidks97w00s4jq0t3iskkyrs ",
+    "campo": "corrente_primaria",
+    "valor": "0",
+    "tipo": "number",
+    "unidade": "A",
+    "created_at": "2025-11-24T20:05:21.000Z",
+    "updated_at": "2025-11-24T20:05:21.000Z"
+  },
+  {
+    "id": "cmidkthz500t5jq0tly9cig8n ",
+    "equipamento_id": "cmidks97w00s4jq0t3iskkyrs ",
+    "campo": "corrente_secundaria",
+    "valor": "0",
+    "tipo": "number",
+    "unidade": "A",
+    "created_at": "2025-11-24T20:05:21.000Z",
+    "updated_at": "2025-11-24T20:05:21.000Z"
+  },
+  {
+    "id": "cmidkthz500t6jq0tg6pdwook ",
+    "equipamento_id": "cmidks97w00s4jq0t3iskkyrs ",
+    "campo": "tipo_ligacao",
+    "valor": "Delta-Estrela",
+    "tipo": "select",
+    "unidade": "",
+    "created_at": "2025-11-24T20:05:21.000Z",
+    "updated_at": "2025-11-24T20:05:21.000Z"
+  },
+  {
+    "id": "cmidkthz500t7jq0tp7x7r2q7 ",
+    "equipamento_id": "cmidks97w00s4jq0t3iskkyrs ",
+    "campo": "tipo_resfriamento",
+    "valor": "ONAN",
+    "tipo": "select",
+    "unidade": "",
+    "created_at": "2025-11-24T20:05:21.000Z",
+    "updated_at": "2025-11-24T20:05:21.000Z"
+  },
+  {
+    "id": "cmidkthz500t8jq0tubofmh8h ",
+    "equipamento_id": "cmidks97w00s4jq0t3iskkyrs ",
+    "campo": "frequencia",
+    "valor": "60",
+    "tipo": "number",
+    "unidade": "Hz",
+    "created_at": "2025-11-24T20:05:21.000Z",
+    "updated_at": "2025-11-24T20:05:21.000Z"
+  },
+  {
+    "id": "cmidl1voh00wzjq0ty3i61bv9 ",
+    "equipamento_id": "cmidl1uwk00wyjq0tmenvq3bd ",
+    "campo": "tensao_nominal",
+    "valor": "0",
+    "tipo": "number",
+    "unidade": "V",
+    "created_at": "2025-11-24T20:11:52.000Z",
+    "updated_at": "2025-11-24T20:11:52.000Z"
+  },
+  {
+    "id": "cmidl1voh00x0jq0toiara3sk ",
+    "equipamento_id": "cmidl1uwk00wyjq0tmenvq3bd ",
+    "campo": "corrente_nominal",
+    "valor": "0",
+    "tipo": "number",
+    "unidade": "A",
+    "created_at": "2025-11-24T20:11:52.000Z",
+    "updated_at": "2025-11-24T20:11:52.000Z"
+  },
+  {
+    "id": "cmidl1voh00x1jq0to8awlofh ",
+    "equipamento_id": "cmidl1uwk00wyjq0tmenvq3bd ",
+    "campo": "frequencia",
+    "valor": "0",
+    "tipo": "number",
+    "unidade": "Hz",
+    "created_at": "2025-11-24T20:11:52.000Z",
+    "updated_at": "2025-11-24T20:11:52.000Z"
+  },
+  {
+    "id": "cmidl1voh00x2jq0tbi2ytcqi ",
+    "equipamento_id": "cmidl1uwk00wyjq0tmenvq3bd ",
+    "campo": "classe_precisao",
+    "valor": "0",
+    "tipo": "text",
+    "unidade": "",
+    "created_at": "2025-11-24T20:11:52.000Z",
+    "updated_at": "2025-11-24T20:11:52.000Z"
+  },
+  {
+    "id": "cmidl1voh00x3jq0trixn2072 ",
+    "equipamento_id": "cmidl1uwk00wyjq0tmenvq3bd ",
+    "campo": "protocolo_comunicacao",
+    "valor": "Modbus RTU",
+    "tipo": "select",
+    "unidade": "",
+    "created_at": "2025-11-24T20:11:52.000Z",
+    "updated_at": "2025-11-24T20:11:52.000Z"
+  },
+  {
+    "id": "cmidl1voh00x4jq0tcnfy8e8d ",
+    "equipamento_id": "cmidl1uwk00wyjq0tmenvq3bd ",
+    "campo": "endereco_modbus",
+    "valor": "0",
+    "tipo": "number",
+    "unidade": "",
+    "created_at": "2025-11-24T20:11:52.000Z",
+    "updated_at": "2025-11-24T20:11:52.000Z"
+  },
+  {
+    "id": "cmidl1voh00x5jq0twv3rjzdo ",
+    "equipamento_id": "cmidl1uwk00wyjq0tmenvq3bd ",
+    "campo": "taxa_comunicacao",
+    "valor": "9600",
+    "tipo": "select",
+    "unidade": "",
+    "created_at": "2025-11-24T20:11:52.000Z",
+    "updated_at": "2025-11-24T20:11:52.000Z"
+  },
+  {
+    "id": "cmidl9ehy00yhjq0tcymmc54e ",
+    "equipamento_id": "cmidji6nc00dcjq0tf8m2ut2s ",
+    "campo": "tensao_nominal",
+    "valor": "34500",
+    "tipo": "number",
+    "unidade": "V",
+    "created_at": "2025-11-24T20:17:43.000Z",
+    "updated_at": "2025-11-24T20:17:43.000Z"
+  },
+  {
+    "id": "cmidl9ehy00yijq0tqys2xos0 ",
+    "equipamento_id": "cmidji6nc00dcjq0tf8m2ut2s ",
+    "campo": "corrente_nominal",
+    "valor": "2500",
+    "tipo": "number",
+    "unidade": "A",
+    "created_at": "2025-11-24T20:17:43.000Z",
+    "updated_at": "2025-11-24T20:17:43.000Z"
+  },
+  {
+    "id": "cmidl9ehy00yjjq0tru0mgkg7 ",
+    "equipamento_id": "cmidji6nc00dcjq0tf8m2ut2s ",
+    "campo": "capacidade_ruptura",
+    "valor": "0.01",
+    "tipo": "number",
+    "unidade": "kA",
+    "created_at": "2025-11-24T20:17:43.000Z",
+    "updated_at": "2025-11-24T20:17:43.000Z"
+  },
+  {
+    "id": "cmidl9ehy00ykjq0toj3clz30 ",
+    "equipamento_id": "cmidji6nc00dcjq0tf8m2ut2s ",
+    "campo": "numero_polos",
+    "valor": "3",
+    "tipo": "select",
+    "unidade": "",
+    "created_at": "2025-11-24T20:17:43.000Z",
+    "updated_at": "2025-11-24T20:17:43.000Z"
+  },
+  {
+    "id": "cmidl9ehy00yljq0tmbgrj5ek ",
+    "equipamento_id": "cmidji6nc00dcjq0tf8m2ut2s ",
+    "campo": "tipo_acionamento",
+    "valor": "Remoto",
+    "tipo": "select",
+    "unidade": "",
+    "created_at": "2025-11-24T20:17:43.000Z",
+    "updated_at": "2025-11-24T20:17:43.000Z"
+  },
+  {
+    "id": "cmidl9sun00ymjq0t7irnh0la ",
+    "equipamento_id": "cmidjlx5p00eajq0te1dt2qt6 ",
+    "campo": "tensao_nominal",
+    "valor": "34500",
+    "tipo": "number",
+    "unidade": "V",
+    "created_at": "2025-11-24T20:18:02.000Z",
+    "updated_at": "2025-11-24T20:18:02.000Z"
+  },
+  {
+    "id": "cmidl9sun00ynjq0t3iocqcfx ",
+    "equipamento_id": "cmidjlx5p00eajq0te1dt2qt6 ",
+    "campo": "corrente_nominal",
+    "valor": "2500",
+    "tipo": "number",
+    "unidade": "A",
+    "created_at": "2025-11-24T20:18:02.000Z",
+    "updated_at": "2025-11-24T20:18:02.000Z"
+  },
+  {
+    "id": "cmidl9sun00yojq0tfbn2jj9d ",
+    "equipamento_id": "cmidjlx5p00eajq0te1dt2qt6 ",
+    "campo": "capacidade_ruptura",
+    "valor": "0.01",
+    "tipo": "number",
+    "unidade": "kA",
+    "created_at": "2025-11-24T20:18:02.000Z",
+    "updated_at": "2025-11-24T20:18:02.000Z"
+  },
+  {
+    "id": "cmidl9sun00ypjq0tjkd3u464 ",
+    "equipamento_id": "cmidjlx5p00eajq0te1dt2qt6 ",
+    "campo": "numero_polos",
+    "valor": "3",
+    "tipo": "select",
+    "unidade": "",
+    "created_at": "2025-11-24T20:18:02.000Z",
+    "updated_at": "2025-11-24T20:18:02.000Z"
+  },
+  {
+    "id": "cmidl9sun00yqjq0t8hfkybeo ",
+    "equipamento_id": "cmidjlx5p00eajq0te1dt2qt6 ",
+    "campo": "tipo_acionamento",
+    "valor": "Remoto",
+    "tipo": "select",
+    "unidade": "",
+    "created_at": "2025-11-24T20:18:02.000Z",
+    "updated_at": "2025-11-24T20:18:02.000Z"
+  },
+  {
+    "id": "cmidla4pt00yrjq0t2w28oz4v ",
+    "equipamento_id": "cmidjphgu00fmjq0t3vfd5pxu ",
+    "campo": "tensao_nominal",
+    "valor": "34500",
+    "tipo": "number",
+    "unidade": "V",
+    "created_at": "2025-11-24T20:18:17.000Z",
+    "updated_at": "2025-11-24T20:18:17.000Z"
+  },
+  {
+    "id": "cmidla4pt00ysjq0tehfzqnkd ",
+    "equipamento_id": "cmidjphgu00fmjq0t3vfd5pxu ",
+    "campo": "corrente_nominal",
+    "valor": "2500",
+    "tipo": "number",
+    "unidade": "A",
+    "created_at": "2025-11-24T20:18:17.000Z",
+    "updated_at": "2025-11-24T20:18:17.000Z"
+  },
+  {
+    "id": "cmidla4pt00ytjq0tsxis1hba ",
+    "equipamento_id": "cmidjphgu00fmjq0t3vfd5pxu ",
+    "campo": "capacidade_ruptura",
+    "valor": "0.01",
+    "tipo": "number",
+    "unidade": "kA",
+    "created_at": "2025-11-24T20:18:17.000Z",
+    "updated_at": "2025-11-24T20:18:17.000Z"
+  },
+  {
+    "id": "cmidla4pt00yujq0t79anup8f ",
+    "equipamento_id": "cmidjphgu00fmjq0t3vfd5pxu ",
+    "campo": "numero_polos",
+    "valor": "3",
+    "tipo": "select",
+    "unidade": "",
+    "created_at": "2025-11-24T20:18:17.000Z",
+    "updated_at": "2025-11-24T20:18:17.000Z"
+  },
+  {
+    "id": "cmidla4pt00yvjq0tf7956fol ",
+    "equipamento_id": "cmidjphgu00fmjq0t3vfd5pxu ",
+    "campo": "tipo_acionamento",
+    "valor": "Remoto",
+    "tipo": "select",
+    "unidade": "",
+    "created_at": "2025-11-24T20:18:17.000Z",
+    "updated_at": "2025-11-24T20:18:17.000Z"
+  },
+  {
+    "id": "cmidlcee50102jq0twwpotd8o ",
+    "equipamento_id": "cmidjc33h00btjq0tgdzrh6bk ",
+    "campo": "potencia_nominal",
+    "valor": "0",
+    "tipo": "number",
+    "unidade": "kW",
+    "created_at": "2025-11-24T20:20:03.000Z",
+    "updated_at": "2025-11-24T20:20:03.000Z"
+  },
+  {
+    "id": "cmidlcee50103jq0tnpoerqlh ",
+    "equipamento_id": "cmidjc33h00btjq0tgdzrh6bk ",
+    "campo": "tensao_nominal",
+    "valor": "0",
+    "tipo": "number",
+    "unidade": "V",
+    "created_at": "2025-11-24T20:20:03.000Z",
+    "updated_at": "2025-11-24T20:20:03.000Z"
+  },
+  {
+    "id": "cmidlcee50104jq0tm3awkfk2 ",
+    "equipamento_id": "cmidjc33h00btjq0tgdzrh6bk ",
+    "campo": "corrente_nominal",
+    "valor": "0",
+    "tipo": "number",
+    "unidade": "A",
+    "created_at": "2025-11-24T20:20:03.000Z",
+    "updated_at": "2025-11-24T20:20:03.000Z"
+  },
+  {
+    "id": "cmidlcee50105jq0tveb84u59 ",
+    "equipamento_id": "cmidjc33h00btjq0tgdzrh6bk ",
+    "campo": "rotacao_nominal",
+    "valor": "0",
+    "tipo": "number",
+    "unidade": "rpm",
+    "created_at": "2025-11-24T20:20:03.000Z",
+    "updated_at": "2025-11-24T20:20:03.000Z"
+  },
+  {
+    "id": "cmidlcee50106jq0t4tkn67af ",
+    "equipamento_id": "cmidjc33h00btjq0tgdzrh6bk ",
+    "campo": "frequencia",
+    "valor": "0",
+    "tipo": "number",
+    "unidade": "Hz",
+    "created_at": "2025-11-24T20:20:03.000Z",
+    "updated_at": "2025-11-24T20:20:03.000Z"
+  },
+  {
+    "id": "cmidlcee50107jq0toh9exutd ",
+    "equipamento_id": "cmidjc33h00btjq0tgdzrh6bk ",
+    "campo": "numero_polos",
+    "valor": "0",
+    "tipo": "number",
+    "unidade": "",
+    "created_at": "2025-11-24T20:20:03.000Z",
+    "updated_at": "2025-11-24T20:20:03.000Z"
+  },
+  {
+    "id": "cmidlcee50108jq0tf351tj97 ",
+    "equipamento_id": "cmidjc33h00btjq0tgdzrh6bk ",
+    "campo": "fator_servico",
+    "valor": "0",
+    "tipo": "number",
+    "unidade": "",
+    "created_at": "2025-11-24T20:20:03.000Z",
+    "updated_at": "2025-11-24T20:20:03.000Z"
+  },
+  {
+    "id": "cmidm01yt014xjq0tb20dqe6b ",
+    "equipamento_id": "cmidlg081010sjq0t0orepc35 ",
+    "campo": "tensao_nominal",
+    "valor": "0",
+    "tipo": "number",
+    "unidade": "V",
+    "created_at": "2025-11-24T20:38:27.000Z",
+    "updated_at": "2025-11-24T20:38:27.000Z"
+  },
+  {
+    "id": "cmidm01yt014yjq0tp9ib4y19 ",
+    "equipamento_id": "cmidlg081010sjq0t0orepc35 ",
+    "campo": "corrente_nominal",
+    "valor": "0",
+    "tipo": "number",
+    "unidade": "A",
+    "created_at": "2025-11-24T20:38:27.000Z",
+    "updated_at": "2025-11-24T20:38:27.000Z"
+  },
+  {
+    "id": "cmidm01yt014zjq0t161eriwf ",
+    "equipamento_id": "cmidlg081010sjq0t0orepc35 ",
+    "campo": "frequencia",
+    "valor": "0",
+    "tipo": "number",
+    "unidade": "Hz",
+    "created_at": "2025-11-24T20:38:27.000Z",
+    "updated_at": "2025-11-24T20:38:27.000Z"
+  },
+  {
+    "id": "cmidm01yt0150jq0tkzppe3pk ",
+    "equipamento_id": "cmidlg081010sjq0t0orepc35 ",
+    "campo": "classe_precisao",
+    "valor": "0",
+    "tipo": "text",
+    "unidade": "",
+    "created_at": "2025-11-24T20:38:27.000Z",
+    "updated_at": "2025-11-24T20:38:27.000Z"
+  },
+  {
+    "id": "cmidm01yt0151jq0tqvbvid7n ",
+    "equipamento_id": "cmidlg081010sjq0t0orepc35 ",
+    "campo": "protocolo_comunicacao",
+    "valor": "Modbus RTU",
+    "tipo": "select",
+    "unidade": "",
+    "created_at": "2025-11-24T20:38:27.000Z",
+    "updated_at": "2025-11-24T20:38:27.000Z"
+  },
+  {
+    "id": "cmidm01yt0152jq0tvlj20jlf ",
+    "equipamento_id": "cmidlg081010sjq0t0orepc35 ",
+    "campo": "endereco_modbus",
+    "valor": "0",
+    "tipo": "number",
+    "unidade": "",
+    "created_at": "2025-11-24T20:38:27.000Z",
+    "updated_at": "2025-11-24T20:38:27.000Z"
+  },
+  {
+    "id": "cmidm01yt0153jq0t2umfj2l9 ",
+    "equipamento_id": "cmidlg081010sjq0t0orepc35 ",
+    "campo": "taxa_comunicacao",
+    "valor": "9600",
+    "tipo": "select",
+    "unidade": "",
+    "created_at": "2025-11-24T20:38:27.000Z",
+    "updated_at": "2025-11-24T20:38:27.000Z"
+  },
+  {
+    "id": "cmjj1lyp20048jqiipqxkheka ",
+    "equipamento_id": "cmhcg1w27000ejqo84gbjeyty ",
+    "campo": "potencia_nominal",
+    "valor": "1250",
+    "tipo": "number",
+    "unidade": "kVA",
+    "created_at": "2025-12-23T20:33:56.000Z",
+    "updated_at": "2025-12-23T20:33:56.000Z"
+  },
+  {
+    "id": "cmjj1lyp20049jqii0zbqvxe1 ",
+    "equipamento_id": "cmhcg1w27000ejqo84gbjeyty ",
+    "campo": "tensao_primaria",
+    "valor": "34500",
+    "tipo": "number",
+    "unidade": "V",
+    "created_at": "2025-12-23T20:33:56.000Z",
+    "updated_at": "2025-12-23T20:33:56.000Z"
+  },
+  {
+    "id": "cmjj1lyp2004ajqiidkpfn58l ",
+    "equipamento_id": "cmhcg1w27000ejqo84gbjeyty ",
+    "campo": "tensao_secundaria",
+    "valor": "800",
+    "tipo": "number",
+    "unidade": "V",
+    "created_at": "2025-12-23T20:33:56.000Z",
+    "updated_at": "2025-12-23T20:33:56.000Z"
+  },
+  {
+    "id": "cmjj1lyp2004bjqii8p82s9z1 ",
+    "equipamento_id": "cmhcg1w27000ejqo84gbjeyty ",
+    "campo": "corrente_primaria",
+    "valor": "125",
+    "tipo": "number",
+    "unidade": "A",
+    "created_at": "2025-12-23T20:33:56.000Z",
+    "updated_at": "2025-12-23T20:33:56.000Z"
+  },
+  {
+    "id": "cmjj1lyp2004cjqiid1u7bga3 ",
+    "equipamento_id": "cmhcg1w27000ejqo84gbjeyty ",
+    "campo": "corrente_secundaria",
+    "valor": "800",
+    "tipo": "number",
+    "unidade": "A",
+    "created_at": "2025-12-23T20:33:56.000Z",
+    "updated_at": "2025-12-23T20:33:56.000Z"
+  },
+  {
+    "id": "cmjj1lyp2004djqii4q1afgv1 ",
+    "equipamento_id": "cmhcg1w27000ejqo84gbjeyty ",
+    "campo": "tipo_ligacao",
+    "valor": "Delta-Estrela",
+    "tipo": "select",
+    "unidade": "",
+    "created_at": "2025-12-23T20:33:56.000Z",
+    "updated_at": "2025-12-23T20:33:56.000Z"
+  },
+  {
+    "id": "cmjj1lyp2004ejqiil48ua510 ",
+    "equipamento_id": "cmhcg1w27000ejqo84gbjeyty ",
+    "campo": "tipo_resfriamento",
+    "valor": "ONAN",
+    "tipo": "select",
+    "unidade": "",
+    "created_at": "2025-12-23T20:33:56.000Z",
+    "updated_at": "2025-12-23T20:33:56.000Z"
+  },
+  {
+    "id": "cmjj1lyp2004fjqiieq9njki8 ",
+    "equipamento_id": "cmhcg1w27000ejqo84gbjeyty ",
+    "campo": "impedancia",
+    "valor": "3.5",
+    "tipo": "number",
+    "unidade": "%",
+    "created_at": "2025-12-23T20:33:56.000Z",
+    "updated_at": "2025-12-23T20:33:56.000Z"
+  },
+  {
+    "id": "cmjj1lyp2004gjqiiyk0r2crq ",
+    "equipamento_id": "cmhcg1w27000ejqo84gbjeyty ",
+    "campo": "frequencia",
+    "valor": "60",
+    "tipo": "number",
+    "unidade": "Hz",
+    "created_at": "2025-12-23T20:33:56.000Z",
+    "updated_at": "2025-12-23T20:33:56.000Z"
+  },
+  {
+    "id": "cmk4g2pp8000q2fz0sil1igs6 ",
+    "equipamento_id": "cmk4g2oyn000p2fz01l57gr2q ",
+    "campo": "Potência Nominal",
+    "valor": "5656",
+    "tipo": "number",
+    "unidade": "kVA",
+    "created_at": "2026-01-07T20:02:02.000Z",
+    "updated_at": "2026-01-07T20:02:02.000Z"
+  },
+  {
+    "id": "cmk4g2pp8000r2fz0ulze0gmc ",
+    "equipamento_id": "cmk4g2oyn000p2fz01l57gr2q ",
+    "campo": "Tensão Primária",
+    "valor": "6565",
+    "tipo": "number",
+    "unidade": "kV",
+    "created_at": "2026-01-07T20:02:02.000Z",
+    "updated_at": "2026-01-07T20:02:02.000Z"
+  },
+  {
+    "id": "cmk4g2pp8000s2fz08aphuixq ",
+    "equipamento_id": "cmk4g2oyn000p2fz01l57gr2q ",
+    "campo": "Tensão Secundária",
+    "valor": "6565",
+    "tipo": "number",
+    "unidade": "kV",
+    "created_at": "2026-01-07T20:02:02.000Z",
+    "updated_at": "2026-01-07T20:02:02.000Z"
+  },
+  {
+    "id": "cmk4g2pp8000t2fz0c0w1jkw6 ",
+    "equipamento_id": "cmk4g2oyn000p2fz01l57gr2q ",
+    "campo": "Tipo de TAP",
+    "valor": "Com Carga",
+    "tipo": "select",
+    "unidade": "",
+    "created_at": "2026-01-07T20:02:02.000Z",
+    "updated_at": "2026-01-07T20:02:02.000Z"
+  },
+  {
+    "id": "cmk4g2pp8000u2fz05mlwwd1h ",
+    "equipamento_id": "cmk4g2oyn000p2fz01l57gr2q ",
+    "campo": "Quantidade de TAPs",
+    "valor": "6565",
+    "tipo": "number",
+    "unidade": "",
+    "created_at": "2026-01-07T20:02:02.000Z",
+    "updated_at": "2026-01-07T20:02:02.000Z"
+  },
+  {
+    "id": "cmk4g2pp8000v2fz0ythy9mqw ",
+    "equipamento_id": "cmk4g2oyn000p2fz01l57gr2q ",
+    "campo": "Tensão Referência",
+    "valor": "6565",
+    "tipo": "number",
+    "unidade": "kV",
+    "created_at": "2026-01-07T20:02:02.000Z",
+    "updated_at": "2026-01-07T20:02:02.000Z"
+  },
+  {
+    "id": "cmk4g2pp8000w2fz0kpm6s1al ",
+    "equipamento_id": "cmk4g2oyn000p2fz01l57gr2q ",
+    "campo": "TAP Referência",
+    "valor": "6565",
+    "tipo": "number",
+    "unidade": "",
+    "created_at": "2026-01-07T20:02:02.000Z",
+    "updated_at": "2026-01-07T20:02:02.000Z"
+  },
+  {
+    "id": "cmk4g2pp8000x2fz0kc40zkpf ",
+    "equipamento_id": "cmk4g2oyn000p2fz01l57gr2q ",
+    "campo": "Frequência",
+    "valor": "6565",
+    "tipo": "number",
+    "unidade": "Hz",
+    "created_at": "2026-01-07T20:02:02.000Z",
+    "updated_at": "2026-01-07T20:02:02.000Z"
+  },
+  {
+    "id": "cmk4g2pp8000y2fz09oxaiqj6 ",
+    "equipamento_id": "cmk4g2oyn000p2fz01l57gr2q ",
+    "campo": "Grupo de Ligação",
+    "valor": "6565",
+    "tipo": "text",
+    "unidade": "",
+    "created_at": "2026-01-07T20:02:02.000Z",
+    "updated_at": "2026-01-07T20:02:02.000Z"
+  },
+  {
+    "id": "cmk4g2pp8000z2fz0s2fjl80n ",
+    "equipamento_id": "cmk4g2oyn000p2fz01l57gr2q ",
+    "campo": "Impedância",
+    "valor": "65",
+    "tipo": "number",
+    "unidade": "%",
+    "created_at": "2026-01-07T20:02:02.000Z",
+    "updated_at": "2026-01-07T20:02:02.000Z"
+  },
+  {
+    "id": "cmk4g2pp800102fz0kzpen19x ",
+    "equipamento_id": "cmk4g2oyn000p2fz01l57gr2q ",
+    "campo": "Perdas em Vazio",
+    "valor": "565",
+    "tipo": "number",
+    "unidade": "W",
+    "created_at": "2026-01-07T20:02:02.000Z",
+    "updated_at": "2026-01-07T20:02:02.000Z"
+  },
+  {
+    "id": "cmk4g2pp800112fz0bmurw7cf ",
+    "equipamento_id": "cmk4g2oyn000p2fz01l57gr2q ",
+    "campo": "Perdas em Carga",
+    "valor": "656",
+    "tipo": "number",
+    "unidade": "W",
+    "created_at": "2026-01-07T20:02:02.000Z",
+    "updated_at": "2026-01-07T20:02:02.000Z"
+  },
+  {
+    "id": "cmk4g2pp800122fz0i2ptz0ev ",
+    "equipamento_id": "cmk4g2oyn000p2fz01l57gr2q ",
+    "campo": "Tipo de Resfriamento",
+    "valor": "ONAF",
+    "tipo": "select",
+    "unidade": "",
+    "created_at": "2026-01-07T20:02:02.000Z",
+    "updated_at": "2026-01-07T20:02:02.000Z"
+  }
+]

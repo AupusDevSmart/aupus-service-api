@@ -167,27 +167,29 @@ export class PlantasService {
       // Calcular paginação
       const skip = (page - 1) * limit;
 
-      // Buscar dados e contagem total em paralelo
-      const [plantas, total] = await Promise.all([
-        this.prisma.plantas.findMany({
-          where: whereClause,
-          include: {
-            proprietario: {
-              select: {
-                id: true,
-                nome: true,
-                cpf_cnpj: true
+      // Buscar dados e contagem total em paralelo com retry automático
+      const [plantas, total] = await this.prisma.executeWithRetry(async () => {
+        return await Promise.all([
+          this.prisma.plantas.findMany({
+            where: whereClause,
+            include: {
+              proprietario: {
+                select: {
+                  id: true,
+                  nome: true,
+                  cpf_cnpj: true
+                }
               }
-            }
-          },
-          orderBy: orderByClause,
-          skip,
-          take: limit
-        }),
-        this.prisma.plantas.count({
-          where: whereClause
-        })
-      ]);
+            },
+            orderBy: orderByClause,
+            skip,
+            take: limit
+          }),
+          this.prisma.plantas.count({
+            where: whereClause
+          })
+        ]);
+      });
 
       // Formatar resposta
       const plantasFormatadas = plantas.map(planta => this.formatPlantaResponse(planta));

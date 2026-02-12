@@ -13,6 +13,11 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
         { emit: 'event', level: 'warn' },
       ],
       errorFormat: 'pretty',
+      datasources: {
+        db: {
+          url: process.env.DATABASE_URL,
+        },
+      },
     });
 
     // Log de queries em desenvolvimento
@@ -79,10 +84,20 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
       } catch (error: any) {
         lastError = error;
 
-        // Códigos de erro que indicam problemas de conexão
-        const connectionErrors = ['P1001', 'P1002', 'P1008', 'P1017'];
+        // P2037: Too many database connections (pool exhausted) - aguardar sem reconectar
+        if (error.code === 'P2037') {
+          this.logger.warn(
+            `Pool de conexões esgotado (P2037). Aguardando ${(i + 1) * 2}s antes de tentar novamente... (${i + 1}/${maxRetries})`,
+          );
+          // Aguardar progressivamente mais tempo (2s, 4s, 6s)
+          await new Promise((resolve) => setTimeout(resolve, 2000 * (i + 1)));
+          continue;
+        }
 
-        if (connectionErrors.includes(error.code)) {
+        // Códigos de erro que indicam problemas de conexão (reconectar)
+        const reconnectionErrors = ['P1001', 'P1002', 'P1008', 'P1017'];
+
+        if (reconnectionErrors.includes(error.code)) {
           this.logger.warn(
             `Erro de conexão detectado (${error.code}). Tentativa ${i + 1}/${maxRetries}`,
           );

@@ -1,0 +1,50 @@
+[
+  {
+    "id": "cmfkhvuln000d2fhcge9vt4qc ",
+    "nome": "Horário Comercial Padrão",
+    "descricao": "Configuração padrão para empresas: Segunda a Sexta-feira",
+    "segunda": true,
+    "terca": true,
+    "quarta": true,
+    "quinta": true,
+    "sexta": true,
+    "sabado": false,
+    "domingo": false,
+    "geral": true,
+    "ativo": true,
+    "created_at": "2025-09-15T02:18:28.000Z",
+    "updated_at": "2025-09-15T02:18:28.000Z"
+  },
+  {
+    "id": "cmfkhvuth000e2fhcmfwkjyhw ",
+    "nome": "Operação Industrial 24h",
+    "descricao": "Para plantas industriais que operam todos os dias da semana",
+    "segunda": true,
+    "terca": true,
+    "quarta": true,
+    "quinta": true,
+    "sexta": true,
+    "sabado": true,
+    "domingo": true,
+    "geral": false,
+    "ativo": true,
+    "created_at": "2025-09-15T02:18:28.000Z",
+    "updated_at": "2025-09-15T02:18:28.000Z"
+  },
+  {
+    "id": "cmfkhvvd0000f2fhcs4c8a31j ",
+    "nome": "Horário Oficinas",
+    "descricao": "Para oficinas e serviços: Segunda a Sábado",
+    "segunda": true,
+    "terca": true,
+    "quarta": true,
+    "quinta": true,
+    "sexta": true,
+    "sabado": true,
+    "domingo": false,
+    "geral": false,
+    "ativo": true,
+    "created_at": "2025-09-15T02:18:29.000Z",
+    "updated_at": "2025-09-15T02:18:29.000Z"
+  }
+]

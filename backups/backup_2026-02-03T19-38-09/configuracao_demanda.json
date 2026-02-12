@@ -1,0 +1,59 @@
+[
+  {
+    "id": "cfgmiiv4lrz9bmf712u5zw    ",
+    "unidade_id": "cmhcfvf5k0001jqo8nff75bcv ",
+    "fonte": "AGRUPAMENTO",
+    "equipamentos_ids": [
+      "cmhddtv0h0024jqo8h4dzm4gq",
+      "cmhdd6wkv001kjqo8rl39taa6",
+      "cmhcfyoj30003jqo8bhhaexlp"
+    ],
+    "mostrar_detalhes": false,
+    "intervalo_atualizacao": 30,
+    "aplicar_perdas": false,
+    "fator_perdas": "3",
+    "valor_contratado": "999",
+    "percentual_adicional": "5",
+    "created_at": "2025-11-28T12:52:46.000Z",
+    "updated_at": "2025-12-18T18:09:08.000Z",
+    "created_by": null,
+    "updated_by": "46s3jvitajhy00b67esqrie2jr"
+  },
+  {
+    "id": "cfgmkmkup75h9g5oj0hqv9    ",
+    "unidade_id": "cmkl9hsdn1mpdjq8j9ssw7kfu ",
+    "fonte": "AGRUPAMENTO",
+    "equipamentos_ids": [
+      "cmklcc7zz1n2ujq8jrkozgit2",
+      "cmkl9jq8w1mprjq8jyvkfn57o"
+    ],
+    "mostrar_detalhes": true,
+    "intervalo_atualizacao": 30,
+    "aplicar_perdas": true,
+    "fator_perdas": "3",
+    "valor_contratado": "150",
+    "percentual_adicional": "5",
+    "created_at": "2026-01-20T12:35:37.000Z",
+    "updated_at": "2026-01-20T12:35:37.000Z",
+    "created_by": "k6g72ojagrl415bsak6y68qi96",
+    "updated_by": null
+  },
+  {
+    "id": "cfgmkcnfy8kj22oph05xf     ",
+    "unidade_id": "cmidit6r5008zjq0t6po4x34v ",
+    "fonte": "AGRUPAMENTO",
+    "equipamentos_ids": [
+      "cmkbk4a17006z2fqciyehzk0r"
+    ],
+    "mostrar_detalhes": true,
+    "intervalo_atualizacao": 30,
+    "aplicar_perdas": true,
+    "fator_perdas": "3",
+    "valor_contratado": "450",
+    "percentual_adicional": "5",
+    "created_at": "2026-01-13T13:50:26.000Z",
+    "updated_at": "2026-01-23T13:24:06.000Z",
+    "created_by": "k6g72ojagrl415bsak6y68qi96",
+    "updated_by": "ppkh5pl3o8d974is9z00x4bxzl"
+  }
+]

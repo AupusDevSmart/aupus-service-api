@@ -65,13 +65,9 @@ class ConfiguracoesDto {
   @Type(() => ViewportConfigDto)
   viewport?: ViewportConfigDto;
 
-  @ApiPropertyOptional({ description: 'Componentes visuais do diagrama (PONTO, BARRAMENTO, JUNCTION)', type: 'array' })
-  @IsOptional()
-  componentesVisuais?: any[];
-
-  @ApiPropertyOptional({ description: 'Conexões visuais (que envolvem componentes visuais)', type: 'array' })
-  @IsOptional()
-  conexoesVisuais?: any[];
+  // ❌ REMOVIDO V2: componentesVisuais e conexoesVisuais
+  // Barramentos e pontos de junção não existem mais no backend
+  // São calculados algoritmicamente no frontend
 
   @ApiPropertyOptional({
     description: 'Posições customizadas dos labels dos componentes (mapeado por equipamento_id)',

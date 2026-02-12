@@ -78,15 +78,7 @@ export class EquipamentosDiagramaService {
       throw new BadRequestException('Rotação deve estar entre 0 e 360 graus');
     }
 
-    // 7. Mesclar propriedades existentes com as novas (incluindo labelOffset)
-    const propriedadesExistentes = (equipamento.propriedades as any) || {};
-    const propriedadesMescladas = {
-      ...propriedadesExistentes,
-      ...propriedades,
-      ...(labelOffset !== undefined && labelOffset !== null ? { labelOffset } : {}),
-    };
-
-    // 8. Atualizar equipamento
+    // 7. Atualizar equipamento (V2 - sem customização de dimensões/propriedades)
     console.log(`💾 [addEquipamento] Salvando no banco:`, {
       equipamentoId,
       posicao_x: posicao.x,
@@ -102,9 +94,6 @@ export class EquipamentosDiagramaService {
         posicao_y: posicao.y,
         rotacao: rotacao ?? 0,
         label_position: labelPosition || 'bottom',
-        largura_customizada: dimensoes?.largura,
-        altura_customizada: dimensoes?.altura,
-        propriedades: propriedadesMescladas as any,
       },
     });
 
@@ -155,15 +144,7 @@ export class EquipamentosDiagramaService {
       throw new BadRequestException('Rotação deve estar entre 0 e 360 graus');
     }
 
-    // 4. Mesclar propriedades (incluindo labelOffset)
-    const propriedadesExistentes = (equipamento.propriedades as any) || {};
-    const propriedadesMescladas = {
-      ...propriedadesExistentes,
-      ...propriedades,
-      ...(labelOffset !== undefined && labelOffset !== null ? { labelOffset } : {}),
-    };
-
-    // 5. Atualizar equipamento
+    // 4. Atualizar equipamento (V2 - sem customização de dimensões/propriedades)
     const equipamentoAtualizado = await this.prisma.equipamentos.update({
       where: { id: equipamentoId },
       data: {
@@ -171,9 +152,6 @@ export class EquipamentosDiagramaService {
         posicao_y: posicao?.y,
         rotacao,
         label_position: labelPosition,
-        largura_customizada: dimensoes?.largura,
-        altura_customizada: dimensoes?.altura,
-        propriedades: propriedadesMescladas as any,
       },
     });
 
@@ -415,17 +393,7 @@ export class EquipamentosDiagramaService {
             continue;
           }
 
-          // Preparar propriedades
-          const propriedadesExistentes = (equipamento.propriedades as any) || {};
-          const propriedadesMescladas = {
-            ...propriedadesExistentes,
-            ...equipDto.propriedades,
-            ...(equipDto.labelOffset !== undefined && equipDto.labelOffset !== null
-              ? { labelOffset: equipDto.labelOffset }
-              : {}),
-          };
-
-          // Atualizar equipamento
+          // Atualizar equipamento (V2 - sem customização)
           const equipamentoAtualizado = await tx.equipamentos.update({
             where: { id: equipDto.equipamentoId },
             data: {
@@ -434,9 +402,6 @@ export class EquipamentosDiagramaService {
               posicao_y: equipDto.posicao.y,
               rotacao: equipDto.rotacao ?? 0,
               label_position: equipDto.labelPosition || 'bottom',
-              largura_customizada: equipDto.dimensoes?.largura,
-              altura_customizada: equipDto.dimensoes?.altura,
-              propriedades: propriedadesMescladas as any,
             },
           });
 
@@ -471,10 +436,9 @@ export class EquipamentosDiagramaService {
   }
 
   /**
-   * Formata a resposta do equipamento
+   * Formata a resposta do equipamento (V2 - sem customização)
    */
   private formatEquipamentoResponse(equipamento: any) {
-    const props = equipamento.propriedades as any || {};
     return {
       id: equipamento.id,
       diagramaId: equipamento.diagrama_id,
@@ -486,12 +450,6 @@ export class EquipamentosDiagramaService {
       },
       rotacao: equipamento.rotacao || 0,
       label_position: equipamento.label_position,
-      label_offset: props.labelOffset,
-      dimensoes: {
-        largura: equipamento.largura_customizada || 64,
-        altura: equipamento.altura_customizada || 64,
-      },
-      propriedades: equipamento.propriedades,
       updatedAt: equipamento.updated_at,
     };
   }

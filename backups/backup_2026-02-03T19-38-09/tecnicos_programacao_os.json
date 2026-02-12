@@ -1,0 +1,67 @@
+[
+  {
+    "id": "cmhjflz5f00042f5wwft79qsm",
+    "programacao_id": "cmhjflxy200012f5w6zogbbww",
+    "nome": "teste tecnico 1",
+    "especialidade": "Técnico Elétrico",
+    "horas_estimadas": "8",
+    "custo_hora": "200",
+    "custo_total": "1600",
+    "disponivel": true,
+    "tecnico_id": null,
+    "created_at": "2025-11-03T17:46:26.739Z",
+    "updated_at": "2025-11-03T17:46:26.739Z"
+  },
+  {
+    "id": "cmhti4wvv00042focb4nzfaqz",
+    "programacao_id": "cmhti4vse00012foc9c9cr0an",
+    "nome": "fsefsefsefse",
+    "especialidade": "Técnico Mecânico",
+    "horas_estimadas": "8",
+    "custo_hora": "78",
+    "custo_total": "624",
+    "disponivel": true,
+    "tecnico_id": null,
+    "created_at": "2025-11-10T18:54:51.259Z",
+    "updated_at": "2025-11-10T18:54:51.259Z"
+  },
+  {
+    "id": "cmhtispvo000s2f0g1zqimeix",
+    "programacao_id": "cmhtisoo2000p2f0gpwz272xi",
+    "nome": "aaaaaaaaaaa",
+    "especialidade": "Técnico Elétrico",
+    "horas_estimadas": "8",
+    "custo_hora": "54",
+    "custo_total": "432",
+    "disponivel": true,
+    "tecnico_id": null,
+    "created_at": "2025-11-10T19:13:21.925Z",
+    "updated_at": "2025-11-10T19:13:21.925Z"
+  },
+  {
+    "id": "cmj0ifuko001b2fr0smrkporc",
+    "programacao_id": "cmj0ifrnm00152fr0str3aahm",
+    "nome": "eu",
+    "especialidade": "Técnico Elétrico",
+    "horas_estimadas": "8",
+    "custo_hora": "7",
+    "custo_total": "56",
+    "disponivel": true,
+    "tecnico_id": null,
+    "created_at": "2025-12-10T21:17:27.048Z",
+    "updated_at": "2025-12-10T21:17:27.048Z"
+  },
+  {
+    "id": "cmj0ifuko001c2fr00fb4sigk",
+    "programacao_id": "cmj0ifrnm00152fr0str3aahm",
+    "nome": "art",
+    "especialidade": "Outros",
+    "horas_estimadas": "8",
+    "custo_hora": "6",
+    "custo_total": "48",
+    "disponivel": true,
+    "tecnico_id": null,
+    "created_at": "2025-12-10T21:17:27.048Z",
+    "updated_at": "2025-12-10T21:17:27.048Z"
+  }
+]

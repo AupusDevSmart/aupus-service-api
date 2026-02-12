@@ -1,0 +1,425 @@
+{
+  "timestamp": "2026-02-03T19:44:48.886Z",
+  "database": "aupus",
+  "totalTables": 80,
+  "successfulTables": 66,
+  "failedTables": 14,
+  "totalRecords": 32150,
+  "duration": "398.99s",
+  "stats": [
+    {
+      "tableName": "cache_locks",
+      "recordCount": 0,
+      "status": "success"
+    },
+    {
+      "tableName": "concessionaria_usuario",
+      "recordCount": 0,
+      "status": "success"
+    },
+    {
+      "tableName": "concessionarias",
+      "recordCount": 1,
+      "status": "success"
+    },
+    {
+      "tableName": "configuracoes",
+      "recordCount": 3,
+      "status": "success"
+    },
+    {
+      "tableName": "consorcios",
+      "recordCount": 0,
+      "status": "success"
+    },
+    {
+      "tableName": "controle_clube",
+      "recordCount": 1,
+      "status": "success"
+    },
+    {
+      "tableName": "documentos",
+      "recordCount": 0,
+      "status": "success"
+    },
+    {
+      "tableName": "enderecos",
+      "recordCount": 30,
+      "status": "success"
+    },
+    {
+      "tableName": "failed_jobs",
+      "recordCount": 0,
+      "status": "success"
+    },
+    {
+      "tableName": "faturas",
+      "recordCount": 0,
+      "status": "success"
+    },
+    {
+      "tableName": "feedbacks",
+      "recordCount": 0,
+      "status": "success"
+    },
+    {
+      "tableName": "historicos_faturamento",
+      "recordCount": 0,
+      "status": "success"
+    },
+    {
+      "tableName": "migrations",
+      "recordCount": 56,
+      "status": "success"
+    },
+    {
+      "tableName": "model_has_permissions",
+      "recordCount": 0,
+      "status": "error",
+      "error": "Do not know how to serialize a BigInt"
+    },
+    {
+      "tableName": "model_has_roles",
+      "recordCount": 0,
+      "status": "error",
+      "error": "Do not know how to serialize a BigInt"
+    },
+    {
+      "tableName": "notificacoes",
+      "recordCount": 0,
+      "status": "success"
+    },
+    {
+      "tableName": "oportunidades",
+      "recordCount": 0,
+      "status": "success"
+    },
+    {
+      "tableName": "organizacao_usuario",
+      "recordCount": 0,
+      "status": "success"
+    },
+    {
+      "tableName": "organizacoes",
+      "recordCount": 0,
+      "status": "success"
+    },
+    {
+      "tableName": "password_reset_tokens",
+      "recordCount": 0,
+      "status": "success"
+    },
+    {
+      "tableName": "permissions",
+      "recordCount": 0,
+      "status": "error",
+      "error": "Do not know how to serialize a BigInt"
+    },
+    {
+      "tableName": "personal_access_tokens",
+      "recordCount": 0,
+      "status": "error",
+      "error": "Do not know how to serialize a BigInt"
+    },
+    {
+      "tableName": "propostas",
+      "recordCount": 17,
+      "status": "success"
+    },
+    {
+      "tableName": "prospects",
+      "recordCount": 0,
+      "status": "success"
+    },
+    {
+      "tableName": "rateios",
+      "recordCount": 0,
+      "status": "success"
+    },
+    {
+      "tableName": "role_has_permissions",
+      "recordCount": 0,
+      "status": "error",
+      "error": "Do not know how to serialize a BigInt"
+    },
+    {
+      "tableName": "roles",
+      "recordCount": 0,
+      "status": "error",
+      "error": "Do not know how to serialize a BigInt"
+    },
+    {
+      "tableName": "sessions",
+      "recordCount": 16,
+      "status": "success"
+    },
+    {
+      "tableName": "telefones",
+      "recordCount": 0,
+      "status": "success"
+    },
+    {
+      "tableName": "telescope_entries",
+      "recordCount": 0,
+      "status": "error",
+      "error": "Do not know how to serialize a BigInt"
+    },
+    {
+      "tableName": "telescope_entries_tags",
+      "recordCount": 26605,
+      "status": "success"
+    },
+    {
+      "tableName": "telescope_monitoring",
+      "recordCount": 0,
+      "status": "success"
+    },
+    {
+      "tableName": "unidades_consumidoras",
+      "recordCount": 0,
+      "status": "error",
+      "error": "Do not know how to serialize a BigInt"
+    },
+    {
+      "tableName": "usuarios",
+      "recordCount": 70,
+      "status": "success"
+    },
+    {
+      "tableName": "plantas",
+      "recordCount": 15,
+      "status": "success"
+    },
+    {
+      "tableName": "unidades",
+      "recordCount": 40,
+      "status": "success"
+    },
+    {
+      "tableName": "diagramas_unitarios",
+      "recordCount": 20,
+      "status": "success"
+    },
+    {
+      "tableName": "inversor_leituras",
+      "recordCount": 0,
+      "status": "error",
+      "error": "\nInvalid `prisma.$queryRawUnsafe()` invocation:\n\n\nFailed to convert rust `String` into napi `string`"
+    },
+    {
+      "tableName": "categorias_equipamentos",
+      "recordCount": 17,
+      "status": "success"
+    },
+    {
+      "tableName": "tipos_equipamentos",
+      "recordCount": 33,
+      "status": "success"
+    },
+    {
+      "tableName": "equipamentos",
+      "recordCount": 279,
+      "status": "success"
+    },
+    {
+      "tableName": "equipamentos_dados_tecnicos",
+      "recordCount": 277,
+      "status": "success"
+    },
+    {
+      "tableName": "equipamentos_dados",
+      "recordCount": 0,
+      "status": "error",
+      "error": "Invalid string length"
+    },
+    {
+      "tableName": "equipamentos_conexoes",
+      "recordCount": 4344,
+      "status": "success"
+    },
+    {
+      "tableName": "anomalias",
+      "recordCount": 10,
+      "status": "success"
+    },
+    {
+      "tableName": "historico_anomalias",
+      "recordCount": 11,
+      "status": "success"
+    },
+    {
+      "tableName": "anexos_anomalias",
+      "recordCount": 0,
+      "status": "error",
+      "error": "Do not know how to serialize a BigInt"
+    },
+    {
+      "tableName": "planos_manutencao",
+      "recordCount": 4,
+      "status": "success"
+    },
+    {
+      "tableName": "tarefas",
+      "recordCount": 7,
+      "status": "success"
+    },
+    {
+      "tableName": "sub_tarefas",
+      "recordCount": 0,
+      "status": "success"
+    },
+    {
+      "tableName": "recursos_tarefa",
+      "recordCount": 0,
+      "status": "success"
+    },
+    {
+      "tableName": "anexos_tarefa",
+      "recordCount": 0,
+      "status": "success"
+    },
+    {
+      "tableName": "feriados",
+      "recordCount": 14,
+      "status": "success"
+    },
+    {
+      "tableName": "feriado_plantas",
+      "recordCount": 7,
+      "status": "success"
+    },
+    {
+      "tableName": "configuracoes_dias_uteis",
+      "recordCount": 3,
+      "status": "success"
+    },
+    {
+      "tableName": "configuracao_plantas",
+      "recordCount": 3,
+      "status": "success"
+    },
+    {
+      "tableName": "veiculo",
+      "recordCount": 0,
+      "status": "error",
+      "error": "\nInvalid `prisma.$queryRawUnsafe()` invocation:\n\n\nRaw query failed. Code: `42P01`. Message: `relation \"veiculo\" does not exist`"
+    },
+    {
+      "tableName": "documentacao_veiculo",
+      "recordCount": 0,
+      "status": "error",
+      "error": "\nInvalid `prisma.$queryRawUnsafe()` invocation:\n\n\nRaw query failed. Code: `42P01`. Message: `relation \"documentacao_veiculo\" does not exist`"
+    },
+    {
+      "tableName": "reserva_veiculo",
+      "recordCount": 0,
+      "status": "error",
+      "error": "\nInvalid `prisma.$queryRawUnsafe()` invocation:\n\n\nRaw query failed. Code: `42P01`. Message: `relation \"reserva_veiculo\" does not exist`"
+    },
+    {
+      "tableName": "programacoes_os",
+      "recordCount": 36,
+      "status": "success"
+    },
+    {
+      "tableName": "materiais_programacao_os",
+      "recordCount": 5,
+      "status": "success"
+    },
+    {
+      "tableName": "ferramentas_programacao_os",
+      "recordCount": 4,
+      "status": "success"
+    },
+    {
+      "tableName": "tecnicos_programacao_os",
+      "recordCount": 5,
+      "status": "success"
+    },
+    {
+      "tableName": "historico_programacao_os",
+      "recordCount": 96,
+      "status": "success"
+    },
+    {
+      "tableName": "ordens_servico",
+      "recordCount": 11,
+      "status": "success"
+    },
+    {
+      "tableName": "tarefas_programacao_os",
+      "recordCount": 6,
+      "status": "success"
+    },
+    {
+      "tableName": "tarefas_os",
+      "recordCount": 4,
+      "status": "success"
+    },
+    {
+      "tableName": "materiais_os",
+      "recordCount": 4,
+      "status": "success"
+    },
+    {
+      "tableName": "ferramentas_os",
+      "recordCount": 3,
+      "status": "success"
+    },
+    {
+      "tableName": "tecnicos_os",
+      "recordCount": 4,
+      "status": "success"
+    },
+    {
+      "tableName": "historico_os",
+      "recordCount": 49,
+      "status": "success"
+    },
+    {
+      "tableName": "checklist_atividades_os",
+      "recordCount": 30,
+      "status": "success"
+    },
+    {
+      "tableName": "anexos_os",
+      "recordCount": 0,
+      "status": "success"
+    },
+    {
+      "tableName": "registros_tempo_os",
+      "recordCount": 5,
+      "status": "success"
+    },
+    {
+      "tableName": "ferramentas",
+      "recordCount": 0,
+      "status": "success"
+    },
+    {
+      "tableName": "historico_calibracoes",
+      "recordCount": 0,
+      "status": "success"
+    },
+    {
+      "tableName": "historico_manutencoes",
+      "recordCount": 0,
+      "status": "success"
+    },
+    {
+      "tableName": "concessionarias_energia",
+      "recordCount": 1,
+      "status": "success"
+    },
+    {
+      "tableName": "anexos_concessionarias_energia",
+      "recordCount": 1,
+      "status": "success"
+    },
+    {
+      "tableName": "configuracao_demanda",
+      "recordCount": 3,
+      "status": "success"
+    }
+  ]
+}

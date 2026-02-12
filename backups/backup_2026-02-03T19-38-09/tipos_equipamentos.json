@@ -1,0 +1,1787 @@
+[
+  {
+    "id": "01JAQTE1DISJABERTO0000012 ",
+    "codigo": "DISJUNTOR_ABERTO",
+    "nome": "Disjuntor Aberto (Desenergizado)",
+    "largura_padrao": 32,
+    "altura_padrao": 24,
+    "icone_svg": null,
+    "propriedades_schema": null,
+    "created_at": "2025-10-20T18:27:24.321Z",
+    "updated_at": "2026-01-07T18:39:16.852Z",
+    "categoria_id": "502e36ab06f54aeface2637156",
+    "fabricante": "Genérico",
+    "mqtt_schema": null
+  },
+  {
+    "id": "01JAQTE1DISJFECHADO000011 ",
+    "codigo": "DISJUNTOR_FECHADO",
+    "nome": "Disjuntor Fechado (Energizado)",
+    "largura_padrao": 32,
+    "altura_padrao": 24,
+    "icone_svg": null,
+    "propriedades_schema": null,
+    "created_at": "2025-10-20T18:27:24.321Z",
+    "updated_at": "2026-01-07T18:39:17.245Z",
+    "categoria_id": "502e36ab06f54aeface2637156",
+    "fabricante": "Genérico",
+    "mqtt_schema": null
+  },
+  {
+    "id": "01JAQTE1CHAVEABERTA000013 ",
+    "codigo": "CHAVE_ABERTA",
+    "nome": "Chave Seccionadora Aberta",
+    "largura_padrao": 32,
+    "altura_padrao": 24,
+    "icone_svg": null,
+    "propriedades_schema": null,
+    "created_at": "2025-10-20T18:27:24.321Z",
+    "updated_at": "2026-01-07T18:39:17.638Z",
+    "categoria_id": "3605964d663b40d986df754ced",
+    "fabricante": "Genérico",
+    "mqtt_schema": null
+  },
+  {
+    "id": "01JAQTE1CHAVEFECHADA00014 ",
+    "codigo": "CHAVE_FECHADA",
+    "nome": "Chave Seccionadora Fechada",
+    "largura_padrao": 32,
+    "altura_padrao": 24,
+    "icone_svg": null,
+    "propriedades_schema": null,
+    "created_at": "2025-10-20T18:27:24.321Z",
+    "updated_at": "2026-01-07T18:39:18.047Z",
+    "categoria_id": "3605964d663b40d986df754ced",
+    "fabricante": "Genérico",
+    "mqtt_schema": null
+  },
+  {
+    "id": "01JAQTE1CHAVEFUSIVEL00015 ",
+    "codigo": "CHAVE_FUSIVEL",
+    "nome": "Chave Fusível",
+    "largura_padrao": 32,
+    "altura_padrao": 24,
+    "icone_svg": null,
+    "propriedades_schema": null,
+    "created_at": "2025-10-20T18:27:24.321Z",
+    "updated_at": "2026-01-07T18:39:18.436Z",
+    "categoria_id": "3605964d663b40d986df754ced",
+    "fabricante": "Genérico",
+    "mqtt_schema": null
+  },
+  {
+    "id": "01JAQTE1CAPACITOR00000018 ",
+    "codigo": "CAPACITOR",
+    "nome": "Banco de Capacitores",
+    "largura_padrao": 32,
+    "altura_padrao": 48,
+    "icone_svg": null,
+    "propriedades_schema": null,
+    "created_at": "2025-10-20T18:27:24.321Z",
+    "updated_at": "2026-01-07T18:39:19.217Z",
+    "categoria_id": "dca628d31635437e957f2598a9",
+    "fabricante": "Genérico",
+    "mqtt_schema": null
+  },
+  {
+    "id": "01JAQTE1BOTOEIRA000000019 ",
+    "codigo": "BOTOEIRA",
+    "nome": "Botoeira de Comando",
+    "largura_padrao": 24,
+    "altura_padrao": 24,
+    "icone_svg": null,
+    "propriedades_schema": null,
+    "created_at": "2025-10-20T18:27:24.321Z",
+    "updated_at": "2026-01-07T18:39:21.169Z",
+    "categoria_id": "9956da3a54a240398df9a75e06",
+    "fabricante": "Genérico",
+    "mqtt_schema": null
+  },
+  {
+    "id": "01JAQTE1CFTV0000000000022 ",
+    "codigo": "CFTV",
+    "nome": "Sistema de CFTV",
+    "largura_padrao": 48,
+    "altura_padrao": 48,
+    "icone_svg": null,
+    "propriedades_schema": null,
+    "created_at": "2025-10-20T18:27:24.321Z",
+    "updated_at": "2026-01-07T18:39:21.563Z",
+    "categoria_id": "9956da3a54a240398df9a75e06",
+    "fabricante": "Genérico",
+    "mqtt_schema": null
+  },
+  {
+    "id": "01JAQTE1PAINELPMT00000026 ",
+    "codigo": "PAINEL_PMT",
+    "nome": "Painel PMT",
+    "largura_padrao": 64,
+    "altura_padrao": 64,
+    "icone_svg": null,
+    "propriedades_schema": null,
+    "created_at": "2025-10-20T18:27:24.321Z",
+    "updated_at": "2026-01-07T18:39:21.952Z",
+    "categoria_id": "9956da3a54a240398df9a75e06",
+    "fabricante": "Genérico",
+    "mqtt_schema": null
+  },
+  {
+    "id": "01JAQTE1SALACOMANDO000028 ",
+    "codigo": "SALA_COMANDO",
+    "nome": "Sala de Comando",
+    "largura_padrao": 96,
+    "altura_padrao": 80,
+    "icone_svg": null,
+    "propriedades_schema": null,
+    "created_at": "2025-10-20T18:27:24.321Z",
+    "updated_at": "2026-01-07T18:39:23.136Z",
+    "categoria_id": "9956da3a54a240398df9a75e06",
+    "fabricante": "Genérico",
+    "mqtt_schema": null
+  },
+  {
+    "id": "01JAQTE1SKID0000000000027 ",
+    "codigo": "SKID",
+    "nome": "SKID de Equipamentos",
+    "largura_padrao": 80,
+    "altura_padrao": 64,
+    "icone_svg": null,
+    "propriedades_schema": null,
+    "created_at": "2025-10-20T18:27:24.321Z",
+    "updated_at": "2026-01-07T18:39:23.928Z",
+    "categoria_id": "9956da3a54a240398df9a75e06",
+    "fabricante": "Genérico",
+    "mqtt_schema": null
+  },
+  {
+    "id": "01JAQTE1TELECOM00000000023",
+    "codigo": "TELECOM",
+    "nome": "Sistema de Telecomunicações",
+    "largura_padrao": 48,
+    "altura_padrao": 48,
+    "icone_svg": null,
+    "propriedades_schema": null,
+    "created_at": "2025-10-20T18:27:24.321Z",
+    "updated_at": "2026-01-07T18:39:24.311Z",
+    "categoria_id": "9956da3a54a240398df9a75e06",
+    "fabricante": "Genérico",
+    "mqtt_schema": null
+  },
+  {
+    "id": "tipo-ims-a966-001         ",
+    "codigo": "IMS_A966",
+    "nome": "IMS A966",
+    "largura_padrao": 64,
+    "altura_padrao": 64,
+    "icone_svg": "<svg>...</svg>",
+    "propriedades_schema": null,
+    "created_at": "2025-10-02T19:39:46.474Z",
+    "updated_at": "2026-01-07T19:47:12.081Z",
+    "categoria_id": "f668041b813c41758f1d352597",
+    "fabricante": "Kron",
+    "mqtt_schema": null
+  },
+  {
+    "id": "tipo-meter-landis-001     ",
+    "codigo": "METER_LANDIS",
+    "nome": "Landis Gyr",
+    "largura_padrao": 64,
+    "altura_padrao": 64,
+    "icone_svg": "<svg>...</svg>",
+    "propriedades_schema": null,
+    "created_at": "2025-10-02T19:39:47.178Z",
+    "updated_at": "2026-01-07T19:47:12.346Z",
+    "categoria_id": "9956da3a54a240398df9a75e06",
+    "fabricante": "Genérico",
+    "mqtt_schema": null
+  },
+  {
+    "id": "01JAQTE1DISJUNTOR000000010",
+    "codigo": "DISJUNTOR",
+    "nome": "Disjuntor",
+    "largura_padrao": 32,
+    "altura_padrao": 24,
+    "icone_svg": null,
+    "propriedades_schema": {
+      "campos": [
+        {
+          "tipo": "number",
+          "campo": "Tensão Nominal",
+          "unidade": "V",
+          "obrigatorio": true
+        },
+        {
+          "tipo": "number",
+          "campo": "Corrente Nominal",
+          "unidade": "A",
+          "obrigatorio": true
+        },
+        {
+          "tipo": "number",
+          "campo": "Capacidade Ruptura",
+          "unidade": "kA",
+          "obrigatorio": true
+        },
+        {
+          "tipo": "select",
+          "campo": "Número Polos",
+          "opcoes": [
+            "1",
+            "2",
+            "3",
+            "4"
+          ],
+          "obrigatorio": true
+        },
+        {
+          "tipo": "select",
+          "campo": "Curva Atuação",
+          "opcoes": [
+            "B",
+            "C",
+            "D",
+            "K",
+            "Z"
+          ],
+          "obrigatorio": false
+        },
+        {
+          "tipo": "select",
+          "campo": "Tipo Acionamento",
+          "opcoes": [
+            "Manual",
+            "Motorizado",
+            "Remoto"
+          ],
+          "obrigatorio": false
+        },
+        {
+          "tipo": "select",
+          "campo": "Categoria Utilização",
+          "opcoes": [
+            "A",
+            "B"
+          ],
+          "obrigatorio": false
+        }
+      ]
+    },
+    "created_at": "2025-10-20T18:27:24.321Z",
+    "updated_at": "2026-01-07T19:46:51.014Z",
+    "categoria_id": "502e36ab06f54aeface2637156",
+    "fabricante": "Schneider",
+    "mqtt_schema": null
+  },
+  {
+    "id": "01JAQTE1TRANSFORM00000007 ",
+    "codigo": "TRANSFORMADOR",
+    "nome": "Transformador",
+    "largura_padrao": 48,
+    "altura_padrao": 48,
+    "icone_svg": null,
+    "propriedades_schema": {
+      "campos": [
+        {
+          "tipo": "number",
+          "campo": "Potência Nominal",
+          "unidade": "kVA",
+          "descricao": "Potência nominal do transformador",
+          "obrigatorio": true
+        },
+        {
+          "tipo": "number",
+          "campo": "Tensão Primária",
+          "unidade": "kV",
+          "descricao": "Tensão do lado primário",
+          "obrigatorio": true
+        },
+        {
+          "tipo": "number",
+          "campo": "Tensão Secundária",
+          "unidade": "kV",
+          "descricao": "Tensão do lado secundário",
+          "obrigatorio": true
+        },
+        {
+          "tipo": "select",
+          "campo": "Tipo de TAP",
+          "opcoes": [
+            "Com Carga",
+            "Sem Carga"
+          ],
+          "descricao": "Tipo de comutador de tap",
+          "obrigatorio": true
+        },
+        {
+          "tipo": "number",
+          "campo": "Quantidade de TAPs",
+          "descricao": "Número total de posições de tap (ex: 7, 25, 34)",
+          "obrigatorio": true
+        },
+        {
+          "tipo": "number",
+          "campo": "Tensão Referência",
+          "unidade": "kV",
+          "descricao": "Tensão de referência para o tap (ex: 30 kV)",
+          "obrigatorio": false
+        },
+        {
+          "tipo": "number",
+          "campo": "TAP Referência",
+          "descricao": "Posição de tap de referência (ex: 4)",
+          "obrigatorio": false
+        },
+        {
+          "tipo": "number",
+          "campo": "Frequência",
+          "unidade": "Hz",
+          "descricao": "Frequência nominal",
+          "obrigatorio": false,
+          "valor_padrao": 60
+        },
+        {
+          "tipo": "text",
+          "campo": "Grupo de Ligação",
+          "descricao": "Grupo de ligação (ex: Dyn1, Dyn11, Yyn0)",
+          "obrigatorio": false
+        },
+        {
+          "tipo": "number",
+          "campo": "Impedância",
+          "unidade": "%",
+          "descricao": "Impedância percentual",
+          "obrigatorio": false
+        },
+        {
+          "tipo": "number",
+          "campo": "Perdas em Vazio",
+          "unidade": "W",
+          "descricao": "Perdas em vazio",
+          "obrigatorio": false
+        },
+        {
+          "tipo": "number",
+          "campo": "Perdas em Carga",
+          "unidade": "W",
+          "descricao": "Perdas totais em carga",
+          "obrigatorio": false
+        },
+        {
+          "tipo": "select",
+          "campo": "Tipo de Resfriamento",
+          "opcoes": [
+            "ONAN",
+            "ONAF",
+            "OFAF",
+            "OFWF"
+          ],
+          "descricao": "Tipo de sistema de resfriamento",
+          "obrigatorio": false
+        },
+        {
+          "tipo": "number",
+          "campo": "Peso Total",
+          "unidade": "kg",
+          "descricao": "Peso total do transformador",
+          "obrigatorio": false
+        },
+        {
+          "tipo": "number",
+          "campo": "Volume de Óleo",
+          "unidade": "L",
+          "descricao": "Volume de óleo isolante",
+          "obrigatorio": false
+        }
+      ]
+    },
+    "created_at": "2025-10-20T18:27:24.321Z",
+    "updated_at": "2026-01-07T19:46:52.521Z",
+    "categoria_id": "fa2c0c2b861e4b5a8e87e33825",
+    "fabricante": "Genérico",
+    "mqtt_schema": null
+  },
+  {
+    "id": "01JAQTE1INVERSOR000000005 ",
+    "codigo": "INVERSOR",
+    "nome": "Inversor Solar",
+    "largura_padrao": 48,
+    "altura_padrao": 32,
+    "icone_svg": null,
+    "propriedades_schema": {
+      "campos": [
+        {
+          "tipo": "number",
+          "campo": "potencia_nominal",
+          "unidade": "kW",
+          "obrigatorio": true
+        },
+        {
+          "tipo": "number",
+          "campo": "tensao_entrada_max",
+          "unidade": "V",
+          "obrigatorio": true
+        },
+        {
+          "tipo": "number",
+          "campo": "tensao_saida",
+          "unidade": "V",
+          "obrigatorio": true,
+          "valor_padrao": 220
+        },
+        {
+          "tipo": "number",
+          "campo": "corrente_maxima_entrada",
+          "unidade": "A",
+          "obrigatorio": true
+        },
+        {
+          "tipo": "number",
+          "campo": "corrente_maxima_saida",
+          "unidade": "A",
+          "obrigatorio": true
+        },
+        {
+          "tipo": "number",
+          "campo": "eficiencia",
+          "unidade": "%",
+          "obrigatorio": false,
+          "valor_padrao": 97.5
+        },
+        {
+          "tipo": "number",
+          "campo": "mppt_trackers",
+          "obrigatorio": true,
+          "valor_padrao": 2
+        },
+        {
+          "tipo": "select",
+          "campo": "protocolo_comunicacao",
+          "opcoes": [
+            "Modbus RTU",
+            "Modbus TCP",
+            "SunSpec",
+            "Proprietário"
+          ],
+          "obrigatorio": false
+        },
+        {
+          "tipo": "select",
+          "campo": "topologia",
+          "opcoes": [
+            "String",
+            "Central",
+            "Micro-inversor"
+          ],
+          "obrigatorio": true
+        }
+      ]
+    },
+    "created_at": "2025-10-20T18:27:24.321Z",
+    "updated_at": "2026-01-07T18:39:14.027Z",
+    "categoria_id": "1a023241b14747f3ba18818627",
+    "fabricante": "Growatt",
+    "mqtt_schema": null
+  },
+  {
+    "id": "01JAQTE1MEDIDOR00000001   ",
+    "codigo": "MEDIDOR",
+    "nome": "Medidor de Energia",
+    "largura_padrao": 32,
+    "altura_padrao": 32,
+    "icone_svg": null,
+    "propriedades_schema": {
+      "campos": [
+        {
+          "tipo": "number",
+          "campo": "Tensão Nominal",
+          "unidade": "V",
+          "obrigatorio": true
+        },
+        {
+          "tipo": "number",
+          "campo": "Corrente Nominal",
+          "unidade": "A",
+          "obrigatorio": true
+        },
+        {
+          "tipo": "select",
+          "campo": "Classe Precisão",
+          "opcoes": [
+            "0.2",
+            "0.5",
+            "1.0",
+            "2.0"
+          ],
+          "obrigatorio": true
+        },
+        {
+          "tipo": "select",
+          "campo": "Fases",
+          "opcoes": [
+            "Monofásico",
+            "Bifásico",
+            "Trifásico"
+          ],
+          "obrigatorio": true
+        },
+        {
+          "tipo": "select",
+          "campo": "Comunicação",
+          "opcoes": [
+            "RS485",
+            "Ethernet",
+            "LoRa",
+            "Zigbee",
+            "Sem comunicação"
+          ],
+          "obrigatorio": false
+        }
+      ]
+    },
+    "created_at": "2025-12-22T18:23:34.283Z",
+    "updated_at": "2026-01-07T19:46:51.414Z",
+    "categoria_id": "9956da3a54a240398df9a75e06",
+    "fabricante": "Genérico",
+    "mqtt_schema": null
+  },
+  {
+    "id": "01JAQTE1PAINEL00000000006 ",
+    "codigo": "PAINEL_SOLAR",
+    "nome": "Painel Solar Fotovoltaico",
+    "largura_padrao": 64,
+    "altura_padrao": 48,
+    "icone_svg": "",
+    "propriedades_schema": {
+      "campos": [
+        {
+          "tipo": "number",
+          "campo": "Potência Pico",
+          "unidade": "W",
+          "obrigatorio": true
+        },
+        {
+          "tipo": "number",
+          "campo": "Tensão Circuito Aberto",
+          "unidade": "V",
+          "obrigatorio": true
+        },
+        {
+          "tipo": "number",
+          "campo": "Corrente Curto Circuito",
+          "unidade": "A",
+          "obrigatorio": true
+        },
+        {
+          "tipo": "number",
+          "campo": "Tensão Max Potência",
+          "unidade": "V",
+          "obrigatorio": true
+        },
+        {
+          "tipo": "number",
+          "campo": "Corrente Max Potência",
+          "unidade": "A",
+          "obrigatorio": true
+        },
+        {
+          "tipo": "number",
+          "campo": "Eficiência",
+          "unidade": "%",
+          "obrigatorio": false
+        },
+        {
+          "tipo": "select",
+          "campo": "Tecnologia",
+          "opcoes": [
+            "Monocristalino",
+            "Policristalino",
+            "Filme Fino",
+            "PERC",
+            "HJT"
+          ],
+          "obrigatorio": true
+        },
+        {
+          "tipo": "number",
+          "campo": "Quantidade Células",
+          "obrigatorio": false
+        },
+        {
+          "tipo": "text",
+          "campo": "Dimensões",
+          "descricao": "LxAxP em mm",
+          "obrigatorio": false
+        }
+      ]
+    },
+    "created_at": "2025-10-20T18:27:24.321Z",
+    "updated_at": "2026-01-07T19:46:51.841Z",
+    "categoria_id": "21ff276d901d417b9fbaa54357",
+    "fabricante": "Canadian Solar",
+    "mqtt_schema": null
+  },
+  {
+    "id": "01JAQTE1PIVO0000000000033 ",
+    "codigo": "PIVO",
+    "nome": "Pivô Central de Irrigação",
+    "largura_padrao": 48,
+    "altura_padrao": 48,
+    "icone_svg": null,
+    "propriedades_schema": {
+      "campos": [
+        {
+          "nome": "estado",
+          "tipo": "select",
+          "label": "Estado",
+          "opcoes": [
+            "ABERTO",
+            "FECHADO"
+          ],
+          "padrao": "ABERTO"
+        },
+        {
+          "max": 10,
+          "min": 0,
+          "nome": "velocidadeRotacao",
+          "tipo": "number",
+          "label": "Velocidade de Rotação (RPM)",
+          "padrao": 2
+        },
+        {
+          "max": 10,
+          "min": 0,
+          "nome": "pressaoAgua",
+          "tipo": "number",
+          "label": "Pressão da Água (bar)",
+          "padrao": 3.5
+        },
+        {
+          "max": 500,
+          "min": 0,
+          "nome": "vazaoAgua",
+          "tipo": "number",
+          "label": "Vazão de Água (m³/h)",
+          "padrao": 120
+        },
+        {
+          "max": 200,
+          "min": 0,
+          "nome": "areaIrrigada",
+          "tipo": "number",
+          "label": "Área Irrigada (hectares)",
+          "padrao": 50
+        },
+        {
+          "nome": "modoOperacao",
+          "tipo": "select",
+          "label": "Modo de Operação",
+          "opcoes": [
+            "AUTOMATICO",
+            "MANUAL"
+          ],
+          "padrao": "AUTOMATICO"
+        }
+      ]
+    },
+    "created_at": "2025-11-26T11:41:11.296Z",
+    "updated_at": "2026-01-07T18:39:14.419Z",
+    "categoria_id": "c5be08ecc2304fcd8a9bbb2fee",
+    "fabricante": "Valley",
+    "mqtt_schema": null
+  },
+  {
+    "id": "tipo-meter-m160-001       ",
+    "codigo": "METER_M160",
+    "nome": "Medidor M160",
+    "largura_padrao": 64,
+    "altura_padrao": 64,
+    "icone_svg": "<svg>...</svg>",
+    "propriedades_schema": null,
+    "created_at": "2025-10-02T19:39:45.355Z",
+    "updated_at": "2026-01-07T18:39:11.871Z",
+    "categoria_id": "9956da3a54a240398df9a75e06",
+    "fabricante": "Kron",
+    "mqtt_schema": {
+      "type": "object",
+      "required": [
+        "Resumo"
+      ],
+      "properties": {
+        "Ia": {
+          "type": "array",
+          "items": {
+            "type": "number",
+            "minimum": 0
+          },
+          "description": "Histórico de 30 leituras de corrente fase A (A)"
+        },
+        "Ib": {
+          "type": "array",
+          "items": {
+            "type": "number",
+            "minimum": 0
+          },
+          "description": "Histórico de 30 leituras de corrente fase B (A)"
+        },
+        "Ic": {
+          "type": "array",
+          "items": {
+            "type": "number",
+            "minimum": 0
+          },
+          "description": "Histórico de 30 leituras de corrente fase C (A)"
+        },
+        "Va": {
+          "type": "array",
+          "items": {
+            "type": "number",
+            "minimum": 0
+          },
+          "description": "Histórico de 30 leituras de tensão fase A (V)"
+        },
+        "Vb": {
+          "type": "array",
+          "items": {
+            "type": "number",
+            "minimum": 0
+          },
+          "description": "Histórico de 30 leituras de tensão fase B (V)"
+        },
+        "Vc": {
+          "type": "array",
+          "items": {
+            "type": "number",
+            "minimum": 0
+          },
+          "description": "Histórico de 30 leituras de tensão fase C (V)"
+        },
+        "FPa": {
+          "type": "array",
+          "items": {
+            "type": "number",
+            "maximum": 1,
+            "minimum": -1
+          },
+          "description": "Histórico de 30 leituras de fator de potência fase A"
+        },
+        "FPb": {
+          "type": "array",
+          "items": {
+            "type": "number",
+            "maximum": 1,
+            "minimum": -1
+          },
+          "description": "Histórico de 30 leituras de fator de potência fase B"
+        },
+        "FPc": {
+          "type": "array",
+          "items": {
+            "type": "number",
+            "maximum": 1,
+            "minimum": -1
+          },
+          "description": "Histórico de 30 leituras de fator de potência fase C"
+        },
+        "kwh": {
+          "type": "array",
+          "items": {
+            "type": "number",
+            "minimum": 0
+          },
+          "description": "Histórico de 30 leituras de energia (kWh)"
+        },
+        "kvarh": {
+          "type": "array",
+          "items": {
+            "type": "number"
+          },
+          "description": "Histórico de 30 leituras de energia reativa (kVArh)"
+        },
+        "Resumo": {
+          "type": "object",
+          "required": [
+            "energia_total",
+            "timestamp",
+            "total_leituras"
+          ],
+          "properties": {
+            "Ia_media": {
+              "type": "number",
+              "minimum": 0,
+              "description": "Corrente média fase A (A)"
+            },
+            "Ib_media": {
+              "type": "number",
+              "minimum": 0,
+              "description": "Corrente média fase B (A)"
+            },
+            "Ic_media": {
+              "type": "number",
+              "minimum": 0,
+              "description": "Corrente média fase C (A)"
+            },
+            "Va_media": {
+              "type": "number",
+              "maximum": 500,
+              "minimum": 0,
+              "description": "Tensão média fase A (V)"
+            },
+            "Vb_media": {
+              "type": "number",
+              "maximum": 500,
+              "minimum": 0,
+              "description": "Tensão média fase B (V)"
+            },
+            "Vc_media": {
+              "type": "number",
+              "maximum": 500,
+              "minimum": 0,
+              "description": "Tensão média fase C (V)"
+            },
+            "FPa_medio": {
+              "type": "number",
+              "maximum": 1,
+              "minimum": -1,
+              "description": "Fator de potência médio fase A"
+            },
+            "FPb_medio": {
+              "type": "number",
+              "maximum": 1,
+              "minimum": -1,
+              "description": "Fator de potência médio fase B"
+            },
+            "FPc_medio": {
+              "type": "number",
+              "maximum": 1,
+              "minimum": -1,
+              "description": "Fator de potência médio fase C"
+            },
+            "energia_a": {
+              "type": "number",
+              "minimum": 0,
+              "description": "Energia consumida fase A no período (kWh)"
+            },
+            "energia_b": {
+              "type": "number",
+              "minimum": 0,
+              "description": "Energia consumida fase B no período (kWh)"
+            },
+            "energia_c": {
+              "type": "number",
+              "minimum": 0,
+              "description": "Energia consumida fase C no período (kWh)"
+            },
+            "timestamp": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "Timestamp Unix da última leitura (segundos)"
+            },
+            "energia_total": {
+              "type": "number",
+              "minimum": 0,
+              "description": "Energia total consumida no período de 30s (kWh)"
+            },
+            "somatorio_phf": {
+              "type": "number",
+              "minimum": 0,
+              "description": "Energia ativa importada acumulada total (kWh)"
+            },
+            "somatorio_phr": {
+              "type": "number",
+              "minimum": 0,
+              "description": "Energia ativa exportada acumulada total (kWh)"
+            },
+            "total_leituras": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "description": "Número de leituras agregadas (geralmente 30)"
+            },
+            "consumo_total_phf": {
+              "type": "number",
+              "minimum": 0,
+              "description": "Consumo de energia importada nos últimos 30s (kWh)"
+            },
+            "consumo_total_phr": {
+              "type": "number",
+              "minimum": 0,
+              "description": "Consumo de energia exportada nos últimos 30s (kWh)"
+            }
+          }
+        }
+      }
+    }
+  },
+  {
+    "id": "01JAQTE1PONTO000000000029 ",
+    "codigo": "PONTO",
+    "nome": "Ponto de Junção",
+    "largura_padrao": 8,
+    "altura_padrao": 8,
+    "icone_svg": null,
+    "propriedades_schema": {
+      "campos": []
+    },
+    "created_at": "2025-10-20T18:27:24.321Z",
+    "updated_at": "2026-01-07T19:46:51.982Z",
+    "categoria_id": "9956da3a54a240398df9a75e06",
+    "fabricante": "Genérico",
+    "mqtt_schema": null
+  },
+  {
+    "id": "01JAQTE1RELE0000000000016 ",
+    "codigo": "RELE",
+    "nome": "Relé de Proteção",
+    "largura_padrao": 32,
+    "altura_padrao": 32,
+    "icone_svg": null,
+    "propriedades_schema": {
+      "campos": [
+        {
+          "tipo": "select",
+          "campo": "Tipo Proteção",
+          "opcoes": [
+            "Sobrecorrente",
+            "Subtensão",
+            "Sobretensão",
+            "Frequência",
+            "Diferencial",
+            "Distância",
+            "Multi-função"
+          ],
+          "obrigatorio": true
+        },
+        {
+          "tipo": "number",
+          "campo": "Tensão Nominal",
+          "unidade": "V",
+          "obrigatorio": true
+        },
+        {
+          "tipo": "number",
+          "campo": "Corrente Nominal",
+          "unidade": "A",
+          "obrigatorio": true
+        },
+        {
+          "tipo": "select",
+          "campo": "Protocolo Comunicação",
+          "opcoes": [
+            "IEC 61850",
+            "Modbus",
+            "DNP3",
+            "IEC 60870-5-104",
+            "Sem comunicação"
+          ],
+          "obrigatorio": false
+        },
+        {
+          "tipo": "text",
+          "campo": "Funções Ansi",
+          "descricao": "Ex: 50/51, 27, 59, 81",
+          "obrigatorio": false
+        },
+        {
+          "tipo": "number",
+          "campo": "Tempo Atuação",
+          "unidade": "ms",
+          "obrigatorio": false
+        }
+      ]
+    },
+    "created_at": "2025-10-20T18:27:24.321Z",
+    "updated_at": "2026-01-07T19:46:52.118Z",
+    "categoria_id": "fc7b9f5e1a9c44beaef8b3de02",
+    "fabricante": "Genérico",
+    "mqtt_schema": null
+  },
+  {
+    "id": "01JAQTE1A96600000000000020",
+    "codigo": "A966",
+    "nome": "Gateway IoT A-966",
+    "largura_padrao": 40,
+    "altura_padrao": 40,
+    "icone_svg": null,
+    "propriedades_schema": {
+      "campos": [
+        {
+          "tipo": "number",
+          "campo": "Tensão Alimentação",
+          "unidade": "V",
+          "obrigatorio": true,
+          "valor_padrao": 24
+        },
+        {
+          "tipo": "text",
+          "campo": "Ip Address",
+          "obrigatorio": true
+        },
+        {
+          "tipo": "text",
+          "campo": "Máscara Rede",
+          "obrigatorio": true,
+          "valor_padrao": "255.255.255.0"
+        },
+        {
+          "tipo": "text",
+          "campo": "Gateway",
+          "obrigatorio": true
+        },
+        {
+          "tipo": "number",
+          "campo": "Porta Modbus Tcp",
+          "obrigatorio": false,
+          "valor_padrao": 502
+        },
+        {
+          "tipo": "select",
+          "campo": "Protocolo Upstream",
+          "opcoes": [
+            "MQTT",
+            "HTTP",
+            "CoAP",
+            "WebSocket"
+          ],
+          "obrigatorio": true,
+          "valor_padrao": "MQTT"
+        },
+        {
+          "tipo": "text",
+          "campo": "Servidor Mqtt",
+          "obrigatorio": false
+        },
+        {
+          "tipo": "number",
+          "campo": "Porta Mqtt",
+          "obrigatorio": false,
+          "valor_padrao": 1883
+        },
+        {
+          "tipo": "text",
+          "campo": "Número Serie",
+          "obrigatorio": true
+        },
+        {
+          "tipo": "text",
+          "campo": "Firmware Version",
+          "obrigatorio": false
+        }
+      ]
+    },
+    "created_at": "2025-10-20T18:27:24.321Z",
+    "updated_at": "2026-01-07T19:46:51.147Z",
+    "categoria_id": "f668041b813c41758f1d352597",
+    "fabricante": "Kron",
+    "mqtt_schema": null
+  },
+  {
+    "id": "01JAQTE1BARRAMENTO0000008 ",
+    "codigo": "BARRAMENTO",
+    "nome": "Barramento Elétrico",
+    "largura_padrao": 64,
+    "altura_padrao": 16,
+    "icone_svg": null,
+    "propriedades_schema": {
+      "campos": [
+        {
+          "tipo": "number",
+          "campo": "Tensão Nominal",
+          "unidade": "V",
+          "obrigatorio": true
+        },
+        {
+          "tipo": "number",
+          "campo": "Corrente Nominal",
+          "unidade": "A",
+          "obrigatorio": true
+        },
+        {
+          "tipo": "select",
+          "campo": "Material",
+          "opcoes": [
+            "Cobre",
+            "Alumínio"
+          ],
+          "obrigatorio": true
+        },
+        {
+          "tipo": "select",
+          "campo": "Configuração",
+          "opcoes": [
+            "Monofásico",
+            "Bifásico",
+            "Trifásico",
+            "Trifásico + Neutro"
+          ],
+          "obrigatorio": true
+        },
+        {
+          "tipo": "select",
+          "campo": "Tipo Isolamento",
+          "opcoes": [
+            "Ar",
+            "SF6",
+            "Encapsulado"
+          ],
+          "obrigatorio": false
+        },
+        {
+          "tipo": "number",
+          "campo": "Seção Transversal",
+          "unidade": "mm²",
+          "obrigatorio": false
+        }
+      ]
+    },
+    "created_at": "2025-10-20T18:27:24.321Z",
+    "updated_at": "2026-01-07T19:46:50.880Z",
+    "categoria_id": "f668041b813c41758f1d352597",
+    "fabricante": "Genérico",
+    "mqtt_schema": null
+  },
+  {
+    "id": "01JAQTE1SCADA000000000021 ",
+    "codigo": "SCADA",
+    "nome": "Sistema SCADA",
+    "largura_padrao": 64,
+    "altura_padrao": 48,
+    "icone_svg": null,
+    "propriedades_schema": {
+      "campos": [
+        {
+          "tipo": "text",
+          "campo": "Software",
+          "descricao": "Nome do software SCADA",
+          "obrigatorio": true
+        },
+        {
+          "tipo": "text",
+          "campo": "Versao",
+          "obrigatorio": false
+        },
+        {
+          "tipo": "text",
+          "campo": "Servidor Ip",
+          "obrigatorio": true
+        },
+        {
+          "tipo": "number",
+          "campo": "Porta Comunicação",
+          "obrigatorio": false
+        },
+        {
+          "tipo": "select",
+          "campo": "Protocolo",
+          "opcoes": [
+            "OPC UA",
+            "OPC DA",
+            "Modbus TCP",
+            "DNP3",
+            "IEC 61850",
+            "IEC 60870-5-104"
+          ],
+          "obrigatorio": true
+        },
+        {
+          "tipo": "number",
+          "campo": "Licenças Tags",
+          "descricao": "Número de tags licenciadas",
+          "obrigatorio": false
+        },
+        {
+          "tipo": "select",
+          "campo": "Redundância",
+          "opcoes": [
+            "Sim",
+            "Não"
+          ],
+          "obrigatorio": false
+        }
+      ]
+    },
+    "created_at": "2025-10-20T18:27:24.321Z",
+    "updated_at": "2026-01-07T19:46:52.389Z",
+    "categoria_id": "9956da3a54a240398df9a75e06",
+    "fabricante": "Genérico",
+    "mqtt_schema": null
+  },
+  {
+    "id": "01JAQTE1TSA000000000000009",
+    "codigo": "TSA",
+    "nome": "Transformador de Serviço Auxiliar",
+    "largura_padrao": 48,
+    "altura_padrao": 48,
+    "icone_svg": null,
+    "propriedades_schema": {
+      "campos": [
+        {
+          "tipo": "number",
+          "campo": "Potência Nominal",
+          "unidade": "kVA",
+          "obrigatorio": true
+        },
+        {
+          "tipo": "number",
+          "campo": "Tensão Primaria",
+          "unidade": "V",
+          "obrigatorio": true
+        },
+        {
+          "tipo": "number",
+          "campo": "Tensão Secundaria",
+          "unidade": "V",
+          "obrigatorio": true,
+          "valor_padrao": 220
+        },
+        {
+          "tipo": "select",
+          "campo": "Tipo Ligação",
+          "opcoes": [
+            "Estrela-Estrela",
+            "Delta-Delta",
+            "Estrela-Delta",
+            "Delta-Estrela"
+          ],
+          "obrigatorio": true
+        },
+        {
+          "tipo": "number",
+          "campo": "Frequência",
+          "unidade": "Hz",
+          "obrigatorio": true,
+          "valor_padrao": 60
+        },
+        {
+          "tipo": "text",
+          "campo": "Serviços Alimentados",
+          "descricao": "Lista de serviços auxiliares",
+          "obrigatorio": false
+        }
+      ]
+    },
+    "created_at": "2025-10-20T18:27:24.321Z",
+    "updated_at": "2026-01-07T19:46:52.663Z",
+    "categoria_id": "fa2c0c2b861e4b5a8e87e33825",
+    "fabricante": "Genérico",
+    "mqtt_schema": null
+  },
+  {
+    "id": "01JAQTE1LANDIS0000000004  ",
+    "codigo": "LANDIS_E750",
+    "nome": "Landis+Gyr E750",
+    "largura_padrao": 40,
+    "altura_padrao": 40,
+    "icone_svg": null,
+    "propriedades_schema": {
+      "campos": [
+        {
+          "tipo": "number",
+          "campo": "Tensão Nominal",
+          "unidade": "V",
+          "obrigatorio": true,
+          "valor_padrao": 220
+        },
+        {
+          "tipo": "number",
+          "campo": "Corrente Máxima",
+          "unidade": "A",
+          "obrigatorio": true,
+          "valor_padrao": 100
+        },
+        {
+          "tipo": "text",
+          "campo": "Classe Precisão",
+          "obrigatorio": true,
+          "valor_padrao": "0.2S"
+        },
+        {
+          "tipo": "select",
+          "campo": "Protocolo Comunicação",
+          "opcoes": [
+            "DLMS/COSEM",
+            "Modbus",
+            "IEC 62056"
+          ],
+          "obrigatorio": true,
+          "valor_padrao": "DLMS/COSEM"
+        },
+        {
+          "tipo": "text",
+          "campo": "Número Serie",
+          "obrigatorio": true
+        },
+        {
+          "tipo": "text",
+          "campo": "Firmware Version",
+          "obrigatorio": false
+        },
+        {
+          "tipo": "text",
+          "campo": "Ip Address",
+          "obrigatorio": false
+        },
+        {
+          "tipo": "number",
+          "campo": "Porta Comunicação",
+          "obrigatorio": false,
+          "valor_padrao": 4059
+        }
+      ]
+    },
+    "created_at": "2025-10-20T18:27:24.321Z",
+    "updated_at": "2026-01-07T19:46:51.281Z",
+    "categoria_id": "9956da3a54a240398df9a75e06",
+    "fabricante": "Genérico",
+    "mqtt_schema": null
+  },
+  {
+    "id": "01JAQTE1BANCOBATERIAS00025",
+    "codigo": "BANCO_BATERIAS",
+    "nome": "Banco de Baterias",
+    "largura_padrao": 64,
+    "altura_padrao": 48,
+    "icone_svg": null,
+    "propriedades_schema": {
+      "campos": [
+        {
+          "tipo": "number",
+          "campo": "Capacidade",
+          "unidade": "Ah",
+          "obrigatorio": true
+        },
+        {
+          "tipo": "number",
+          "campo": "Tensão Nominal",
+          "unidade": "V",
+          "obrigatorio": true
+        },
+        {
+          "tipo": "select",
+          "campo": "Tipo Bateria",
+          "opcoes": [
+            "Chumbo-Ácido",
+            "VRLA",
+            "Níquel-Cádmio",
+            "Lítio",
+            "Gel"
+          ],
+          "obrigatorio": true
+        },
+        {
+          "tipo": "number",
+          "campo": "Quantidade Elementos",
+          "obrigatorio": true
+        },
+        {
+          "tipo": "number",
+          "campo": "Tempo Autonomia",
+          "unidade": "h",
+          "obrigatorio": false
+        },
+        {
+          "tipo": "number",
+          "campo": "Corrente Descarga Max",
+          "unidade": "A",
+          "obrigatorio": false
+        },
+        {
+          "tipo": "number",
+          "campo": "Temperatura Operação Min",
+          "unidade": "°C",
+          "obrigatorio": false
+        },
+        {
+          "tipo": "number",
+          "campo": "Temperatura Operação Max",
+          "unidade": "°C",
+          "obrigatorio": false
+        },
+        {
+          "tipo": "date",
+          "campo": "Data Fabricação",
+          "obrigatorio": false
+        }
+      ]
+    },
+    "created_at": "2025-10-20T18:27:24.321Z",
+    "updated_at": "2026-01-07T19:46:50.599Z",
+    "categoria_id": "9956da3a54a240398df9a75e06",
+    "fabricante": "Genérico",
+    "mqtt_schema": null
+  },
+  {
+    "id": "01JAQTE1MOTOR000000000017 ",
+    "codigo": "MOTOR",
+    "nome": "Motor Elétrico",
+    "largura_padrao": 48,
+    "altura_padrao": 48,
+    "icone_svg": null,
+    "propriedades_schema": {
+      "campos": [
+        {
+          "tipo": "number",
+          "campo": "Potência Nominal",
+          "unidade": "kW",
+          "obrigatorio": true
+        },
+        {
+          "tipo": "number",
+          "campo": "Tensão Nominal",
+          "unidade": "V",
+          "obrigatorio": true
+        },
+        {
+          "tipo": "number",
+          "campo": "Corrente Nominal",
+          "unidade": "A",
+          "obrigatorio": true
+        },
+        {
+          "tipo": "number",
+          "campo": "Rotação Nominal",
+          "unidade": "rpm",
+          "obrigatorio": true
+        },
+        {
+          "tipo": "number",
+          "campo": "Frequência",
+          "unidade": "Hz",
+          "obrigatorio": true,
+          "valor_padrao": 60
+        },
+        {
+          "tipo": "number",
+          "campo": "Número Polos",
+          "obrigatorio": true
+        },
+        {
+          "tipo": "number",
+          "campo": "Fator Serviço",
+          "obrigatorio": false,
+          "valor_padrao": 1.15
+        },
+        {
+          "tipo": "select",
+          "campo": "Categoria",
+          "opcoes": [
+            "N",
+            "H",
+            "D"
+          ],
+          "obrigatorio": false
+        },
+        {
+          "tipo": "select",
+          "campo": "Classe Isolamento",
+          "opcoes": [
+            "B",
+            "F",
+            "H"
+          ],
+          "obrigatorio": false
+        },
+        {
+          "tipo": "select",
+          "campo": "Grau Proteção",
+          "opcoes": [
+            "IP54",
+            "IP55",
+            "IP56",
+            "IP65"
+          ],
+          "obrigatorio": false
+        },
+        {
+          "tipo": "number",
+          "campo": "Rendimento",
+          "unidade": "%",
+          "obrigatorio": false
+        }
+      ]
+    },
+    "created_at": "2025-10-20T18:27:24.321Z",
+    "updated_at": "2026-01-07T19:46:51.559Z",
+    "categoria_id": "aadc85d440f24829aa59911725",
+    "fabricante": "WEG",
+    "mqtt_schema": null
+  },
+  {
+    "id": "01JAQTE1M30000000000003   ",
+    "codigo": "M300",
+    "nome": "Multimeter M300",
+    "largura_padrao": 40,
+    "altura_padrao": 40,
+    "icone_svg": null,
+    "propriedades_schema": {
+      "campos": [
+        {
+          "tipo": "number",
+          "campo": "Tensão Nominal",
+          "unidade": "V",
+          "obrigatorio": true,
+          "valor_padrao": 220
+        },
+        {
+          "tipo": "number",
+          "campo": "Corrente Nominal",
+          "unidade": "A",
+          "obrigatorio": true,
+          "valor_padrao": 100
+        },
+        {
+          "tipo": "number",
+          "campo": "Frequência",
+          "unidade": "Hz",
+          "obrigatorio": true,
+          "valor_padrao": 60
+        },
+        {
+          "tipo": "select",
+          "campo": "Protocolo Comunicação",
+          "opcoes": [
+            "Modbus RTU",
+            "Modbus TCP"
+          ],
+          "obrigatorio": true,
+          "valor_padrao": "Modbus RTU"
+        },
+        {
+          "tipo": "number",
+          "campo": "Endereco Modbus",
+          "obrigatorio": true,
+          "valor_padrao": 1
+        },
+        {
+          "tipo": "select",
+          "campo": "Taxa Comunicação",
+          "opcoes": [
+            "9600",
+            "19200",
+            "38400",
+            "57600"
+          ],
+          "obrigatorio": true,
+          "valor_padrao": "9600"
+        },
+        {
+          "tipo": "text",
+          "campo": "TC Ratio",
+          "descricao": "Relação de transformação TC (ex: 100:5)",
+          "obrigatorio": false
+        },
+        {
+          "tipo": "text",
+          "campo": "TP Ratio",
+          "descricao": "Relação de transformação TP (ex: 13800:115)",
+          "obrigatorio": false
+        }
+      ]
+    },
+    "created_at": "2025-10-20T18:27:24.321Z",
+    "updated_at": "2026-01-07T19:46:51.700Z",
+    "categoria_id": "9956da3a54a240398df9a75e06",
+    "fabricante": "Genérico",
+    "mqtt_schema": null
+  },
+  {
+    "id": "01JAQTE1RETIFICADOR000024 ",
+    "codigo": "RETIFICADOR",
+    "nome": "Retificador",
+    "largura_padrao": 48,
+    "altura_padrao": 40,
+    "icone_svg": null,
+    "propriedades_schema": {
+      "campos": [
+        {
+          "tipo": "number",
+          "campo": "Potência Nominal",
+          "unidade": "kW",
+          "obrigatorio": true
+        },
+        {
+          "tipo": "number",
+          "campo": "Tensão Entrada",
+          "unidade": "V",
+          "obrigatorio": true,
+          "valor_padrao": 220
+        },
+        {
+          "tipo": "number",
+          "campo": "Tensão Saida",
+          "unidade": "V",
+          "obrigatorio": true,
+          "valor_padrao": 48
+        },
+        {
+          "tipo": "number",
+          "campo": "Corrente Máxima",
+          "unidade": "A",
+          "obrigatorio": true
+        },
+        {
+          "tipo": "number",
+          "campo": "Eficiência",
+          "unidade": "%",
+          "obrigatorio": false
+        },
+        {
+          "tipo": "select",
+          "campo": "Tipo",
+          "opcoes": [
+            "Monofásico",
+            "Trifásico"
+          ],
+          "obrigatorio": true
+        },
+        {
+          "tipo": "number",
+          "campo": "Frequência",
+          "unidade": "Hz",
+          "obrigatorio": true,
+          "valor_padrao": 60
+        },
+        {
+          "tipo": "number",
+          "campo": "Fator Potência",
+          "obrigatorio": false
+        }
+      ]
+    },
+    "created_at": "2025-10-20T18:27:24.321Z",
+    "updated_at": "2026-01-07T19:46:52.256Z",
+    "categoria_id": "9956da3a54a240398df9a75e06",
+    "fabricante": "Genérico",
+    "mqtt_schema": null
+  },
+  {
+    "id": "kz437bftq4g37mhe6xxkeh8i  ",
+    "codigo": "INVERSOR_SUNGROW",
+    "nome": "Inversor Solar Sungrow",
+    "largura_padrao": 64,
+    "altura_padrao": 48,
+    "icone_svg": null,
+    "propriedades_schema": {
+      "campos": [
+        {
+          "tipo": "number",
+          "campo": "potencia_nominal",
+          "unidade": "kW",
+          "descricao": "Potência nominal do inversor",
+          "obrigatorio": true
+        },
+        {
+          "tipo": "string",
+          "campo": "modelo",
+          "unidade": null,
+          "descricao": "Modelo específico do inversor (ex: SG110CX)",
+          "obrigatorio": true
+        },
+        {
+          "tipo": "number",
+          "campo": "tensao_mppt_max",
+          "unidade": "V",
+          "descricao": "Tensão máxima MPPT",
+          "obrigatorio": false
+        },
+        {
+          "tipo": "number",
+          "campo": "numero_mppts",
+          "unidade": null,
+          "descricao": "Número de MPPTs",
+          "obrigatorio": false
+        },
+        {
+          "tipo": "string",
+          "campo": "numero_serie",
+          "unidade": null,
+          "descricao": "Número de série do equipamento",
+          "obrigatorio": false
+        }
+      ]
+    },
+    "created_at": "2026-01-19T19:04:44.335Z",
+    "updated_at": "2026-01-19T19:04:44.335Z",
+    "categoria_id": "1a023241b14747f3ba18818627",
+    "fabricante": "Sungrow",
+    "mqtt_schema": {
+      "tipo": "inversor_solar",
+      "topicos": {
+        "status": "aupus/{unidade_id}/inversor/{equipamento_id}/status",
+        "comando": "aupus/{unidade_id}/inversor/{equipamento_id}/comando",
+        "telemetria": "aupus/{unidade_id}/inversor/{equipamento_id}/telemetria"
+      },
+      "campos_telemetria": [
+        {
+          "tipo": "float",
+          "campo": "potencia_ativa",
+          "unidade": "kW",
+          "descricao": "Potência ativa instantânea"
+        },
+        {
+          "tipo": "float",
+          "campo": "potencia_reativa",
+          "unidade": "kVAr",
+          "descricao": "Potência reativa"
+        },
+        {
+          "tipo": "float",
+          "campo": "tensao_dc",
+          "unidade": "V",
+          "descricao": "Tensão DC entrada"
+        },
+        {
+          "tipo": "float",
+          "campo": "corrente_dc",
+          "unidade": "A",
+          "descricao": "Corrente DC entrada"
+        },
+        {
+          "tipo": "float",
+          "campo": "tensao_ac",
+          "unidade": "V",
+          "descricao": "Tensão AC saída"
+        },
+        {
+          "tipo": "float",
+          "campo": "corrente_ac",
+          "unidade": "A",
+          "descricao": "Corrente AC saída"
+        },
+        {
+          "tipo": "float",
+          "campo": "frequencia",
+          "unidade": "Hz",
+          "descricao": "Frequência da rede"
+        },
+        {
+          "tipo": "float",
+          "campo": "temperatura",
+          "unidade": "°C",
+          "descricao": "Temperatura interna"
+        },
+        {
+          "tipo": "float",
+          "campo": "energia_total",
+          "unidade": "kWh",
+          "descricao": "Energia total gerada"
+        },
+        {
+          "tipo": "float",
+          "campo": "energia_diaria",
+          "unidade": "kWh",
+          "descricao": "Energia gerada hoje"
+        },
+        {
+          "tipo": "string",
+          "campo": "status_operacao",
+          "descricao": "Status operacional"
+        },
+        {
+          "tipo": "integer",
+          "campo": "codigo_alarme",
+          "descricao": "Código de alarme (0 = sem alarme)"
+        }
+      ]
+    }
+  }
+]

@@ -1,0 +1,50 @@
+[
+  {
+    "id": "cmhjnsr5f000b2fr4jn8vcwqt",
+    "os_id": "cmhjnsqx3000a2fr495cdntcw",
+    "tarefa_id": "cmhjn2g4r00012f5k8moujbsd ",
+    "ordem": 1,
+    "status": "PENDENTE",
+    "data_conclusao": null,
+    "concluida_por": null,
+    "observacoes": null,
+    "created_at": "2025-11-03T21:35:39.891Z",
+    "updated_at": "2025-11-03T21:35:39.891Z"
+  },
+  {
+    "id": "cmj0feoic000b2f68b4vp9hgc",
+    "os_id": "cmj0feoak000a2f68bet825dc",
+    "tarefa_id": "cmhjn2g4r00012f5k8moujbsd ",
+    "ordem": 1,
+    "status": "PENDENTE",
+    "data_conclusao": null,
+    "concluida_por": null,
+    "observacoes": null,
+    "created_at": "2025-12-10T19:52:33.685Z",
+    "updated_at": "2025-12-10T19:52:33.685Z"
+  },
+  {
+    "id": "cmj0imtin001n2fr0priwhmye",
+    "os_id": "cmj0imt2o001m2fr05degyrsp",
+    "tarefa_id": "cmj0i4tcs00132fr0xfdr8ccf ",
+    "ordem": 1,
+    "status": "PENDENTE",
+    "data_conclusao": null,
+    "concluida_por": null,
+    "observacoes": null,
+    "created_at": "2025-12-10T21:22:52.271Z",
+    "updated_at": "2025-12-10T21:22:52.271Z"
+  },
+  {
+    "id": "cmj0imtin001o2fr0hq1e0jm2",
+    "os_id": "cmj0imt2o001m2fr05degyrsp",
+    "tarefa_id": "cmhjn3yly00032f5kz4ef8exs ",
+    "ordem": 2,
+    "status": "PENDENTE",
+    "data_conclusao": null,
+    "concluida_por": null,
+    "observacoes": null,
+    "created_at": "2025-12-10T21:22:52.271Z",
+    "updated_at": "2025-12-10T21:22:52.271Z"
+  }
+]

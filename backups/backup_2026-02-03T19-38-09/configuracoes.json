@@ -1,0 +1,35 @@
+[
+  {
+    "id": "01K2YQYYWJNJ8V0065CNPJ2RKB",
+    "chave": "calibragem_max_permitida",
+    "valor": "50.00",
+    "tipo": "number",
+    "descricao": "Valor máximo permitido para calibragem (%)",
+    "grupo": "controle",
+    "updated_by": null,
+    "created_at": "2025-08-18T14:05:05.000Z",
+    "updated_at": "2025-08-18T14:05:05.000Z"
+  },
+  {
+    "id": "01K2YQYYWJNJ8V0065CNPJ2RKC",
+    "chave": "controle_auto_refresh",
+    "valor": "false",
+    "tipo": "boolean",
+    "descricao": "Se deve atualizar automaticamente os dados do controle",
+    "grupo": "controle",
+    "updated_by": null,
+    "created_at": "2025-08-18T14:05:05.000Z",
+    "updated_at": "2025-08-18T14:05:05.000Z"
+  },
+  {
+    "id": "01K2YQYYA8P8D9S0C7T0BT1FWK",
+    "chave": "calibragem_global",
+    "valor": "17",
+    "tipo": "number",
+    "descricao": "Percentual de calibragem global aplicado a todas as propostas do controle (%)",
+    "grupo": "controle",
+    "updated_by": "01K2CPBYE07B3HWW0CZHHB3ZCR",
+    "created_at": "2025-08-18T14:05:04.000Z",
+    "updated_at": "2025-08-28T04:49:40.000Z"
+  }
+]

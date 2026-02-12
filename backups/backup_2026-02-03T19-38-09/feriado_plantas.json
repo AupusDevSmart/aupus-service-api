@@ -1,0 +1,37 @@
+[
+  {
+    "feriado_id": "cmfkhvsah00082fhc76tfl0zp ",
+    "planta_id": "cmekb23pr00012f4o4nqp9ypz ",
+    "created_at": "2025-09-15T02:18:26.000Z"
+  },
+  {
+    "feriado_id": "cmfkhvsed00092fhczkd6uin7 ",
+    "planta_id": "cmekb23pr00012f4o4nqp9ypz ",
+    "created_at": "2025-09-15T02:18:26.000Z"
+  },
+  {
+    "feriado_id": "cmfkhvsi9000a2fhcn0t14b4q ",
+    "planta_id": "cmekb23xd00032f4o1rw4g8rk ",
+    "created_at": "2025-09-15T02:18:27.000Z"
+  },
+  {
+    "feriado_id": "cmfkhvsm9000b2fhceoorzvuh ",
+    "planta_id": "cmekb23xd00032f4o1rw4g8rk ",
+    "created_at": "2025-09-15T02:18:27.000Z"
+  },
+  {
+    "feriado_id": "cmfkhvsq5000c2fhcsaycbl53 ",
+    "planta_id": "cmekb241300052f4o9frhlfqy ",
+    "created_at": "2025-09-15T02:18:28.000Z"
+  },
+  {
+    "feriado_id": "cmfpsaj6t00002fn0fghedi5e ",
+    "planta_id": "cmekb23xd00032f4o1rw4g8rk ",
+    "created_at": "2025-09-18T19:08:59.000Z"
+  },
+  {
+    "feriado_id": "cmfpsaj6t00002fn0fghedi5e ",
+    "planta_id": "cmekb245400072f4oyfcrcxzw ",
+    "created_at": "2025-09-18T19:08:59.000Z"
+  }
+]

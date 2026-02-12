@@ -1159,14 +1159,13 @@ model equipamentos {
   deleted_at             DateTime?                     @db.Timestamp(0)
   planta_id              String?                       @db.Char(26)
   proprietario_id        String?                       @db.Char(26)
-  altura_customizada     Int?
   diagrama_id            String?                       @db.Char(26)
-  largura_customizada    Int?
   posicao_x              Float?                        @db.Real
   posicao_y              Float?                        @db.Real
-  propriedades           Json?
   rotacao                Float?                        @default(0) @db.Real
   label_position         String?                       @default("top") @db.VarChar(10)
+  label_offset_x         Float?                        @db.Real // Offset X do label em pixels (para posicionamento customizado)
+  label_offset_y         Float?                        @db.Real // Offset Y do label em pixels (para posicionamento customizado)
   status                 String?                       @default("NORMAL") @db.VarChar(20)
   tag                    String?                       @db.VarChar(50)
   tipo_equipamento_id    String?                       @db.Char(26)
@@ -1251,25 +1250,34 @@ model equipamentos_dados {
   @@map("equipamentos_dados")
 }
 
+/// SIMPLIFICADO: Conexões visuais do diagrama unifilar
+/// Versão 2.0 - Apenas dados essenciais (sem customização visual)
+/// Todas conexões usam estilo padrão (linha branca/cinza, ortogonal)
 model equipamentos_conexoes {
   id                     String              @id @default(cuid()) @db.Char(26)
   diagrama_id            String              @db.Char(26)
-  equipamento_origem_id  String              @db.Char(26)
-  porta_origem           String              @db.VarChar(20)
-  equipamento_destino_id String              @db.Char(26)
-  porta_destino          String              @db.VarChar(20)
-  tipo_linha             String              @default("solida") @db.VarChar(20)
-  cor                    String?             @db.VarChar(20)
-  espessura              Int                 @default(2)
-  pontos_intermediarios  Json?
-  rotulo                 String?             @db.VarChar(100)
-  ordem                  Int?
+
+  // ===== ORIGEM: Equipamento OU Junction Point =====
+  equipamento_origem_id  String?             @db.Char(26)
+  porta_origem           String              @db.VarChar(20) /// top, bottom, left, right
+  origem_tipo            String?             @default("equipamento") @db.VarChar(20) /// equipamento | junction
+  origem_grid_x          Int?
+  origem_grid_y          Int?
+
+  // ===== DESTINO: Equipamento OU Junction Point =====
+  equipamento_destino_id String?             @db.Char(26)
+  porta_destino          String              @db.VarChar(20) /// top, bottom, left, right
+  destino_tipo           String?             @default("equipamento") @db.VarChar(20) /// equipamento | junction
+  destino_grid_x         Int?
+  destino_grid_y         Int?
+
+  // ❌ REMOVIDOS: tipo_linha, cor, espessura, pontos_intermediarios, rotulo, ordem
   created_at             DateTime            @default(now()) @db.Timestamp(0)
   updated_at             DateTime            @updatedAt @db.Timestamp(0)
   deleted_at             DateTime?           @db.Timestamp(0)
   diagrama               diagramas_unitarios @relation(fields: [diagrama_id], references: [id], onDelete: Cascade)
-  equipamento_destino    equipamentos        @relation("ConexaoDestino", fields: [equipamento_destino_id], references: [id], onDelete: Cascade)
-  equipamento_origem     equipamentos        @relation("ConexaoOrigem", fields: [equipamento_origem_id], references: [id], onDelete: Cascade)
+  equipamento_destino    equipamentos?       @relation("ConexaoDestino", fields: [equipamento_destino_id], references: [id], onDelete: Cascade)
+  equipamento_origem     equipamentos?       @relation("ConexaoOrigem", fields: [equipamento_origem_id], references: [id], onDelete: Cascade)
 
   @@index([diagrama_id])
   @@index([equipamento_origem_id])

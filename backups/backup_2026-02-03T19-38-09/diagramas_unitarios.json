@@ -1,0 +1,604 @@
+[
+  {
+    "id": "diagrama-aupus-local-001  ",
+    "unidade_id": "aupus-local-unit-001      ",
+    "nome": "Diagrama Principal - Aupus Local",
+    "descricao": "Diagrama sinóptico com os 3 equipamentos de monitoramento",
+    "versao": "1.0",
+    "ativo": true,
+    "created_at": "2025-10-02T19:39:47.886Z",
+    "updated_at": "2025-10-02T19:39:47.886Z",
+    "deleted_at": null,
+    "configuracoes": null,
+    "thumbnail_url": null
+  },
+  {
+    "id": "cmidkigi800lejq0t7g3we9j2 ",
+    "unidade_id": "cmidivfa5009djq0taij3vg8w ",
+    "nome": "Diagrama - UBS",
+    "descricao": null,
+    "versao": "1.0",
+    "ativo": true,
+    "created_at": "2025-11-24T19:56:45.969Z",
+    "updated_at": "2025-11-24T19:56:45.969Z",
+    "deleted_at": null,
+    "configuracoes": {
+      "grid": {
+        "size": 20,
+        "enabled": true,
+        "snapToGrid": true
+      },
+      "zoom": 1,
+      "canvas": {
+        "width": 2000,
+        "height": 1500,
+        "backgroundColor": "#f5f5f5"
+      },
+      "viewport": {
+        "x": 0,
+        "y": 0,
+        "scale": 1
+      }
+    },
+    "thumbnail_url": null
+  },
+  {
+    "id": "cmh106b6h00002fwslp036e96 ",
+    "unidade_id": "cmgphty10000p2fz4460rhz2o ",
+    "nome": "Diagrama - Unidade",
+    "descricao": null,
+    "versao": "1.2",
+    "ativo": true,
+    "created_at": "2025-10-21T20:14:30.419Z",
+    "updated_at": "2025-10-21T21:06:04.049Z",
+    "deleted_at": null,
+    "configuracoes": {
+      "grid": {
+        "size": 20,
+        "enabled": true,
+        "snapToGrid": true
+      },
+      "zoom": 1,
+      "canvas": {
+        "width": 2000,
+        "height": 1500,
+        "backgroundColor": "#f5f5f5"
+      },
+      "viewport": {
+        "x": 0,
+        "y": 0,
+        "scale": 1
+      },
+      "componentesVisuais": [
+        [],
+        [],
+        []
+      ]
+    },
+    "thumbnail_url": null
+  },
+  {
+    "id": "cmh9meg9v00002fiogfs64ojc ",
+    "unidade_id": "cmh9hbiah00012fdka59smo54 ",
+    "nome": "Diagrama - drgrddrgrdg",
+    "descricao": null,
+    "versao": "1.0",
+    "ativo": true,
+    "created_at": "2025-10-27T20:58:51.169Z",
+    "updated_at": "2025-10-27T20:58:51.169Z",
+    "deleted_at": null,
+    "configuracoes": {
+      "grid": {
+        "size": 20,
+        "enabled": true,
+        "snapToGrid": true
+      },
+      "zoom": 1,
+      "canvas": {
+        "width": 2000,
+        "height": 1500,
+        "backgroundColor": "#f5f5f5"
+      },
+      "viewport": {
+        "x": 0,
+        "y": 0,
+        "scale": 1
+      }
+    },
+    "thumbnail_url": null
+  },
+  {
+    "id": "cmhcg62dh000wjqo83s1b5mpx ",
+    "unidade_id": "cmhcfvf5k0001jqo8nff75bcv ",
+    "nome": "Diagrama - Usina Solar 2",
+    "descricao": null,
+    "versao": "1.0",
+    "ativo": true,
+    "created_at": "2025-10-29T20:27:40.806Z",
+    "updated_at": "2025-10-29T20:27:40.806Z",
+    "deleted_at": null,
+    "configuracoes": {
+      "grid": {
+        "size": 20,
+        "enabled": true,
+        "snapToGrid": true
+      },
+      "zoom": 1,
+      "canvas": {
+        "width": 2000,
+        "height": 1500,
+        "backgroundColor": "#f5f5f5"
+      },
+      "viewport": {
+        "x": 0,
+        "y": 0,
+        "scale": 1
+      }
+    },
+    "thumbnail_url": null
+  },
+  {
+    "id": "cmhdr4aol00044jmsfo7h2nyd ",
+    "unidade_id": "cmgphtx95000b2fz45jmt67lw ",
+    "nome": "Diagrama - Motor Elevador Rio-01",
+    "descricao": null,
+    "versao": "1.0",
+    "ativo": true,
+    "created_at": "2025-10-30T18:22:00.214Z",
+    "updated_at": "2025-10-30T18:22:00.214Z",
+    "deleted_at": null,
+    "configuracoes": {
+      "grid": {
+        "size": 20,
+        "enabled": true,
+        "snapToGrid": true
+      },
+      "zoom": 1,
+      "canvas": {
+        "width": 2000,
+        "height": 1500,
+        "backgroundColor": "#f5f5f5"
+      },
+      "viewport": {
+        "x": 0,
+        "y": 0,
+        "scale": 1
+      }
+    },
+    "thumbnail_url": null
+  },
+  {
+    "id": "cmkfs8ub500hy2f5wqtadwk1h ",
+    "unidade_id": "cmkfs6jz100hd2f5wh5zcbqju ",
+    "nome": "Diagrama - Brookfield Tower",
+    "descricao": null,
+    "versao": "1.0",
+    "ativo": true,
+    "created_at": "2026-01-15T18:28:11.249Z",
+    "updated_at": "2026-01-15T18:28:11.249Z",
+    "deleted_at": null,
+    "configuracoes": {
+      "grid": {
+        "size": 20,
+        "enabled": true,
+        "snapToGrid": true
+      },
+      "zoom": 1,
+      "canvas": {
+        "width": 2000,
+        "height": 1500,
+        "backgroundColor": "#f5f5f5"
+      },
+      "viewport": {
+        "x": 0,
+        "y": 0,
+        "scale": 1
+      }
+    },
+    "thumbnail_url": null
+  },
+  {
+    "id": "cmkl9kokg1mpyjq8j81idd8sg ",
+    "unidade_id": "cmkl9hsdn1mpdjq8j9ssw7kfu ",
+    "nome": "Diagrama - INVERSORES",
+    "descricao": null,
+    "versao": "1.0",
+    "ativo": true,
+    "created_at": "2026-01-19T14:32:08.032Z",
+    "updated_at": "2026-01-19T14:32:08.032Z",
+    "deleted_at": null,
+    "configuracoes": {
+      "grid": {
+        "size": 20,
+        "enabled": true,
+        "snapToGrid": true
+      },
+      "zoom": 1,
+      "canvas": {
+        "width": 2000,
+        "height": 1500,
+        "backgroundColor": "#f5f5f5"
+      },
+      "viewport": {
+        "x": 0,
+        "y": 0,
+        "scale": 1
+      }
+    },
+    "thumbnail_url": null
+  },
+  {
+    "id": "cmkmp4inj06v8jqv9q533i9et ",
+    "unidade_id": "cmklhl6821nvajq8js29xyyhz ",
+    "nome": "Diagrama - UBS + UFV",
+    "descricao": null,
+    "versao": "1.0",
+    "ativo": true,
+    "created_at": "2026-01-20T14:35:13.903Z",
+    "updated_at": "2026-01-20T14:35:13.903Z",
+    "deleted_at": null,
+    "configuracoes": {
+      "grid": {
+        "size": 20,
+        "enabled": true,
+        "snapToGrid": true
+      },
+      "zoom": 1,
+      "canvas": {
+        "width": 2000,
+        "height": 1500,
+        "backgroundColor": "#f5f5f5"
+      },
+      "viewport": {
+        "x": 0,
+        "y": 0,
+        "scale": 1
+      }
+    },
+    "thumbnail_url": null
+  },
+  {
+    "id": "cmkmzv3hg09znjqv9qka0go6u ",
+    "unidade_id": "cmkli3xmt1nxqjq8jxc409h4s ",
+    "nome": "Diagrama - Pivos 1 a 3",
+    "descricao": null,
+    "versao": "1.0",
+    "ativo": true,
+    "created_at": "2026-01-20T19:35:50.116Z",
+    "updated_at": "2026-01-20T19:35:50.116Z",
+    "deleted_at": null,
+    "configuracoes": {
+      "grid": {
+        "size": 20,
+        "enabled": true,
+        "snapToGrid": true
+      },
+      "zoom": 1,
+      "canvas": {
+        "width": 2000,
+        "height": 1500,
+        "backgroundColor": "#f5f5f5"
+      },
+      "viewport": {
+        "x": 0,
+        "y": 0,
+        "scale": 1
+      }
+    },
+    "thumbnail_url": null
+  },
+  {
+    "id": "cml5n77n700gw2fu8v6u2ygzv ",
+    "unidade_id": "cmkmn2lp606a7jqv9j2lclre2 ",
+    "nome": "Diagrama Unifilar",
+    "descricao": null,
+    "versao": "1.0",
+    "ativo": true,
+    "created_at": "2026-02-02T20:48:57.716Z",
+    "updated_at": "2026-02-02T20:48:57.716Z",
+    "deleted_at": null,
+    "configuracoes": {
+      "grid": {
+        "size": 20,
+        "enabled": true,
+        "snapToGrid": true
+      },
+      "zoom": 1,
+      "canvas": {
+        "width": 2000,
+        "height": 1500,
+        "backgroundColor": "#f5f5f5"
+      },
+      "viewport": {
+        "x": 0,
+        "y": 0,
+        "scale": 1
+      }
+    },
+    "thumbnail_url": null
+  },
+  {
+    "id": "cml5ncnho00hf2fu8y9zuicds ",
+    "unidade_id": "cmkmn2lp606a7jqv9j2lclre2 ",
+    "nome": "Diagrama Unifilar",
+    "descricao": null,
+    "versao": "1.0",
+    "ativo": true,
+    "created_at": "2026-02-02T20:53:11.533Z",
+    "updated_at": "2026-02-02T20:53:11.533Z",
+    "deleted_at": null,
+    "configuracoes": {
+      "grid": {
+        "size": 20,
+        "enabled": true,
+        "snapToGrid": true
+      },
+      "zoom": 1,
+      "canvas": {
+        "width": 2000,
+        "height": 1500,
+        "backgroundColor": "#f5f5f5"
+      },
+      "viewport": {
+        "x": 0,
+        "y": 0,
+        "scale": 1
+      }
+    },
+    "thumbnail_url": null
+  },
+  {
+    "id": "cmhz7zwv000044jv0fsea4zvn ",
+    "unidade_id": "cmhf798h100034jvozjdnfzlk ",
+    "nome": "Diagrama - Unidade de Teste",
+    "descricao": null,
+    "versao": "1.12",
+    "ativo": true,
+    "created_at": "2025-11-14T18:57:38.844Z",
+    "updated_at": "2025-11-19T18:00:09.130Z",
+    "deleted_at": null,
+    "configuracoes": {
+      "grid": {
+        "size": 20,
+        "enabled": true,
+        "snapToGrid": true
+      },
+      "zoom": 1,
+      "canvas": {
+        "width": 2000,
+        "height": 1500,
+        "backgroundColor": "#f5f5f5"
+      },
+      "viewport": {
+        "x": 0,
+        "y": 0,
+        "scale": 1
+      },
+      "labelPositions": {
+        "cmhz411ah000s4jbwdyff1hzq": {
+          "x": 9,
+          "y": -16
+        },
+        "cmhz7a4mi00014jv0kjhl4n3a": {
+          "x": 24,
+          "y": 67
+        },
+        "cmhz7zjjj00034jv0maegt1lf": {
+          "x": 44,
+          "y": 31
+        }
+      }
+    },
+    "thumbnail_url": null
+  },
+  {
+    "id": "cmidkg82l00kxjq0tlsxzpqa4 ",
+    "unidade_id": "cmidit6r5008zjq0t6po4x34v ",
+    "nome": "Diagrama - Pivos 4 a 6",
+    "descricao": null,
+    "versao": "1.0",
+    "ativo": true,
+    "created_at": "2025-11-24T19:55:01.723Z",
+    "updated_at": "2025-11-24T19:55:01.723Z",
+    "deleted_at": null,
+    "configuracoes": {
+      "grid": {
+        "size": 20,
+        "enabled": true,
+        "snapToGrid": true
+      },
+      "zoom": 1,
+      "canvas": {
+        "width": 2000,
+        "height": 1500,
+        "backgroundColor": "#f5f5f5"
+      },
+      "viewport": {
+        "x": 0,
+        "y": 0,
+        "scale": 1
+      }
+    },
+    "thumbnail_url": null
+  },
+  {
+    "id": "cml5nlbc700j62fu8mf6ke561 ",
+    "unidade_id": "cmkmn2lp606a7jqv9j2lclre2 ",
+    "nome": "Diagrama Unifilar",
+    "descricao": null,
+    "versao": "1.0",
+    "ativo": true,
+    "created_at": "2026-02-02T20:59:55.687Z",
+    "updated_at": "2026-02-02T20:59:55.687Z",
+    "deleted_at": null,
+    "configuracoes": {
+      "grid": {
+        "size": 20,
+        "enabled": true,
+        "snapToGrid": true
+      },
+      "zoom": 1,
+      "canvas": {
+        "width": 2000,
+        "height": 1500,
+        "backgroundColor": "#f5f5f5"
+      },
+      "viewport": {
+        "x": 0,
+        "y": 0,
+        "scale": 1
+      }
+    },
+    "thumbnail_url": null
+  },
+  {
+    "id": "cml5nspgp00kv2fu88dmw2g82 ",
+    "unidade_id": "cmkmn2lp606a7jqv9j2lclre2 ",
+    "nome": "Diagrama Unifilar",
+    "descricao": null,
+    "versao": "1.0",
+    "ativo": true,
+    "created_at": "2026-02-02T21:05:40.585Z",
+    "updated_at": "2026-02-02T21:05:40.585Z",
+    "deleted_at": null,
+    "configuracoes": {
+      "grid": {
+        "size": 20,
+        "enabled": true,
+        "snapToGrid": true
+      },
+      "zoom": 1,
+      "canvas": {
+        "width": 2000,
+        "height": 1500,
+        "backgroundColor": "#f5f5f5"
+      },
+      "viewport": {
+        "x": 0,
+        "y": 0,
+        "scale": 1
+      }
+    },
+    "thumbnail_url": null
+  },
+  {
+    "id": "cml6vd9um00l22fu8q2v68f1l ",
+    "unidade_id": "cmkmn2lp606a7jqv9j2lclre2 ",
+    "nome": "Diagrama Unifilar",
+    "descricao": null,
+    "versao": "1.0",
+    "ativo": true,
+    "created_at": "2026-02-03T17:25:23.615Z",
+    "updated_at": "2026-02-03T17:25:23.615Z",
+    "deleted_at": null,
+    "configuracoes": {
+      "grid": {
+        "size": 20,
+        "enabled": true,
+        "snapToGrid": true
+      },
+      "zoom": 1,
+      "canvas": {
+        "width": 2000,
+        "height": 1500,
+        "backgroundColor": "#f5f5f5"
+      },
+      "viewport": {
+        "x": 0,
+        "y": 0,
+        "scale": 1
+      }
+    },
+    "thumbnail_url": null
+  },
+  {
+    "id": "cml6vqr4a00lb2fu8gnzy94ys ",
+    "unidade_id": "cmkmn2lp606a7jqv9j2lclre2 ",
+    "nome": "Diagrama Unifilar",
+    "descricao": null,
+    "versao": "1.0",
+    "ativo": true,
+    "created_at": "2026-02-03T17:35:52.523Z",
+    "updated_at": "2026-02-03T17:35:52.523Z",
+    "deleted_at": null,
+    "configuracoes": {
+      "grid": {
+        "size": 20,
+        "enabled": true,
+        "snapToGrid": true
+      },
+      "zoom": 1,
+      "canvas": {
+        "width": 2000,
+        "height": 1500,
+        "backgroundColor": "#f5f5f5"
+      },
+      "viewport": {
+        "x": 0,
+        "y": 0,
+        "scale": 1
+      }
+    },
+    "thumbnail_url": null
+  },
+  {
+    "id": "cml6vr2hl00lc2fu87nrwc6fv ",
+    "unidade_id": "cmkmn2lp606a7jqv9j2lclre2 ",
+    "nome": "Diagrama Unifilar",
+    "descricao": null,
+    "versao": "1.0",
+    "ativo": true,
+    "created_at": "2026-02-03T17:36:07.258Z",
+    "updated_at": "2026-02-03T17:36:07.258Z",
+    "deleted_at": null,
+    "configuracoes": {
+      "grid": {
+        "size": 20,
+        "enabled": true,
+        "snapToGrid": true
+      },
+      "zoom": 1,
+      "canvas": {
+        "width": 2000,
+        "height": 1500,
+        "backgroundColor": "#f5f5f5"
+      },
+      "viewport": {
+        "x": 0,
+        "y": 0,
+        "scale": 1
+      }
+    },
+    "thumbnail_url": null
+  },
+  {
+    "id": "cml6wf2vu00lp2fu8ovoc3sxd ",
+    "unidade_id": "cmkmn2lp606a7jqv9j2lclre2 ",
+    "nome": "Diagrama Unifilar",
+    "descricao": null,
+    "versao": "1.0",
+    "ativo": true,
+    "created_at": "2026-02-03T17:54:47.515Z",
+    "updated_at": "2026-02-03T17:54:47.515Z",
+    "deleted_at": null,
+    "configuracoes": {
+      "grid": {
+        "size": 20,
+        "enabled": true,
+        "snapToGrid": true
+      },
+      "zoom": 1,
+      "canvas": {
+        "width": 2000,
+        "height": 1500,
+        "backgroundColor": "#f5f5f5"
+      },
+      "viewport": {
+        "x": 0,
+        "y": 0,
+        "scale": 1
+      }
+    },
+    "thumbnail_url": null
+  }
+]

@@ -2,6 +2,7 @@ import { Injectable, NotFoundException, BadRequestException, ConflictException }
 import { PrismaService } from '../../../shared/prisma/prisma.service';
 import { CreateDiagramaDto } from '../dto/create-diagrama.dto';
 import { UpdateDiagramaDto } from '../dto/update-diagrama.dto';
+import { SaveLayoutDto } from '../dto/save-layout.dto';
 
 @Injectable()
 export class DiagramasService {
@@ -192,33 +193,38 @@ export class DiagramasService {
     // ⚡ Formatar equipamentos (tipo já vem do JOIN)
     const equipamentosFormatados = equipamentos.map((eq) => {
       const tipoRel = eq.tipo_equipamento_rel;
+      const tipoFormatado = tipoRel ? {
+        id: tipoRel.id,
+        codigo: tipoRel.codigo,
+        nome: tipoRel.nome,
+        categoria: tipoRel.categoria,
+        larguraPadrao: tipoRel.largura_padrao,
+        alturaPadrao: tipoRel.altura_padrao,
+        iconeSvg: tipoRel.icone_svg,
+      } : null;
+
       return {
         id: eq.id,
         nome: eq.nome,
         tag: eq.tag,
         classificacao: eq.classificacao,
-        tipo_equipamento: eq.tipo_equipamento, // IMPORTANTE: Para BARRAMENTO/PONTO que não têm tipo_equipamento_id
-        tipo: tipoRel ? {
-          id: tipoRel.id,
-          codigo: tipoRel.codigo,
-          nome: tipoRel.nome,
-          categoria: tipoRel.categoria,
-          larguraPadrao: tipoRel.largura_padrao,
-          alturaPadrao: tipoRel.altura_padrao,
-          iconeSvg: tipoRel.icone_svg,
-        } : null,
-        posicao: {
-          x: eq.posicao_x,
-          y: eq.posicao_y,
-        },
+        tipo_equipamento: eq.tipo_equipamento,
+        // ✅ Retornar em AMBOS os formatos para compatibilidade
+        tipo: tipoFormatado,
+        tipoEquipamento: tipoFormatado,
+        tipo_equipamento_rel: tipoFormatado,
+        // ✅ CORRIGIDO: Retornar posições no nível raiz (não aninhado)
+        posicao_x: eq.posicao_x,
+        posicao_y: eq.posicao_y,
         rotacao: eq.rotacao || 0,
         label_position: eq.label_position,
+        label_offset_x: eq.label_offset_x,
+        label_offset_y: eq.label_offset_y,
         dimensoes: {
-          largura: eq.largura_customizada || tipoRel?.largura_padrao || 64,
-          altura: eq.altura_customizada || tipoRel?.altura_padrao || 64,
+          largura: tipoRel?.largura_padrao || 64,
+          altura: tipoRel?.altura_padrao || 64,
         },
         status: eq.status,
-        propriedades: eq.propriedades,
         // Campos MQTT para integração com dados em tempo real
         mqtt_habilitado: eq.mqtt_habilitado,
         topico_mqtt: eq.topico_mqtt,
@@ -243,27 +249,28 @@ export class DiagramasService {
     });
 
     // ⚡ Formatar conexões (equipamentos já vêm do JOIN)
+    // ✅ Suporte a junction points
     const conexoesFormatadas = conexoes.map((conn) => ({
       id: conn.id,
       diagramaId: conn.diagrama_id,
       origem: {
+        tipo: (conn as any).origem_tipo || 'equipamento',
         equipamentoId: conn.equipamento_origem_id,
         equipamento: conn.equipamento_origem,
+        gridPoint: (conn as any).origem_tipo === 'junction'
+          ? { x: (conn as any).origem_grid_x, y: (conn as any).origem_grid_y }
+          : null,
         porta: conn.porta_origem,
       },
       destino: {
+        tipo: (conn as any).destino_tipo || 'equipamento',
         equipamentoId: conn.equipamento_destino_id,
         equipamento: conn.equipamento_destino,
+        gridPoint: (conn as any).destino_tipo === 'junction'
+          ? { x: (conn as any).destino_grid_x, y: (conn as any).destino_grid_y }
+          : null,
         porta: conn.porta_destino,
       },
-      visual: {
-        tipoLinha: conn.tipo_linha,
-        cor: conn.cor,
-        espessura: conn.espessura,
-      },
-      pontosIntermediarios: conn.pontos_intermediarios,
-      rotulo: conn.rotulo,
-      ordem: conn.ordem,
       createdAt: conn.created_at,
       updatedAt: conn.updated_at,
     }));
@@ -432,5 +439,147 @@ export class DiagramasService {
       acc[status] = (acc[status] || 0) + 1;
       return acc;
     }, {});
+  }
+
+  /**
+   * V2 - Salvar layout completo do diagrama (atômico)
+   * Estratégia: DELETE ALL + INSERT ALL em uma única transação
+   * ~10x mais rápido que múltiplas requisições PATCH
+   */
+  async saveLayout(diagramaId: string, dto: SaveLayoutDto) {
+    // Verificar se o diagrama existe
+    const diagrama = await this.prisma.diagramas_unitarios.findFirst({
+      where: { id: diagramaId, deleted_at: null },
+    });
+
+    if (!diagrama) {
+      throw new NotFoundException('Diagrama não encontrado');
+    }
+
+    // Validar que todos os equipamentos existem e pertencem à mesma unidade
+    const equipamentoIds = dto.equipamentos.map(eq => eq.equipamentoId);
+    if (equipamentoIds.length > 0) {
+      const equipamentos = await this.prisma.equipamentos.findMany({
+        where: {
+          id: { in: equipamentoIds },
+          unidade_id: diagrama.unidade_id,
+          deleted_at: null,
+        },
+        select: { id: true },
+      });
+
+      if (equipamentos.length !== equipamentoIds.length) {
+        throw new BadRequestException('Um ou mais equipamentos não existem ou não pertencem à unidade do diagrama');
+      }
+    }
+
+    // Validar conexões - apenas verificar equipamentos quando tipo = 'equipamento'
+    // Junction points não precisam de validação
+    const conexoesComEquipamentos = dto.conexoes.filter(
+      conn => conn.origem.tipo === 'equipamento' || conn.destino.tipo === 'equipamento'
+    );
+
+    if (conexoesComEquipamentos.length > 0) {
+      const equipamentoIdsEmConexoes = new Set<string>();
+      conexoesComEquipamentos.forEach(conn => {
+        if (conn.origem.tipo === 'equipamento' && conn.origem.equipamentoId) {
+          equipamentoIdsEmConexoes.add(conn.origem.equipamentoId);
+        }
+        if (conn.destino.tipo === 'equipamento' && conn.destino.equipamentoId) {
+          equipamentoIdsEmConexoes.add(conn.destino.equipamentoId);
+        }
+      });
+
+      // Verificar que equipamentos referenciados existem
+      const equipamentosValidos = await this.prisma.equipamentos.findMany({
+        where: {
+          id: { in: Array.from(equipamentoIdsEmConexoes) },
+          deleted_at: null,
+        },
+        select: { id: true },
+      });
+
+      if (equipamentosValidos.length !== equipamentoIdsEmConexoes.size) {
+        throw new BadRequestException('Um ou mais equipamentos referenciados nas conexões não existem');
+      }
+    }
+
+    // Executar em transação atômica
+    const resultado = await this.prisma.$transaction(async (tx) => {
+      // 1. DELETE ALL - Remover todas as conexões existentes (hard delete para performance)
+      await tx.equipamentos_conexoes.deleteMany({
+        where: { diagrama_id: diagramaId },
+      });
+
+      // 2. UPDATE - Limpar posições de todos os equipamentos do diagrama
+      await tx.equipamentos.updateMany({
+        where: { diagrama_id: diagramaId },
+        data: {
+          diagrama_id: null,
+          posicao_x: null,
+          posicao_y: null,
+          rotacao: null,
+          label_position: null,
+        },
+      });
+
+      // 3. UPDATE - Atualizar posições dos equipamentos do novo layout
+      let equipamentosAtualizados = 0;
+      if (dto.equipamentos.length > 0) {
+        // Fazer bulk update com Promise.all para performance
+        await Promise.all(
+          dto.equipamentos.map(eq =>
+            tx.equipamentos.update({
+              where: { id: eq.equipamentoId },
+              data: {
+                diagrama_id: diagramaId,
+                posicao_x: eq.posicaoX,
+                posicao_y: eq.posicaoY,
+                rotacao: eq.rotacao || 0,
+                label_position: eq.labelPosition || 'top',
+                label_offset_x: eq.labelOffsetX,
+                label_offset_y: eq.labelOffsetY,
+              },
+            })
+          )
+        );
+        equipamentosAtualizados = dto.equipamentos.length;
+      }
+
+      // 4. INSERT ALL - Criar todas as novas conexões (bulk insert para performance)
+      // Agora suporta junction points (origem/destino podem ser grid points)
+      let conexoesCriadas = 0;
+      if (dto.conexoes.length > 0) {
+        const conexoesData = dto.conexoes.map(conn => ({
+          diagrama_id: diagramaId,
+
+          // Origem (equipamento OU junction point)
+          equipamento_origem_id: conn.origem.tipo === 'equipamento' ? conn.origem.equipamentoId : null,
+          porta_origem: conn.origem.porta,
+          origem_tipo: conn.origem.tipo,
+          origem_grid_x: conn.origem.tipo === 'junction' ? conn.origem.gridPoint?.x : null,
+          origem_grid_y: conn.origem.tipo === 'junction' ? conn.origem.gridPoint?.y : null,
+
+          // Destino (equipamento OU junction point)
+          equipamento_destino_id: conn.destino.tipo === 'equipamento' ? conn.destino.equipamentoId : null,
+          porta_destino: conn.destino.porta,
+          destino_tipo: conn.destino.tipo,
+          destino_grid_x: conn.destino.tipo === 'junction' ? conn.destino.gridPoint?.x : null,
+          destino_grid_y: conn.destino.tipo === 'junction' ? conn.destino.gridPoint?.y : null,
+        }));
+
+        await tx.equipamentos_conexoes.createMany({
+          data: conexoesData,
+        });
+        conexoesCriadas = dto.conexoes.length;
+      }
+
+      return {
+        equipamentosAtualizados,
+        conexoesCriadas,
+      };
+    });
+
+    return resultado;
   }
 }

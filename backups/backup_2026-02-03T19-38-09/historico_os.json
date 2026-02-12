@@ -1,0 +1,740 @@
+[
+  {
+    "id": "cmhti69le000o2focgtamfh45",
+    "os_id": "cmhti68oa000k2foc1e9xmita",
+    "acao": "[PROGRAMAÇÃO] CRIACAO",
+    "usuario": "Sistema",
+    "usuario_id": null,
+    "data": "2025-11-10T18:54:52.599Z",
+    "observacoes": "Programação criada",
+    "status_anterior": null,
+    "status_novo": null,
+    "dados_extras": {
+      "origem": "programacao",
+      "programacao_id": "cmhti4vse00012foc9c9cr0an",
+      "dados_extras_originais": null,
+      "status_novo_programacao": "PENDENTE",
+      "status_anterior_programacao": null
+    }
+  },
+  {
+    "id": "cmhti69le000p2focne88egcc",
+    "os_id": "cmhti68oa000k2foc1e9xmita",
+    "acao": "[PROGRAMAÇÃO] ANALISE",
+    "usuario": "Sistema",
+    "usuario_id": null,
+    "data": "2025-11-10T18:55:35.776Z",
+    "observacoes": "",
+    "status_anterior": null,
+    "status_novo": null,
+    "dados_extras": {
+      "origem": "programacao",
+      "programacao_id": "cmhti4vse00012foc9c9cr0an",
+      "dados_extras_originais": null,
+      "status_novo_programacao": "EM_ANALISE",
+      "status_anterior_programacao": "PENDENTE"
+    }
+  },
+  {
+    "id": "cmhti69le000q2foc5rav2wwk",
+    "os_id": "cmhti68oa000k2foc1e9xmita",
+    "acao": "[PROGRAMAÇÃO] APROVACAO",
+    "usuario": "Sistema",
+    "usuario_id": null,
+    "data": "2025-11-10T18:55:51.416Z",
+    "observacoes": "",
+    "status_anterior": null,
+    "status_novo": null,
+    "dados_extras": {
+      "origem": "programacao",
+      "programacao_id": "cmhti4vse00012foc9c9cr0an",
+      "dados_extras_originais": null,
+      "status_novo_programacao": "APROVADA",
+      "status_anterior_programacao": "EM_ANALISE"
+    }
+  },
+  {
+    "id": "cmhti69tl000s2focz42aqs4v",
+    "os_id": "cmhti68oa000k2foc1e9xmita",
+    "acao": "CRIACAO_AUTO",
+    "usuario": "Sistema",
+    "usuario_id": null,
+    "data": "2025-11-10T18:55:54.681Z",
+    "observacoes": "OS gerada automaticamente a partir da programação PRG-2025-010",
+    "status_anterior": null,
+    "status_novo": "PLANEJADA",
+    "dados_extras": {
+      "programacao_id": "cmhti4vse00012foc9c9cr0an",
+      "programacao_codigo": "PRG-2025-010"
+    }
+  },
+  {
+    "id": "cmhtj7sj7000x2fcwwy0ne39k",
+    "os_id": "cmhtj7rmv000t2fcw85lwp0m4",
+    "acao": "[PROGRAMAÇÃO] CRIACAO",
+    "usuario": "Sistema",
+    "usuario_id": null,
+    "data": "2025-11-10T19:13:22.216Z",
+    "observacoes": "Programação criada",
+    "status_anterior": null,
+    "status_novo": null,
+    "dados_extras": {
+      "origem": "programacao",
+      "programacao_id": "cmhtisoo2000p2f0gpwz272xi",
+      "dados_extras_originais": null,
+      "status_novo_programacao": "PENDENTE",
+      "status_anterior_programacao": null
+    }
+  },
+  {
+    "id": "cmhtj7sj7000y2fcwfyj016ju",
+    "os_id": "cmhtj7rmv000t2fcw85lwp0m4",
+    "acao": "[PROGRAMAÇÃO] ATUALIZACAO",
+    "usuario": "Sistema",
+    "usuario_id": null,
+    "data": "2025-11-10T19:14:43.640Z",
+    "observacoes": "Programação atualizada",
+    "status_anterior": null,
+    "status_novo": null,
+    "dados_extras": {
+      "origem": "programacao",
+      "programacao_id": "cmhtisoo2000p2f0gpwz272xi",
+      "dados_extras_originais": null,
+      "status_novo_programacao": null,
+      "status_anterior_programacao": null
+    }
+  },
+  {
+    "id": "cmhtj7sj7000z2fcw4m09czzc",
+    "os_id": "cmhtj7rmv000t2fcw85lwp0m4",
+    "acao": "[PROGRAMAÇÃO] ATUALIZACAO",
+    "usuario": "Sistema",
+    "usuario_id": null,
+    "data": "2025-11-10T19:16:02.721Z",
+    "observacoes": "Programação atualizada",
+    "status_anterior": null,
+    "status_novo": null,
+    "dados_extras": {
+      "origem": "programacao",
+      "programacao_id": "cmhtisoo2000p2f0gpwz272xi",
+      "dados_extras_originais": null,
+      "status_novo_programacao": null,
+      "status_anterior_programacao": null
+    }
+  },
+  {
+    "id": "cmhtj7sj700102fcwgbum7rma",
+    "os_id": "cmhtj7rmv000t2fcw85lwp0m4",
+    "acao": "[PROGRAMAÇÃO] ATUALIZACAO",
+    "usuario": "Sistema",
+    "usuario_id": null,
+    "data": "2025-11-10T19:23:34.873Z",
+    "observacoes": "Programação atualizada",
+    "status_anterior": null,
+    "status_novo": null,
+    "dados_extras": {
+      "origem": "programacao",
+      "programacao_id": "cmhtisoo2000p2f0gpwz272xi",
+      "dados_extras_originais": null,
+      "status_novo_programacao": null,
+      "status_anterior_programacao": null
+    }
+  },
+  {
+    "id": "cmhtj7sj700112fcw7w7t0bws",
+    "os_id": "cmhtj7rmv000t2fcw85lwp0m4",
+    "acao": "[PROGRAMAÇÃO] ATUALIZACAO",
+    "usuario": "Sistema",
+    "usuario_id": null,
+    "data": "2025-11-10T19:24:22.022Z",
+    "observacoes": "Programação atualizada",
+    "status_anterior": null,
+    "status_novo": null,
+    "dados_extras": {
+      "origem": "programacao",
+      "programacao_id": "cmhtisoo2000p2f0gpwz272xi",
+      "dados_extras_originais": null,
+      "status_novo_programacao": null,
+      "status_anterior_programacao": null
+    }
+  },
+  {
+    "id": "cmhtj7sj700122fcwp52vvj0p",
+    "os_id": "cmhtj7rmv000t2fcw85lwp0m4",
+    "acao": "[PROGRAMAÇÃO] ANALISE",
+    "usuario": "Sistema",
+    "usuario_id": null,
+    "data": "2025-11-10T19:24:47.087Z",
+    "observacoes": "",
+    "status_anterior": null,
+    "status_novo": null,
+    "dados_extras": {
+      "origem": "programacao",
+      "programacao_id": "cmhtisoo2000p2f0gpwz272xi",
+      "dados_extras_originais": null,
+      "status_novo_programacao": "EM_ANALISE",
+      "status_anterior_programacao": "PENDENTE"
+    }
+  },
+  {
+    "id": "cmhtj7sj700132fcw6gftr8ki",
+    "os_id": "cmhtj7rmv000t2fcw85lwp0m4",
+    "acao": "[PROGRAMAÇÃO] APROVACAO",
+    "usuario": "Sistema",
+    "usuario_id": null,
+    "data": "2025-11-10T19:25:02.424Z",
+    "observacoes": "",
+    "status_anterior": null,
+    "status_novo": null,
+    "dados_extras": {
+      "origem": "programacao",
+      "programacao_id": "cmhtisoo2000p2f0gpwz272xi",
+      "dados_extras_originais": null,
+      "status_novo_programacao": "APROVADA",
+      "status_anterior_programacao": "EM_ANALISE"
+    }
+  },
+  {
+    "id": "cmhtj7sr900152fcwic4gj56w",
+    "os_id": "cmhtj7rmv000t2fcw85lwp0m4",
+    "acao": "CRIACAO_AUTO",
+    "usuario": "Sistema",
+    "usuario_id": null,
+    "data": "2025-11-10T19:25:05.493Z",
+    "observacoes": "OS gerada automaticamente a partir da programação PRG-2025-011",
+    "status_anterior": null,
+    "status_novo": "PLANEJADA",
+    "dados_extras": {
+      "programacao_id": "cmhtisoo2000p2f0gpwz272xi",
+      "programacao_codigo": "PRG-2025-011"
+    }
+  },
+  {
+    "id": "cmhuxy168000j2f2suv754ve6",
+    "os_id": "cmhtj7rmv000t2fcw85lwp0m4",
+    "acao": "PROGRAMACAO",
+    "usuario": "Sistema",
+    "usuario_id": null,
+    "data": "2025-11-11T19:05:10.256Z",
+    "observacoes": "OS programada com recursos confirmados",
+    "status_anterior": "PLANEJADA",
+    "status_novo": "PROGRAMADA",
+    "dados_extras": null
+  },
+  {
+    "id": "cmhuxymt5000t2f2sat3o20mh",
+    "os_id": "cmhpbbr1w00692fjcetcz79p1",
+    "acao": "INICIO_EXECUCAO",
+    "usuario": "Não atribuído",
+    "usuario_id": null,
+    "data": "2025-11-11T19:05:38.298Z",
+    "observacoes": "Execução iniciada. Equipe: eu, voce, dois filhos",
+    "status_anterior": "PROGRAMADA",
+    "status_novo": "EM_EXECUCAO",
+    "dados_extras": null
+  },
+  {
+    "id": "cmhuxzeg4000v2f2sx8en4vqd",
+    "os_id": "cmhpbbr1w00692fjcetcz79p1",
+    "acao": "FINALIZACAO",
+    "usuario": "Sistema",
+    "usuario_id": null,
+    "data": "2025-11-11T19:06:14.116Z",
+    "observacoes": "OS finalizada. Qualidade: 5/5. ooo",
+    "status_anterior": "EM_EXECUCAO",
+    "status_novo": "FINALIZADA",
+    "dados_extras": null
+  },
+  {
+    "id": "cmhuyhkux003f2f2sstkzxtuz",
+    "os_id": "cmhjk852o000b2fx0h4csq3ry",
+    "acao": "PROGRAMACAO",
+    "usuario": "Sistema",
+    "usuario_id": null,
+    "data": "2025-11-11T19:20:22.233Z",
+    "observacoes": "OS programada com recursos confirmados",
+    "status_anterior": "PLANEJADA",
+    "status_novo": "PROGRAMADA",
+    "dados_extras": null
+  },
+  {
+    "id": "cmj0f9q2y00032f0w69hy51hl",
+    "os_id": "cmhjkjz9500092ftof8spwh4y",
+    "acao": "CANCELAMENTO",
+    "usuario": "Sistema",
+    "usuario_id": null,
+    "data": "2025-12-10T19:48:42.442Z",
+    "observacoes": "Cancelado para teste automatizado. Apenas teste",
+    "status_anterior": "PLANEJADA",
+    "status_novo": "CANCELADA",
+    "dados_extras": null
+  },
+  {
+    "id": "cmj0fbok000072fh0c7wvavk3",
+    "os_id": "cmhjnsqx3000a2fr495cdntcw",
+    "acao": "PROGRAMACAO",
+    "usuario": "Sistema",
+    "usuario_id": null,
+    "data": "2025-12-10T19:50:13.776Z",
+    "observacoes": "OS programada com recursos confirmados",
+    "status_anterior": "PLANEJADA",
+    "status_novo": "PROGRAMADA",
+    "dados_extras": null
+  },
+  {
+    "id": "cmj0fbrym000b2fh03spojbyh",
+    "os_id": "cmhjnsqx3000a2fr495cdntcw",
+    "acao": "INICIO_EXECUCAO",
+    "usuario": "Técnico de Teste",
+    "usuario_id": null,
+    "data": "2025-12-10T19:50:18.190Z",
+    "observacoes": "Execução iniciada. Equipe: Técnico 1, Técnico 2",
+    "status_anterior": "PROGRAMADA",
+    "status_novo": "EM_EXECUCAO",
+    "dados_extras": null
+  },
+  {
+    "id": "cmj0fbvkp000d2fh0iav2qsgy",
+    "os_id": "cmhjnsqx3000a2fr495cdntcw",
+    "acao": "PAUSA",
+    "usuario": "Sistema",
+    "usuario_id": null,
+    "data": "2025-12-10T19:50:22.874Z",
+    "observacoes": "Pausa para almoço. Retorno às 13h",
+    "status_anterior": "EM_EXECUCAO",
+    "status_novo": "PAUSADA",
+    "dados_extras": null
+  },
+  {
+    "id": "cmj0fbzvh000f2fh06eac32ul",
+    "os_id": "cmhjnsqx3000a2fr495cdntcw",
+    "acao": "RETOMADA",
+    "usuario": "Sistema",
+    "usuario_id": null,
+    "data": "2025-12-10T19:50:28.445Z",
+    "observacoes": "Trabalhos retomados",
+    "status_anterior": "PAUSADA",
+    "status_novo": "EM_EXECUCAO",
+    "dados_extras": null
+  },
+  {
+    "id": "cmj0fc3wp000h2fh09zeea02g",
+    "os_id": "cmhjnsqx3000a2fr495cdntcw",
+    "acao": "FINALIZACAO",
+    "usuario": "Sistema",
+    "usuario_id": null,
+    "data": "2025-12-10T19:50:33.674Z",
+    "observacoes": "OS finalizada. Qualidade: 5/5. Serviço concluído com êxito",
+    "status_anterior": "EM_EXECUCAO",
+    "status_novo": "FINALIZADA",
+    "dados_extras": null
+  },
+  {
+    "id": "cmj0fc9w0000j2fh01r2gbwfq",
+    "os_id": "cmhjnwjf5000l2fr4whpl7kk0",
+    "acao": "CANCELAMENTO",
+    "usuario": "Sistema",
+    "usuario_id": null,
+    "data": "2025-12-10T19:50:41.425Z",
+    "observacoes": "Equipamento fora de operação. Será reagendado",
+    "status_anterior": "PLANEJADA",
+    "status_novo": "CANCELADA",
+    "dados_extras": null
+  },
+  {
+    "id": "cmj0feoq6000c2f68q731mzbe",
+    "os_id": "cmj0feoak000a2f68bet825dc",
+    "acao": "[PROGRAMAÇÃO] CRIACAO",
+    "usuario": "Sistema",
+    "usuario_id": null,
+    "data": "2025-12-10T19:52:22.146Z",
+    "observacoes": "Programação criada",
+    "status_anterior": null,
+    "status_novo": null,
+    "dados_extras": {
+      "origem": "programacao",
+      "programacao_id": "cmj0feeej00012f68nrisgbu2",
+      "dados_extras_originais": null,
+      "status_novo_programacao": "PENDENTE",
+      "status_anterior_programacao": null
+    }
+  },
+  {
+    "id": "cmj0feoq6000d2f687i21l73y",
+    "os_id": "cmj0feoak000a2f68bet825dc",
+    "acao": "[PROGRAMAÇÃO] ANALISE",
+    "usuario": "Sistema",
+    "usuario_id": null,
+    "data": "2025-12-10T19:52:28.632Z",
+    "observacoes": "Teste automatizado",
+    "status_anterior": null,
+    "status_novo": null,
+    "dados_extras": {
+      "origem": "programacao",
+      "programacao_id": "cmj0feeej00012f68nrisgbu2",
+      "dados_extras_originais": null,
+      "status_novo_programacao": "EM_ANALISE",
+      "status_anterior_programacao": "PENDENTE"
+    }
+  },
+  {
+    "id": "cmj0feoq6000e2f6841wcyyx1",
+    "os_id": "cmj0feoak000a2f68bet825dc",
+    "acao": "[PROGRAMAÇÃO] APROVACAO",
+    "usuario": "Sistema",
+    "usuario_id": null,
+    "data": "2025-12-10T19:52:31.860Z",
+    "observacoes": "Aprovado",
+    "status_anterior": null,
+    "status_novo": null,
+    "dados_extras": {
+      "origem": "programacao",
+      "programacao_id": "cmj0feeej00012f68nrisgbu2",
+      "dados_extras_originais": null,
+      "status_novo_programacao": "APROVADA",
+      "status_anterior_programacao": "EM_ANALISE"
+    }
+  },
+  {
+    "id": "cmj0feoxw000g2f68ayynxk82",
+    "os_id": "cmj0feoak000a2f68bet825dc",
+    "acao": "CRIACAO_AUTO",
+    "usuario": "Sistema",
+    "usuario_id": null,
+    "data": "2025-12-10T19:52:34.245Z",
+    "observacoes": "OS gerada automaticamente a partir da programação PRG-2025-012",
+    "status_anterior": null,
+    "status_novo": "PLANEJADA",
+    "dados_extras": {
+      "programacao_id": "cmj0feeej00012f68nrisgbu2",
+      "programacao_codigo": "PRG-2025-012"
+    }
+  },
+  {
+    "id": "cmj0ffc4s00142f68lky7n0vl",
+    "os_id": "cmhti68oa000k2foc1e9xmita",
+    "acao": "PROGRAMACAO",
+    "usuario": "Sistema",
+    "usuario_id": null,
+    "data": "2025-12-10T19:53:04.300Z",
+    "observacoes": "OS programada com recursos confirmados",
+    "status_anterior": "PLANEJADA",
+    "status_novo": "PROGRAMADA",
+    "dados_extras": null
+  },
+  {
+    "id": "cmj0ffgs700182f68qn3kn4ee",
+    "os_id": "cmhti68oa000k2foc1e9xmita",
+    "acao": "INICIO_EXECUCAO",
+    "usuario": "Técnico Teste",
+    "usuario_id": null,
+    "data": "2025-12-10T19:53:10.327Z",
+    "observacoes": "Execução iniciada. Equipe: Técnico 1",
+    "status_anterior": "PROGRAMADA",
+    "status_novo": "EM_EXECUCAO",
+    "dados_extras": null
+  },
+  {
+    "id": "cmj0ffkf1001a2f68yo7y6wj4",
+    "os_id": "cmhti68oa000k2foc1e9xmita",
+    "acao": "PAUSA",
+    "usuario": "Sistema",
+    "usuario_id": null,
+    "data": "2025-12-10T19:53:15.038Z",
+    "observacoes": "Pausa para almoço. ",
+    "status_anterior": "EM_EXECUCAO",
+    "status_novo": "PAUSADA",
+    "dados_extras": null
+  },
+  {
+    "id": "cmj0ffn76001c2f68wejz9skh",
+    "os_id": "cmhti68oa000k2foc1e9xmita",
+    "acao": "RETOMADA",
+    "usuario": "Sistema",
+    "usuario_id": null,
+    "data": "2025-12-10T19:53:18.642Z",
+    "observacoes": "Trabalhos retomados",
+    "status_anterior": "PAUSADA",
+    "status_novo": "EM_EXECUCAO",
+    "dados_extras": null
+  },
+  {
+    "id": "cmj0ffr7m001e2f68j8cdb8yt",
+    "os_id": "cmhti68oa000k2foc1e9xmita",
+    "acao": "FINALIZACAO",
+    "usuario": "Sistema",
+    "usuario_id": null,
+    "data": "2025-12-10T19:53:23.842Z",
+    "observacoes": "OS finalizada. Qualidade: 5/5. Serviço concluído",
+    "status_anterior": "EM_EXECUCAO",
+    "status_novo": "FINALIZADA",
+    "dados_extras": null
+  },
+  {
+    "id": "cmj0ffw8m001g2f68puehsl4z",
+    "os_id": "cmj0feoak000a2f68bet825dc",
+    "acao": "CANCELAMENTO",
+    "usuario": "Sistema",
+    "usuario_id": null,
+    "data": "2025-12-10T19:53:30.358Z",
+    "observacoes": "Equipamento inoperante. ",
+    "status_anterior": "PLANEJADA",
+    "status_novo": "CANCELADA",
+    "dados_extras": null
+  },
+  {
+    "id": "cmj0gooby00092fr0hyh5ta44",
+    "os_id": "cmj0gonue00082fr0sbnritm1",
+    "acao": "[PROGRAMAÇÃO] CRIACAO",
+    "usuario": "Sistema",
+    "usuario_id": null,
+    "data": "2025-12-10T20:28:05.779Z",
+    "observacoes": "Programação criada",
+    "status_anterior": null,
+    "status_novo": null,
+    "dados_extras": {
+      "origem": "programacao",
+      "programacao_id": "cmj0goczo00002fr0brrcx94s",
+      "dados_extras_originais": null,
+      "status_novo_programacao": "PENDENTE",
+      "status_anterior_programacao": null
+    }
+  },
+  {
+    "id": "cmj0gooby000a2fr04gtx4u0f",
+    "os_id": "cmj0gonue00082fr0sbnritm1",
+    "acao": "[PROGRAMAÇÃO] ANALISE",
+    "usuario": "Sistema",
+    "usuario_id": null,
+    "data": "2025-12-10T20:28:12.148Z",
+    "observacoes": null,
+    "status_anterior": null,
+    "status_novo": null,
+    "dados_extras": {
+      "origem": "programacao",
+      "programacao_id": "cmj0goczo00002fr0brrcx94s",
+      "dados_extras_originais": null,
+      "status_novo_programacao": "EM_ANALISE",
+      "status_anterior_programacao": "PENDENTE"
+    }
+  },
+  {
+    "id": "cmj0gooby000b2fr0zekf85pm",
+    "os_id": "cmj0gonue00082fr0sbnritm1",
+    "acao": "[PROGRAMAÇÃO] APROVACAO",
+    "usuario": "Sistema",
+    "usuario_id": null,
+    "data": "2025-12-10T20:28:16.413Z",
+    "observacoes": null,
+    "status_anterior": null,
+    "status_novo": null,
+    "dados_extras": {
+      "origem": "programacao",
+      "programacao_id": "cmj0goczo00002fr0brrcx94s",
+      "dados_extras_originais": null,
+      "status_novo_programacao": "APROVADA",
+      "status_anterior_programacao": "EM_ANALISE"
+    }
+  },
+  {
+    "id": "cmj0gooju000d2fr0cv0uky6y",
+    "os_id": "cmj0gonue00082fr0sbnritm1",
+    "acao": "CRIACAO_AUTO",
+    "usuario": "Sistema",
+    "usuario_id": null,
+    "data": "2025-12-10T20:28:19.915Z",
+    "observacoes": "OS gerada automaticamente a partir da programação PRG-2025-031",
+    "status_anterior": null,
+    "status_novo": "PLANEJADA",
+    "dados_extras": {
+      "programacao_id": "cmj0goczo00002fr0brrcx94s",
+      "programacao_codigo": "PRG-2025-031"
+    }
+  },
+  {
+    "id": "cmj0gptxe000v2fr08r78hitw",
+    "os_id": "cmj0gpttg000u2fr0zyf4uqod",
+    "acao": "[PROGRAMAÇÃO] CRIACAO",
+    "usuario": "Sistema",
+    "usuario_id": null,
+    "data": "2025-12-10T20:29:03.633Z",
+    "observacoes": "Programação criada",
+    "status_anterior": null,
+    "status_novo": null,
+    "dados_extras": {
+      "origem": "programacao",
+      "programacao_id": "cmj0gply0000m2fr096htncvg",
+      "dados_extras_originais": null,
+      "status_novo_programacao": "PENDENTE",
+      "status_anterior_programacao": null
+    }
+  },
+  {
+    "id": "cmj0gptxe000w2fr0t1o8rlbm",
+    "os_id": "cmj0gpttg000u2fr0zyf4uqod",
+    "acao": "[PROGRAMAÇÃO] ANALISE",
+    "usuario": "Sistema",
+    "usuario_id": null,
+    "data": "2025-12-10T20:29:07.178Z",
+    "observacoes": null,
+    "status_anterior": null,
+    "status_novo": null,
+    "dados_extras": {
+      "origem": "programacao",
+      "programacao_id": "cmj0gply0000m2fr096htncvg",
+      "dados_extras_originais": null,
+      "status_novo_programacao": "EM_ANALISE",
+      "status_anterior_programacao": "PENDENTE"
+    }
+  },
+  {
+    "id": "cmj0gptxe000x2fr04v6j4mjy",
+    "os_id": "cmj0gpttg000u2fr0zyf4uqod",
+    "acao": "[PROGRAMAÇÃO] APROVACAO",
+    "usuario": "Sistema",
+    "usuario_id": null,
+    "data": "2025-12-10T20:29:11.588Z",
+    "observacoes": null,
+    "status_anterior": null,
+    "status_novo": null,
+    "dados_extras": {
+      "origem": "programacao",
+      "programacao_id": "cmj0gply0000m2fr096htncvg",
+      "dados_extras_originais": null,
+      "status_novo_programacao": "APROVADA",
+      "status_anterior_programacao": "EM_ANALISE"
+    }
+  },
+  {
+    "id": "cmj0gpu18000z2fr0bs2hrxg6",
+    "os_id": "cmj0gpttg000u2fr0zyf4uqod",
+    "acao": "CRIACAO_AUTO",
+    "usuario": "Sistema",
+    "usuario_id": null,
+    "data": "2025-12-10T20:29:13.676Z",
+    "observacoes": "OS gerada automaticamente a partir da programação PRG-2025-034",
+    "status_anterior": null,
+    "status_novo": "PLANEJADA",
+    "dados_extras": {
+      "programacao_id": "cmj0gply0000m2fr096htncvg",
+      "programacao_codigo": "PRG-2025-034"
+    }
+  },
+  {
+    "id": "cmj0imufo001u2fr0n7s454pv",
+    "os_id": "cmj0imt2o001m2fr05degyrsp",
+    "acao": "[PROGRAMAÇÃO] CRIACAO",
+    "usuario": "Sistema",
+    "usuario_id": null,
+    "data": "2025-12-10T21:17:29.051Z",
+    "observacoes": "Programação criada",
+    "status_anterior": null,
+    "status_novo": null,
+    "dados_extras": {
+      "origem": "programacao",
+      "programacao_id": "cmj0ifrnm00152fr0str3aahm",
+      "dados_extras_originais": null,
+      "status_novo_programacao": "PENDENTE",
+      "status_anterior_programacao": null
+    }
+  },
+  {
+    "id": "cmj0imufo001v2fr05vew94zh",
+    "os_id": "cmj0imt2o001m2fr05degyrsp",
+    "acao": "[PROGRAMAÇÃO] ANALISE",
+    "usuario": "Sistema",
+    "usuario_id": null,
+    "data": "2025-12-10T21:18:49.757Z",
+    "observacoes": "analisada pelo nicolas",
+    "status_anterior": null,
+    "status_novo": null,
+    "dados_extras": {
+      "origem": "programacao",
+      "programacao_id": "cmj0ifrnm00152fr0str3aahm",
+      "dados_extras_originais": null,
+      "status_novo_programacao": "EM_ANALISE",
+      "status_anterior_programacao": "PENDENTE"
+    }
+  },
+  {
+    "id": "cmj0imufo001w2fr0y3vpuwfi",
+    "os_id": "cmj0imt2o001m2fr05degyrsp",
+    "acao": "[PROGRAMAÇÃO] APROVACAO",
+    "usuario": "Sistema",
+    "usuario_id": null,
+    "data": "2025-12-10T21:22:50.103Z",
+    "observacoes": "aprovada pelo nicolas",
+    "status_anterior": null,
+    "status_novo": null,
+    "dados_extras": {
+      "origem": "programacao",
+      "programacao_id": "cmj0ifrnm00152fr0str3aahm",
+      "dados_extras_originais": null,
+      "status_novo_programacao": "APROVADA",
+      "status_anterior_programacao": "EM_ANALISE"
+    }
+  },
+  {
+    "id": "cmj0imuns001y2fr0om1lm63r",
+    "os_id": "cmj0imt2o001m2fr05degyrsp",
+    "acao": "CRIACAO_AUTO",
+    "usuario": "Sistema",
+    "usuario_id": null,
+    "data": "2025-12-10T21:22:53.752Z",
+    "observacoes": "OS gerada automaticamente a partir da programação PRG-2025-035",
+    "status_anterior": null,
+    "status_novo": "PLANEJADA",
+    "dados_extras": {
+      "programacao_id": "cmj0ifrnm00152fr0str3aahm",
+      "programacao_codigo": "PRG-2025-035"
+    }
+  },
+  {
+    "id": "cmj0iu2j200262fr0f0jto79x",
+    "os_id": "cmj0imt2o001m2fr05degyrsp",
+    "acao": "PROGRAMACAO",
+    "usuario": "Sistema",
+    "usuario_id": null,
+    "data": "2025-12-10T21:28:30.542Z",
+    "observacoes": "OS programada com recursos confirmados",
+    "status_anterior": "PLANEJADA",
+    "status_novo": "PROGRAMADA",
+    "dados_extras": null
+  },
+  {
+    "id": "cmj0ivuhk002a2fr03345rqi0",
+    "os_id": "cmj0imt2o001m2fr05degyrsp",
+    "acao": "INICIO_EXECUCAO",
+    "usuario": "Não atribuído",
+    "usuario_id": null,
+    "data": "2025-12-10T21:29:53.433Z",
+    "observacoes": "Execução iniciada. Equipe: a, b",
+    "status_anterior": "PROGRAMADA",
+    "status_novo": "EM_EXECUCAO",
+    "dados_extras": null
+  },
+  {
+    "id": "cmj1ea5yb000v2fjwsydfuvap",
+    "os_id": "cmj0imt2o001m2fr05degyrsp",
+    "acao": "FINALIZACAO",
+    "usuario": "Sistema",
+    "usuario_id": null,
+    "data": "2025-12-11T12:08:49.572Z",
+    "observacoes": "OS finalizada. Qualidade: 2/5. s",
+    "status_anterior": "EM_EXECUCAO",
+    "status_novo": "FINALIZADA",
+    "dados_extras": null
+  },
+  {
+    "id": "cmj1k9uiv00kx2f40pw72oq0r",
+    "os_id": "cmhtj7rmv000t2fcw85lwp0m4",
+    "acao": "INICIO_EXECUCAO",
+    "usuario": "46s3jvitajhy00b67esqrie2jr",
+    "usuario_id": null,
+    "data": "2025-12-11T14:56:32.455Z",
+    "observacoes": "Execução iniciada. Equipe: cmhtj7sb3000w2fcw3k2z2t3x",
+    "status_anterior": "PROGRAMADA",
+    "status_novo": "EM_EXECUCAO",
+    "dados_extras": null
+  }
+]
