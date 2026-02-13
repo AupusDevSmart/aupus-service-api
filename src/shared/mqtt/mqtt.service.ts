@@ -21,6 +21,7 @@ export class MqttService extends EventEmitter implements OnModuleInit, OnModuleD
   private client: mqtt.MqttClient;
   private subscriptions: Map<string, string[]> = new Map(); // topic -> [equipamentoIds]
   private ajv: Ajv;
+  private logLevel: 'minimal' | 'normal' | 'verbose' = 'normal';
 
   // Buffer para agregação de 1 minuto
   private buffers: Map<string, BufferData> = new Map();
@@ -65,6 +66,7 @@ export class MqttService extends EventEmitter implements OnModuleInit, OnModuleD
     // ✅ SISTEMA DE 3 MODOS: production, development, disabled
     const mqttMode = process.env.MQTT_MODE || 'production';
     const instanceId = process.env.INSTANCE_ID || 'unknown';
+    this.logLevel = (process.env.MQTT_LOG_LEVEL as any) || 'normal';
 
     // Modo DISABLED: Não conectar ao MQTT
     if (mqttMode === 'disabled') {
@@ -76,12 +78,16 @@ export class MqttService extends EventEmitter implements OnModuleInit, OnModuleD
 
     // Modo DEVELOPMENT: Conectar mas não salvar no banco
     if (mqttMode === 'development') {
-      console.log(`🔧 [MQTT] MODO DESENVOLVIMENTO - Instância: ${instanceId}`);
-      console.log(`🔧 [MQTT] Conectará ao MQTT mas NÃO salvará dados no banco`);
-      console.log(`🔧 [MQTT] WebSocket e logs funcionarão normalmente`);
+      if (this.logLevel !== 'minimal') {
+        console.log(`🔧 [MQTT] MODO DESENVOLVIMENTO - Instância: ${instanceId}`);
+        console.log(`🔧 [MQTT] Conectará ao MQTT mas NÃO salvará dados no banco`);
+        console.log(`🔧 [MQTT] WebSocket e logs funcionarão normalmente`);
+      }
     } else {
       // Modo PRODUCTION: Funcionalidade completa
-      console.log(`🚀 [MQTT] MODO PRODUÇÃO - Instância: ${instanceId}`);
+      if (this.logLevel !== 'minimal') {
+        console.log(`🚀 [MQTT] MODO PRODUÇÃO - Instância: ${instanceId}`);
+      }
     }
 
     // Construir URL do broker a partir de HOST e PORT
@@ -95,40 +101,90 @@ export class MqttService extends EventEmitter implements OnModuleInit, OnModuleD
       password: process.env.MQTT_PASSWORD,
       clean: true,
       reconnectPeriod: 5000,
+      // 🔧 FIX: Parâmetros adicionais para estabilidade de conexão
+      keepalive: 30,              // Enviar PINGREQ a cada 30s para manter conexão ativa
+      connectTimeout: 30 * 1000,  // 30s timeout para conexão inicial
+      protocolVersion: 4,         // MQTT 3.1.1 (mais estável que 5.0)
+      reschedulePings: true,      // Reajustar ping se houver tráfego
     };
 
-    console.log(`🔌 [MQTT] Conectando ao broker: ${mqttUrl}`);
+    if (this.logLevel !== 'minimal') {
+      console.log(`🔌 [MQTT] Conectando ao broker: ${mqttUrl}`);
+    }
     this.client = mqtt.connect(mqttUrl, options);
 
     this.client.on('connect', () => {
-      console.log('✅ [MQTT] Conectado com sucesso!');
+      if (this.logLevel !== 'minimal') {
+        console.log('✅ [MQTT] Conectado com sucesso!');
+      }
       this.carregarTopicosEquipamentos();
     });
 
     this.client.on('message', (topic, payload) => {
+      // 🔍 LOG TEMPORÁRIO: Logar TODAS as mensagens recebidas
+      if (this.logLevel === 'verbose') {
+        console.log(`📥 [MQTT] Mensagem recebida | Tópico: ${topic} | Tamanho: ${payload.length} bytes`);
+      }
       this.handleMessage(topic, payload);
     });
 
     this.client.on('error', (error) => {
-      console.error('❌ [MQTT] ERRO:', error);
+      // Sempre mostrar erros críticos com mais detalhes
+      console.error('❌ [MQTT] ERRO:', error.message || error);
+      if (this.logLevel === 'verbose') {
+        console.error('❌ [MQTT] Stack:', error.stack);
+      }
     });
 
     this.client.on('reconnect', () => {
-      console.warn('🔄 [MQTT] Reconectando ao broker...');
+      // Silenciar em modo minimal
+      if (this.logLevel !== 'minimal') {
+        console.warn('🔄 [MQTT] Reconectando ao broker...');
+      }
     });
 
     // ✅ NOVO: Eventos adicionais para monitoramento
     this.client.on('offline', () => {
-      console.error('🔴 [MQTT] ALERTA CRÍTICO: Broker OFFLINE! Dados não estão sendo recebidos!');
+      // Silenciar em modo minimal - este log é muito verbose
+      if (this.logLevel === 'verbose') {
+        console.error('🔴 [MQTT] ALERTA: Broker OFFLINE!');
+      }
     });
 
     this.client.on('close', () => {
-      console.warn('⚠️ [MQTT] Conexão fechada');
+      // 🔧 FIX: Mostrar sempre (não só em verbose) para debug de ECONNRESET
+      if (this.logLevel !== 'minimal') {
+        console.warn('⚠️ [MQTT] Conexão fechada pelo broker');
+      }
     });
 
     this.client.on('end', () => {
-      console.log('🔌 [MQTT] Cliente MQTT encerrado');
+      if (this.logLevel !== 'minimal') {
+        console.log('🔌 [MQTT] Cliente MQTT encerrado (chamado explicitamente)');
+      }
     });
+
+    // 🔧 FIX: Adicionar handler para evento 'disconnect'
+    this.client.on('disconnect', (packet) => {
+      if (this.logLevel !== 'minimal') {
+        console.warn('⚠️ [MQTT] Desconectado do broker:', packet);
+      }
+    });
+
+    // 🔧 FIX: Adicionar handler para evento 'packetsend' em modo verbose
+    if (this.logLevel === 'verbose') {
+      this.client.on('packetsend', (packet) => {
+        if (packet.cmd === 'pingreq') {
+          console.log('💓 [MQTT] Enviando PINGREQ (keepalive)');
+        }
+      });
+
+      this.client.on('packetreceive', (packet) => {
+        if (packet.cmd === 'pingresp') {
+          console.log('💓 [MQTT] Recebido PINGRESP (keepalive OK)');
+        }
+      });
+    }
   }
 
   /**
@@ -147,13 +203,17 @@ export class MqttService extends EventEmitter implements OnModuleInit, OnModuleD
       },
     });
 
-    console.log(`📡 [MQTT] Carregando ${equipamentos.length} tópicos MQTT...`);
+    if (this.logLevel !== 'minimal') {
+      console.log(`📡 [MQTT] Carregando ${equipamentos.length} tópicos MQTT...`);
+    }
 
     for (const equip of equipamentos) {
       this.subscribeTopic(equip.topico_mqtt!, equip.id);
     }
 
-    console.log(`✅ [MQTT] ${equipamentos.length} equipamentos inscritos em ${this.subscriptions.size} tópicos distintos`);
+    if (this.logLevel !== 'minimal') {
+      console.log(`✅ [MQTT] ${equipamentos.length} equipamentos inscritos em ${this.subscriptions.size} tópicos distintos`);
+    }
   }
 
   /**
@@ -327,11 +387,19 @@ export class MqttService extends EventEmitter implements OnModuleInit, OnModuleD
 
       if (isM160) {
         try {
-          // Novo formato: JSON com campo Resumo (dados agregados de 30 segundos)
+          // ✅ SUPORTE A DOIS FORMATOS:
+          // 1. Formato novo: JSON com campo "Resumo" (dados agregados de 30s)
+          // 2. Formato direto: Dados na raiz do JSON (P666 e equipamentos CHINT)
+
           if (dados.Resumo && typeof dados.Resumo === 'object') {
+            // Formato com campo Resumo
             await this.salvarDadosM160Resumo(equipamentoId, dados, timestampDados, qualidade);
+          } else if (dados.Va !== undefined || dados.consumo_phf !== undefined) {
+            // Formato direto - dados na raiz (P666/CHINT)
+            // Envolver os dados em um objeto Resumo para usar a mesma função
+            await this.salvarDadosM160Resumo(equipamentoId, { Resumo: dados }, timestampDados, qualidade);
           } else {
-            console.warn(`⚠️ [M-160] Formato JSON desconhecido para equipamento ${equipamentoId}. Esperado campo "Resumo". Chaves recebidas:`, Object.keys(dados));
+            console.warn(`⚠️ [M-160] Formato JSON desconhecido para equipamento ${equipamentoId}. Esperado campo "Resumo" ou dados na raiz. Chaves recebidas:`, Object.keys(dados));
           }
 
           // ⚠️ NÃO adicionar M-160 ao buffer para evitar conflito de UNIQUE constraint
@@ -412,6 +480,37 @@ export class MqttService extends EventEmitter implements OnModuleInit, OnModuleD
   }
 
   /**
+   * Determina qualidade dos dados M160 baseado nos valores reais
+   */
+  private determinarQualidadeM160(resumo: any): 'boa' | 'parcial' | 'ruim' {
+    // Verificar se tem tensões
+    const temTensao = (resumo.Va > 0 || resumo.Vb > 0 || resumo.Vc > 0);
+
+    // Verificar se tem corrente
+    const temCorrente = (resumo.Ia > 0 || resumo.Ib > 0 || resumo.Ic > 0);
+
+    // Verificar se tem potência
+    const temPotencia = (resumo.Pa > 0 || resumo.Pb > 0 || resumo.Pc > 0 || resumo.Pt > 0);
+
+    // Regras de qualidade:
+    // BOA: Tem tensão + corrente + potência (consumo real)
+    // PARCIAL: Tem tensão mas sem corrente (instalação sem carga - normal)
+    // RUIM: Sem tensão (desligado/desconectado)
+
+    if (!temTensao) {
+      return 'ruim'; // Sem tensão = equipamento desligado/problema
+    }
+
+    if (temCorrente && temPotencia) {
+      return 'boa'; // Tudo funcionando, medindo consumo real
+    }
+
+    // Tem tensão mas sem corrente = instalação energizada mas sem carga
+    // Isso é NORMAL em muitos casos (ex: noite, final de semana)
+    return 'parcial';
+  }
+
+  /**
    * Salva dados do M160 no novo formato (Resumo)
    * Novo formato: JSON chega agregado de 30 em 30 segundos
    */
@@ -419,12 +518,15 @@ export class MqttService extends EventEmitter implements OnModuleInit, OnModuleD
     equipamentoId: string,
     dados: any,
     timestamp: Date,
-    qualidade: string,
+    qualidadeOriginal: string,
   ) {
     const mqttMode = process.env.MQTT_MODE || 'production';
 
     try {
       const resumo = dados.Resumo;
+
+      // ✅ Determinar qualidade baseado nos DADOS REAIS, não no campo qualidade do MQTT
+      const qualidadeReal = this.determinarQualidadeM160(resumo);
 
       // Extrair timestamp do Resumo (se disponível) ou usar o fornecido
       let timestampDados = timestamp;
@@ -559,7 +661,7 @@ export class MqttService extends EventEmitter implements OnModuleInit, OnModuleD
           fonte: 'MQTT',
           timestamp_fim: timestampDados,
           num_leituras: resumo.total_leituras || 1,
-          qualidade: qualidade === 'GOOD' ? 'bom' : 'ruim',
+          qualidade: qualidadeReal, // ✅ Usar qualidade calculada baseada nos dados reais
           // ✅ CAMPOS CRÍTICOS PARA CÁLCULO DE CUSTOS
           potencia_ativa_kw: potenciaMediaKw,
           energia_kwh: energiaKwh,
@@ -571,7 +673,7 @@ export class MqttService extends EventEmitter implements OnModuleInit, OnModuleD
           timestamp_dados: timestampDados,
           timestamp_fim: timestampDados,
           num_leituras: resumo.total_leituras || 1,
-          qualidade: qualidade === 'GOOD' ? 'bom' : 'ruim',
+          qualidade: qualidadeReal, // ✅ Usar qualidade calculada baseada nos dados reais
           // ✅ CAMPOS CRÍTICOS PARA CÁLCULO DE CUSTOS
           potencia_ativa_kw: potenciaMediaKw,
           energia_kwh: energiaKwh,
@@ -579,13 +681,14 @@ export class MqttService extends EventEmitter implements OnModuleInit, OnModuleD
       });
 
       // ✅ LOG COMPACTO (otimizado para performance)
+      const qualidadeIcon = qualidadeReal === 'boa' ? '✅' : qualidadeReal === 'parcial' ? '⚠️' : '❌';
       console.log(
-        `✅ [M-160] ${equipamentoId.substring(0, 8)} | ` +
+        `${qualidadeIcon} [M-160] ${equipamentoId.substring(0, 8)} | ` +
+        `${qualidadeReal.toUpperCase()} | ` +
         `${energiaKwh.toFixed(4)}kWh | ` +
         `${(resumo.Pt || 0)}W | ` +
         `V:${resumo.Va?.toFixed(1)}/${resumo.Vb?.toFixed(1)}/${resumo.Vc?.toFixed(1)} | ` +
         `I:${resumo.Ia?.toFixed(1)}/${resumo.Ib?.toFixed(1)}/${resumo.Ic?.toFixed(1)}A | ` +
-        `FP:${resumo.FPa?.toFixed(2)}/${resumo.FPb?.toFixed(2)}/${resumo.FPc?.toFixed(2)} | ` +
         `${resumo.total_leituras || 1}x`,
       );
 
