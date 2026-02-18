@@ -195,6 +195,7 @@ export class MqttService extends EventEmitter implements OnModuleInit, OnModuleD
       where: {
         mqtt_habilitado: true,
         topico_mqtt: { not: null },
+        NOT: { topico_mqtt: '' },   // ← NOVO: ignora tópicos vazios
         deleted_at: null,
       },
       select: {
@@ -220,6 +221,12 @@ export class MqttService extends EventEmitter implements OnModuleInit, OnModuleD
    * Subscreve a um tópico MQTT
    */
   private subscribeTopic(topic: string, equipamentoId: string) {
+    // 🔧 FIX: Validação para ignorar tópicos vazios ou apenas espaços
+    if (!topic || !topic.trim()) {
+      console.warn(`⚠️ [MQTT] Tópico vazio ignorado para equipamento ${equipamentoId}`);
+      return;
+    }
+
     if (!this.subscriptions.has(topic)) {
       this.subscriptions.set(topic, []);
       this.client.subscribe(topic, (err) => {
