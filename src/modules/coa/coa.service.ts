@@ -272,9 +272,9 @@ export class CoaService {
     `;
 
     // 3.5. ✅ CORRIGIDO: Buscar energia gerada/consumida do dia por unidade
-    // Lógica IDÊNTICA ao useDadosDemanda.ts (calcularEnergiaDia):
-    // - Para M160: buscar dados->Dados->phf da última leitura (energia acumulada em kWh)
-    // - Para inversores: buscar dados->energy->daily_yield da última leitura (já é total do dia em Wh, converter para kWh)
+    // Usa a coluna energia_kwh (soma todas as leituras do dia)
+    // - Para M160: cada leitura tem energia_kwh calculada (Pt * tempo)
+    // - Para inversores: usa energy.daily_yield da última leitura
     // Timezone: America/Sao_Paulo (UTC-3)
     const energiaAgregadaDia = await this.prisma.$queryRaw<any[]>`
       WITH DadosDia AS (
@@ -283,27 +283,23 @@ export class CoaService {
           e.tipo_equipamento,
           ed.equipamento_id,
           ed.dados,
+          ed.energia_kwh,
           ed.timestamp_dados,
           ROW_NUMBER() OVER (PARTITION BY ed.equipamento_id ORDER BY ed.timestamp_dados DESC) as rn_ultima
         FROM equipamentos_dados ed
         INNER JOIN equipamentos e ON e.id = ed.equipamento_id
         WHERE ed.timestamp_dados >= (CURRENT_DATE AT TIME ZONE 'America/Sao_Paulo')
           AND e.deleted_at IS NULL
-          AND ed.dados IS NOT NULL
       ),
       EnergiaM160 AS (
-        -- M160: pegar Dados.phf da última leitura (energia acumulada em kWh)
-        -- Campo: dados->Dados->phf
+        -- ✅ M160: SOMAR a coluna energia_kwh de todas as leituras do dia
+        -- (cada leitura já tem o cálculo de energia dos últimos 30s)
         SELECT
           unidade_id,
-          COALESCE(
-            CAST(dados->'Dados'->>'phf' AS NUMERIC),
-            0
-          ) as energia_dia_kwh
+          SUM(COALESCE(energia_kwh, 0)) as energia_dia_kwh
         FROM DadosDia
-        WHERE rn_ultima = 1
-          AND (tipo_equipamento ILIKE '%M-160%' OR tipo_equipamento ILIKE '%M160%')
-          AND dados->'Dados'->>'phf' IS NOT NULL
+        WHERE (tipo_equipamento ILIKE '%M-160%' OR tipo_equipamento ILIKE '%M160%')
+        GROUP BY unidade_id
       ),
       EnergiaInversores AS (
         -- Inversores: pegar energy.daily_yield da última leitura (em Wh, converter para kWh)
@@ -326,16 +322,15 @@ export class CoaService {
           )
       ),
       EnergiaOutros AS (
-        -- Outros equipamentos: tentar campo energia_dia_kwh direto
+        -- Outros equipamentos: somar coluna energia_kwh
         SELECT
           unidade_id,
-          COALESCE(CAST(dados->>'energia_dia_kwh' AS NUMERIC), 0) as energia_dia_kwh
+          SUM(COALESCE(energia_kwh, 0)) as energia_dia_kwh
         FROM DadosDia
-        WHERE rn_ultima = 1
-          AND tipo_equipamento NOT ILIKE '%INVERSOR%'
+        WHERE tipo_equipamento NOT ILIKE '%INVERSOR%'
           AND tipo_equipamento NOT ILIKE '%M-160%'
           AND tipo_equipamento NOT ILIKE '%M160%'
-          AND dados->>'energia_dia_kwh' IS NOT NULL
+        GROUP BY unidade_id
       ),
       EnergiaUnificada AS (
         SELECT * FROM EnergiaM160
@@ -424,7 +419,7 @@ export class CoaService {
           // Extrair potência - tentar coluna primeiro, depois JSON
           let potencia = Number(leitura.potencia_ativa_kw) || 0;
 
-          // Se potência não estiver na coluna, extrair do JSON (inversores)
+          // Se potência não estiver na coluna, extrair do JSON (inversores e M-160)
           if (potencia === 0 && leitura.dados) {
             try {
               const dados = leitura.dados as any;
@@ -432,7 +427,11 @@ export class CoaService {
               if (dados?.power?.active_total) {
                 potencia = Number(dados.power.active_total) / 1000;
               }
-              // Formato M-160: Dados.Pa + Dados.Pb + Dados.Pc (em W, converter para kW)
+              // ✅ Formato M-160 NOVO (flat): Pt na raiz (em W, converter para kW)
+              else if (dados?.Pt !== undefined) {
+                potencia = Number(dados.Pt) / 1000;
+              }
+              // ✅ Formato M-160 LEGADO (nested): Dados.Pa/Pb/Pc (em W, converter para kW)
               else if (dados?.Dados) {
                 const Pa = Number(dados.Dados.Pa) || 0;
                 const Pb = Number(dados.Dados.Pb) || 0;

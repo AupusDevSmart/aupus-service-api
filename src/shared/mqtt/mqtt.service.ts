@@ -576,72 +576,27 @@ export class MqttService extends EventEmitter implements OnModuleInit, OnModuleD
         }
       }
 
-      // Calcular potência média do período (kW)
-      // energia_total (kWh) / tempo (horas) = potência (kW)
+      // Calcular energia e potência do período
       // 30 segundos = 30/3600 horas = 0.00833... horas
-      const energiaKwh = resumo.energia_total || 0;
       const tempoHoras = 30 / 3600; // 30 segundos em horas
-      const potenciaMediaKw = energiaKwh / tempoHoras;
 
-      // Montar objeto de dados processados (compatível com estrutura atual do banco)
-      const dadosProcessados = {
-        // Timestamp original
-        timestamp: dados.timestamp || timestampDados.toISOString(),
+      // Opção 1: energia_total já vem calculada (novo formato)
+      let energiaKwh = resumo.energia_total || 0;
+      let potenciaMediaKw = 0;
 
-        // Dados agregados do Resumo
-        Dados: {
-          // ✅ CORREÇÃO CRÍTICA: Os campos vêm SEM sufixo _media/_medio
-          // Tensões (V)
-          Va: resumo.Va || 0,
-          Vb: resumo.Vb || 0,
-          Vc: resumo.Vc || 0,
+      // Opção 2: calcular baseado na potência Pt (em W)
+      if (energiaKwh === 0 && resumo.Pt) {
+        potenciaMediaKw = resumo.Pt / 1000; // W para kW
+        energiaKwh = potenciaMediaKw * tempoHoras; // kW × horas = kWh
+      } else if (energiaKwh > 0) {
+        // Se já tem energia_total, calcular potência
+        potenciaMediaKw = energiaKwh / tempoHoras;
+      }
 
-          // Correntes (A)
-          Ia: resumo.Ia || 0,
-          Ib: resumo.Ib || 0,
-          Ic: resumo.Ic || 0,
-
-          // Potências (W)
-          Pa: resumo.Pa || 0,
-          Pb: resumo.Pb || 0,
-          Pc: resumo.Pc || 0,
-          Pt: resumo.Pt || 0, // Potência total
-
-          // Fatores de potência
-          FPA: resumo.FPa || 0,
-          FPB: resumo.FPb || 0,
-          FPC: resumo.FPc || 0,
-
-          // Frequência (Hz) - não vem no Resumo, deixar zero ou buscar de outro lugar
-          freq: resumo.freq || 0,
-
-          // Energia acumulada (kWh) - valores cumulativos
-          phf: resumo.consumo_phf || 0,      // Energia ativa importada
-          phr: resumo.consumo_phr || 0,      // Energia ativa exportada
-          qhfi: resumo.consumo_qhfi || 0,    // Energia reativa indutiva
-          qhfr: resumo.consumo_qhfr || 0,    // Energia reativa capacitiva
-
-          // Potências reativas
-          Qa: resumo.Qa || 0,
-          Qb: resumo.Qb || 0,
-          Qc: resumo.Qc || 0,
-          Qt: resumo.Qt || 0, // Potência reativa total
-
-          // Potências aparentes
-          Sa: resumo.Sa || 0,
-          Sb: resumo.Sb || 0,
-          Sc: resumo.Sc || 0,
-          St: resumo.St || 0, // Potência aparente total
-
-          // Timestamp da leitura
-          timestamp: resumo.timestamp,
-        },
-
-        // ✅ NOVOS CAMPOS: Potência e energia calculados do Resumo
-        potencia_kw: potenciaMediaKw, // Potência média do período (kW)
-        energia_kwh: energiaKwh, // Energia consumida no período de 30s (kWh)
-        total_leituras: resumo.total_leituras || 1, // Quantidade de leituras agregadas
-      };
+      // ✅ SALVAR APENAS JSON ORIGINAL (sem adicionar campos extras)
+      // Remover campos que não vieram do MQTT (_validation_errors, etc.)
+      const dadosProcessados = { ...resumo };
+      delete dadosProcessados._validation_errors;
 
       // Em modo DEVELOPMENT: Apenas logar, NÃO salvar no banco
       if (mqttMode === 'development') {
@@ -811,6 +766,18 @@ export class MqttService extends EventEmitter implements OnModuleInit, OnModuleD
         return;
       }
 
+      // ✅ EXTRAIR energia_kwh e potencia_ativa_kw dos dados agregados
+      let energiaKwh: number | null = null;
+      let potenciaAtivaKw: number | null = null;
+
+      // Para inversores: energy.period_energy_kwh e power.active_total
+      if (dadosAgregados.energy?.period_energy_kwh !== undefined) {
+        energiaKwh = dadosAgregados.energy.period_energy_kwh;
+      }
+      if (dadosAgregados.power?.active_total !== undefined) {
+        potenciaAtivaKw = dadosAgregados.power.active_total / 1000; // W para kW
+      }
+
       // PRODUÇÃO: Salvar normalmente no banco
       // ✅ CORREÇÃO CRÍTICA: Usar upsert() em vez de create() para evitar erro P2002
       // quando múltiplas instâncias tentam salvar o mesmo dado
@@ -827,6 +794,9 @@ export class MqttService extends EventEmitter implements OnModuleInit, OnModuleD
           timestamp_fim,
           num_leituras: leiturasSalvar.length,
           qualidade: qualidadeGeral,
+          // ✅ CAMPOS CRÍTICOS PARA CÁLCULO DE CUSTOS
+          energia_kwh: energiaKwh,
+          potencia_ativa_kw: potenciaAtivaKw,
         },
         create: {
           equipamento_id: equipamentoId,
@@ -836,6 +806,9 @@ export class MqttService extends EventEmitter implements OnModuleInit, OnModuleD
           timestamp_fim,
           num_leituras: leiturasSalvar.length,
           qualidade: qualidadeGeral,
+          // ✅ CAMPOS CRÍTICOS PARA CÁLCULO DE CUSTOS
+          energia_kwh: energiaKwh,
+          potencia_ativa_kw: potenciaAtivaKw,
         },
       });
 

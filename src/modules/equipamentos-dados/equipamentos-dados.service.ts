@@ -303,7 +303,11 @@ export class EquipamentosDadosService {
         potenciaKw = d.dados.potencia_ativa_kw;
       } else if (d.dados.active_power !== undefined) {
         potenciaKw = d.dados.active_power / 1000;
+      } else if (d.dados.Pt !== undefined) {
+        // ✅ NOVO FORMATO: Power Meter (M-160) com Pt na raiz
+        potenciaKw = d.dados.Pt / 1000;
       } else if (d.dados.Dados) {
+        // ✅ FORMATO LEGADO: Power Meter com Dados.Pt
         const Pa = d.dados.Dados.Pa || 0;
         const Pb = d.dados.Dados.Pb || 0;
         const Pc = d.dados.Dados.Pc || 0;
@@ -313,8 +317,13 @@ export class EquipamentosDadosService {
       grupo.potencias.push(potenciaKw);
 
       // Se houver dados M160, armazenar para agregação
+      // Suportar NOVO FORMATO (dados direto) e FORMATO LEGADO (dados.Dados)
       if (d.dados.Dados) {
+        // Formato legado
         grupo.dadosM160.push(d.dados.Dados);
+      } else if (d.dados.Va !== undefined || d.dados.Ia !== undefined) {
+        // Novo formato: dados direto na raiz
+        grupo.dadosM160.push(d.dados);
       }
     });
 
@@ -347,13 +356,14 @@ export class EquipamentosDadosService {
           Ia: grupo.dadosM160.reduce((sum, d) => sum + (d.Ia || 0), 0) / grupo.dadosM160.length,
           Ib: grupo.dadosM160.reduce((sum, d) => sum + (d.Ib || 0), 0) / grupo.dadosM160.length,
           Ic: grupo.dadosM160.reduce((sum, d) => sum + (d.Ic || 0), 0) / grupo.dadosM160.length,
-          Pa: grupo.dadosM160.reduce((sum, d) => sum + (d.Pa || 0), 0) / grupo.dadosM160.length,
-          Pb: grupo.dadosM160.reduce((sum, d) => sum + (d.Pb || 0), 0) / grupo.dadosM160.length,
-          Pc: grupo.dadosM160.reduce((sum, d) => sum + (d.Pc || 0), 0) / grupo.dadosM160.length,
-          FPA: grupo.dadosM160.reduce((sum, d) => sum + (d.FPA || 0), 0) / grupo.dadosM160.length,
-          FPB: grupo.dadosM160.reduce((sum, d) => sum + (d.FPB || 0), 0) / grupo.dadosM160.length,
-          FPC: grupo.dadosM160.reduce((sum, d) => sum + (d.FPC || 0), 0) / grupo.dadosM160.length,
-          freq: grupo.dadosM160.reduce((sum, d) => sum + (d.freq || 0), 0) / grupo.dadosM160.length,
+          Pt: grupo.dadosM160.reduce((sum, d) => sum + (d.Pt || 0), 0) / grupo.dadosM160.length,
+          Qt: grupo.dadosM160.reduce((sum, d) => sum + (d.Qt || 0), 0) / grupo.dadosM160.length,
+          St: grupo.dadosM160.reduce((sum, d) => sum + (d.St || 0), 0) / grupo.dadosM160.length,
+          // ✅ Suportar MAIÚSCULAS (formato legado) e minúsculas (formato novo)
+          FPa: grupo.dadosM160.reduce((sum, d) => sum + (d.FPa || d.FPA || 0), 0) / grupo.dadosM160.length,
+          FPb: grupo.dadosM160.reduce((sum, d) => sum + (d.FPb || d.FPB || 0), 0) / grupo.dadosM160.length,
+          FPc: grupo.dadosM160.reduce((sum, d) => sum + (d.FPc || d.FPC || 0), 0) / grupo.dadosM160.length,
+          phf: grupo.dadosM160.reduce((sum, d) => sum + (d.phf || 0), 0) / grupo.dadosM160.length,
         };
         ponto.Dados = avgM160;
       }
@@ -669,8 +679,11 @@ export class EquipamentosDadosService {
         potenciaKw = d.dados.power_avg;
       } else if (d.dados.potencia_ativa_kw !== undefined) {
         potenciaKw = d.dados.potencia_ativa_kw;
+      } else if (d.dados.Pt !== undefined) {
+        // ✅ NOVO FORMATO: Power Meter (M-160) com Pt na raiz
+        potenciaKw = d.dados.Pt / 1000;
       } else if (d.dados.Dados) {
-        // M160 formato legado: calcular potência das fases
+        // ✅ FORMATO LEGADO: Power Meter com Dados.Pt
         const Pa = d.dados.Dados.Pa || 0;
         const Pb = d.dados.Dados.Pb || 0;
         const Pc = d.dados.Dados.Pc || 0;
@@ -885,8 +898,11 @@ export class EquipamentosDadosService {
         potenciaKw = d.dados.power_avg;
       } else if (d.dados.potencia_ativa_kw !== undefined) {
         potenciaKw = d.dados.potencia_ativa_kw;
+      } else if (d.dados.Pt !== undefined) {
+        // ✅ NOVO FORMATO: Power Meter (M-160) com Pt na raiz
+        potenciaKw = d.dados.Pt / 1000;
       } else if (d.dados.Dados) {
-        // M160 formato legado: calcular potência das fases
+        // ✅ FORMATO LEGADO: Power Meter com Dados.Pt
         const Pa = d.dados.Dados.Pa || 0;
         const Pb = d.dados.Dados.Pb || 0;
         const Pc = d.dados.Dados.Pc || 0;
@@ -1046,8 +1062,11 @@ export class EquipamentosDadosService {
         potenciaKw = d.dados.power_avg;
       } else if (d.dados.potencia_ativa_kw !== undefined) {
         potenciaKw = d.dados.potencia_ativa_kw;
+      } else if (d.dados.Pt !== undefined) {
+        // ✅ NOVO FORMATO: Power Meter (M-160) com Pt na raiz
+        potenciaKw = d.dados.Pt / 1000;
       } else if (d.dados.Dados) {
-        // M160 formato legado: calcular potência das fases
+        // ✅ FORMATO LEGADO: Power Meter com Dados.Pt
         const Pa = d.dados.Dados.Pa || 0;
         const Pb = d.dados.Dados.Pb || 0;
         const Pc = d.dados.Dados.Pc || 0;
