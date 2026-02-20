@@ -36,16 +36,20 @@ export class ClassificacaoHorariosService {
 
   /**
    * Classifica um timestamp específico e retorna o tipo de horário e tarifas aplicáveis
+   * ✅ CORRIGIDO: Usa timezone America/Sao_Paulo ao invés de UTC
    */
   classificar(
     timestamp: Date,
     unidade: DadosUnidade,
     tarifas: TarifasConcessionaria,
   ): ClassificacaoHorario {
-    const hora = timestamp.getHours();
-    const minutos = timestamp.getMinutes();
+    // ✅ CONVERTER PARA HORÁRIO LOCAL BRASILEIRO (America/Sao_Paulo)
+    // timestamp.getHours() retorna UTC, mas precisamos do horário local
+    const timestampLocal = new Date(timestamp.toLocaleString('en-US', { timeZone: 'America/Sao_Paulo' }));
+    const hora = timestampLocal.getHours();
+    const minutos = timestampLocal.getMinutes();
     const horaDecimal = hora + minutos / 60;
-    const diaSemana = timestamp.getDay(); // 0 = domingo, 6 = sábado
+    const diaSemana = timestampLocal.getDay(); // 0 = domingo, 6 = sábado
 
     // ✅ PRIORIDADE 1: Feriado/Fim de semana + Irrigante = HR 24h
     const isFeriado = this.feriadosService.isFeriadoNacional(timestamp);
