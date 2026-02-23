@@ -580,17 +580,29 @@ export class MqttService extends EventEmitter implements OnModuleInit, OnModuleD
       // 30 segundos = 30/3600 horas = 0.00833... horas
       const tempoHoras = 30 / 3600; // 30 segundos em horas
 
-      // Opção 1: energia_total já vem calculada (novo formato)
-      let energiaKwh = resumo.energia_total || 0;
+      // ✅ PRIORIDADE 1: consumo_phf (energia real medida pelo equipamento nos últimos 30s)
+      let energiaKwh = resumo.consumo_phf || 0;
       let potenciaMediaKw = 0;
 
-      // Opção 2: calcular baseado na potência Pt (em W)
+      // Opção 2: energia_total (formato alternativo)
+      if (energiaKwh === 0 && resumo.energia_total) {
+        energiaKwh = resumo.energia_total;
+      }
+
+      // Opção 3: calcular baseado na potência Pt (em W) - FALLBACK apenas se não tiver consumo_phf
       if (energiaKwh === 0 && resumo.Pt) {
         potenciaMediaKw = resumo.Pt / 1000; // W para kW
         energiaKwh = potenciaMediaKw * tempoHoras; // kW × horas = kWh
-      } else if (energiaKwh > 0) {
-        // Se já tem energia_total, calcular potência
+      }
+
+      // Calcular potência se já tem energia
+      if (energiaKwh > 0 && potenciaMediaKw === 0) {
         potenciaMediaKw = energiaKwh / tempoHoras;
+      }
+
+      // Se tem Pt no JSON, usar como potência (mais preciso)
+      if (resumo.Pt) {
+        potenciaMediaKw = resumo.Pt / 1000;
       }
 
       // ✅ SALVAR APENAS JSON ORIGINAL (sem adicionar campos extras)

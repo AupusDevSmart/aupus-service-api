@@ -155,29 +155,33 @@ export class EquipamentosDadosController {
     }
 
     // MODO 2 e 3: Dia ou Mês com data de referência
+    // ✅ TIMEZONE: Trabalhar em horário de Brasília (America/Sao_Paulo)
     const dataRef = query.data ? new Date(query.data) : new Date();
 
     if (query.periodo === PeriodoTipo.DIA) {
-      // Dia completo: 00:00:00 até 23:59:59
-      const dataInicio = new Date(dataRef);
-      dataInicio.setHours(0, 0, 0, 0);
+      // ✅ Dia completo em horário de Brasília: 00:00:00 até 23:59:59 (America/Sao_Paulo)
+      // Exemplo: 23/02/2026 00:00:00 BRT = 23/02/2026 03:00:00 UTC
+      const ano = dataRef.getFullYear();
+      const mes = dataRef.getMonth();
+      const dia = dataRef.getDate();
 
-      const dataFim = new Date(dataRef);
-      dataFim.setHours(23, 59, 59, 999);
+      // Criar datas em UTC representando o dia em Brasília
+      // 00:00:00 BRT = 03:00:00 UTC (adicionar 3 horas)
+      const dataInicio = new Date(Date.UTC(ano, mes, dia, 3, 0, 0, 0));
+      // 23:59:59 BRT = 02:59:59 UTC do dia seguinte
+      const dataFim = new Date(Date.UTC(ano, mes, dia + 1, 2, 59, 59, 999));
 
       return { dataInicio, dataFim };
     } else if (query.periodo === PeriodoTipo.MES) {
-      // Mês completo: primeiro dia 00:00:00 até último dia 23:59:59
-      const dataInicio = new Date(dataRef.getFullYear(), dataRef.getMonth(), 1, 0, 0, 0, 0);
-      const dataFim = new Date(
-        dataRef.getFullYear(),
-        dataRef.getMonth() + 1,
-        0,
-        23,
-        59,
-        59,
-        999,
-      );
+      // ✅ Mês completo em horário de Brasília
+      const ano = dataRef.getFullYear();
+      const mes = dataRef.getMonth();
+
+      // Primeiro dia do mês 00:00:00 BRT = 03:00:00 UTC
+      const dataInicio = new Date(Date.UTC(ano, mes, 1, 3, 0, 0, 0));
+      // Último dia do mês 23:59:59 BRT = 02:59:59 UTC do primeiro dia do próximo mês
+      const ultimoDia = new Date(ano, mes + 1, 0).getDate();
+      const dataFim = new Date(Date.UTC(ano, mes, ultimoDia + 1, 2, 59, 59, 999));
 
       return { dataInicio, dataFim };
     }

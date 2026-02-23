@@ -201,7 +201,7 @@ export class CalculoCustosService {
 
   /**
    * Busca leituras MQTT do período
-   * ✅ ATUALIZADO: Usa novos campos energia_kwh e potencia_ativa_kw
+   * ✅ USA consumo_phf DIRETAMENTE DO JSON (fonte de verdade)
    */
   private async buscarLeiturasPeriodo(
     equipamentoId: string,
@@ -215,32 +215,33 @@ export class CalculoCustosService {
           gte: dataInicio,
           lte: dataFim,
         },
-        energia_kwh: {
-          not: null, // ✅ Apenas leituras com energia calculada
-        },
-        // ✅ Aceitar todas as qualidades que tenham energia_kwh válida
-        // O campo energia_kwh já está sendo salvo corretamente, então podemos confiar nele
       },
       orderBy: {
         timestamp_dados: 'asc',
       },
       select: {
         timestamp_dados: true,
-        energia_kwh: true,          // ✅ NOVO campo
-        potencia_ativa_kw: true,    // ✅ NOVO campo
-        dados: true,                 // Fallback para compatibilidade
+        dados: true, // ✅ Sempre ler do JSON (fonte de verdade)
+        potencia_ativa_kw: true, // Potência pode vir da coluna
       },
     });
 
     return dados.map((d) => {
-      // Priorizar novos campos calculados
-      const energia_kwh = d.energia_kwh
-        ? parseFloat(d.energia_kwh.toString())
+      // ✅ PRIORIDADE: consumo_phf do JSON (energia real medida pelo equipamento)
+      const dadosJson = d.dados as any;
+      const energia_kwh = dadosJson.consumo_phf
+        ? parseFloat(dadosJson.consumo_phf.toString())
         : 0;
 
-      const potencia_kw = d.potencia_ativa_kw
+      // Potência: tentar coluna primeiro, depois JSON
+      let potencia_kw = d.potencia_ativa_kw
         ? parseFloat(d.potencia_ativa_kw.toString())
         : 0;
+
+      // Se não tem na coluna, tentar pegar Pt do JSON
+      if (potencia_kw === 0 && dadosJson.Pt) {
+        potencia_kw = parseFloat(dadosJson.Pt.toString()) / 1000; // W para kW
+      }
 
       return {
         timestamp: d.timestamp_dados,

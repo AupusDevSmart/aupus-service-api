@@ -292,11 +292,11 @@ export class CoaService {
           AND e.deleted_at IS NULL
       ),
       EnergiaM160 AS (
-        -- ✅ M160: SOMAR a coluna energia_kwh de todas as leituras do dia
-        -- (cada leitura já tem o cálculo de energia dos últimos 30s)
+        -- ✅ M160: SOMAR consumo_phf do JSON (fonte de verdade do medidor)
+        -- consumo_phf = energia real medida nos últimos 30s
         SELECT
           unidade_id,
-          SUM(COALESCE(energia_kwh, 0)) as energia_dia_kwh
+          SUM(COALESCE(CAST(dados->>'consumo_phf' AS NUMERIC), 0)) as energia_dia_kwh
         FROM DadosDia
         WHERE (tipo_equipamento ILIKE '%M-160%' OR tipo_equipamento ILIKE '%M160%')
         GROUP BY unidade_id
