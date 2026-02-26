@@ -1065,28 +1065,6 @@ model diagramas_unitarios {
   @@map("diagramas_unitarios")
 }
 
-model inversor_leituras {
-  id             BigInt   @id @default(autoincrement())
-  timestamp      DateTime @default(now()) @db.Timestamptz(6)
-  inversor_id    Int
-  voltage_ab     Float    @db.Real
-  voltage_bc     Float    @db.Real
-  voltage_ca     Float    @db.Real
-  current_a      Float    @db.Real
-  current_b      Float    @db.Real
-  current_c      Float    @db.Real
-  active_power   Int
-  reactive_power Int
-  apparent_power Int
-  power_factor   Float    @db.Real
-  frequency      Float    @db.Real
-  created_at     DateTime @default(now()) @db.Timestamp(0)
-  raw_payload    Json?
-
-  @@index([inversor_id, timestamp(sort: Desc)])
-  @@index([timestamp(sort: Desc)])
-  @@index([created_at])
-}
 
 // ✅ NOVA TABELA: Categorias de Equipamentos
 model categorias_equipamentos {

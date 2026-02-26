@@ -21,10 +21,15 @@ export class CategoriasEquipamentosController {
   ) {}
 
   @Post()
-  create(@Body() createCategoriaEquipamentoDto: CreateCategoriaEquipamentoDto) {
-    return this.categoriasEquipamentosService.create(
+  async create(@Body() createCategoriaEquipamentoDto: CreateCategoriaEquipamentoDto) {
+    const categoria = await this.categoriasEquipamentosService.create(
       createCategoriaEquipamentoDto,
     );
+
+    return {
+      success: true,
+      data: categoria,
+    };
   }
 
   @Get()

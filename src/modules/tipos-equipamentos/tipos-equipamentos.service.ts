@@ -1,5 +1,7 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, ConflictException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../../shared/prisma/prisma.service';
+import { CreateTipoEquipamentoDto } from './dto/create-tipo-equipamento.dto';
+import * as crypto from 'crypto';
 
 export interface CampoTecnico {
   campo: string;
@@ -82,6 +84,61 @@ export class TiposEquipamentosService {
           total: cat._count.id,
         })),
       },
+    };
+  }
+
+  /**
+   * Cria um novo tipo de equipamento (modelo)
+   */
+  async create(dto: CreateTipoEquipamentoDto) {
+    // Verificar se a categoria existe
+    const categoriaExiste = await this.prisma.categorias_equipamentos.findUnique({
+      where: { id: dto.categoriaId },
+    });
+
+    if (!categoriaExiste) {
+      throw new BadRequestException('Categoria não encontrada');
+    }
+
+    // Verificar se já existe tipo com o mesmo código
+    const tipoExistente = await this.prisma.tipos_equipamentos.findUnique({
+      where: { codigo: dto.codigo },
+    });
+
+    if (tipoExistente) {
+      throw new ConflictException('Já existe um tipo de equipamento com este código');
+    }
+
+    // Criar tipo
+    const tipo = await this.prisma.tipos_equipamentos.create({
+      data: {
+        id: crypto.randomUUID(),
+        codigo: dto.codigo,
+        nome: dto.nome,
+        fabricante: dto.fabricante,
+        categoria_id: dto.categoriaId,
+        largura_padrao: 100,
+        altura_padrao: 100,
+        icone_svg: '',
+        propriedades_schema: {},
+        mqtt_schema: {},
+      },
+    });
+
+    return {
+      id: tipo.id,
+      codigo: tipo.codigo,
+      nome: tipo.nome,
+      categoriaId: tipo.categoria_id,
+      categoria: categoriaExiste,
+      fabricante: tipo.fabricante,
+      larguraPadrao: tipo.largura_padrao,
+      alturaPadrao: tipo.altura_padrao,
+      iconeSvg: tipo.icone_svg,
+      propriedadesSchema: tipo.propriedades_schema,
+      mqttSchema: tipo.mqtt_schema,
+      createdAt: tipo.created_at,
+      updatedAt: tipo.updated_at,
     };
   }
 

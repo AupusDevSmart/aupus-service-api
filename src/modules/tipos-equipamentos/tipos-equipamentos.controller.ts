@@ -1,11 +1,14 @@
 import {
   Controller,
   Get,
+  Post,
+  Body,
   Query,
   Param,
   HttpStatus,
   Logger,
   NotFoundException,
+  UseGuards,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -15,13 +18,50 @@ import {
   ApiParam,
 } from '@nestjs/swagger';
 import { TiposEquipamentosService } from './tipos-equipamentos.service';
+import { CreateTipoEquipamentoDto } from './dto/create-tipo-equipamento.dto';
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 
 @ApiTags('tipos-equipamentos')
 @Controller('tipos-equipamentos')
+@UseGuards(JwtAuthGuard)
 export class TiposEquipamentosController {
   private readonly logger = new Logger(TiposEquipamentosController.name);
 
   constructor(private readonly tiposEquipamentosService: TiposEquipamentosService) {}
+
+  @Post()
+  @ApiOperation({
+    summary: 'Criar novo tipo de equipamento (modelo)',
+    description: 'Cria um novo modelo de equipamento no catálogo',
+  })
+  @ApiResponse({
+    status: HttpStatus.CREATED,
+    description: 'Tipo de equipamento criado com sucesso',
+  })
+  @ApiResponse({
+    status: HttpStatus.CONFLICT,
+    description: 'Já existe um tipo com este código',
+  })
+  @ApiResponse({
+    status: HttpStatus.BAD_REQUEST,
+    description: 'Categoria não encontrada ou dados inválidos',
+  })
+  async create(@Body() dto: CreateTipoEquipamentoDto) {
+    this.logger.log(`📝 [CREATE TIPO] Criando novo tipo: ${dto.nome} (${dto.codigo})`);
+
+    try {
+      const tipo = await this.tiposEquipamentosService.create(dto);
+      this.logger.log(`✅ [CREATE TIPO] Tipo criado com sucesso: ${tipo.id}`);
+
+      return {
+        success: true,
+        data: tipo,
+      };
+    } catch (error) {
+      this.logger.error(`❌ [CREATE TIPO] Erro:`, error.message);
+      throw error;
+    }
+  }
 
   @Get()
   @ApiOperation({
