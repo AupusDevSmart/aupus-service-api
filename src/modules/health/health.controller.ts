@@ -4,6 +4,7 @@ import { HealthService } from './health.service';
 import { AlertService } from './alert.service';
 import { MetricsService } from './metrics.service';
 import { Public } from '../auth/decorators/public.decorator';
+import { PrismaService } from '../../shared/prisma/prisma.service';
 
 @ApiTags('Health Check')
 @Controller('health')
@@ -12,6 +13,7 @@ export class HealthController {
     private readonly healthService: HealthService,
     private readonly alertService: AlertService,
     private readonly metricsService: MetricsService,
+    private readonly prismaService: PrismaService,
   ) {}
 
   @Get()
@@ -87,5 +89,16 @@ export class HealthController {
   @ApiResponse({ status: 200, description: 'Métricas simplificadas' })
   async getSimpleMetrics() {
     return this.metricsService.getSimpleMetrics();
+  }
+
+  @Get('metrics/database')
+  @Public()
+  @ApiOperation({ summary: 'Retorna métricas de queries do banco de dados' })
+  @ApiResponse({ status: 200, description: 'Métricas de queries do banco' })
+  async getDatabaseMetrics() {
+    return {
+      database: this.prismaService.getQueryMetrics(),
+      timestamp: new Date().toISOString(),
+    };
   }
 }

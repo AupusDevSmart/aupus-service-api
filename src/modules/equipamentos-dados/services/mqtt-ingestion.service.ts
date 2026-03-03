@@ -18,6 +18,13 @@ import { Prisma } from '@prisma/client';
 export class MqttIngestionService {
   private readonly logger = new Logger(MqttIngestionService.name);
 
+  // ✅ Cache em memória para evitar queries N+1
+  private equipamentosCache = new Map<string, {
+    data: any;
+    timestamp: number;
+  }>();
+  private readonly CACHE_TTL = 60000; // 60 segundos
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly classificacaoService: ClassificacaoHorariosService,
@@ -234,6 +241,30 @@ export class MqttIngestionService {
   }
 
   /**
+   * Busca equipamento com cache para evitar queries N+1
+   */
+  private async buscarEquipamentoComCache(equipamentoId: string, select: any) {
+    const cacheKey = `${equipamentoId}_${JSON.stringify(select)}`;
+    const cached = this.equipamentosCache.get(cacheKey);
+
+    if (cached && Date.now() - cached.timestamp < this.CACHE_TTL) {
+      return cached.data;
+    }
+
+    const equipamento = await this.prisma.equipamentos.findUnique({
+      where: { id: equipamentoId },
+      select,
+    });
+
+    this.equipamentosCache.set(cacheKey, {
+      data: equipamento,
+      timestamp: Date.now(),
+    });
+
+    return equipamento;
+  }
+
+  /**
    * Classifica horário tarifário do timestamp
    */
   private async classificarHorario(
@@ -241,16 +272,13 @@ export class MqttIngestionService {
     equipamentoId: string,
   ): Promise<string | null> {
     try {
-      // Buscar dados da unidade para classificação
-      const equipamento = await this.prisma.equipamentos.findUnique({
-        where: { id: equipamentoId },
-        select: {
-          unidade_id: true,
-          unidade: {
-            select: {
-              grupo: true,
-              irrigante: true,
-            },
+      // Buscar dados da unidade para classificação (com cache)
+      const equipamento = await this.buscarEquipamentoComCache(equipamentoId, {
+        unidade_id: true,
+        unidade: {
+          select: {
+            grupo: true,
+            irrigante: true,
           },
         },
       });
@@ -348,14 +376,11 @@ export class MqttIngestionService {
     tipoHorario: string | null,
   ): Promise<string> {
     try {
-      // Buscar unidade e concessionária
-      const equipamento = await this.prisma.equipamentos.findUnique({
-        where: { id: equipamentoId },
-        include: {
-          unidade: {
-            include: {
-              concessionaria: true,
-            },
+      // Buscar unidade e concessionária (com cache)
+      const equipamento = await this.buscarEquipamentoComCache(equipamentoId, {
+        unidade: {
+          include: {
+            concessionaria: true,
           },
         },
       });

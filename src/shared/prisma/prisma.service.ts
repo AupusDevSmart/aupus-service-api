@@ -1,9 +1,18 @@
 import { Injectable, OnModuleInit, OnModuleDestroy, Logger } from '@nestjs/common';
 import { PrismaClient } from '@prisma/client';
+import { loggers } from '../../config/logger.config';
+import { Sentry } from '../../config/sentry.config';
 
 @Injectable()
 export class PrismaService extends PrismaClient implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(PrismaService.name);
+
+  // Métricas de queries
+  private queryMetrics = {
+    totalQueries: 0,
+    slowQueries: 0,
+    errorCount: 0,
+  };
 
   constructor() {
     super({
@@ -20,23 +29,80 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
       },
     });
 
-    // Log de queries em desenvolvimento
-    if (process.env.NODE_ENV === 'develop') {
-      this.$on('query' as never, (e: any) => {
-        if (e.duration > 1000) {
-          this.logger.warn(`Query lenta detectada (${e.duration}ms): ${e.query}`);
+    const slowQueryThreshold = parseInt(process.env.SLOW_QUERY_THRESHOLD || '1000');
+
+    // Monitoramento de queries
+    this.$on('query' as never, (e: any) => {
+      this.queryMetrics.totalQueries++;
+
+      const duration = e.duration;
+      const query = e.query;
+      const params = e.params;
+
+      // Log estruturado com Pino
+      loggers.database.debug({
+        query,
+        params,
+        duration,
+        target: e.target,
+      }, 'Query executada');
+
+      // Detectar queries lentas
+      if (duration > slowQueryThreshold) {
+        this.queryMetrics.slowQueries++;
+
+        loggers.database.warn({
+          query,
+          params,
+          duration,
+          threshold: slowQueryThreshold,
+        }, `Query lenta detectada (${duration}ms)`);
+
+        // Reportar query lenta ao Sentry (apenas em produção)
+        if (process.env.NODE_ENV === 'production') {
+          Sentry.captureMessage('Slow Database Query', {
+            level: 'warning',
+            extra: {
+              query,
+              duration,
+              params,
+              threshold: slowQueryThreshold,
+            },
+            tags: {
+              component: 'database',
+              query_type: 'slow',
+            },
+          });
         }
-      });
-    }
+      }
+    });
 
     // Log de erros
     this.$on('error' as never, (e: any) => {
-      this.logger.error('Prisma error:', e);
+      this.queryMetrics.errorCount++;
+
+      loggers.database.error({
+        error: e,
+        timestamp: new Date().toISOString(),
+      }, 'Erro no Prisma');
+
+      // Reportar erro ao Sentry
+      Sentry.captureException(new Error(`Prisma Error: ${e.message || JSON.stringify(e)}`), {
+        level: 'error',
+        extra: { details: e },
+        tags: {
+          component: 'database',
+          error_type: 'prisma',
+        },
+      });
     });
 
     // Log de warnings
     this.$on('warn' as never, (e: any) => {
-      this.logger.warn('Prisma warning:', e);
+      loggers.database.warn({
+        warning: e,
+        timestamp: new Date().toISOString(),
+      }, 'Aviso do Prisma');
     });
   }
 
@@ -67,8 +133,21 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
   }
 
   async onModuleDestroy() {
+    // Log de métricas finais
+    loggers.database.info({
+      metrics: this.queryMetrics,
+    }, 'Métricas de queries antes de desconectar');
+
     await this.$disconnect();
     this.logger.log('Desconectado do banco de dados');
+  }
+
+  // Método para obter métricas de queries
+  getQueryMetrics() {
+    return {
+      ...this.queryMetrics,
+      timestamp: new Date().toISOString(),
+    };
   }
 
   // Método helper para executar queries com retry automático

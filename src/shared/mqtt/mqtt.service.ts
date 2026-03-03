@@ -324,6 +324,10 @@ export class MqttService extends EventEmitter implements OnModuleInit, OnModuleD
     }
   }
 
+  // ✅ Cache para equipamentos MQTT (evita N+1)
+  private equipamentosCache = new Map<string, { data: any; timestamp: number }>();
+  private readonly CACHE_TTL_MQTT = 300000; // 5 minutos
+
   /**
    * Processa e salva dados de um equipamento
    */
@@ -333,20 +337,52 @@ export class MqttService extends EventEmitter implements OnModuleInit, OnModuleD
     topic: string,
   ) {
     try {
-      // Buscar equipamento com tipo
-      const equipamento = await this.prisma.equipamentos.findUnique({
-        where: { id: equipamentoId },
-        include: {
-          tipo_equipamento_rel: {
-            select: {
-              id: true,
-              codigo: true,
-              nome: true,
-              mqtt_schema: true, // ✅ CORRIGIDO: usar mqtt_schema em vez de propriedades_schema
-            },
-          },
-        },
-      });
+      // ✅ Buscar equipamento com cache (SQL raw otimizado)
+      const cacheKey = `equip_${equipamentoId}`;
+      const cached = this.equipamentosCache.get(cacheKey);
+
+      let equipamento: any;
+      if (cached && Date.now() - cached.timestamp < this.CACHE_TTL_MQTT) {
+        equipamento = cached.data;
+      } else {
+        // SQL raw otimizado - apenas colunas necessárias
+        const result = await this.prisma.$queryRaw<any[]>`
+          SELECT
+            e.id,
+            e.nome,
+            e.diagrama_id,
+            te.id as tipo_id,
+            te.codigo as tipo_codigo,
+            te.nome as tipo_nome,
+            te.mqtt_schema as tipo_schema
+          FROM equipamentos e
+          LEFT JOIN tipos_equipamentos te ON te.id = e.tipo_equipamento_id
+          WHERE e.id = ${equipamentoId}
+          LIMIT 1
+        `;
+
+        if (result.length === 0) {
+          return;
+        }
+
+        // Mapear resultado para formato esperado
+        equipamento = {
+          id: result[0].id,
+          nome: result[0].nome,
+          diagrama_id: result[0].diagrama_id,
+          tipo_equipamento_rel: result[0].tipo_id ? {
+            id: result[0].tipo_id,
+            codigo: result[0].tipo_codigo,
+            nome: result[0].tipo_nome,
+            mqtt_schema: result[0].tipo_schema
+          } : null
+        };
+
+        this.equipamentosCache.set(cacheKey, {
+          data: equipamento,
+          timestamp: Date.now()
+        });
+      }
 
       if (!equipamento) {
         // console.warn(`⚠️ Equipamento ${equipamentoId} não encontrado`);
@@ -738,14 +774,31 @@ export class MqttService extends EventEmitter implements OnModuleInit, OnModuleD
     const leiturasSalvar = [...buffer.leituras];
 
     try {
-      // Buscar tópico MQTT do equipamento para o log
-      const equipamento = await this.prisma.equipamentos.findUnique({
-        where: { id: equipamentoId },
-        select: {
-          topico_mqtt: true,
-          nome: true
+      // ✅ Buscar tópico MQTT do equipamento com cache
+      const cacheKey = `equip_${equipamentoId}`;
+      const cached = this.equipamentosCache.get(cacheKey);
+
+      let equipamento: any;
+      if (cached && Date.now() - cached.timestamp < this.CACHE_TTL_MQTT) {
+        equipamento = cached.data;
+      } else {
+        // SQL raw otimizado - apenas colunas necessárias
+        const result = await this.prisma.$queryRaw<any[]>`
+          SELECT id, topico_mqtt, nome
+          FROM equipamentos
+          WHERE id = ${equipamentoId}
+          LIMIT 1
+        `;
+
+        equipamento = result[0] || null;
+
+        if (equipamento) {
+          this.equipamentosCache.set(cacheKey, {
+            data: equipamento,
+            timestamp: Date.now()
+          });
         }
-      });
+      }
 
       const timestamp_fim = new Date();
 

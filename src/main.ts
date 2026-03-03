@@ -4,12 +4,19 @@ import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { AppModule } from './app.module';
 import { ResponseInterceptor } from './common/interceptors/response.interceptor';
 import { HttpExceptionFilter } from './common/filters/http-exception.filter';
+import { LoggingInterceptor } from './common/interceptors/logging.interceptor';
 import { NestExpressApplication } from '@nestjs/platform-express';
 import { join } from 'path';
+import { initializeSentry, Sentry } from './config/sentry.config';
+import logger from './config/logger.config';
+
+// Inicializar Sentry ANTES de criar a aplicação
+initializeSentry();
 
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule, {
-    logger: ['error', 'warn', 'log', 'debug', 'verbose']
+    logger: ['error', 'warn', 'log', 'debug', 'verbose'],
+    bufferLogs: true,
   });
 
   // Servir arquivos estáticos (uploads)
@@ -39,8 +46,9 @@ async function bootstrap() {
     }),
   );
 
-  // ✅ Aplicar interceptor de resposta padrão
-  app.useGlobalInterceptors(new ResponseInterceptor());
+  // ✅ Interceptors (ordem importa!)
+  app.useGlobalInterceptors(new LoggingInterceptor()); // Primeiro: logging
+  app.useGlobalInterceptors(new ResponseInterceptor()); // Segundo: formatação de resposta
 
   // ✅ Aplicar filtro de exceções global
   app.useGlobalFilters(new HttpExceptionFilter());
@@ -63,9 +71,21 @@ async function bootstrap() {
   const port = process.env.PORT || 3001;
   await app.listen(port);
 
-  console.log(`🚀 API rodando em: http://localhost:${port}`);
-  console.log(`📖 Swagger docs: http://localhost:${port}/api/docs`);
-  console.log(`🔍 Teste de banco: http://localhost:${port}/api/v1/test-db`);
+  // Usar Pino logger para mensagens de inicialização
+  logger.info(`🚀 API rodando em: http://localhost:${port}`);
+  logger.info(`📖 Swagger docs: http://localhost:${port}/api/docs`);
+  logger.info(`🔍 Teste de banco: http://localhost:${port}/api/v1/test-db`);
+  logger.info(`📊 Ambiente: ${process.env.NODE_ENV || 'development'}`);
+
+  if (process.env.SENTRY_DSN) {
+    logger.info('✅ Sentry ativo - Monitoramento de erros habilitado');
+  } else {
+    logger.warn('⚠️  Sentry não configurado - Defina SENTRY_DSN no .env');
+  }
 }
 
-bootstrap();
+bootstrap().catch((error) => {
+  logger.error({ error }, 'Erro fatal ao iniciar aplicação');
+  Sentry.captureException(error);
+  process.exit(1);
+});

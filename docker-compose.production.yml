@@ -22,8 +22,20 @@ services:
       # CORS para frontend (ajuste conforme necessário)
       CORS_ORIGIN: "${CORS_ORIGIN:-https://your-frontend-domain.com}"
 
-      # Outras configurações opcionais
+      # Sentry - Monitoramento de Erros (CONFIGURE!)
+      SENTRY_DSN: "${SENTRY_DSN}"
+
+      # Logging e Performance
       LOG_LEVEL: "${LOG_LEVEL:-info}"
+      SLOW_QUERY_THRESHOLD: "${SLOW_QUERY_THRESHOLD:-1000}"
+
+      # MQTT (se aplicável)
+      MQTT_HOST: "${MQTT_HOST:-72.60.158.163}"
+      MQTT_PORT: "${MQTT_PORT:-1883}"
+      MQTT_USERNAME: "${MQTT_USERNAME:-root}"
+      MQTT_PASSWORD: "${MQTT_PASSWORD}"
+      MQTT_MODE: "${MQTT_MODE:-production}"
+      INSTANCE_ID: "${INSTANCE_ID:-production-server}"
 
     # Configurações de recursos (opcional)
     deploy:

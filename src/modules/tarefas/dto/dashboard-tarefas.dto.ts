@@ -3,6 +3,7 @@ export class DashboardTarefasDto {
   total_tarefas: number;
   tarefas_ativas: number;
   tarefas_inativas: number;
+  tarefas_atrasadas: number; // Tarefas que já deveriam ter sido executadas
   tarefas_em_revisao: number;
   tarefas_arquivadas: number;
 

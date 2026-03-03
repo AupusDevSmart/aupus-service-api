@@ -106,8 +106,11 @@ export class TarefasService {
     limit: number;
     totalPages: number;
   }> {
-    const { page, limit, search, sort_by, sort_order, ...filters } = queryDto;
+    const { page, limit, search, sort_by, sort_order, status_atrasada, ...filters } = queryDto;
     const skip = (page - 1) * limit;
+
+    // Log para debug
+    console.log('🔍 [TAREFAS] Filtro status_atrasada recebido:', status_atrasada, 'tipo:', typeof status_atrasada);
 
     // Construir filtros
     const where: Prisma.tarefasWhereInput = {
@@ -118,6 +121,43 @@ export class TarefasService {
     // Construir ordenação
     const orderBy = this.construirOrdenacao(sort_by, sort_order);
 
+    // Se filtrar por tarefas atrasadas, precisamos buscar todas e filtrar depois
+    if (status_atrasada === true) {
+      const todasTarefas = await this.prisma.tarefas.findMany({
+        where,
+        include: this.includeRelacionamentosLista(),
+        orderBy
+      });
+
+      // Filtrar tarefas atrasadas
+      const dataAtual = new Date();
+      const tarefasAtrasadas = todasTarefas.filter(tarefa => {
+        if (!tarefa.data_ultima_execucao) {
+          return false; // Se nunca foi executada, não está atrasada
+        }
+
+        const proximaExecucao = this.calcularProximaExecucao(
+          tarefa.data_ultima_execucao,
+          tarefa.frequencia,
+          tarefa.frequencia_personalizada
+        );
+
+        return proximaExecucao < dataAtual;
+      });
+
+      // Aplicar paginação manual
+      const tarefasPaginadas = tarefasAtrasadas.slice(skip, skip + limit);
+
+      return {
+        data: tarefasPaginadas.map(tarefa => this.mapearParaResponse(tarefa)),
+        total: tarefasAtrasadas.length,
+        page,
+        limit,
+        totalPages: Math.ceil(tarefasAtrasadas.length / limit)
+      };
+    }
+
+    // Fluxo normal sem filtro de atrasadas
     const [tarefas, total] = await Promise.all([
       this.prisma.tarefas.findMany({
         where,
@@ -139,19 +179,77 @@ export class TarefasService {
   }
 
   async buscarPorId(id: string): Promise<TarefaResponseDto> {
-    const tarefa = await this.prisma.tarefas.findFirst({
-      where: {
-        id,
-        deleted_at: null
-      },
-      include: this.includeRelacionamentosCompletos()
-    });
+    const inicio = Date.now();
+
+    // ✅ OTIMIZADO: Buscar tarefa e relacionamentos em paralelo
+    const [tarefa, sub_tarefas, recursos, anexos] = await Promise.all([
+      // Query principal - apenas campos necessários
+      this.prisma.tarefas.findFirst({
+        where: {
+          id,
+          deleted_at: null
+        },
+        include: {
+          plano_manutencao: {
+            select: {
+              id: true,
+              nome: true,
+              versao: true,
+              status: true
+            }
+          },
+          planta: {
+            select: {
+              id: true,
+              nome: true,
+              localizacao: true
+            }
+          },
+          equipamento: {
+            select: {
+              id: true,
+              nome: true,
+              tipo_equipamento: true,
+              classificacao: true
+            }
+          }
+          // ✅ Removido usuario_criador e usuario_atualizador - raramente usados
+        }
+      }),
+      // Buscar sub_tarefas em paralelo
+      this.prisma.sub_tarefas.findMany({
+        where: { tarefa_id: id },
+        orderBy: { ordem: 'asc' }
+      }),
+      // Buscar recursos em paralelo
+      this.prisma.recursos_tarefa.findMany({
+        where: { tarefa_id: id }
+      }),
+      // Buscar anexos em paralelo
+      this.prisma.anexos_tarefa.findMany({
+        where: { tarefa_id: id },
+        orderBy: { created_at: 'desc' }
+      })
+    ]);
+
+    const tempoQuery = Date.now() - inicio;
+    console.log(`⏱️ [BACKEND] buscarPorId levou ${tempoQuery}ms`);
 
     if (!tarefa) {
       throw new NotFoundException('Tarefa não encontrada');
     }
 
-    return this.mapearParaResponse(tarefa);
+    // Adicionar relacionamentos à tarefa
+    const tarefaCompleta = {
+      ...tarefa,
+      sub_tarefas,
+      recursos,
+      anexos,
+      usuario_criador: null,
+      usuario_atualizador: null
+    };
+
+    return this.mapearParaResponse(tarefaCompleta);
   }
 
   async listarPorPlano(planoId: string, queryDto?: Partial<QueryTarefasDto>): Promise<TarefaResponseDto[]> {
@@ -323,7 +421,7 @@ export class TarefasService {
   }
 
   async obterDashboard(): Promise<DashboardTarefasDto> {
-    const [statusStats, criticidadeStats, tipoStats, categoriaStats, gerais] = await Promise.all([
+    const [statusStats, criticidadeStats, tipoStats, categoriaStats, gerais, tarefasAtivas] = await Promise.all([
       // Stats por status
       this.prisma.tarefas.groupBy({
         by: ['status'],
@@ -357,9 +455,19 @@ export class TarefasService {
         where: { deleted_at: null, ativo: true },
         _count: true,
         _sum: { tempo_estimado: true },
-        _avg: { 
+        _avg: {
           tempo_estimado: true,
-          criticidade: true 
+          criticidade: true
+        }
+      }),
+
+      // Buscar todas as tarefas ativas para calcular atrasadas
+      this.prisma.tarefas.findMany({
+        where: { deleted_at: null, ativo: true },
+        select: {
+          data_ultima_execucao: true,
+          frequencia: true,
+          frequencia_personalizada: true
         }
       })
     ]);
@@ -385,10 +493,27 @@ export class TarefasService {
 
     const totalTarefas = statusStats.reduce((acc, stat) => acc + stat._count, 0);
 
+    // Calcular tarefas atrasadas
+    const dataAtual = new Date();
+    const tarefasAtrasadas = tarefasAtivas.filter(tarefa => {
+      if (!tarefa.data_ultima_execucao) {
+        return false; // Se nunca foi executada, não está atrasada
+      }
+
+      const proximaExecucao = this.calcularProximaExecucao(
+        tarefa.data_ultima_execucao,
+        tarefa.frequencia,
+        tarefa.frequencia_personalizada
+      );
+
+      return proximaExecucao < dataAtual;
+    }).length;
+
     return {
       total_tarefas: totalTarefas,
       tarefas_ativas: this.contarPorStatus(statusStats, StatusTarefa.ATIVA),
       tarefas_inativas: this.contarPorStatus(statusStats, StatusTarefa.INATIVA),
+      tarefas_atrasadas: tarefasAtrasadas,
       tarefas_em_revisao: this.contarPorStatus(statusStats, StatusTarefa.EM_REVISAO),
       tarefas_arquivadas: this.contarPorStatus(statusStats, StatusTarefa.ARQUIVADA),
 
@@ -581,6 +706,7 @@ export class TarefasService {
           classificacao: true
         }
       },
+      // ✅ MANTIDO _count mas otimizado - Prisma faz LEFT JOIN mas é necessário para UI
       _count: {
         select: {
           sub_tarefas: true,
@@ -649,6 +775,17 @@ export class TarefasService {
 
     if (filters.equipamento_id) {
       where.equipamento_id = filters.equipamento_id;
+    }
+
+    if (filters.planta_id) {
+      where.planta_id = filters.planta_id;
+    }
+
+    if (filters.unidade_id) {
+      // Filtrar por unidade através do equipamento
+      where.equipamento = {
+        unidade_id: filters.unidade_id
+      };
     }
 
     if (filters.status) {
@@ -757,9 +894,9 @@ export class TarefasService {
       sub_tarefas: tarefa.sub_tarefas,
       recursos: tarefa.recursos,
       anexos: tarefa.anexos,
-      total_sub_tarefas: tarefa._count?.sub_tarefas || tarefa.sub_tarefas?.length || 0,
-      total_recursos: tarefa._count?.recursos || tarefa.recursos?.length || 0,
-      total_anexos: tarefa._count?.anexos || tarefa.anexos?.length || 0
+      total_sub_tarefas: tarefa._count?.sub_tarefas ?? tarefa.sub_tarefas?.length ?? 0,
+      total_recursos: tarefa._count?.recursos ?? tarefa.recursos?.length ?? 0,
+      total_anexos: tarefa._count?.anexos ?? tarefa.anexos?.length ?? 0
     };
   }
 
@@ -778,5 +915,50 @@ export class TarefasService {
 
   private contarPorCategoria(stats: any[], categoria: string): number {
     return stats.find(s => s.categoria === categoria)?._count || 0;
+  }
+
+  private calcularProximaExecucao(
+    dataUltimaExecucao: Date,
+    frequencia: any,
+    frequenciaPersonalizada?: number
+  ): Date {
+    const proximaExecucao = new Date(dataUltimaExecucao);
+
+    switch (frequencia) {
+      case 'DIARIA':
+        proximaExecucao.setDate(proximaExecucao.getDate() + 1);
+        break;
+      case 'SEMANAL':
+        proximaExecucao.setDate(proximaExecucao.getDate() + 7);
+        break;
+      case 'QUINZENAL':
+        proximaExecucao.setDate(proximaExecucao.getDate() + 15);
+        break;
+      case 'MENSAL':
+        proximaExecucao.setMonth(proximaExecucao.getMonth() + 1);
+        break;
+      case 'BIMESTRAL':
+        proximaExecucao.setMonth(proximaExecucao.getMonth() + 2);
+        break;
+      case 'TRIMESTRAL':
+        proximaExecucao.setMonth(proximaExecucao.getMonth() + 3);
+        break;
+      case 'SEMESTRAL':
+        proximaExecucao.setMonth(proximaExecucao.getMonth() + 6);
+        break;
+      case 'ANUAL':
+        proximaExecucao.setFullYear(proximaExecucao.getFullYear() + 1);
+        break;
+      case 'PERSONALIZADA':
+        if (frequenciaPersonalizada && frequenciaPersonalizada > 0) {
+          proximaExecucao.setDate(proximaExecucao.getDate() + frequenciaPersonalizada);
+        }
+        break;
+      default:
+        // Se frequência não for reconhecida, considerar como 30 dias
+        proximaExecucao.setDate(proximaExecucao.getDate() + 30);
+    }
+
+    return proximaExecucao;
   }
 }

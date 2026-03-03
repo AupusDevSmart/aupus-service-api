@@ -22,11 +22,23 @@ export class QueryTarefasDto {
   equipamento_id?: string;
 
   @IsOptional()
+  @IsString()
+  planta_id?: string;
+
+  @IsOptional()
+  @IsString()
+  unidade_id?: string;
+
+  @IsOptional()
   @IsEnum(StatusTarefa)
   status?: StatusTarefa;
 
   @IsOptional()
-  @Transform(({ value }) => value === 'true')
+  @Transform(({ value }) => {
+    if (value === 'true' || value === true) return true;
+    if (value === 'false' || value === false) return false;
+    return undefined;
+  })
   @IsBoolean()
   ativo?: boolean;
 
@@ -48,6 +60,15 @@ export class QueryTarefasDto {
   @Min(1)
   @Max(5)
   criticidade?: number;
+
+  @IsOptional()
+  @Transform(({ value }) => {
+    if (value === 'true' || value === true) return true;
+    if (value === 'false' || value === false) return false;
+    return undefined;
+  })
+  @IsBoolean()
+  status_atrasada?: boolean;
 
   @IsOptional()
   @Type(() => Number)
