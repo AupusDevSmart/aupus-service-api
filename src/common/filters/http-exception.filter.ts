@@ -7,9 +7,11 @@ import {
 } from '@nestjs/common';
 import { Response } from 'express';
 import { v4 as uuidv4 } from 'uuid';
+import { SentryExceptionCaptured } from '@sentry/nestjs';
 
 @Catch(HttpException)
 export class HttpExceptionFilter implements ExceptionFilter {
+  @SentryExceptionCaptured()
   catch(exception: HttpException, host: ArgumentsHost) {
     const ctx = host.switchToHttp();
     const response = ctx.getResponse<Response>();

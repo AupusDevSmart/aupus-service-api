@@ -32,9 +32,15 @@ import { UploadsModule } from './modules/uploads/uploads.module';
 import { ConfiguracaoDemandaModule } from './modules/configuracao-demanda/configuracao-demanda.module';
 import { CoaModule } from './modules/coa/coa.module';
 import { DashboardModule } from './modules/dashboard/dashboard.module';
+import { SentryModule } from '@sentry/nestjs/setup';
+import { SentryGlobalFilter } from '@sentry/nestjs/setup';
+import { APP_FILTER } from '@nestjs/core';
 
 @Module({
   imports: [
+    // ✅ Sentry (deve ser o primeiro import)
+    SentryModule.forRoot(),
+
     // ✅ Configuração global
     ConfigModule.forRoot({
       isGlobal: true,
@@ -83,6 +89,12 @@ import { DashboardModule } from './modules/dashboard/dashboard.module';
     UploadsModule, // Módulo para servir arquivos de upload
   ],
   controllers: [AppController],
-  providers: [AppService],
+  providers: [
+    {
+      provide: APP_FILTER,
+      useClass: SentryGlobalFilter,
+    },
+    AppService,
+  ],
 })
 export class AppModule {}

@@ -2,6 +2,8 @@
 import { Controller, Get } from '@nestjs/common';
 import { AppService } from './app.service';
 import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
+import { Public } from './modules/auth/decorators/public.decorator';
+import * as Sentry from '@sentry/nestjs';
 
 @ApiTags('Sistema')
 @Controller()
@@ -35,8 +37,8 @@ export class AppController {
 
   @Get('test-db')
   @ApiOperation({ summary: 'Testar conexão com banco de dados' })
-  @ApiResponse({ 
-    status: 200, 
+  @ApiResponse({
+    status: 200,
     description: 'Teste de conexão com banco',
     schema: {
       example: {
@@ -48,5 +50,13 @@ export class AppController {
   })
   testDatabase() {
     return this.appService.testDatabase();
+  }
+
+  @Public()
+  @Get('debug-sentry')
+  @ApiOperation({ summary: 'Testar integração com Sentry' })
+  debugSentry() {
+    Sentry.logger.info('User triggered test log', { action: 'test_log' });
+    throw new Error('Teste de integração Sentry - pode ignorar este erro');
   }
 }
