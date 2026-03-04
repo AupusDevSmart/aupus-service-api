@@ -186,7 +186,7 @@ export class EquipamentosDadosService {
    * Gráfico do Dia - Curva de potência ao longo do dia
    * Retorna dados agregados de 1 minuto para o dia especificado
    */
-  async getGraficoDia(equipamentoId: string, data?: string, intervalo?: string) {
+  async getGraficoDia(equipamentoId: string, data?: string, intervalo?: string, inicio?: string, fim?: string) {
     // Validar intervalo (minutos): 1, 5, 15, 30. Default: 30
     const INTERVALOS_VALIDOS = [1, 5, 15, 30];
     const intervaloMin = INTERVALOS_VALIDOS.includes(Number(intervalo)) ? Number(intervalo) : 30;
@@ -205,15 +205,20 @@ export class EquipamentosDadosService {
     let dataConsulta: Date;
     let dataFim: Date;
 
-    if (data) {
+    if (inicio && fim) {
+      // Janela específica de zoom — usa os timestamps exatos fornecidos
+      dataConsulta = new Date(inicio);
+      dataFim = new Date(fim);
+    } else if (data) {
       dataConsulta = new Date(data);
       dataConsulta.setHours(0, 0, 0, 0);
       dataFim = new Date(dataConsulta);
       dataFim.setDate(dataFim.getDate() + 1);
     } else {
+      // Dia corrente: de 00:00 até agora
+      dataConsulta = new Date();
+      dataConsulta.setHours(0, 0, 0, 0);
       dataFim = new Date();
-      dataConsulta = new Date(dataFim);
-      dataConsulta.setHours(dataConsulta.getHours() - 24);
     }
 
     // Raw SQL com agregação no banco por intervalo dinâmico
