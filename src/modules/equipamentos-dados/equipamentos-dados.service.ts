@@ -217,16 +217,6 @@ export class EquipamentosDadosService {
     const INTERVALOS_VALIDOS = [1, 5, 15, 30];
     const intervaloMin = INTERVALOS_VALIDOS.includes(Number(intervalo)) ? Number(intervalo) : 30;
 
-    // Verificar o tipo do equipamento
-    const equipamento = await this.prisma.equipamentos.findUnique({
-      where: { id: equipamentoId },
-      include: { tipo_equipamento_rel: true }
-    });
-
-    if (!equipamento) {
-      throw new NotFoundException(`Equipamento ${equipamentoId} não encontrado`);
-    }
-
     // Definir o período de busca
     let dataConsulta: Date;
     let dataFim: Date;
@@ -313,7 +303,11 @@ export class EquipamentosDadosService {
     }));
 
     // SE NÃO HOUVER DADOS E FOR INVERSOR, GERAR DADOS SIMULADOS
-    if (pontos.length === 0 && equipamento.tipo_equipamento_rel?.codigo === 'INVERSOR') {
+    // (só busca o tipo do equipamento se realmente necessário)
+    const tipoEquipamento = pontos.length === 0
+      ? await this.prisma.equipamentos.findUnique({ where: { id: equipamentoId }, select: { tipo_equipamento_rel: { select: { codigo: true } } } })
+      : null;
+    if (pontos.length === 0 && tipoEquipamento?.tipo_equipamento_rel?.codigo === 'INVERSOR') {
       const horaInicio = 6;
       const horaFim = 18;
       const picoHora = 12;
