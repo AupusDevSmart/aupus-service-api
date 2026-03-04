@@ -187,6 +187,32 @@ export class EquipamentosDadosService {
    * Retorna dados agregados de 1 minuto para o dia especificado
    */
   async getGraficoDia(equipamentoId: string, data?: string, intervalo?: string, inicio?: string, fim?: string) {
+    // Se intervalo NÃO foi fornecido explicitamente, retorna dados brutos (comportamento legado)
+    // Outros hooks (M160, demanda) dependem dos campos JSON crus da DB
+    if (!intervalo) {
+      const dataConsulta = data ? new Date(data + 'T00:00:00') : (() => { const d = new Date(); d.setHours(0,0,0,0); return d; })();
+      const dataFimRaw = data ? new Date(dataConsulta.getTime() + 86400000) : new Date();
+
+      const dadosBrutos = await this.prisma.equipamentos_dados.findMany({
+        where: {
+          equipamento_id: equipamentoId,
+          timestamp_dados: { gte: dataConsulta, lt: dataFimRaw },
+        },
+        orderBy: { timestamp_dados: 'asc' },
+        take: 2000,
+      });
+
+      return {
+        data: dataConsulta.toISOString().split('T')[0],
+        total_pontos: dadosBrutos.length,
+        dados: dadosBrutos.map((d: any) => ({
+          ...d,
+          timestamp: d.timestamp_dados,
+          hora: d.timestamp_dados.toISOString(),
+        })),
+      };
+    }
+
     // Validar intervalo (minutos): 1, 5, 15, 30. Default: 30
     const INTERVALOS_VALIDOS = [1, 5, 15, 30];
     const intervaloMin = INTERVALOS_VALIDOS.includes(Number(intervalo)) ? Number(intervalo) : 30;
