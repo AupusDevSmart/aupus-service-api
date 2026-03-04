@@ -302,41 +302,6 @@ export class EquipamentosDadosService {
       qualidade: 'GOOD',
     }));
 
-    // SE NÃO HOUVER DADOS E FOR INVERSOR, GERAR DADOS SIMULADOS
-    // (só busca o tipo do equipamento se realmente necessário)
-    const tipoEquipamento = pontos.length === 0
-      ? await this.prisma.equipamentos.findUnique({ where: { id: equipamentoId }, select: { tipo_equipamento_rel: { select: { codigo: true } } } })
-      : null;
-    if (pontos.length === 0 && tipoEquipamento?.tipo_equipamento_rel?.codigo === 'INVERSOR') {
-      const horaInicio = 6;
-      const horaFim = 18;
-      const picoHora = 12;
-      const potenciaPico = 5000;
-
-      for (let hora = horaInicio; hora <= horaFim; hora++) {
-        for (let minuto = 0; minuto < 60; minuto += intervaloMin) {
-          const timestamp = new Date(dataConsulta);
-          timestamp.setHours(hora, minuto, 0, 0);
-
-          const horaDecimal = hora + minuto / 60;
-          const distanciaPico = Math.abs(horaDecimal - picoHora);
-          const fatorGaussiano = Math.exp(-Math.pow(distanciaPico / 3, 2));
-          const variacao = 1 + (Math.random() - 0.5) * 0.2;
-          const potencia = potenciaPico * fatorGaussiano * variacao;
-
-          pontos.push({
-            timestamp: timestamp,
-            hora: timestamp.toISOString(),
-            potencia_kw: potencia / 1000,
-            potencia_min: potencia * 0.95 / 1000,
-            potencia_max: potencia * 1.05 / 1000,
-            num_leituras: 1,
-            qualidade: 'SIMULATED',
-          });
-        }
-      }
-    }
-
     return {
       data: dataConsulta.toISOString().split('T')[0],
       total_pontos: pontos.length,
