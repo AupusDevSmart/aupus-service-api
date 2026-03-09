@@ -247,6 +247,47 @@ export class ExecucaoOSService {
       },
       include: {
         programacao: true,
+        // ✅ ADICIONADO: Include anomalia
+        anomalia: {
+          select: {
+            id: true,
+            descricao: true,
+            prioridade: true,
+            status: true,
+            local: true,
+            ativo: true,
+            condicao: true,
+            origem: true,
+            observacoes: true,
+            created_at: true,
+            updated_at: true,
+          },
+        },
+        // ✅ ADICIONADO: Include plano_manutencao
+        plano_manutencao: {
+          select: {
+            id: true,
+            nome: true,
+            descricao: true,
+          },
+        },
+        // ✅ ADICIONADO: Include planta
+        planta: {
+          select: {
+            id: true,
+            nome: true,
+          },
+        },
+        // ✅ ADICIONADO: Include equipamento
+        equipamento: {
+          select: {
+            id: true,
+            nome: true,
+            tipo_equipamento: true,
+            fabricante: true,
+            modelo: true,
+          },
+        },
         tarefas_os: {
           include: {
             tarefa: {
@@ -306,8 +347,9 @@ export class ExecucaoOSService {
   async programar(id: string, dto: ProgramarOSDto, usuarioId?: string): Promise<void> {
     const os = await this.buscarPorId(id);
 
-    if (os.status !== StatusOS.PLANEJADA) {
-      throw new ConflictException('Apenas OS planejadas podem ser programadas');
+    // Removida validação de estado PLANEJADA - OS já são criadas como PROGRAMADA
+    if (os.status !== StatusOS.PROGRAMADA && os.status !== StatusOS.PLANEJADA) {
+      throw new ConflictException('Esta OS não pode ser reprogramada neste status');
     }
 
     await this.prisma.$transaction(async (prisma) => {
@@ -395,8 +437,8 @@ export class ExecucaoOSService {
         'PROGRAMACAO',
         'Sistema',
         usuarioId,
-        'OS programada com recursos confirmados',
-        StatusOS.PLANEJADA,
+        'OS reprogramada com recursos confirmados',
+        os.status,
         StatusOS.PROGRAMADA,
       );
     });
@@ -1338,6 +1380,8 @@ export class ExecucaoOSService {
       programacao: os.programacao,
       anomalia: os.anomalia,
       plano_manutencao: os.plano_manutencao,
+      planta: os.planta,
+      equipamento: os.equipamento,
       reserva_veiculo: os.reserva_veiculo,
     };
   }

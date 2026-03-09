@@ -130,8 +130,10 @@ export class MetricsService {
       },
     });
 
-    // Último registro
+    // Último registro (janela de 15min para evitar full scan)
+    const quinzeMinutosAtras = new Date(now.getTime() - 15 * 60 * 1000);
     const lastRecord = await this.prisma.equipamentos_dados.findFirst({
+      where: { created_at: { gte: quinzeMinutosAtras } },
       orderBy: { created_at: 'desc' },
       select: { created_at: true },
     });

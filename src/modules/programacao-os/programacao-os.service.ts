@@ -1083,7 +1083,7 @@ export class ProgramacaoOSService {
         local: programacao.local,
         ativo: programacao.ativo,
         condicoes: programacao.condicoes,
-        status: 'PLANEJADA', // Status inicial é PLANEJADA
+        status: 'PROGRAMADA', // Status inicial é PROGRAMADA - simplificado para remover estado PLANEJADA
         tipo: programacao.tipo,
         prioridade: programacao.prioridade,
         origem: programacao.origem,
@@ -1197,7 +1197,7 @@ export class ProgramacaoOSService {
         usuario: 'Sistema',
         usuario_id: programacao.aprovado_por_id,
         observacoes: `OS gerada automaticamente a partir da programação ${programacao.codigo}`,
-        status_novo: 'PLANEJADA',
+        status_novo: 'PROGRAMADA', // Simplificado - OS já criada como PROGRAMADA
         dados_extras: {
           programacao_id: programacaoId,
           programacao_codigo: programacao.codigo,

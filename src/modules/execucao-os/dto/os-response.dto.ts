@@ -602,6 +602,12 @@ export class OrdemServicoResponseDto {
   @ApiPropertyOptional({ description: 'Dados do plano de manutenção' })
   plano_manutencao?: any;
 
+  @ApiPropertyOptional({ description: 'Dados da planta' })
+  planta?: any;
+
+  @ApiPropertyOptional({ description: 'Dados do equipamento' })
+  equipamento?: any;
+
   @ApiPropertyOptional({ description: 'Reserva de veículo', type: ReservaVeiculoResponseDto })
   reserva_veiculo?: ReservaVeiculoResponseDto;
 }

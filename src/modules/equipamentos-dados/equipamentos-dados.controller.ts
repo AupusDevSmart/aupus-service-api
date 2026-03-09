@@ -256,7 +256,7 @@ export class EquipamentosDadosController {
 
   /**
    * Calcula range de datas com base no período solicitado
-   * ✅ ATUALIZADO: Suporta período customizado com timestamps
+   * ✅ CORRIGIDO: Usa conversão de timezone dinâmica (America/Sao_Paulo)
    */
   private calcularRangeDatas(query: CustosEnergiaQueryDto): {
     dataInicio: Date;
@@ -288,33 +288,31 @@ export class EquipamentosDadosController {
     }
 
     // MODO 2 e 3: Dia ou Mês com data de referência
-    // ✅ TIMEZONE: Trabalhar em horário de Brasília (America/Sao_Paulo)
+    // ✅ TIMEZONE: Usar conversão dinâmica para America/Sao_Paulo
     const dataRef = query.data ? new Date(query.data) : new Date();
 
     if (query.periodo === PeriodoTipo.DIA) {
-      // ✅ Dia completo em horário de Brasília: 00:00:00 até 23:59:59 (America/Sao_Paulo)
-      // Exemplo: 23/02/2026 00:00:00 BRT = 23/02/2026 03:00:00 UTC
+      // ✅ Dia completo em horário de Brasília: 00:00:00 até 23:59:59
       const ano = dataRef.getFullYear();
-      const mes = dataRef.getMonth();
-      const dia = dataRef.getDate();
+      const mes = String(dataRef.getMonth() + 1).padStart(2, '0');
+      const dia = String(dataRef.getDate()).padStart(2, '0');
 
-      // Criar datas em UTC representando o dia em Brasília
-      // 00:00:00 BRT = 03:00:00 UTC (adicionar 3 horas)
-      const dataInicio = new Date(Date.UTC(ano, mes, dia, 3, 0, 0, 0));
-      // 23:59:59 BRT = 02:59:59 UTC do dia seguinte
-      const dataFim = new Date(Date.UTC(ano, mes, dia + 1, 2, 59, 59, 999));
+      // Criar timestamps interpretando como America/Sao_Paulo
+      const dataInicio = this.criarDataBrasilia(ano, parseInt(mes), parseInt(dia), 0, 0, 0, 0);
+      const dataFim = this.criarDataBrasilia(ano, parseInt(mes), parseInt(dia), 23, 59, 59, 999);
 
       return { dataInicio, dataFim };
     } else if (query.periodo === PeriodoTipo.MES) {
       // ✅ Mês completo em horário de Brasília
       const ano = dataRef.getFullYear();
-      const mes = dataRef.getMonth();
+      const mes = dataRef.getMonth() + 1;
 
-      // Primeiro dia do mês 00:00:00 BRT = 03:00:00 UTC
-      const dataInicio = new Date(Date.UTC(ano, mes, 1, 3, 0, 0, 0));
-      // Último dia do mês 23:59:59 BRT = 02:59:59 UTC do primeiro dia do próximo mês
-      const ultimoDia = new Date(ano, mes + 1, 0).getDate();
-      const dataFim = new Date(Date.UTC(ano, mes, ultimoDia + 1, 2, 59, 59, 999));
+      // Último dia do mês
+      const ultimoDia = new Date(ano, mes, 0).getDate();
+
+      // Primeiro e último dia do mês
+      const dataInicio = this.criarDataBrasilia(ano, mes, 1, 0, 0, 0, 0);
+      const dataFim = this.criarDataBrasilia(ano, mes, ultimoDia, 23, 59, 59, 999);
 
       return { dataInicio, dataFim };
     }
@@ -332,6 +330,68 @@ export class EquipamentosDadosController {
     );
 
     return { dataInicio, dataFim };
+  }
+
+  /**
+   * Cria uma data interpretando os componentes como timezone de Brasília
+   * ✅ NOVO: Método auxiliar para conversão dinâmica de timezone
+   *
+   * Exemplo:
+   * Input: criarDataBrasilia(2026, 3, 6, 0, 0, 0, 0)
+   * Output: Date em UTC que representa 06/03/2026 00:00:00 em Brasília
+   *         Se BRT = UTC-3 → retorna 06/03/2026 03:00:00 UTC
+   */
+  private criarDataBrasilia(
+    ano: number,
+    mes: number,
+    dia: number,
+    hora: number,
+    minuto: number,
+    segundo: number,
+    ms: number,
+  ): Date {
+    // Criar string ISO da data/hora em Brasília
+    const mesStr = String(mes).padStart(2, '0');
+    const diaStr = String(dia).padStart(2, '0');
+    const horaStr = String(hora).padStart(2, '0');
+    const minutoStr = String(minuto).padStart(2, '0');
+    const segundoStr = String(segundo).padStart(2, '0');
+
+    const isoStringBrasilia = `${ano}-${mesStr}-${diaStr}T${horaStr}:${minutoStr}:${segundoStr}`;
+
+    // Criar Date assumindo que é UTC (vai estar errado)
+    const dateUTC = new Date(isoStringBrasilia + 'Z');
+
+    // Obter como seria essa data em Brasília
+    const dataBrasiliaStr = dateUTC.toLocaleString('en-US', {
+      timeZone: 'America/Sao_Paulo',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+      hour12: false,
+    });
+
+    // Parsear o resultado
+    const [datePart, timePart] = dataBrasiliaStr.split(', ');
+    const [monthBrt, dayBrt, yearBrt] = datePart.split('/');
+    const [hourBrt, minuteBrt, secondBrt] = timePart.split(':');
+
+    // Calcular diferença (offset) entre UTC e Brasília para esta data
+    const dateBrasiliaLocal = new Date(
+      `${yearBrt}-${monthBrt}-${dayBrt}T${hourBrt}:${minuteBrt}:${secondBrt}`,
+    );
+
+    // Offset em milissegundos
+    const offset = dateUTC.getTime() - dateBrasiliaLocal.getTime();
+
+    // Criar data original em UTC
+    const dateOriginalUTC = new Date(isoStringBrasilia);
+
+    // Aplicar offset para converter de Brasília para UTC
+    return new Date(dateOriginalUTC.getTime() + offset + ms);
   }
 
   /**

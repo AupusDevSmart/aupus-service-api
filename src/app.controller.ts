@@ -55,6 +55,10 @@ export class AppController {
   @Public()
   @Get('debug-sentry')
   @ApiOperation({ summary: 'Testar integração com Sentry' })
+  @ApiResponse({
+    status: 500,
+    description: 'Erro de teste para validar integração com Sentry'
+  })
   debugSentry() {
     Sentry.logger.info('User triggered test log', { action: 'test_log' });
     throw new Error('Teste de integração Sentry - pode ignorar este erro');

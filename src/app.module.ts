@@ -2,6 +2,9 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { ScheduleModule } from '@nestjs/schedule';
+import { SentryModule } from '@sentry/nestjs/setup';
+import { SentryGlobalFilter } from '@sentry/nestjs/setup';
+import { APP_FILTER } from '@nestjs/core';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { PrismaModule } from './shared/prisma/prisma.module';
@@ -32,9 +35,6 @@ import { UploadsModule } from './modules/uploads/uploads.module';
 import { ConfiguracaoDemandaModule } from './modules/configuracao-demanda/configuracao-demanda.module';
 import { CoaModule } from './modules/coa/coa.module';
 import { DashboardModule } from './modules/dashboard/dashboard.module';
-import { SentryModule } from '@sentry/nestjs/setup';
-import { SentryGlobalFilter } from '@sentry/nestjs/setup';
-import { APP_FILTER } from '@nestjs/core';
 
 @Module({
   imports: [

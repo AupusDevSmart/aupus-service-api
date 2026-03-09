@@ -8,11 +8,8 @@ import { HttpExceptionFilter } from './common/filters/http-exception.filter';
 import { LoggingInterceptor } from './common/interceptors/logging.interceptor';
 import { NestExpressApplication } from '@nestjs/platform-express';
 import { join } from 'path';
-import { initializeSentry, Sentry } from './config/sentry.config';
+import * as Sentry from '@sentry/nestjs';
 import logger from './config/logger.config';
-
-// Inicializar Sentry ANTES de criar a aplicação
-initializeSentry();
 
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule, {

@@ -21,9 +21,13 @@ export class EquipamentosDataService {
       throw new NotFoundException('Equipamento não encontrado');
     }
 
-    // Buscar último dado
+    // Buscar último dado (janela de 15min para evitar full scan)
+    const quinzeMinutosAtras = new Date(Date.now() - 15 * 60 * 1000);
     const ultimoDado = await this.prisma.equipamentos_dados.findFirst({
-      where: { equipamento_id: equipamentoId },
+      where: {
+        equipamento_id: equipamentoId,
+        timestamp_dados: { gte: quinzeMinutosAtras }
+      },
       orderBy: { timestamp_dados: 'desc' },
     });
 

@@ -149,8 +149,10 @@ export class HealthService {
    */
   async checkRecentDataHealth(): Promise<HealthStatus> {
     try {
-      // Buscar o dado mais recente da tabela equipamentos_dados
+      // Buscar o dado mais recente da tabela equipamentos_dados (janela de 15 min para evitar full scan)
+      const quinzeMinutosAtras = new Date(Date.now() - 15 * 60 * 1000);
       const ultimoDado = await this.prisma.equipamentos_dados.findFirst({
+        where: { created_at: { gte: quinzeMinutosAtras } },
         orderBy: { created_at: 'desc' },
         select: { created_at: true },
       });
@@ -163,7 +165,7 @@ export class HealthService {
             recentData: {
               status: 'critical',
               message:
-                'Nenhum dado encontrado na tabela equipamentos_dados - MQTT pode não estar salvando dados',
+                'Nenhum dado nos últimos 15 minutos - MQTT pode não estar salvando dados',
             },
           },
           uptime: Date.now() - this.startTime.getTime(),
@@ -171,22 +173,20 @@ export class HealthService {
       }
 
       const now = new Date();
-      const hoursSinceLastData =
-        (now.getTime() - ultimoDado.created_at.getTime()) / (1000 * 60 * 60);
+      const minutesSinceLastData =
+        (now.getTime() - ultimoDado.created_at.getTime()) / (1000 * 60);
 
       let status: 'healthy' | 'degraded' | 'unhealthy' = 'healthy';
       let dataStatus: 'ok' | 'warning' | 'critical' = 'ok';
-      let message = `Último dado recebido há ${hoursSinceLastData.toFixed(1)} horas`;
+      let message = `Último dado recebido há ${minutesSinceLastData.toFixed(1)} minutos`;
 
-      if (hoursSinceLastData > 2) {
-        status = 'unhealthy';
-        dataStatus = 'critical';
-        message = `⚠️ CRÍTICO: Último dado há ${hoursSinceLastData.toFixed(1)} horas - MQTT pode estar desconectado ou equipamentos offline`;
-      } else if (hoursSinceLastData > 0.5) {
+      if (minutesSinceLastData > 10) {
         status = 'degraded';
         dataStatus = 'warning';
-        message = `⚠️ ATENÇÃO: Último dado há ${hoursSinceLastData.toFixed(1)} horas - possível problema com MQTT`;
+        message = `⚠️ ATENÇÃO: Último dado há ${minutesSinceLastData.toFixed(1)} minutos - possível problema com MQTT`;
       }
+
+      const hoursSinceLastData = minutesSinceLastData / 60;
 
       return {
         status,
