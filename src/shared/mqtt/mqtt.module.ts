@@ -2,6 +2,7 @@ import { Module, Global } from '@nestjs/common';
 import { MqttService } from './mqtt.service';
 import { MqttDiagnosticsService } from './mqtt-diagnostics.service';
 import { MqttDiagnosticsController } from './mqtt-diagnostics.controller';
+import { MqttRedisBufferService } from './mqtt-redis-buffer.service';
 import { PrismaModule } from '../prisma/prisma.module';
 import { EquipamentosDadosModule } from '../../modules/equipamentos-dados/equipamentos-dados.module';
 
@@ -12,7 +13,15 @@ import { EquipamentosDadosModule } from '../../modules/equipamentos-dados/equipa
     EquipamentosDadosModule, // ✅ Import para usar MqttIngestionService
   ],
   controllers: [MqttDiagnosticsController],
-  providers: [MqttService, MqttDiagnosticsService],
-  exports: [MqttService, MqttDiagnosticsService],
+  providers: [
+    MqttService,
+    MqttDiagnosticsService,
+    MqttRedisBufferService, // ✅ Serviço de buffer Redis
+  ],
+  exports: [
+    MqttService,
+    MqttDiagnosticsService,
+    MqttRedisBufferService, // ✅ Exportar para uso em outros módulos
+  ],
 })
 export class MqttModule {}

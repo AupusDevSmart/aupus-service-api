@@ -1,7 +1,8 @@
-import { Injectable, OnModuleInit, OnModuleDestroy, Inject, forwardRef } from '@nestjs/common';
+import { Injectable, OnModuleInit, OnModuleDestroy, Inject, forwardRef, Optional } from '@nestjs/common';
 import * as mqtt from 'mqtt';
 import { PrismaService } from '../prisma/prisma.service';
 import { MqttIngestionService } from '../../modules/equipamentos-dados/services/mqtt-ingestion.service';
+import { MqttRedisBufferService } from './mqtt-redis-buffer.service';
 import { EventEmitter } from 'events';
 import Ajv from 'ajv';
 import addFormats from 'ajv-formats';
@@ -32,6 +33,7 @@ export class MqttService extends EventEmitter implements OnModuleInit, OnModuleD
     private readonly prisma: PrismaService,
     @Inject(forwardRef(() => MqttIngestionService))
     private readonly mqttIngestionService: MqttIngestionService,
+    @Optional() private readonly redisBuffer?: MqttRedisBufferService,
   ) {
     super();
     // Inicializar Ajv com formatos adicionais
@@ -659,36 +661,51 @@ export class MqttService extends EventEmitter implements OnModuleInit, OnModuleD
       }
 
       // PRODUÇÃO: Salvar diretamente no banco (sem buffer) - usar upsert para evitar conflito de UNIQUE constraint
-      await this.prisma.equipamentos_dados.upsert({
-        where: {
-          uk_equipamento_timestamp: {
-            equipamento_id: equipamentoId,
-            timestamp_dados: timestampDados,
+      try {
+        await this.prisma.equipamentos_dados.upsert({
+          where: {
+            uk_equipamento_timestamp: {
+              equipamento_id: equipamentoId,
+              timestamp_dados: timestampDados,
+            },
           },
-        },
-        update: {
-          dados: dadosProcessados as any,
-          fonte: 'MQTT',
-          timestamp_fim: timestampDados,
-          num_leituras: resumo.total_leituras || 1,
-          qualidade: qualidadeReal, // ✅ Usar qualidade calculada baseada nos dados reais
-          // ✅ CAMPOS CRÍTICOS PARA CÁLCULO DE CUSTOS
-          potencia_ativa_kw: potenciaMediaKw,
-          energia_kwh: energiaKwh,
-        },
-        create: {
-          equipamento_id: equipamentoId,
-          dados: dadosProcessados as any,
-          fonte: 'MQTT',
-          timestamp_dados: timestampDados,
-          timestamp_fim: timestampDados,
-          num_leituras: resumo.total_leituras || 1,
-          qualidade: qualidadeReal, // ✅ Usar qualidade calculada baseada nos dados reais
-          // ✅ CAMPOS CRÍTICOS PARA CÁLCULO DE CUSTOS
-          potencia_ativa_kw: potenciaMediaKw,
-          energia_kwh: energiaKwh,
-        },
-      });
+          update: {
+            dados: dadosProcessados as any,
+            fonte: 'MQTT',
+            timestamp_fim: timestampDados,
+            num_leituras: resumo.total_leituras || 1,
+            qualidade: qualidadeReal, // ✅ Usar qualidade calculada baseada nos dados reais
+            // ✅ CAMPOS CRÍTICOS PARA CÁLCULO DE CUSTOS
+            potencia_ativa_kw: potenciaMediaKw,
+            energia_kwh: energiaKwh,
+          },
+          create: {
+            equipamento_id: equipamentoId,
+            dados: dadosProcessados as any,
+            fonte: 'MQTT',
+            timestamp_dados: timestampDados,
+            timestamp_fim: timestampDados,
+            num_leituras: resumo.total_leituras || 1,
+            qualidade: qualidadeReal, // ✅ Usar qualidade calculada baseada nos dados reais
+            // ✅ CAMPOS CRÍTICOS PARA CÁLCULO DE CUSTOS
+            potencia_ativa_kw: potenciaMediaKw,
+            energia_kwh: energiaKwh,
+          },
+        });
+      } catch (error) {
+        // ❌ FALHA AO SALVAR NO BANCO: Usar buffer Redis
+        console.error(`❌ [M-160] Falha ao salvar no PostgreSQL. Salvando no buffer Redis...`, error);
+
+        if (this.redisBuffer) {
+          await this.redisBuffer.salvarNoBuffer(equipamentoId, timestampDados, dadosProcessados);
+          console.log(`✅ [M-160] Dados salvos no buffer Redis para retry automático`);
+        } else {
+          console.error(`❌ [M-160] Buffer Redis não disponível! Dados perdidos.`);
+        }
+
+        // Re-throw para propagar o erro
+        throw error;
+      }
 
       // ✅ LOG COMPACTO (otimizado para performance)
       const qualidadeIcon = qualidadeReal === 'boa' ? '✅' : qualidadeReal === 'parcial' ? '⚠️' : '❌';
@@ -846,36 +863,54 @@ export class MqttService extends EventEmitter implements OnModuleInit, OnModuleD
       // PRODUÇÃO: Salvar normalmente no banco
       // ✅ CORREÇÃO CRÍTICA: Usar upsert() em vez de create() para evitar erro P2002
       // quando múltiplas instâncias tentam salvar o mesmo dado
-      await this.prisma.equipamentos_dados.upsert({
-        where: {
-          uk_equipamento_timestamp: {
-            equipamento_id: equipamentoId,
-            timestamp_dados: buffer.timestamp_inicio,
+      try {
+        await this.prisma.equipamentos_dados.upsert({
+          where: {
+            uk_equipamento_timestamp: {
+              equipamento_id: equipamentoId,
+              timestamp_dados: buffer.timestamp_inicio,
+            },
           },
-        },
-        update: {
-          dados: dadosAgregados as any,
-          fonte: 'MQTT',
-          timestamp_fim,
-          num_leituras: leiturasSalvar.length,
-          qualidade: qualidadeGeral,
-          // ✅ CAMPOS CRÍTICOS PARA CÁLCULO DE CUSTOS
-          energia_kwh: energiaKwh,
-          potencia_ativa_kw: potenciaAtivaKw,
-        },
-        create: {
-          equipamento_id: equipamentoId,
-          dados: dadosAgregados as any,
-          fonte: 'MQTT',
-          timestamp_dados: buffer.timestamp_inicio,
-          timestamp_fim,
-          num_leituras: leiturasSalvar.length,
-          qualidade: qualidadeGeral,
-          // ✅ CAMPOS CRÍTICOS PARA CÁLCULO DE CUSTOS
-          energia_kwh: energiaKwh,
-          potencia_ativa_kw: potenciaAtivaKw,
-        },
-      });
+          update: {
+            dados: dadosAgregados as any,
+            fonte: 'MQTT',
+            timestamp_fim,
+            num_leituras: leiturasSalvar.length,
+            qualidade: qualidadeGeral,
+            // ✅ CAMPOS CRÍTICOS PARA CÁLCULO DE CUSTOS
+            energia_kwh: energiaKwh,
+            potencia_ativa_kw: potenciaAtivaKw,
+          },
+          create: {
+            equipamento_id: equipamentoId,
+            dados: dadosAgregados as any,
+            fonte: 'MQTT',
+            timestamp_dados: buffer.timestamp_inicio,
+            timestamp_fim,
+            num_leituras: leiturasSalvar.length,
+            qualidade: qualidadeGeral,
+            // ✅ CAMPOS CRÍTICOS PARA CÁLCULO DE CUSTOS
+            energia_kwh: energiaKwh,
+            potencia_ativa_kw: potenciaAtivaKw,
+          },
+        });
+      } catch (error) {
+        // ❌ FALHA AO SALVAR NO BANCO: Usar buffer Redis
+        console.error(`❌ [Buffer] Falha ao salvar no PostgreSQL. Salvando no buffer Redis...`, error);
+
+        if (this.redisBuffer) {
+          // Salvar cada leitura individualmente no buffer
+          for (const leitura of leiturasSalvar) {
+            await this.redisBuffer.salvarNoBuffer(equipamentoId, leitura.timestamp, leitura.dados);
+          }
+          console.log(`✅ [Buffer] ${leiturasSalvar.length} leituras salvas no buffer Redis para retry automático`);
+        } else {
+          console.error(`❌ [Buffer] Buffer Redis não disponível! ${leiturasSalvar.length} leituras perdidas.`);
+        }
+
+        // Re-throw para propagar o erro e manter as leituras no buffer local
+        throw error;
+      }
 
       // console.log(
       //   `✅ [Buffer] Flush ${equipamentoId}: ${leiturasSalvar.length} leituras agregadas (${qualidadeGeral})`,

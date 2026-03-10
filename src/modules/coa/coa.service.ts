@@ -539,8 +539,8 @@ export class CoaService {
           },
         });
 
-        // Verificar alertas de fator de potência
-        if (fatorPotencia > 0 && fatorPotencia < 0.92) {
+        // Verificar alertas de fator de potência (usar módulo para aceitar valores negativos)
+        if (fatorPotencia !== 0 && Math.abs(fatorPotencia) < 0.92) {
           alertas.push({
             id: `${unidade.id}-fp`,
             tipo: 'FATOR_POTENCIA_BAIXO',

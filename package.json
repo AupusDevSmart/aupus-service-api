@@ -91,6 +91,7 @@
     "compression": "^1.8.1",
     "cors": "^2.8.5",
     "helmet": "^8.1.0",
+    "ioredis": "^5.10.0",
     "mqtt": "^5.14.1",
     "multer": "^2.0.2",
     "nanoid": "^5.1.5",
