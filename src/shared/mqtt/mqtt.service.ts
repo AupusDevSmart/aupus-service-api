@@ -348,6 +348,7 @@ export class MqttService extends EventEmitter implements OnModuleInit, OnModuleD
         equipamento = cached.data;
       } else {
         // SQL raw otimizado - apenas colunas necessárias
+        const equipamentoIdTrimmed = equipamentoId.trim();
         const result = await this.prisma.$queryRaw<any[]>`
           SELECT
             e.id,
@@ -359,7 +360,7 @@ export class MqttService extends EventEmitter implements OnModuleInit, OnModuleD
             te.mqtt_schema as tipo_schema
           FROM equipamentos e
           LEFT JOIN tipos_equipamentos te ON te.id = e.tipo_equipamento_id
-          WHERE e.id = ${equipamentoId}
+          WHERE TRIM(e.id) = ${equipamentoIdTrimmed}
           LIMIT 1
         `;
 
@@ -803,7 +804,7 @@ export class MqttService extends EventEmitter implements OnModuleInit, OnModuleD
         const result = await this.prisma.$queryRaw<any[]>`
           SELECT id, topico_mqtt, nome
           FROM equipamentos
-          WHERE id = ${equipamentoId}
+          WHERE TRIM(id) = ${equipamentoId.trim()}
           LIMIT 1
         `;
 

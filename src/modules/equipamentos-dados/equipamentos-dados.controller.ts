@@ -54,11 +54,13 @@ export class EquipamentosDadosController {
   @Get(':id/grafico-dia')
   async getGraficoDia(
     @Param('id') id: string,
-    @Query('data') data?: string, // formato: YYYY-MM-DD (opcional, default: hoje)
+    @Query('data') data?: string,       // formato: YYYY-MM-DD (opcional, default: hoje)
     @Query('intervalo') intervalo?: string, // '1' | '5' | '15' | '30' (minutos, default: 30)
+    @Query('inicio') inicio?: string,   // ISO datetime - janela específica (zoom)
+    @Query('fim') fim?: string,         // ISO datetime - janela específica (zoom)
   ) {
-    this.logger.log(`GET /equipamentos-dados/${id}/grafico-dia?data=${data || 'hoje'}&intervalo=${intervalo || '30'}`);
-    return this.service.getGraficoDia(id, data, intervalo);
+    this.logger.log(`GET /equipamentos-dados/${id}/grafico-dia?intervalo=${intervalo || '30'}`);
+    return this.service.getGraficoDia(id, data, intervalo, inicio, fim);
   }
 
   /**

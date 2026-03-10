@@ -149,7 +149,8 @@ export class HealthService {
    */
   async checkRecentDataHealth(): Promise<HealthStatus> {
     try {
-      // Buscar o dado mais recente da tabela equipamentos_dados (janela de 15 min para evitar full scan)
+      // Buscar o dado mais recente dentro de uma janela de 15 minutos para evitar full scan
+      // (tabela recebe dados a cada minuto via MQTT, então 15min sem dado já é crítico)
       const quinzeMinutosAtras = new Date(Date.now() - 15 * 60 * 1000);
       const ultimoDado = await this.prisma.equipamentos_dados.findFirst({
         where: { created_at: { gte: quinzeMinutosAtras } },
