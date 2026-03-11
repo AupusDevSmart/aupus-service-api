@@ -111,6 +111,32 @@ export class DocumentacaoVeiculosController {
     return { count };
   }
 
+  @Get(':documentacaoId/download')
+  @ApiOperation({ summary: 'Download do arquivo de documentação' })
+  @ApiResponse({
+    status: 200,
+    description: 'Arquivo retornado com sucesso'
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'Arquivo não encontrado'
+  })
+  async downloadArquivo(
+    @Param('documentacaoId') documentacaoId: string,
+    @Res() res: Response
+  ): Promise<void> {
+    const caminhoArquivo = await this.documentacaoService.obterCaminhoArquivo(documentacaoId);
+    const documentacao = await this.documentacaoService.buscarPorId(documentacaoId);
+
+    const nomeDownload = documentacao.nomeArquivoOriginal || documentacao.nomeArquivo || 'documento';
+    const mimeType = documentacao.mimeType || 'application/octet-stream';
+
+    res.setHeader('Content-Disposition', `attachment; filename="${nomeDownload}"`);
+    res.setHeader('Content-Type', mimeType);
+
+    res.sendFile(caminhoArquivo);
+  }
+
   @Get(':documentacaoId')
   @ApiOperation({ summary: 'Buscar documentação por ID' })
   @ApiResponse({
@@ -184,32 +210,6 @@ export class DocumentacaoVeiculosController {
     @UploadedFile() file: any
   ): Promise<DocumentacaoVeiculoResponseDto> {
     return this.documentacaoService.uploadArquivo(documentacaoId, file);
-  }
-
-  @Get(':documentacaoId/download')
-  @ApiOperation({ summary: 'Download do arquivo de documentação' })
-  @ApiResponse({
-    status: 200,
-    description: 'Arquivo retornado com sucesso'
-  })
-  @ApiResponse({
-    status: 404,
-    description: 'Arquivo não encontrado'
-  })
-  async downloadArquivo(
-    @Param('documentacaoId') documentacaoId: string,
-    @Res() res: Response
-  ): Promise<void> {
-    const caminhoArquivo = await this.documentacaoService.obterCaminhoArquivo(documentacaoId);
-    const documentacao = await this.documentacaoService.buscarPorId(documentacaoId);
-
-    const nomeDownload = documentacao.nomeArquivoOriginal || documentacao.nomeArquivo || 'documento';
-    const mimeType = documentacao.mimeType || 'application/octet-stream';
-
-    res.setHeader('Content-Disposition', `attachment; filename="${nomeDownload}"`);
-    res.setHeader('Content-Type', mimeType);
-
-    res.sendFile(caminhoArquivo);
   }
 
   @Delete(':documentacaoId/inativar')

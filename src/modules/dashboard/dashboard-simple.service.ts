@@ -7,7 +7,45 @@ export class DashboardSimpleService {
 
   async getSimpleDashboard(filters: any) {
     try {
+      console.log('\n🔍 [DASHBOARD] ========================================');
+      console.log('🔍 [DASHBOARD] Iniciando getSimpleDashboard');
+      console.log('📋 [DASHBOARD] Filtros recebidos:', JSON.stringify(filters, null, 2));
+
+      // ✅ NOVO: Buscar informações do usuário para verificar se é admin
+      const usuarioId = filters?.usuarioId;
+      let isAdmin = false;
+      let proprietarioId = filters?.proprietarioId;
+
+      if (usuarioId) {
+        const usuario = await this.prisma.usuarios.findUnique({
+          where: { id: usuarioId },
+          select: { role: true }
+        });
+
+        console.log('👤 [DASHBOARD] Usuário encontrado:', usuario);
+
+        // Admin ou Super Admin veem TODOS os dados
+        isAdmin = usuario?.role === 'admin' || usuario?.role === 'super_admin';
+        console.log('🔐 [DASHBOARD] É admin?', isAdmin);
+      } else {
+        console.log('⚠️  [DASHBOARD] Nenhum usuarioId fornecido nos filtros');
+      }
+
+      // ✅ Construir filtro baseado em permissões
+      const baseFilter = {
+        deleted_at: null, // ✅ IMPORTANTE: Ignorar registros deletados
+        ...(isAdmin ? {} : { // ✅ Admin: sem filtro | Não-admin: filtrar por proprietário
+          // Para não-admin, filtrar por proprietário se fornecido
+          ...(proprietarioId && {
+            // TODO: Adicionar lógica de filtro por proprietário quando schema estiver correto
+          })
+        })
+      };
+
+      console.log('🎯 [DASHBOARD] baseFilter construído:', JSON.stringify(baseFilter, null, 2));
+
       // Buscar dados básicos de forma paralela
+      console.log('📊 [DASHBOARD] Iniciando contagem de anomalias...');
       const [
         anomalias,
         ordensServico,
@@ -16,29 +54,39 @@ export class DashboardSimpleService {
         planosManutencao
       ] = await Promise.all([
         // Anomalias
-        this.prisma.anomalias.count(),
+        this.prisma.anomalias.count({ where: baseFilter }),
 
         // Ordens de Serviço
         this.prisma.ordens_servico.count(),
 
         // Equipamentos
-        this.prisma.equipamentos.count(),
+        this.prisma.equipamentos.count({ where: { deleted_at: null } }),
 
         // Tarefas
-        this.prisma.tarefas.count(),
+        this.prisma.tarefas.count({ where: { deleted_at: null } }),
 
         // Planos de Manutenção
-        this.prisma.planos_manutencao.count()
+        this.prisma.planos_manutencao.count({ where: { deleted_at: null } })
       ]);
 
+      console.log('✅ [DASHBOARD] Contagens básicas concluídas:');
+      console.log(`   - Anomalias: ${anomalias}`);
+      console.log(`   - Ordens de Serviço: ${ordensServico}`);
+      console.log(`   - Equipamentos: ${equipamentos}`);
+      console.log(`   - Tarefas: ${tarefas}`);
+      console.log(`   - Planos de Manutenção: ${planosManutencao}`);
+
       // Buscar anomalias abertas (AGUARDANDO, EM_ANALISE, OS_GERADA)
+      console.log('📊 [DASHBOARD] Buscando anomalias abertas...');
       const anomaliasAbertas = await this.prisma.anomalias.count({
         where: {
+          ...baseFilter, // ✅ Aplicar mesmo filtro (deleted_at + permissões)
           status: {
             in: ['AGUARDANDO', 'EM_ANALISE', 'OS_GERADA']
           }
         }
       });
+      console.log(`✅ [DASHBOARD] Anomalias abertas: ${anomaliasAbertas}`);
 
       // Buscar OS em execução
       const osEmExecucao = await this.prisma.ordens_servico.count({
@@ -47,11 +95,15 @@ export class DashboardSimpleService {
 
       // Buscar tarefas ativas
       const tarefasAtivas = await this.prisma.tarefas.count({
-        where: { status: 'ATIVA' }
+        where: {
+          deleted_at: null,
+          status: 'ATIVA'
+        }
       });
 
       // Buscar equipamentos críticos
       const equipamentosCriticos = await this.prisma.equipamentos.findMany({
+        where: { deleted_at: null },
         take: 5,
         orderBy: { created_at: 'desc' },
         select: {
@@ -63,8 +115,11 @@ export class DashboardSimpleService {
 
       // Buscar próximas manutenções
       const proximasManutencoes = await this.prisma.planos_manutencao.findMany({
+        where: {
+          deleted_at: null,
+          ativo: true
+        },
         take: 5,
-        where: { ativo: true },
         orderBy: { created_at: 'asc' },
         select: {
           id: true,
@@ -83,13 +138,16 @@ export class DashboardSimpleService {
 
       // Taxa de resolução baseada em anomalias resolvidas
       const anomaliasResolvidas = await this.prisma.anomalias.count({
-        where: { status: 'RESOLVIDA' }
+        where: {
+          ...baseFilter,
+          status: 'RESOLVIDA'
+        }
       });
 
       const taxaResolucao = anomalias > 0 ?
         (anomaliasResolvidas / anomalias) * 100 : 0;
 
-      return {
+      const resultado = {
         metrics: {
           mtbf: 720, // Valor exemplo - 30 dias
           mttr: 4,   // Valor exemplo - 4 horas
@@ -166,8 +224,15 @@ export class DashboardSimpleService {
         },
         ultimaAtualizacao: new Date().toISOString()
       };
+
+      console.log('🎉 [DASHBOARD] Resultado final:');
+      console.log(`   - anomalias.total: ${resultado.anomalias.total}`);
+      console.log(`   - anomalias.abertas: ${resultado.anomalias.abertas}`);
+      console.log('🔍 [DASHBOARD] ========================================\n');
+
+      return resultado;
     } catch (error) {
-      console.error('Erro ao buscar dados do dashboard:', error);
+      console.error('❌ [DASHBOARD] ERRO ao buscar dados do dashboard:', error);
       // Retornar dados mínimos em caso de erro
       return {
         metrics: {
