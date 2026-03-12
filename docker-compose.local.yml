@@ -1,0 +1,47 @@
+version: '3.8'
+
+services:
+  postgres-local:
+    image: postgres:15
+    container_name: aupus-postgres-local
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: aupus_local
+    ports:
+      - "5433:5432"  # Usa porta 5433 localmente para nao conflitar
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./backups:/backups  # Para colocar/restaurar backups
+    networks:
+      - aupus-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis-local:
+    image: redis:7-alpine
+    container_name: aupus-redis-local
+    ports:
+      - "6380:6379"
+    volumes:
+      - redis-data:/data
+    networks:
+      - aupus-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  postgres-data:
+    name: aupus-postgres-data
+  redis-data:
+    name: aupus-redis-data
+
+networks:
+  aupus-network:
+    name: aupus-local-network
