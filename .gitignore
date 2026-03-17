@@ -69,6 +69,11 @@ temp/
 *.bak
 *.backup
 
+# Backup SQL files (geralmente muito grandes para Git)
+backups/*.sql
+backups/*.dump
+backups/*.gz
+
 # Testing
 test-results/
 playwright-report/
