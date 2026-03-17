@@ -32,6 +32,38 @@ export class TarefaSimpleDto {
   duracao_estimada: number;
 }
 
+export class SolicitacaoServicoSimpleDto {
+  @ApiProperty({ description: 'ID da solicitação' })
+  id: string;
+
+  @ApiProperty({ description: 'Número da solicitação' })
+  numero: string;
+
+  @ApiProperty({ description: 'Título da solicitação' })
+  titulo: string;
+
+  @ApiProperty({ description: 'Descrição' })
+  descricao: string;
+
+  @ApiProperty({ description: 'Tipo' })
+  tipo: string;
+
+  @ApiProperty({ description: 'Prioridade' })
+  prioridade: string;
+
+  @ApiProperty({ description: 'Status' })
+  status: string;
+
+  @ApiProperty({ description: 'Local' })
+  local: string;
+
+  @ApiProperty({ description: 'Nome do solicitante' })
+  solicitante_nome: string;
+
+  @ApiProperty({ description: 'Data da solicitação' })
+  data_solicitacao: string;
+}
+
 export class TarefaProgramacaoResponseDto {
   @ApiProperty({ description: 'ID do relacionamento' })
   id: string;
@@ -250,6 +282,9 @@ export class ProgramacaoResponseDto {
   @ApiPropertyOptional({ description: 'ID do plano de manutenção' })
   plano_manutencao_id?: string;
 
+  @ApiPropertyOptional({ description: 'ID da solicitação de serviço' })
+  solicitacao_servico_id?: string;
+
   @ApiPropertyOptional({ description: 'Dados da origem' })
   dados_origem?: any;
 
@@ -396,6 +431,9 @@ export class ProgramacaoDetalhesResponseDto extends ProgramacaoResponseDto {
 
   @ApiPropertyOptional({ description: 'Ordem de serviço gerada (se aprovada)' })
   ordem_servico?: any;
+
+  @ApiPropertyOptional({ description: 'Solicitação de serviço vinculada (se houver)', type: SolicitacaoServicoSimpleDto })
+  solicitacao_servico?: SolicitacaoServicoSimpleDto;
 
   @ApiPropertyOptional({ description: 'Reserva de veículo vinculada (se houver)' })
   reserva_veiculo?: {

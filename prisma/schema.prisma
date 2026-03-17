@@ -5,8 +5,6 @@ generator client {
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
-  // Configuração de connection pooling
-  // relationMode = "prisma" // ❌ REMOVIDO: Causa conflito com NoAction no PostgreSQL
 }
 
 model cache_locks {
@@ -655,11 +653,11 @@ model password_reset_tokens {
 model permissions {
   id                    BigInt                  @id @default(autoincrement())
   name                  String                  @db.VarChar(255)
-  display_name          String?                 @db.VarChar(255)
-  description           String?                 @db.Text
   guard_name            String                  @db.VarChar(255)
   created_at            DateTime?               @db.Timestamp(0)
   updated_at            DateTime?               @db.Timestamp(0)
+  display_name          String?                 @db.VarChar(255)
+  description           String?
   model_has_permissions model_has_permissions[]
   role_has_permissions  role_has_permissions[]
 
@@ -955,18 +953,17 @@ model usuarios {
   propostas                                                        propostas[]
   prospects                                                        prospects[]
   rateios                                                          rateios[]
+  solicitacoes_solicitante                                         solicitacoes_servico[]   @relation("solicitacoes_solicitante")
   tarefas_atualizadas                                              tarefas[]                @relation("tarefas_atualizado_por")
   tarefas_criadas                                                  tarefas[]                @relation("tarefas_criado_por")
   unidades_consumidoras_unidades_consumidoras_deleted_byTousuarios unidades_consumidoras[]  @relation("unidades_consumidoras_deleted_byTousuarios")
   unidades_consumidoras_unidades_consumidoras_usuario_idTousuarios unidades_consumidoras[]  @relation("unidades_consumidoras_usuario_idTousuarios")
+  criador                                                          usuarios?                @relation("usuarios_created_by", fields: [created_by], references: [id], onUpdate: NoAction, map: "fk_usuarios_created_by")
+  usuarios_criados                                                 usuarios[]               @relation("usuarios_created_by")
   usuarios                                                         usuarios?                @relation("usuariosTousuarios", fields: [manager_id], references: [id], onUpdate: NoAction, map: "fk_usuarios_manager")
   other_usuarios                                                   usuarios[]               @relation("usuariosTousuarios")
-  criador                                                          usuarios?                @relation("usuarios_created_by", fields: [created_by], references: [id], onDelete: SetNull, onUpdate: NoAction, map: "fk_usuarios_created_by")
-  usuarios_criados                                                 usuarios[]               @relation("usuarios_created_by")
   concessionarias                                                  concessionarias?         @relation(fields: [concessionaria_atual_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "usuarios_concessionaria_atual_id_foreign")
   organizacoes_usuarios_organizacao_atual_idToorganizacoes         organizacoes?            @relation("usuarios_organizacao_atual_idToorganizacoes", fields: [organizacao_atual_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "usuarios_organizacao_atual_id_foreign")
-  configuracao_demanda_criadas                                     configuracao_demanda[]   @relation("configuracao_demanda_created_by")
-  configuracao_demanda_atualizadas                                 configuracao_demanda[]   @relation("configuracao_demanda_updated_by")
 
   @@index([email], map: "idx_usuarios_email")
   @@index([manager_id], map: "idx_usuarios_manager")
@@ -987,10 +984,10 @@ model plantas {
   uf                    String                 @db.VarChar(2)
   cep                   String                 @db.VarChar(255)
   proprietario_id       String                 @db.Char(26)
-  numero_uc             String?                @db.VarChar(255)
   created_at            DateTime?              @db.Timestamp(0)
   updated_at            DateTime?              @db.Timestamp(0)
   deleted_at            DateTime?              @db.Timestamp(0)
+  numero_uc             String?                @db.VarChar(255)
   anomalias             anomalias[]
   configuracao_plantas  configuracao_plantas[]
   equipamentos          equipamentos[]
@@ -998,6 +995,7 @@ model plantas {
   ordens_servico        ordens_servico[]
   proprietario          usuarios               @relation("plantas_proprietario", fields: [proprietario_id], references: [id])
   programacoes_os       programacoes_os[]
+  solicitacoes_servico  solicitacoes_servico[]
   tarefas               tarefas[]
   unidades              unidades[]
 
@@ -1007,32 +1005,31 @@ model plantas {
 }
 
 model unidades {
-  id                   String                   @id @default(cuid()) @db.Char(26)
-  planta_id            String                   @db.Char(26)
-  nome                 String                   @db.VarChar(255)
-  tipo                 String                   @db.VarChar(50)
-  estado               String                   @db.VarChar(2)
-  cidade               String                   @db.VarChar(100)
-  latitude             Decimal                  @db.Decimal(10, 7)
-  longitude            Decimal                  @db.Decimal(10, 7)
-  potencia             Decimal                  @db.Decimal(10, 2)
-  status               String                   @default("ativo") @db.VarChar(20)
-  pontos_medicao       Json?
-  irrigante            Boolean                  @default(false)
-  grupo                String?                  @db.VarChar(1)
-  subgrupo             String?                  @db.VarChar(50)
-  tipo_unidade         String?                  @db.VarChar(20)
-  demanda_carga        Decimal?                 @db.Decimal(10, 2)
-  demanda_geracao      Decimal?                 @db.Decimal(10, 2)
-  concessionaria_id    String?                  @db.Char(26)
-  numero_uc            String?                  @db.VarChar(255)
-  created_at           DateTime                 @default(now()) @db.Timestamp(0)
-  updated_at           DateTime                 @updatedAt @db.Timestamp(0)
-  deleted_at           DateTime?                @db.Timestamp(0)
-  equipamentos         equipamentos[]
-  planta               plantas                  @relation(fields: [planta_id], references: [id])
-  concessionaria       concessionarias_energia? @relation(fields: [concessionaria_id], references: [id])
-  configuracao_demanda configuracao_demanda?
+  id                String                   @id @default(cuid()) @db.Char(26)
+  planta_id         String                   @db.Char(26)
+  nome              String                   @db.VarChar(255)
+  tipo              String                   @db.VarChar(50)
+  estado            String                   @db.VarChar(2)
+  cidade            String                   @db.VarChar(100)
+  latitude          Decimal                  @db.Decimal(10, 7)
+  longitude         Decimal                  @db.Decimal(10, 7)
+  potencia          Decimal                  @db.Decimal(10, 2)
+  status            String                   @default("ativo") @db.VarChar(20)
+  pontos_medicao    Json?
+  created_at        DateTime                 @default(now()) @db.Timestamp(0)
+  updated_at        DateTime                 @updatedAt @db.Timestamp(0)
+  deleted_at        DateTime?                @db.Timestamp(0)
+  concessionaria_id String?                  @db.Char(26)
+  demanda_carga     Decimal?                 @db.Decimal(10, 2)
+  demanda_geracao   Decimal?                 @db.Decimal(10, 2)
+  grupo             String?                  @db.VarChar(1)
+  irrigante         Boolean                  @default(false)
+  subgrupo          String?                  @db.VarChar(50)
+  tipo_unidade      String?                  @db.VarChar(20)
+  numero_uc         String?                  @db.VarChar(255)
+  equipamentos      equipamentos[]
+  concessionaria    concessionarias_energia? @relation(fields: [concessionaria_id], references: [id])
+  planta            plantas                  @relation(fields: [planta_id], references: [id])
 
   @@index([planta_id])
   @@index([tipo])
@@ -1065,34 +1062,28 @@ model diagramas_unitarios {
   @@map("diagramas_unitarios")
 }
 
-
-// ✅ NOVA TABELA: Categorias de Equipamentos
 model categorias_equipamentos {
-  id   String @id @default(cuid()) @db.Char(26)
-  nome String @db.VarChar(100)
-
+  id      String               @id @default(cuid()) @db.Char(26)
+  nome    String               @db.VarChar(100)
   modelos tipos_equipamentos[]
 
   @@map("categorias_equipamentos")
 }
 
 model tipos_equipamentos {
-  id     String @id @db.Char(26)
-  codigo String @unique @db.VarChar(50)
-  nome   String @db.VarChar(100)
-
-  // ✅ NOVOS CAMPOS: Relação com categoria e fabricante
-  categoria_id String                  @db.Char(26)
-  categoria    categorias_equipamentos @relation(fields: [categoria_id], references: [id])
-  fabricante   String                  @db.VarChar(100)
-
-  largura_padrao      Int            @default(32)
-  altura_padrao       Int            @default(32)
+  id                  String                   @id @db.Char(26)
+  codigo              String                   @unique @db.VarChar(50)
+  nome                String                   @db.VarChar(100)
+  largura_padrao      Int                      @default(32)
+  altura_padrao       Int                      @default(32)
   icone_svg           String?
-  propriedades_schema Json? // Campos técnicos: {campos: [{campo, tipo, unidade, obrigatorio}]}
-  mqtt_schema         Json? // JSON Schema para validação MQTT (apenas equipamentos com telemetria)
-  created_at          DateTime       @default(now())
-  updated_at          DateTime       @updatedAt
+  propriedades_schema Json?
+  created_at          DateTime                 @default(now())
+  updated_at          DateTime                 @updatedAt
+  categoria_id        String                   @db.Char(26)
+  fabricante          String                   @db.VarChar(100)
+  mqtt_schema         Json?
+  categoria           categorias_equipamentos  @relation(fields: [categoria_id], references: [id])
   equipamentos        equipamentos[]
 
   @@index([categoria_id])
@@ -1105,7 +1096,6 @@ model equipamentos {
   classificacao          String                        @db.VarChar(10)
   equipamento_pai_id     String?                       @db.Char(26)
   fabricante             String?                       @db.VarChar(255)
-  fabricante_custom      String?                       @db.VarChar(255) // ✅ NOVO: Fabricante customizado (só se divergir do modelo)
   modelo                 String?                       @db.VarChar(255)
   numero_serie           String?                       @db.VarChar(255)
   criticidade            String                        @db.VarChar(1)
@@ -1141,15 +1131,16 @@ model equipamentos {
   posicao_x              Float?                        @db.Real
   posicao_y              Float?                        @db.Real
   rotacao                Float?                        @default(0) @db.Real
-  label_position         String?                       @default("top") @db.VarChar(10)
-  label_offset_x         Float?                        @db.Real // Offset X do label em pixels (para posicionamento customizado)
-  label_offset_y         Float?                        @db.Real // Offset Y do label em pixels (para posicionamento customizado)
   status                 String?                       @default("NORMAL") @db.VarChar(20)
   tag                    String?                       @db.VarChar(50)
   tipo_equipamento_id    String?                       @db.Char(26)
   unidade_id             String?                       @db.Char(26)
   mqtt_habilitado        Boolean                       @default(false)
   topico_mqtt            String?                       @db.VarChar(255)
+  label_position         String?                       @default("top") @db.VarChar(10)
+  fabricante_custom      String?                       @db.VarChar(255)
+  label_offset_x         Float?                        @db.Real
+  label_offset_y         Float?                        @db.Real
   anomalias              anomalias[]
   equipamento_pai        equipamentos?                 @relation("EquipamentoUAR", fields: [equipamento_pai_id], references: [id], onDelete: Restrict)
   equipamentos_filhos    equipamentos[]                @relation("EquipamentoUAR")
@@ -1164,6 +1155,7 @@ model equipamentos {
   ordens_servico         ordens_servico[]
   planos_manutencao      planos_manutencao?
   programacoes_os        programacoes_os[]
+  solicitacoes_servico   solicitacoes_servico[]
   tarefas                tarefas[]
 
   @@index([unidade_id])
@@ -1197,34 +1189,27 @@ model equipamentos_dados_tecnicos {
 }
 
 model equipamentos_dados {
-  id              String   @id @default(cuid()) @db.Char(26)
-  equipamento_id  String   @db.Char(26)
-  dados           Json
-  fonte           String   @default("MQTT") @db.VarChar(20)
-  timestamp_dados DateTime @default(now()) @db.Timestamp(0)
-  qualidade       String?  @db.VarChar(20)
-  created_at      DateTime @default(now()) @db.Timestamp(0)
+  id                String       @id @default(cuid()) @db.Char(26)
+  equipamento_id    String       @db.Char(26)
+  dados             Json
+  fonte             String       @default("MQTT") @db.VarChar(20)
+  timestamp_dados   DateTime     @default(now()) @db.Timestamp(0)
+  qualidade         String?      @db.VarChar(20)
+  created_at        DateTime     @default(now()) @db.Timestamp(0)
+  timestamp_fim     DateTime?    @db.Timestamp(0)
+  num_leituras      Int?
+  phf_atual         Decimal?     @db.Decimal(12, 3)
+  phf_anterior      Decimal?     @db.Decimal(12, 3)
+  energia_kwh       Decimal?     @db.Decimal(10, 3)
+  potencia_ativa_kw Decimal?     @db.Decimal(10, 3)
+  tipo_horario      String?      @db.VarChar(20)
+  equipamento       equipamentos @relation(fields: [equipamento_id], references: [id], onDelete: Cascade)
 
-  // Campos para agregação de 1 minuto
-  timestamp_fim DateTime? @db.Timestamp(0)
-  num_leituras  Int? // Número de leituras agregadas no período
-
-  // ✅ NOVOS CAMPOS - PHF e Energia (GDD v2.0)
-  phf_atual         Decimal? @db.Decimal(12, 3) // Period Hour Forward atual (kWh acumulado)
-  phf_anterior      Decimal? @db.Decimal(12, 3) // PHF da leitura anterior
-  energia_kwh       Decimal? @db.Decimal(10, 3) // Energia consumida (delta PHF)
-  potencia_ativa_kw Decimal? @db.Decimal(10, 3) // Potência ativa (Pa+Pb+Pc) para demanda
-  tipo_horario      String?  @db.VarChar(20) // PONTA, FORA_PONTA, HORARIO_RESERVADO
-
-  equipamento equipamentos @relation(fields: [equipamento_id], references: [id], onDelete: Cascade)
-
-  @@unique([equipamento_id, timestamp_dados], name: "uk_equipamento_timestamp")
+  @@unique([equipamento_id, timestamp_dados], name: "uk_equipamento_timestamp", map: "uk_equipamento_timestamp")
   @@index([equipamento_id])
   @@index([timestamp_dados])
   @@index([equipamento_id, timestamp_dados])
-  @@index([equipamento_id, timestamp_dados, energia_kwh], name: "idx_equipamentos_dados_periodo")
-  @@index([equipamento_id, potencia_ativa_kw], name: "idx_equipamentos_dados_potencia")
-  @@index([equipamento_id, tipo_horario, timestamp_dados], name: "idx_equipamentos_dados_tipo_horario")
+  @@index([created_at(sort: Desc)], map: "idx_equipamentos_dados_created_at")
   @@map("equipamentos_dados")
 }
 
@@ -1232,35 +1217,34 @@ model equipamentos_dados {
 /// Versão 2.0 - Apenas dados essenciais (sem customização visual)
 /// Todas conexões usam estilo padrão (linha branca/cinza, ortogonal)
 model equipamentos_conexoes {
-  id          String @id @default(cuid()) @db.Char(26)
-  diagrama_id String @db.Char(26)
-
-  // ===== ORIGEM: Equipamento OU Junction Point =====
-  equipamento_origem_id String? @db.Char(26)
-  porta_origem          String  @db.VarChar(20) /// top, bottom, left, right
-  origem_tipo           String? @default("equipamento") @db.VarChar(20) /// equipamento | junction
-  origem_grid_x         Int?
-  origem_grid_y         Int?
-
-  // ===== DESTINO: Equipamento OU Junction Point =====
-  equipamento_destino_id String? @db.Char(26)
-  porta_destino          String  @db.VarChar(20) /// top, bottom, left, right
-  destino_tipo           String? @default("equipamento") @db.VarChar(20) /// equipamento | junction
+  id                     String              @id @default(cuid()) @db.Char(26)
+  diagrama_id            String              @db.Char(26)
+  equipamento_origem_id  String?             @db.Char(26)
+  /// top, bottom, left, right
+  porta_origem           String              @db.VarChar(20)
+  equipamento_destino_id String?             @db.Char(26)
+  /// top, bottom, left, right
+  porta_destino          String              @db.VarChar(20)
+  created_at             DateTime            @default(now()) @db.Timestamp(0)
+  updated_at             DateTime            @updatedAt @db.Timestamp(0)
+  deleted_at             DateTime?           @db.Timestamp(0)
+  /// equipamento | junction
+  origem_tipo            String?             @default("equipamento") @db.VarChar(20)
+  origem_grid_x          Int?
+  origem_grid_y          Int?
+  /// equipamento | junction
+  destino_tipo           String?             @default("equipamento") @db.VarChar(20)
   destino_grid_x         Int?
   destino_grid_y         Int?
-
-  // ❌ REMOVIDOS: tipo_linha, cor, espessura, pontos_intermediarios, rotulo, ordem
-  created_at          DateTime            @default(now()) @db.Timestamp(0)
-  updated_at          DateTime            @updatedAt @db.Timestamp(0)
-  deleted_at          DateTime?           @db.Timestamp(0)
-  diagrama            diagramas_unitarios @relation(fields: [diagrama_id], references: [id], onDelete: Cascade)
-  equipamento_destino equipamentos?       @relation("ConexaoDestino", fields: [equipamento_destino_id], references: [id], onDelete: Cascade)
-  equipamento_origem  equipamentos?       @relation("ConexaoOrigem", fields: [equipamento_origem_id], references: [id], onDelete: Cascade)
+  diagrama               diagramas_unitarios @relation(fields: [diagrama_id], references: [id], onDelete: Cascade)
+  equipamento_destino    equipamentos?       @relation("ConexaoDestino", fields: [equipamento_destino_id], references: [id], onDelete: Cascade)
+  equipamento_origem     equipamentos?       @relation("ConexaoOrigem", fields: [equipamento_origem_id], references: [id], onDelete: Cascade)
 
   @@index([diagrama_id])
   @@index([equipamento_origem_id])
   @@index([equipamento_destino_id])
   @@index([deleted_at])
+  @@index([diagrama_id], map: "idx_conexoes_diagrama_id")
   @@map("equipamentos_conexoes")
 }
 
@@ -1275,9 +1259,6 @@ model anomalias {
   status              StatusAnomalia        @default(AGUARDANDO)
   prioridade          PrioridadeAnomalia    @default(MEDIA)
   observacoes         String?
-  observacoes_analise String?               @map("observacoes_analise")
-  analisado_por       String?               @map("analisado_por") @db.VarChar(255)
-  data_analise        DateTime?             @map("data_analise") @db.Timestamp(0)
   criado_por          String?               @db.VarChar(255)
   ordem_servico_id    String?               @db.VarChar(50)
   planta_id           String?               @db.Char(26)
@@ -1286,6 +1267,9 @@ model anomalias {
   created_at          DateTime              @default(now()) @db.Timestamp(0)
   updated_at          DateTime              @updatedAt @db.Timestamp(0)
   deleted_at          DateTime?             @db.Timestamp(0)
+  observacoes_analise String?               @map("observacoes_analise")
+  analisado_por       String?               @map("analisado_por") @db.VarChar(255)
+  data_analise        DateTime?             @map("data_analise") @db.Timestamp(0)
   anexos              anexos_anomalias[]
   equipamento         equipamentos?         @relation(fields: [equipamento_id], references: [id])
   planta              plantas?              @relation(fields: [planta_id], references: [id])
@@ -1634,9 +1618,9 @@ model reserva_veiculo {
   km_final                Int?              @map("km_final")
   observacoes_finalizacao String?           @map("observacoes_finalizacao")
   observacoes             String?
-  veiculo                 veiculo           @relation(fields: [veiculo_id], references: [id], onDelete: Cascade)
-  programacoes_os         programacoes_os[]
   ordens_servico          ordens_servico[]
+  programacoes_os         programacoes_os[]
+  veiculo                 veiculo           @relation(fields: [veiculo_id], references: [id], onDelete: Cascade)
 
   @@index([veiculo_id])
   @@index([solicitante_id])
@@ -1665,19 +1649,13 @@ model programacoes_os {
   equipamento_id           String?                      @map("equipamento_id") @db.Char(26)
   anomalia_id              String?                      @map("anomalia_id") @db.Char(26)
   plano_manutencao_id      String?                      @map("plano_manutencao_id") @db.Char(26)
+  solicitacao_servico_id   String?                      @map("solicitacao_servico_id") @db.Char(26)
   dados_origem             Json?                        @map("dados_origem")
   data_previsao_inicio     DateTime?                    @map("data_previsao_inicio") @db.Timestamp(0)
   data_previsao_fim        DateTime?                    @map("data_previsao_fim") @db.Timestamp(0)
   tempo_estimado           Decimal                      @map("tempo_estimado") @db.Decimal(5, 2)
   duracao_estimada         Decimal                      @map("duracao_estimada") @db.Decimal(5, 2)
   necessita_veiculo        Boolean                      @default(false) @map("necessita_veiculo")
-  veiculo_id               String?                      @map("veiculo_id") @db.VarChar(26)
-  reserva_data_inicio      DateTime?                    @map("reserva_data_inicio") @db.Date
-  reserva_data_fim         DateTime?                    @map("reserva_data_fim") @db.Date
-  reserva_hora_inicio      String?                      @map("reserva_hora_inicio") @db.VarChar(5)
-  reserva_hora_fim         String?                      @map("reserva_hora_fim") @db.VarChar(5)
-  reserva_finalidade       String?                      @map("reserva_finalidade")
-  reserva_id               String?                      @map("reserva_id") @db.VarChar(26)
   assentos_necessarios     Int?                         @map("assentos_necessarios")
   carga_necessaria         Decimal?                     @map("carga_necessaria") @db.Decimal(8, 2)
   observacoes_veiculo      String?                      @map("observacoes_veiculo")
@@ -1689,22 +1667,29 @@ model programacoes_os {
   observacoes_programacao  String?                      @map("observacoes_programacao")
   justificativa            String?
   motivo_rejeicao          String?                      @map("motivo_rejeicao")
-  sugestoes_melhoria       String?                      @map("sugestoes_melhoria")
   motivo_cancelamento      String?                      @map("motivo_cancelamento")
   criado_por               String?                      @map("criado_por") @db.VarChar(255)
   criado_por_id            String?                      @map("criado_por_id") @db.Char(26)
   analisado_por            String?                      @map("analisado_por") @db.VarChar(255)
   analisado_por_id         String?                      @map("analisado_por_id") @db.Char(26)
   data_analise             DateTime?                    @map("data_analise")
-  observacoes_analise      String?                      @map("observacoes_analise")
   aprovado_por             String?                      @map("aprovado_por") @db.VarChar(255)
   aprovado_por_id          String?                      @map("aprovado_por_id") @db.Char(26)
   data_aprovacao           DateTime?                    @map("data_aprovacao")
+  data_hora_programada     DateTime?                    @map("data_hora_programada") @db.Timestamp(0)
+  observacoes_analise      String?                      @map("observacoes_analise")
+  sugestoes_melhoria       String?                      @map("sugestoes_melhoria")
   observacoes_aprovacao    String?                      @map("observacoes_aprovacao")
   ajustes_orcamento        Decimal?                     @map("ajustes_orcamento") @db.Decimal(12, 2)
   data_programada_sugerida DateTime?                    @map("data_programada_sugerida") @db.Date
   hora_programada_sugerida String?                      @map("hora_programada_sugerida") @db.VarChar(5)
-  data_hora_programada     DateTime?                    @map("data_hora_programada") @db.Timestamp(0)
+  veiculo_id               String?                      @map("veiculo_id") @db.VarChar(26)
+  reserva_data_inicio      DateTime?                    @map("reserva_data_inicio") @db.Date
+  reserva_data_fim         DateTime?                    @map("reserva_data_fim") @db.Date
+  reserva_hora_inicio      String?                      @map("reserva_hora_inicio") @db.VarChar(5)
+  reserva_hora_fim         String?                      @map("reserva_hora_fim") @db.VarChar(5)
+  reserva_finalidade       String?                      @map("reserva_finalidade")
+  reserva_id               String?                      @map("reserva_id") @db.VarChar(26)
   ferramentas              ferramentas_programacao_os[]
   historico                historico_programacao_os[]
   materiais                materiais_programacao_os[]
@@ -1712,6 +1697,7 @@ model programacoes_os {
   anomalia                 anomalias?                   @relation(fields: [anomalia_id], references: [id])
   equipamento              equipamentos?                @relation(fields: [equipamento_id], references: [id])
   plano_manutencao         planos_manutencao?           @relation(fields: [plano_manutencao_id], references: [id])
+  solicitacao_servico      solicitacoes_servico?        @relation(fields: [solicitacao_servico_id], references: [id])
   planta                   plantas?                     @relation(fields: [planta_id], references: [id])
   reserva_veiculo          reserva_veiculo?             @relation(fields: [reserva_id], references: [id])
   tarefas_programacao      tarefas_programacao_os[]
@@ -1726,6 +1712,7 @@ model programacoes_os {
   @@index([planta_id])
   @@index([equipamento_id])
   @@index([anomalia_id])
+  @@index([solicitacao_servico_id])
   @@index([deletado_em])
   @@map("programacoes_os")
 }
@@ -1821,7 +1808,6 @@ model ordens_servico {
   equipamento_id               String?                   @map("equipamento_id") @db.Char(26)
   anomalia_id                  String?                   @map("anomalia_id") @db.Char(26)
   plano_manutencao_id          String?                   @map("plano_manutencao_id") @db.Char(26)
-  reserva_id                   String?                   @map("reserva_id") @db.VarChar(26)
   dados_origem                 Json?                     @map("dados_origem")
   tempo_estimado               Decimal                   @map("tempo_estimado") @db.Decimal(5, 2)
   duracao_estimada             Decimal                   @map("duracao_estimada") @db.Decimal(5, 2)
@@ -1841,14 +1827,6 @@ model ordens_servico {
   proxima_manutencao           String?                   @map("proxima_manutencao") @db.VarChar(255)
   avaliacao_qualidade          Int?                      @map("avaliacao_qualidade") @db.SmallInt
   observacoes_qualidade        String?                   @map("observacoes_qualidade")
-  // Novos campos adicionados para finalização detalhada
-  atividades_realizadas        String?                   @map("atividades_realizadas")
-  checklist_concluido          Int?                      @map("checklist_concluido") @db.SmallInt
-  procedimentos_seguidos       String?                   @map("procedimentos_seguidos")
-  equipamentos_seguranca       String?                   @map("equipamentos_seguranca")
-  incidentes_seguranca         String?                   @map("incidentes_seguranca")
-  medidas_seguranca_adicionais String?                   @map("medidas_seguranca_adicionais")
-  custos_adicionais            Decimal?                  @map("custos_adicionais") @db.Decimal(12, 2)
   criado_por                   String?                   @map("criado_por") @db.VarChar(255)
   criado_por_id                String?                   @map("criado_por_id") @db.Char(26)
   programado_por               String?                   @map("programado_por") @db.VarChar(255)
@@ -1861,6 +1839,14 @@ model ordens_servico {
   data_hora_fim_real           DateTime?                 @map("data_hora_fim_real") @db.Timestamp(0)
   data_hora_inicio_real        DateTime?                 @map("data_hora_inicio_real") @db.Timestamp(0)
   data_hora_programada         DateTime?                 @map("data_hora_programada") @db.Timestamp(0)
+  reserva_id                   String?                   @map("reserva_id") @db.VarChar(26)
+  atividades_realizadas        String?                   @map("atividades_realizadas")
+  checklist_concluido          Int?                      @map("checklist_concluido") @db.SmallInt
+  custos_adicionais            Decimal?                  @map("custos_adicionais") @db.Decimal(12, 2)
+  equipamentos_seguranca       String?                   @map("equipamentos_seguranca")
+  incidentes_seguranca         String?                   @map("incidentes_seguranca")
+  medidas_seguranca_adicionais String?                   @map("medidas_seguranca_adicionais")
+  procedimentos_seguidos       String?                   @map("procedimentos_seguidos")
   anexos                       anexos_os[]
   checklist_atividades         checklist_atividades_os[]
   ferramentas                  ferramentas_os[]
@@ -2160,6 +2146,205 @@ model historico_manutencoes {
   @@map("historico_manutencoes")
 }
 
+model concessionarias_energia {
+  id                String                           @id @default(cuid()) @db.Char(26)
+  nome              String                           @db.VarChar(255)
+  estado            String                           @db.VarChar(2)
+  data_inicio       DateTime                         @db.Date
+  data_validade     DateTime                         @db.Date
+  a4_verde_tusd_d   Decimal?                         @db.Decimal(10, 6)
+  a4_verde_tusd_p   Decimal?                         @db.Decimal(10, 6)
+  a4_verde_tusd_fp  Decimal?                         @db.Decimal(10, 6)
+  a4_verde_te_d     Decimal?                         @db.Decimal(10, 6)
+  a4_verde_te_p     Decimal?                         @db.Decimal(10, 6)
+  a4_verde_te_fp    Decimal?                         @db.Decimal(10, 6)
+  a3a_verde_tusd_d  Decimal?                         @db.Decimal(10, 6)
+  a3a_verde_tusd_p  Decimal?                         @db.Decimal(10, 6)
+  a3a_verde_tusd_fp Decimal?                         @db.Decimal(10, 6)
+  a3a_verde_te_d    Decimal?                         @db.Decimal(10, 6)
+  a3a_verde_te_p    Decimal?                         @db.Decimal(10, 6)
+  a3a_verde_te_fp   Decimal?                         @db.Decimal(10, 6)
+  b_tusd_valor      Decimal?                         @db.Decimal(10, 6)
+  b_te_valor        Decimal?                         @db.Decimal(10, 6)
+  created_at        DateTime                         @default(now()) @db.Timestamp(0)
+  updated_at        DateTime                         @updatedAt @db.Timestamp(0)
+  deleted_at        DateTime?                        @db.Timestamp(0)
+  anexos            anexos_concessionarias_energia[]
+  unidades          unidades[]
+
+  @@map("concessionarias_energia")
+}
+
+model anexos_concessionarias_energia {
+  id                String                  @id @default(cuid()) @db.Char(26)
+  concessionaria_id String                  @db.Char(26)
+  nome_original     String                  @db.VarChar(255)
+  nome_arquivo      String                  @db.VarChar(255)
+  caminho           String                  @db.VarChar(500)
+  mime_type         String                  @db.VarChar(100)
+  tamanho           Int
+  descricao         String?
+  created_at        DateTime                @default(now()) @db.Timestamp(0)
+  deleted_at        DateTime?               @db.Timestamp(0)
+  concessionaria    concessionarias_energia @relation(fields: [concessionaria_id], references: [id], onDelete: Cascade)
+
+  @@map("anexos_concessionarias_energia")
+}
+
+model configuracao_demanda {
+  id                    String   @id @default(cuid()) @db.Char(26)
+  unidade_id            String   @unique @db.Char(26)
+  fonte                 String   @default("AGRUPAMENTO") @db.VarChar(20)
+  equipamentos_ids      Json     @db.Json
+  mostrar_detalhes      Boolean  @default(true)
+  intervalo_atualizacao Int      @default(30)
+  aplicar_perdas        Boolean  @default(true)
+  fator_perdas          Decimal  @default(3.0) @db.Decimal(5, 2)
+  valor_contratado      Decimal? @db.Decimal(10, 2)
+  percentual_adicional  Decimal? @default(10.0) @db.Decimal(5, 2)
+  created_at            DateTime @default(now()) @db.Timestamp(0)
+  updated_at            DateTime @updatedAt @db.Timestamp(0)
+  created_by            String?  @db.Char(26)
+  updated_by            String?  @db.Char(26)
+
+  @@index([unidade_id], map: "idx_configuracao_demanda_unidade")
+}
+
+model solicitacoes_servico {
+  id                       String                            @id @default(cuid())
+  numero                   String                            @unique
+  titulo                   String
+  descricao                String
+  tipo                     TipoSolicitacaoServico
+  prioridade               PrioridadeSolicitacao             @default(MEDIA)
+  status                   StatusSolicitacaoServico          @default(RASCUNHO)
+  origem                   OrigemSolicitacao                 @default(PORTAL)
+  planta_id                String
+  area                     String?
+  local_especifico         String?
+  equipamento_id           String?
+  solicitante_nome         String
+  solicitante_email        String?
+  solicitante_telefone     String?
+  solicitante_departamento String?
+  solicitante_id           String?
+  data_necessidade         DateTime?
+  prazo_esperado           DateTime?
+  data_inicio_previsto     DateTime?
+  data_fim_previsto        DateTime?
+  tempo_estimado           Decimal?                          @db.Decimal(10, 2)
+  custo_estimado           Decimal?                          @db.Decimal(10, 2)
+  analisado_por_id         String?
+  data_analise             DateTime?
+  observacoes_analise      String?
+  aprovado_por_id          String?
+  data_aprovacao           DateTime?
+  observacoes_aprovacao    String?
+  rejeitado_por_id         String?
+  data_rejeicao            DateTime?
+  motivo_rejeicao          String?
+  cancelado_por_id         String?
+  data_cancelamento        DateTime?
+  motivo_cancelamento      String?
+  concluido_por_id         String?
+  data_conclusao           DateTime?
+  observacoes_conclusao    String?
+  programacao_os_id        String?
+  os_id                    String?
+  observacoes              String?
+  requisitos_especiais     String?
+  riscos_identificados     String?
+  created_at               DateTime                          @default(now())
+  updated_at               DateTime                          @default(now()) @updatedAt
+  deleted_at               DateTime?
+  local                    String                            @db.VarChar(255)
+  data_solicitacao         DateTime                          @default(now())
+  prazo_execucao           Int?
+  data_prevista_inicio     DateTime?
+  data_prevista_fim        DateTime?
+  justificativa            String
+  beneficios_esperados     String?
+  riscos_nao_execucao      String?
+  materiais_necessarios    String?
+  ferramentas_necessarias  String?
+  mao_obra_necessaria      String?
+  departamento             String?                           @db.VarChar(100)
+  contato                  String?                           @db.VarChar(100)
+  analisado_por_nome       String?                           @db.VarChar(255)
+  parecer_tecnico          String?
+  aprovado_por_nome        String?                           @db.VarChar(255)
+  sugestoes_alternativas   String?
+  cancelado_por_nome       String?                           @db.VarChar(255)
+  ordem_servico_id         String?                           @db.VarChar(50)
+  anexos                   anexos_solicitacao_servico[]
+  comentarios              comentarios_solicitacao_servico[]
+  historico                historico_solicitacao_servico[]
+  equipamento              equipamentos?                     @relation(fields: [equipamento_id], references: [id])
+  planta                   plantas                           @relation(fields: [planta_id], references: [id])
+  solicitante              usuarios?                         @relation("solicitacoes_solicitante", fields: [solicitante_id], references: [id])
+  programacoes_os          programacoes_os[]
+
+  @@index([status])
+  @@index([tipo])
+  @@index([planta_id])
+  @@map("solicitacoes_servico")
+}
+
+model historico_solicitacao_servico {
+  id              String                    @id @default(cuid())
+  solicitacao_id  String
+  acao            String
+  usuario         String?
+  usuario_nome    String
+  usuario_id      String?
+  data            DateTime                  @default(now())
+  observacoes     String?
+  status_anterior StatusSolicitacaoServico?
+  status_novo     StatusSolicitacaoServico?
+  dados_extras    Json?
+  solicitacao     solicitacoes_servico      @relation(fields: [solicitacao_id], references: [id], onDelete: Cascade)
+
+  @@index([solicitacao_id])
+  @@map("historico_solicitacao_servico")
+}
+
+model anexos_solicitacao_servico {
+  id              String               @id @default(cuid())
+  solicitacao_id  String
+  nome_original   String
+  nome_arquivo    String
+  caminho         String
+  tamanho         Int
+  mime_type       String
+  descricao       String?
+  tipo_documento  String?
+  uploaded_por    String?
+  uploaded_por_id String?
+  uploaded_at     DateTime             @default(now())
+  deleted_at      DateTime?
+  solicitacao     solicitacoes_servico @relation(fields: [solicitacao_id], references: [id], onDelete: Cascade)
+
+  @@index([solicitacao_id])
+  @@map("anexos_solicitacao_servico")
+}
+
+model comentarios_solicitacao_servico {
+  id             String               @id @default(cuid())
+  solicitacao_id String
+  comentario     String
+  autor          String
+  autor_id       String?
+  tipo           String?              @default("COMENTARIO")
+  privado        Boolean              @default(false)
+  created_at     DateTime             @default(now())
+  updated_at     DateTime             @default(now())
+  deleted_at     DateTime?
+  solicitacao    solicitacoes_servico @relation(fields: [solicitacao_id], references: [id], onDelete: Cascade)
+
+  @@index([solicitacao_id])
+  @@map("comentarios_solicitacao_servico")
+}
+
 enum StatusAnomalia {
   AGUARDANDO
   EM_ANALISE
@@ -2223,65 +2408,6 @@ enum FrequenciaTarefa {
   SEMESTRAL
   ANUAL
   PERSONALIZADA
-}
-
-// ==================== MÓDULO: CONCESSIONÁRIAS DE ENERGIA ====================
-
-model concessionarias_energia {
-  id            String   @id @default(cuid()) @db.Char(26)
-  nome          String   @db.VarChar(255)
-  estado        String   @db.VarChar(2)
-  data_inicio   DateTime @db.Date
-  data_validade DateTime @db.Date
-
-  // Campos de tarifas - A4 VERDE
-  a4_verde_tusd_d  Decimal? @db.Decimal(10, 6)
-  a4_verde_tusd_p  Decimal? @db.Decimal(10, 6)
-  a4_verde_tusd_fp Decimal? @db.Decimal(10, 6)
-  a4_verde_te_d    Decimal? @db.Decimal(10, 6)
-  a4_verde_te_p    Decimal? @db.Decimal(10, 6)
-  a4_verde_te_fp   Decimal? @db.Decimal(10, 6)
-
-  // Campos de tarifas - A3a VERDE
-  a3a_verde_tusd_d  Decimal? @db.Decimal(10, 6)
-  a3a_verde_tusd_p  Decimal? @db.Decimal(10, 6)
-  a3a_verde_tusd_fp Decimal? @db.Decimal(10, 6)
-  a3a_verde_te_d    Decimal? @db.Decimal(10, 6)
-  a3a_verde_te_p    Decimal? @db.Decimal(10, 6)
-  a3a_verde_te_fp   Decimal? @db.Decimal(10, 6)
-
-  // Campos de tarifas - Grupo B
-  b_tusd_valor Decimal? @db.Decimal(10, 6)
-  b_te_valor   Decimal? @db.Decimal(10, 6)
-
-  created_at DateTime  @default(now()) @db.Timestamp(0)
-  updated_at DateTime  @updatedAt @db.Timestamp(0)
-  deleted_at DateTime? @db.Timestamp(0)
-
-  // Relações
-  anexos   anexos_concessionarias_energia[]
-  unidades unidades[]
-
-  @@map("concessionarias_energia")
-}
-
-model anexos_concessionarias_energia {
-  id                String  @id @default(cuid()) @db.Char(26)
-  concessionaria_id String  @db.Char(26)
-  nome_original     String  @db.VarChar(255)
-  nome_arquivo      String  @db.VarChar(255)
-  caminho           String  @db.VarChar(500)
-  mime_type         String  @db.VarChar(100)
-  tamanho           Int
-  descricao         String? @db.Text
-
-  created_at DateTime  @default(now()) @db.Timestamp(0)
-  deleted_at DateTime? @db.Timestamp(0)
-
-  // Relação
-  concessionaria concessionarias_energia @relation(fields: [concessionaria_id], references: [id], onDelete: Cascade)
-
-  @@map("anexos_concessionarias_energia")
 }
 
 enum CondicaoAtivo {
@@ -2374,10 +2500,10 @@ enum StatusReserva {
 
 enum TipoSolicitante {
   ordem_servico  @map("ordem_servico")
-  programacao_os @map("programacao_os")
   viagem         @map("viagem")
   manutencao     @map("manutencao")
   manual         @map("manual")
+  programacao_os @map("programacao_os")
 
   @@map("tipo_solicitante")
 }
@@ -2409,10 +2535,11 @@ enum PrioridadeOS {
 }
 
 enum OrigemOS {
-  ANOMALIA         @map("ANOMALIA")
-  TAREFA           @map("TAREFA")
-  PLANO_MANUTENCAO @map("PLANO_MANUTENCAO")
-  MANUAL           @map("MANUAL")
+  ANOMALIA             @map("ANOMALIA")
+  TAREFA               @map("TAREFA")
+  PLANO_MANUTENCAO     @map("PLANO_MANUTENCAO")
+  SOLICITACAO_SERVICO  @map("SOLICITACAO_SERVICO")
+  MANUAL               @map("MANUAL")
 
   @@map("origem_os")
 }
@@ -2451,24 +2578,44 @@ enum TipoAnexoOS {
   @@map("tipo_anexo_os")
 }
 
-model configuracao_demanda {
-  id                    String    @id @default(cuid()) @db.Char(26)
-  unidade_id            String    @unique @db.Char(26)
-  fonte                 String    @default("AGRUPAMENTO") @db.VarChar(20)
-  equipamentos_ids      Json      @db.Json
-  mostrar_detalhes      Boolean   @default(true)
-  intervalo_atualizacao Int       @default(30)
-  aplicar_perdas        Boolean   @default(true)
-  fator_perdas          Decimal   @default(3.0) @db.Decimal(5, 2)
-  valor_contratado      Decimal?  @db.Decimal(10, 2)
-  percentual_adicional  Decimal?  @default(10.0) @db.Decimal(5, 2)
-  created_at            DateTime  @default(now()) @db.Timestamp(0)
-  updated_at            DateTime  @updatedAt @db.Timestamp(0)
-  created_by            String?   @db.Char(26)
-  updated_by            String?   @db.Char(26)
-  unidade               unidades  @relation(fields: [unidade_id], references: [id], onDelete: Cascade)
-  criado_por            usuarios? @relation("configuracao_demanda_created_by", fields: [created_by], references: [id])
-  atualizado_por        usuarios? @relation("configuracao_demanda_updated_by", fields: [updated_by], references: [id])
+enum StatusSolicitacaoServico {
+  RASCUNHO
+  AGUARDANDO
+  EM_ANALISE
+  APROVADA
+  REJEITADA
+  CANCELADA
+  OS_GERADA
+  EM_EXECUCAO
+  CONCLUIDA
+}
 
-  @@index([unidade_id], map: "idx_configuracao_demanda_unidade")
+enum TipoSolicitacaoServico {
+  INSTALACAO
+  MANUTENCAO_PREVENTIVA
+  MANUTENCAO_CORRETIVA
+  INSPECAO
+  CALIBRACAO
+  MODIFICACAO
+  REMOCAO
+  CONSULTORIA
+  TREINAMENTO
+  OUTRO
+}
+
+enum PrioridadeSolicitacao {
+  BAIXA
+  MEDIA
+  ALTA
+  URGENTE
+  CRITICA
+}
+
+enum OrigemSolicitacao {
+  PORTAL
+  EMAIL
+  TELEFONE
+  PRESENCIAL
+  SISTEMA
+  APLICATIVO
 }

@@ -306,6 +306,34 @@ export class ProgramacaoOSController {
     return this.programacaoOSService.criarDeTarefas(dto, usuarioId);
   }
 
+  @Post('from-solicitacao/:solicitacaoId')
+  @ApiOperation({
+    summary: 'Criar programação a partir de solicitação de serviço',
+    description: 'Cria automaticamente uma programação baseada em dados da solicitação de serviço aprovada',
+  })
+  @ApiParam({ name: 'solicitacaoId', description: 'ID da solicitação de serviço' })
+  @ApiResponse({
+    status: HttpStatus.CREATED,
+    description: 'Programação criada a partir da solicitação',
+    type: ProgramacaoResponseDto,
+  })
+  @ApiResponse({
+    status: HttpStatus.NOT_FOUND,
+    description: 'Solicitação não encontrada',
+  })
+  @ApiResponse({
+    status: HttpStatus.CONFLICT,
+    description: 'Apenas solicitações aprovadas podem gerar OS',
+  })
+  async criarDeSolicitacao(
+    @Param('solicitacaoId', ParseULIDPipe) solicitacaoId: string,
+    @Body() dto?: any,
+  ): Promise<ProgramacaoResponseDto> {
+    // TODO: Obter usuarioId da sessão quando implementar autenticação
+    const usuarioId = undefined;
+    return this.programacaoOSService.criarDeSolicitacao(solicitacaoId, dto, usuarioId);
+  }
+
   @Post(':id/tarefas')
   @ApiOperation({
     summary: 'Adicionar tarefas à programação',

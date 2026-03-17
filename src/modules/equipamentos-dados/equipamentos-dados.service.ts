@@ -352,6 +352,7 @@ export class EquipamentosDadosService {
           DATE(timestamp_dados) as data,
           SUM(
             COALESCE(
+              (dados->>'consumo_phf')::numeric,
               (dados->'energy'->>'period_energy_kwh')::numeric,
               (dados->>'energia_kwh')::numeric
             )
@@ -367,9 +368,9 @@ export class EquipamentosDadosService {
         WHERE equipamento_id = ${equipamentoId}
           AND timestamp_dados >= ${dataInicio}
           AND timestamp_dados < ${dataFim}
-          AND num_leituras IS NOT NULL
           AND (
-            dados->'energy'->>'period_energy_kwh' IS NOT NULL
+            dados->>'consumo_phf' IS NOT NULL
+            OR dados->'energy'->>'period_energy_kwh' IS NOT NULL
             OR dados->>'energia_kwh' IS NOT NULL
           )
         GROUP BY DATE(timestamp_dados)
@@ -1044,6 +1045,7 @@ export class EquipamentosDadosService {
         TO_CHAR(timestamp_dados, 'TMMonth') as mes_nome,
         SUM(
           COALESCE(
+            (dados->>'consumo_phf')::numeric,
             (dados->'energy'->>'period_energy_kwh')::numeric,
             (dados->>'energia_kwh')::numeric
           )
@@ -1059,9 +1061,9 @@ export class EquipamentosDadosService {
       WHERE equipamento_id = ${equipamentoId}
         AND timestamp_dados >= ${dataInicio}
         AND timestamp_dados < ${dataFim}
-        AND num_leituras IS NOT NULL
         AND (
-          dados->'energy'->>'period_energy_kwh' IS NOT NULL
+          dados->>'consumo_phf' IS NOT NULL
+          OR dados->'energy'->>'period_energy_kwh' IS NOT NULL
           OR dados->>'energia_kwh' IS NOT NULL
         )
       GROUP BY DATE_TRUNC('month', timestamp_dados), TO_CHAR(timestamp_dados, 'YYYY-MM'), TO_CHAR(timestamp_dados, 'TMMonth')

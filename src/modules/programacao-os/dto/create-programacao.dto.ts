@@ -152,6 +152,12 @@ export class CreateProgramacaoDto {
   @Length(25, 26) // Aceitar 25 ou 26 por causa de IDs com espaços
   plano_manutencao_id?: string;
 
+  @ApiPropertyOptional({ description: 'ID da solicitação de serviço', example: 'clrx1234567890123456789012' })
+  @IsOptional()
+  @IsString()
+  @Length(25, 26) // Aceitar 25 ou 26 por causa de IDs com espaços
+  solicitacao_servico_id?: string;
+
   @ApiPropertyOptional({ description: 'Dados extras da origem' })
   @IsOptional()
   dados_origem?: any;

@@ -1,117 +1,150 @@
 /**
- * Script para testar a correção do timezone
- * Simula a conversão de datas como o controller agora faz
+ * Script de teste para validar a correção de timezone
+ * Testa a conversão correta de UTC para America/Sao_Paulo
  */
 
-// Simular método criarDataBrasilia
-function criarDataBrasilia(ano, mes, dia, hora, minuto, segundo, ms) {
-  const mesStr = String(mes).padStart(2, '0');
-  const diaStr = String(dia).padStart(2, '0');
-  const horaStr = String(hora).padStart(2, '0');
-  const minutoStr = String(minuto).padStart(2, '0');
-  const segundoStr = String(segundo).padStart(2, '0');
-
-  const isoStringBrasilia = `${ano}-${mesStr}-${diaStr}T${horaStr}:${minutoStr}:${segundoStr}`;
-
-  // Criar Date assumindo que é UTC
-  const dateUTC = new Date(isoStringBrasilia + 'Z');
-
-  // Obter como seria essa data em Brasília
-  const dataBrasiliaStr = dateUTC.toLocaleString('en-US', {
-    timeZone: 'America/Sao_Paulo',
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-    second: '2-digit',
-    hour12: false,
-  });
-
-  // Parsear resultado
-  const [datePart, timePart] = dataBrasiliaStr.split(', ');
-  const [monthBrt, dayBrt, yearBrt] = datePart.split('/');
-  const [hourBrt, minuteBrt, secondBrt] = timePart.split(':');
-
-  // Calcular offset
-  const dateBrasiliaLocal = new Date(
-    `${yearBrt}-${monthBrt}-${dayBrt}T${hourBrt}:${minuteBrt}:${secondBrt}`,
-  );
-
-  const offset = dateUTC.getTime() - dateBrasiliaLocal.getTime();
-
-  // Criar data original e aplicar offset
-  const dateOriginalUTC = new Date(isoStringBrasilia);
-  return new Date(dateOriginalUTC.getTime() + offset + ms);
-}
+const { utcToZonedTime } = require('date-fns-tz');
 
 console.log('\n🧪 TESTE DE CONVERSÃO DE TIMEZONE\n');
 console.log('='.repeat(80));
 
-// Teste 1: Dia 06/03/2026
-console.log('\n📅 TESTE 1: Período do dia 06/03/2026');
-const dataInicio1 = criarDataBrasilia(2026, 3, 6, 0, 0, 0, 0);
-const dataFim1 = criarDataBrasilia(2026, 3, 6, 23, 59, 59, 999);
+// Cenários de teste
+const testCases = [
+  {
+    nome: 'Horário de Ponta (19:00 BRT = 22:00 UTC)',
+    timestampUTC: new Date('2025-11-07T22:00:00.000Z'),
+    esperado: { hora: 19, classificacao: 'PONTA' }
+  },
+  {
+    nome: 'Fora de Ponta (10:00 BRT = 13:00 UTC)',
+    timestampUTC: new Date('2025-11-07T13:00:00.000Z'),
+    esperado: { hora: 10, classificacao: 'FORA_PONTA' }
+  },
+  {
+    nome: 'Horário Reservado (23:00 BRT = 02:00 UTC do dia seguinte)',
+    timestampUTC: new Date('2025-11-08T02:00:00.000Z'),
+    esperado: { hora: 23, classificacao: 'RESERVADO' }
+  },
+  {
+    nome: 'Horário Reservado (03:00 BRT = 06:00 UTC)',
+    timestampUTC: new Date('2025-11-07T06:00:00.000Z'),
+    esperado: { hora: 3, classificacao: 'RESERVADO' }
+  },
+  {
+    nome: 'Início Ponta (18:00 BRT = 21:00 UTC)',
+    timestampUTC: new Date('2025-11-07T21:00:00.000Z'),
+    esperado: { hora: 18, classificacao: 'PONTA' }
+  },
+  {
+    nome: 'Fim Ponta (20:59 BRT = 23:59 UTC)',
+    timestampUTC: new Date('2025-11-07T23:59:00.000Z'),
+    esperado: { hora: 20, classificacao: 'PONTA' }
+  },
+  {
+    nome: 'Após Ponta (21:00 BRT = 00:00 UTC do dia seguinte)',
+    timestampUTC: new Date('2025-11-08T00:00:00.000Z'),
+    esperado: { hora: 21, classificacao: 'FORA_PONTA' }
+  },
+  {
+    nome: 'Início HR (21:30 BRT = 00:30 UTC do dia seguinte)',
+    timestampUTC: new Date('2025-11-08T00:30:00.000Z'),
+    esperado: { hora: 21, minutos: 30, classificacao: 'RESERVADO' }
+  },
+];
 
-console.log('   Solicitado: 06/03/2026 00:00:00 BRT até 06/03/2026 23:59:59 BRT');
-console.log(`   Convertido para UTC:`);
-console.log(`   - Início: ${dataInicio1.toISOString()}`);
-console.log(`   - Fim: ${dataFim1.toISOString()}`);
+// Função auxiliar para classificar horário
+function classificarHorario(hora, minutos) {
+  const horaDecimal = hora + minutos / 60;
 
-// Verificar em Brasília
-const inicioBrt = dataInicio1.toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' });
-const fimBrt = dataFim1.toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' });
-console.log(`   Verificação (volta para BRT):`);
-console.log(`   - Início: ${inicioBrt}`);
-console.log(`   - Fim: ${fimBrt}`);
+  // Horário Reservado (21:30 - 06:00)
+  if (horaDecimal >= 21.5 || horaDecimal < 6) {
+    return 'RESERVADO';
+  }
 
-// Teste 2: Range customizado 06/03 - 09/03/2026
-console.log('\n📅 TESTE 2: Período customizado 06/03/2026 - 09/03/2026');
-const dataInicio2 = criarDataBrasilia(2026, 3, 6, 0, 0, 0, 0);
-const dataFim2 = criarDataBrasilia(2026, 3, 9, 23, 59, 59, 999);
+  // Ponta (18:00 - 21:00)
+  if (hora >= 18 && hora < 21) {
+    return 'PONTA';
+  }
 
-console.log('   Solicitado: 06/03/2026 00:00:00 BRT até 09/03/2026 23:59:59 BRT');
-console.log(`   Convertido para UTC:`);
-console.log(`   - Início: ${dataInicio2.toISOString()}`);
-console.log(`   - Fim: ${dataFim2.toISOString()}`);
+  // Fora Ponta (resto)
+  return 'FORA_PONTA';
+}
 
-// Comparar com método ANTIGO (offset fixo UTC-3)
-console.log('\n⚠️  COMPARAÇÃO COM MÉTODO ANTIGO (offset fixo UTC-3):');
-const dataInicioAntigo = new Date(Date.UTC(2026, 2, 6, 3, 0, 0, 0)); // +3h fixo
-const dataFimAntigo = new Date(Date.UTC(2026, 2, 10, 2, 59, 59, 999)); // dia 10, 02:59 UTC
+// Executar testes
+let passados = 0;
+let falhados = 0;
 
-console.log(`   Método antigo:`);
-console.log(`   - Início: ${dataInicioAntigo.toISOString()}`);
-console.log(`   - Fim: ${dataFimAntigo.toISOString()}`);
-console.log(`   Método novo:`);
-console.log(`   - Início: ${dataInicio2.toISOString()}`);
-console.log(`   - Fim: ${dataFim2.toISOString()}`);
+testCases.forEach((test, index) => {
+  console.log(`\n📋 Teste ${index + 1}: ${test.nome}`);
+  console.log('-'.repeat(80));
 
-const diffInicio = Math.abs(dataInicio2.getTime() - dataInicioAntigo.getTime()) / 1000 / 60 / 60;
-const diffFim = Math.abs(dataFim2.getTime() - dataFimAntigo.getTime()) / 1000 / 60 / 60;
+  // Timestamp original (UTC)
+  console.log(`   Timestamp UTC:     ${test.timestampUTC.toISOString()}`);
+  console.log(`   UTC hora:          ${test.timestampUTC.getUTCHours()}:${String(test.timestampUTC.getUTCMinutes()).padStart(2, '0')}`);
 
-console.log(`\n   Diferença:`);
-console.log(`   - Início: ${diffInicio.toFixed(2)} horas`);
-console.log(`   - Fim: ${diffFim.toFixed(2)} horas`);
+  // Conversão CORRETA usando date-fns-tz
+  const timestampBrasilia = utcToZonedTime(test.timestampUTC, 'America/Sao_Paulo');
+  const hora = timestampBrasilia.getHours();
+  const minutos = timestampBrasilia.getMinutes();
+  const classificacao = classificarHorario(hora, minutos);
 
-// Teste 3: Mês completo (março/2026)
-console.log('\n📅 TESTE 3: Mês completo março/2026');
-const dataInicioMes = criarDataBrasilia(2026, 3, 1, 0, 0, 0, 0);
-const dataFimMes = criarDataBrasilia(2026, 3, 31, 23, 59, 59, 999);
+  console.log(`   Brasília (BRT):    ${timestampBrasilia.toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' })}`);
+  console.log(`   BRT hora:          ${hora}:${String(minutos).padStart(2, '0')}`);
+  console.log(`   Classificação:     ${classificacao}`);
 
-console.log('   Solicitado: março/2026 completo');
-console.log(`   Convertido para UTC:`);
-console.log(`   - Início: ${dataInicioMes.toISOString()}`);
-console.log(`   - Fim: ${dataFimMes.toISOString()}`);
+  // Validar resultado
+  const horaOk = hora === test.esperado.hora;
+  const minutosOk = test.esperado.minutos === undefined || minutos === test.esperado.minutos;
+  const classificacaoOk = classificacao === test.esperado.classificacao;
 
-const inicioBrtMes = dataInicioMes.toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' });
-const fimBrtMes = dataFimMes.toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' });
-console.log(`   Verificação (volta para BRT):`);
-console.log(`   - Início: ${inicioBrtMes}`);
-console.log(`   - Fim: ${fimBrtMes}`);
+  const passou = horaOk && minutosOk && classificacaoOk;
 
+  if (passou) {
+    console.log(`   ✅ PASSOU`);
+    passados++;
+  } else {
+    console.log(`   ❌ FALHOU`);
+    if (!horaOk) console.log(`      - Hora esperada: ${test.esperado.hora}, obtida: ${hora}`);
+    if (!minutosOk) console.log(`      - Minutos esperados: ${test.esperado.minutos}, obtidos: ${minutos}`);
+    if (!classificacaoOk) console.log(`      - Classificação esperada: ${test.esperado.classificacao}, obtida: ${classificacao}`);
+    falhados++;
+  }
+});
+
+// Resumo
 console.log('\n' + '='.repeat(80));
-console.log('\n✅ CONCLUSÃO:');
-console.log('   A correção agora usa conversão dinâmica de timezone.');
-console.log('   Não depende mais de offset fixo UTC-3.');
-console.log('   Funciona corretamente com ou sem horário de verão.\n');
+console.log('📊 RESUMO DOS TESTES\n');
+console.log(`   Total:    ${testCases.length}`);
+console.log(`   ✅ Passou:  ${passados}`);
+console.log(`   ❌ Falhou:  ${falhados}`);
+console.log('='.repeat(80));
+
+// Teste adicional: conversão antiga vs nova
+console.log('\n🔬 COMPARAÇÃO: MÉTODO ANTIGO vs MÉTODO NOVO\n');
+console.log('='.repeat(80));
+
+const timestampTeste = new Date('2025-11-07T22:00:00.000Z'); // 19:00 BRT
+
+console.log(`Timestamp UTC: ${timestampTeste.toISOString()}`);
+console.log(`Hora UTC: ${timestampTeste.getUTCHours()}:00\n`);
+
+// Método ANTIGO (BUGADO)
+const timestampLocalAntigo = new Date(
+  timestampTeste.toLocaleString('en-US', { timeZone: 'America/Sao_Paulo' })
+);
+console.log('❌ MÉTODO ANTIGO (BUGADO):');
+console.log(`   String intermediária: "${timestampTeste.toLocaleString('en-US', { timeZone: 'America/Sao_Paulo' })}"`);
+console.log(`   Date resultante:      ${timestampLocalAntigo.toISOString()}`);
+console.log(`   Hora interpretada:    ${timestampLocalAntigo.getHours()}:00`);
+console.log(`   ⚠️  Pode estar errado dependendo do timezone do servidor!\n`);
+
+// Método NOVO (CORRETO)
+const timestampBrasiliaCorreto = utcToZonedTime(timestampTeste, 'America/Sao_Paulo');
+console.log('✅ MÉTODO NOVO (CORRETO):');
+console.log(`   Date em Brasília:     ${timestampBrasiliaCorreto.toISOString()}`);
+console.log(`   Hora BRT:             ${timestampBrasiliaCorreto.getHours()}:00`);
+console.log(`   ✅ Sempre correto, independente do servidor!\n`);
+
+console.log('='.repeat(80));
+
+process.exit(falhados > 0 ? 1 : 0);

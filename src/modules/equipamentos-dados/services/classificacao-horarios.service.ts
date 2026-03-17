@@ -7,6 +7,7 @@ import {
   ConfiguracaoHorarios,
 } from '../interfaces/calculo-custos.interface';
 import { FeriadosNacionaisService } from './feriados-nacionais.service';
+import { toZonedTime } from 'date-fns-tz';
 
 /**
  * Serviço responsável por classificar horários em tipos tarifários
@@ -36,20 +37,21 @@ export class ClassificacaoHorariosService {
 
   /**
    * Classifica um timestamp específico e retorna o tipo de horário e tarifas aplicáveis
-   * ✅ CORRIGIDO: Usa timezone America/Sao_Paulo ao invés de UTC
+   * ✅ CORRIGIDO: Usa timezone America/Sao_Paulo com date-fns-tz (conversão correta)
    */
   classificar(
     timestamp: Date,
     unidade: DadosUnidade,
     tarifas: TarifasConcessionaria,
   ): ClassificacaoHorario {
-    // ✅ CONVERTER PARA HORÁRIO LOCAL BRASILEIRO (America/Sao_Paulo)
-    // timestamp.getHours() retorna UTC, mas precisamos do horário local
-    const timestampLocal = new Date(timestamp.toLocaleString('en-US', { timeZone: 'America/Sao_Paulo' }));
-    const hora = timestampLocal.getHours();
-    const minutos = timestampLocal.getMinutes();
+    // ✅ CONVERSÃO CORRETA: UTC → America/Sao_Paulo usando date-fns-tz
+    // Independente de como o timestamp está armazenado no banco,
+    // esta função converte corretamente para o timezone de Brasília
+    const timestampBrasilia = toZonedTime(timestamp, 'America/Sao_Paulo');
+    const hora = timestampBrasilia.getHours();
+    const minutos = timestampBrasilia.getMinutes();
     const horaDecimal = hora + minutos / 60;
-    const diaSemana = timestampLocal.getDay(); // 0 = domingo, 6 = sábado
+    const diaSemana = timestampBrasilia.getDay(); // 0 = domingo, 6 = sábado
 
     // ✅ PRIORIDADE 1: Feriado/Fim de semana + Irrigante = HR 24h
     const isFeriado = this.feriadosService.isFeriadoNacional(timestamp);

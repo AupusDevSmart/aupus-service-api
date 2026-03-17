@@ -121,6 +121,20 @@ export class ProgramacaoOSService {
             },
           },
         },
+        solicitacao_servico: {
+          select: {
+            id: true,
+            numero: true,
+            titulo: true,
+            descricao: true,
+            tipo: true,
+            prioridade: true,
+            status: true,
+            local: true,
+            solicitante_nome: true,
+            data_solicitacao: true,
+          },
+        },
       },
       orderBy: { criado_em: 'desc' },
       skip: (page - 1) * limit,
@@ -170,6 +184,20 @@ export class ProgramacaoOSService {
           orderBy: { data: 'desc' },
         },
         ordem_servico: true,
+        solicitacao_servico: {
+          select: {
+            id: true,
+            numero: true,
+            titulo: true,
+            descricao: true,
+            tipo: true,
+            prioridade: true,
+            status: true,
+            local: true,
+            solicitante_nome: true,
+            data_solicitacao: true,
+          },
+        },
       },
     });
 
@@ -239,6 +267,7 @@ export class ProgramacaoOSService {
           equipamento_id: createDto.equipamento_id,
           anomalia_id: createDto.anomalia_id,
           plano_manutencao_id: createDto.plano_manutencao_id,
+          solicitacao_servico_id: createDto.solicitacao_servico_id,
           dados_origem: createDto.dados_origem,
           tempo_estimado: createDto.tempo_estimado || 2, // Padrão: 2 horas
           duracao_estimada: createDto.duracao_estimada || (createDto.tempo_estimado ? createDto.tempo_estimado * 1.5 : 3), // Padrão: 3h ou 1.5x tempo
@@ -696,6 +725,102 @@ export class ProgramacaoOSService {
     // ✅ NOVO: Atualizar status da anomalia para EM_ANALISE
     // (Não precisa do try-catch aqui pois o método criar() já faz isso)
 
+    return programacao;
+  }
+
+  async criarDeSolicitacao(
+    solicitacaoId: string,
+    dto: any,
+    usuarioId?: string
+  ): Promise<ProgramacaoResponseDto> {
+    // Buscar solicitação do serviço de solicitações
+    // Por enquanto vamos simular a busca
+    const solicitacao = await this.prisma.solicitacoes_servico.findUnique({
+      where: { id: solicitacaoId },
+      include: {
+        planta: true,
+        equipamento: true,
+      },
+    });
+
+    if (!solicitacao) {
+      throw new NotFoundException('Solicitação de serviço não encontrada');
+    }
+
+    if (solicitacao.status !== 'APROVADA') {
+      throw new ConflictException('Apenas solicitações aprovadas podem gerar OS');
+    }
+
+    // Mapear tipo de solicitação para tipo de OS
+    const mapTipoSolicitacaoToTipoOS = (tipo: string): string => {
+      const mapeamento = {
+        INSTALACAO: 'ADAPTATIVA',
+        MELHORIA: 'ADAPTATIVA',
+        PREVENTIVA: 'PREVENTIVA',
+        ADAPTACAO: 'ADAPTATIVA',
+        INSPECAO: 'PREVENTIVA',
+        CALIBRACAO: 'PREVENTIVA',
+        LIMPEZA: 'PREVENTIVA',
+        TREINAMENTO: 'ADAPTATIVA',
+        OUTROS: 'ADAPTATIVA',
+      };
+      return mapeamento[tipo] || 'ADAPTATIVA';
+    };
+
+    // Criar programação baseada na solicitação
+    const createDto: CreateProgramacaoDto = {
+      descricao: solicitacao.titulo,
+      local: solicitacao.local,
+      ativo: solicitacao.equipamento?.nome || 'N/A',
+      condicoes: 'FUNCIONANDO',
+      tipo: mapTipoSolicitacaoToTipoOS(solicitacao.tipo) as any,
+      prioridade: solicitacao.prioridade as any,
+      origem: 'SOLICITACAO_SERVICO' as any,
+      planta_id: solicitacao.planta_id,
+      equipamento_id: solicitacao.equipamento_id,
+      solicitacao_servico_id: solicitacao.id,
+      tempo_estimado: solicitacao.tempo_estimado ? Number(solicitacao.tempo_estimado) : 2,
+      duracao_estimada: solicitacao.tempo_estimado ? Number(solicitacao.tempo_estimado) * 1.5 : 3,
+      observacoes: solicitacao.descricao,
+      justificativa: solicitacao.justificativa,
+      responsavel: dto?.responsavel || solicitacao.solicitante_nome,
+      dados_origem: {
+        solicitacao_id: solicitacao.id,
+        numero: solicitacao.numero,
+        tipo: solicitacao.tipo,
+        solicitante: solicitacao.solicitante_nome,
+      },
+      ...dto, // Permitir sobrescrever campos via DTO
+    };
+
+    // Criar a programação
+    const programacao = await this.criar(createDto, usuarioId);
+
+    // Atualizar status da solicitação e vincular programação
+    await this.prisma.$transaction(async (prisma) => {
+      await prisma.solicitacoes_servico.update({
+        where: { id: solicitacaoId },
+        data: {
+          status: 'OS_GERADA',
+          programacao_os_id: programacao.id,
+        },
+      });
+
+      // Registrar no histórico da solicitação
+      await prisma.historico_solicitacao_servico.create({
+        data: {
+          solicitacao_id: solicitacaoId,
+          acao: 'GERACAO_OS',
+          usuario_nome: 'Sistema',
+          usuario_id: usuarioId,
+          observacoes: `Programação OS ${programacao.codigo} gerada`,
+          status_anterior: 'APROVADA',
+          status_novo: 'OS_GERADA',
+        },
+      });
+    });
+
+    this.logger.log(`Programação ${programacao.codigo} criada a partir da solicitação ${solicitacao.numero}`);
     return programacao;
   }
 
@@ -1519,6 +1644,7 @@ export class ProgramacaoOSService {
       equipamento_id: programacao.equipamento_id,
       anomalia_id: programacao.anomalia_id,
       plano_manutencao_id: programacao.plano_manutencao_id,
+      solicitacao_servico_id: programacao.solicitacao_servico_id,
       dados_origem: programacao.dados_origem,
       data_previsao_inicio: programacao.data_previsao_inicio,
       data_previsao_fim: programacao.data_previsao_fim,
@@ -1636,6 +1762,18 @@ export class ProgramacaoOSService {
         dados_extras: h.dados_extras,
       })) || [],
       ordem_servico: programacao.ordem_servico,
+      solicitacao_servico: programacao.solicitacao_servico ? {
+        id: programacao.solicitacao_servico.id,
+        numero: programacao.solicitacao_servico.numero,
+        titulo: programacao.solicitacao_servico.titulo,
+        descricao: programacao.solicitacao_servico.descricao,
+        tipo: programacao.solicitacao_servico.tipo,
+        prioridade: programacao.solicitacao_servico.prioridade,
+        status: programacao.solicitacao_servico.status,
+        local: programacao.solicitacao_servico.local,
+        solicitante_nome: programacao.solicitacao_servico.solicitante_nome,
+        data_solicitacao: programacao.solicitacao_servico.data_solicitacao,
+      } : null,
       reserva_veiculo: reserva ? {
         id: reserva.id,
         veiculo_id: reserva.veiculo_id,

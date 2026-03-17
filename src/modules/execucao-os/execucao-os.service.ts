@@ -137,18 +137,8 @@ export class ExecucaoOSService {
             descricao: true,
           },
         },
-        reserva_veiculo: {
-          include: {
-            veiculo: {
-              select: {
-                id: true,
-                placa: true,
-                modelo: true,
-                marca: true,
-              },
-            },
-          },
-        },
+        // solicitacao_servico: relação não existe no schema
+        // reserva_veiculo: relação não existe no schema (buscar manualmente depois)
       },
       orderBy: { [sortBy]: sortOrder },
       skip: (page - 1) * limit,
@@ -204,24 +194,25 @@ export class ExecucaoOSService {
       }
 
       // Buscar reserva_veiculo se o ID existir mas a relação não veio
-      if (ordem.reserva_id && !ordem.reserva_veiculo) {
-        const reservaId = ordem.reserva_id.trim();
-        if (reservaId) {
-          ordem.reserva_veiculo = await this.prisma.reserva_veiculo.findUnique({
-            where: { id: reservaId },
-            include: {
-              veiculo: {
-                select: {
-                  id: true,
-                  placa: true,
-                  modelo: true,
-                  marca: true,
-                },
-              },
-            },
-          });
-        }
-      }
+      // COMENTADO: reserva_veiculo não é uma relação no schema, usar query manual se necessário
+      // if (ordem.reserva_id) {
+      //   const reservaId = ordem.reserva_id.trim();
+      //   if (reservaId) {
+      //     (ordem as any).reserva_veiculo = await this.prisma.reserva_veiculo.findUnique({
+      //       where: { id: reservaId },
+      //       include: {
+      //         veiculo: {
+      //           select: {
+      //             id: true,
+      //             placa: true,
+      //             modelo: true,
+      //             marca: true,
+      //           },
+      //         },
+      //       },
+      //     });
+      //   }
+      // }
     }
 
     // Buscar estatísticas
@@ -271,6 +262,21 @@ export class ExecucaoOSService {
             descricao: true,
           },
         },
+        // ✅ COMENTADO: solicitacao_servico não existe como relação no schema
+        // solicitacao_servico: {
+        //   select: {
+        //     id: true,
+        //     numero: true,
+        //     titulo: true,
+        //     descricao: true,
+        //     tipo: true,
+        //     prioridade: true,
+        //     status: true,
+        //     local: true,
+        //     solicitante_nome: true,
+        //     data_solicitacao: true,
+        //   },
+        // },
         // ✅ ADICIONADO: Include planta
         planta: {
           select: {
@@ -322,18 +328,19 @@ export class ExecucaoOSService {
         historico: {
           orderBy: { data: 'desc' },
         },
-        reserva_veiculo: {
-          include: {
-            veiculo: {
-              select: {
-                id: true,
-                placa: true,
-                modelo: true,
-                marca: true,
-              },
-            },
-          },
-        },
+        // reserva_veiculo não é uma relação no schema
+        // reserva_veiculo: {
+        //   include: {
+        //     veiculo: {
+        //       select: {
+        //         id: true,
+        //         placa: true,
+        //         modelo: true,
+        //         marca: true,
+        //       },
+        //     },
+        //   },
+        // },
       },
     });
 
@@ -1380,6 +1387,7 @@ export class ExecucaoOSService {
       programacao: os.programacao,
       anomalia: os.anomalia,
       plano_manutencao: os.plano_manutencao,
+      // solicitacao_servico não existe no schema
       planta: os.planta,
       equipamento: os.equipamento,
       reserva_veiculo: os.reserva_veiculo,

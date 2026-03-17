@@ -35,6 +35,7 @@ import { UploadsModule } from './modules/uploads/uploads.module';
 import { ConfiguracaoDemandaModule } from './modules/configuracao-demanda/configuracao-demanda.module';
 import { CoaModule } from './modules/coa/coa.module';
 import { DashboardModule } from './modules/dashboard/dashboard.module';
+import { SolicitacoesServicoModule } from './modules/solicitacoes-servico/solicitacoes-servico.module';
 
 @Module({
   imports: [
@@ -81,6 +82,7 @@ import { DashboardModule } from './modules/dashboard/dashboard.module';
     ReservasModule,
     ProgramacaoOSModule,
     ExecucaoOSModule,
+    SolicitacoesServicoModule, // Novo módulo de Solicitações de Serviço
     ConcessionariasModule,
     EquipamentosDadosModule,
     ConfiguracaoDemandaModule,
