@@ -92,13 +92,36 @@ export class TarefasController {
 
   @Get('dashboard')
   @ApiOperation({ summary: 'Obter estatísticas gerais das tarefas' })
-  @ApiResponse({ 
-    status: HttpStatus.OK, 
+  @ApiResponse({
+    status: HttpStatus.OK,
     description: 'Dashboard obtido com sucesso',
-    type: DashboardTarefasDto 
+    type: DashboardTarefasDto
   })
   async obterDashboard(): Promise<DashboardTarefasDto> {
     return this.tarefasService.obterDashboard();
+  }
+
+  @Get('sem-plano')
+  @ApiOperation({ summary: 'Listar tarefas sem plano de manutenção (tarefas independentes)' })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Lista de tarefas independentes encontrada',
+    schema: {
+      type: 'object',
+      properties: {
+        data: {
+          type: 'array',
+          items: { $ref: '#/components/schemas/TarefaResponseDto' }
+        },
+        total: { type: 'number' },
+        page: { type: 'number' },
+        limit: { type: 'number' },
+        totalPages: { type: 'number' }
+      }
+    }
+  })
+  async listarSemPlano(@Query() queryDto?: Partial<QueryTarefasDto>) {
+    return this.tarefasService.listarSemPlano(queryDto);
   }
 
   @Get('plano/:planoId')

@@ -954,6 +954,7 @@ model usuarios {
   prospects                                                        prospects[]
   rateios                                                          rateios[]
   solicitacoes_solicitante                                         solicitacoes_servico[]   @relation("solicitacoes_solicitante")
+  solicitacoes_proprietario                                        solicitacoes_servico[]   @relation("solicitacoes_proprietario")
   tarefas_atualizadas                                              tarefas[]                @relation("tarefas_atualizado_por")
   tarefas_criadas                                                  tarefas[]                @relation("tarefas_criado_por")
   unidades_consumidoras_unidades_consumidoras_deleted_byTousuarios unidades_consumidoras[]  @relation("unidades_consumidoras_deleted_byTousuarios")
@@ -1028,6 +1029,7 @@ model unidades {
   tipo_unidade      String?                  @db.VarChar(20)
   numero_uc         String?                  @db.VarChar(255)
   equipamentos      equipamentos[]
+  solicitacoes_servico solicitacoes_servico[]
   concessionaria    concessionarias_energia? @relation(fields: [concessionaria_id], references: [id])
   planta            plantas                  @relation(fields: [planta_id], references: [id])
 
@@ -1361,13 +1363,13 @@ model planos_manutencao {
 
 model tarefas {
   id                       String                   @id @default(cuid()) @db.VarChar(26)
-  plano_manutencao_id      String                   @db.VarChar(26)
+  plano_manutencao_id      String?                  @db.VarChar(26)
   tag                      String                   @unique @db.VarChar(50)
   nome                     String                   @db.VarChar(200)
   descricao                String
   categoria                CategoriaTarefa
   tipo_manutencao          TipoManutencao
-  frequencia               FrequenciaTarefa
+  frequencia               FrequenciaTarefa?
   frequencia_personalizada Int?
   condicao_ativo           CondicaoAtivo
   criticidade              Int                      @db.SmallInt
@@ -1391,10 +1393,11 @@ model tarefas {
   anexos                   anexos_tarefa[]
   recursos                 recursos_tarefa[]
   sub_tarefas              sub_tarefas[]
+  tarefas_solicitacoes     tarefas_solicitacoes[]
   usuario_atualizador      usuarios?                @relation("tarefas_atualizado_por", fields: [atualizado_por], references: [id])
   usuario_criador          usuarios?                @relation("tarefas_criado_por", fields: [criado_por], references: [id])
   equipamento              equipamentos             @relation(fields: [equipamento_id], references: [id])
-  plano_manutencao         planos_manutencao        @relation(fields: [plano_manutencao_id], references: [id], onDelete: Cascade)
+  plano_manutencao         planos_manutencao?       @relation(fields: [plano_manutencao_id], references: [id], onDelete: Cascade)
   planta                   plantas?                 @relation(fields: [planta_id], references: [id])
   tarefas_os               tarefas_os[]
   tarefas_programacao_os   tarefas_programacao_os[]
@@ -2220,6 +2223,8 @@ model solicitacoes_servico {
   status                   StatusSolicitacaoServico          @default(RASCUNHO)
   origem                   OrigemSolicitacao                 @default(PORTAL)
   planta_id                String
+  unidade_id               String?
+  proprietario_id          String?
   area                     String?
   local_especifico         String?
   equipamento_id           String?
@@ -2279,8 +2284,11 @@ model solicitacoes_servico {
   anexos                   anexos_solicitacao_servico[]
   comentarios              comentarios_solicitacao_servico[]
   historico                historico_solicitacao_servico[]
+  tarefas                  tarefas_solicitacoes[]
   equipamento              equipamentos?                     @relation(fields: [equipamento_id], references: [id])
   planta                   plantas                           @relation(fields: [planta_id], references: [id])
+  unidade                  unidades?                         @relation(fields: [unidade_id], references: [id])
+  proprietario             usuarios?                         @relation("solicitacoes_proprietario", fields: [proprietario_id], references: [id])
   solicitante              usuarios?                         @relation("solicitacoes_solicitante", fields: [solicitante_id], references: [id])
   programacoes_os          programacoes_os[]
 
@@ -2343,6 +2351,22 @@ model comentarios_solicitacao_servico {
 
   @@index([solicitacao_id])
   @@map("comentarios_solicitacao_servico")
+}
+
+model tarefas_solicitacoes {
+  id             String               @id @default(cuid()) @db.VarChar(26)
+  tarefa_id      String               @db.VarChar(26)
+  solicitacao_id String
+  ordem          Int                  @default(1) @db.SmallInt
+  observacoes    String?
+  created_at     DateTime             @default(now()) @db.Timestamp(0)
+  created_by     String?              @db.VarChar(255)
+  tarefa         tarefas              @relation(fields: [tarefa_id], references: [id], onDelete: Cascade)
+  solicitacao    solicitacoes_servico @relation(fields: [solicitacao_id], references: [id], onDelete: Cascade)
+
+  @@unique([tarefa_id, solicitacao_id])
+  @@index([tarefa_id])
+  @@index([solicitacao_id])
 }
 
 enum StatusAnomalia {

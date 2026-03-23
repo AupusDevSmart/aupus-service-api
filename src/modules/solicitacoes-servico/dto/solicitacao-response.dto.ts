@@ -35,6 +35,12 @@ export class SolicitacaoResponseDto {
   planta_id?: string;
 
   @ApiPropertyOptional()
+  unidade_id?: string;
+
+  @ApiPropertyOptional()
+  proprietario_id?: string;
+
+  @ApiPropertyOptional()
   equipamento_id?: string;
 
   @ApiProperty()
@@ -138,6 +144,12 @@ export class SolicitacaoResponseDto {
   planta?: any;
 
   @ApiPropertyOptional()
+  unidade?: any;
+
+  @ApiPropertyOptional()
+  proprietario?: any;
+
+  @ApiPropertyOptional()
   equipamento?: any;
 
   @ApiPropertyOptional()
@@ -148,6 +160,12 @@ export class SolicitacaoResponseDto {
 
   @ApiPropertyOptional()
   comentarios?: any[];
+
+  @ApiPropertyOptional({
+    description: 'Tarefas associadas à solicitação',
+    type: [Object]
+  })
+  tarefas?: any[];
 }
 
 export class ListarSolicitacoesResponseDto {

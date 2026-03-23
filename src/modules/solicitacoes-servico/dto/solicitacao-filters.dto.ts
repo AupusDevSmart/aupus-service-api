@@ -48,6 +48,16 @@ export class SolicitacaoFiltersDto {
   @IsString()
   planta_id?: string;
 
+  @ApiPropertyOptional({ description: 'Filtrar por unidade' })
+  @IsOptional()
+  @IsString()
+  unidade_id?: string;
+
+  @ApiPropertyOptional({ description: 'Filtrar por proprietário' })
+  @IsOptional()
+  @IsString()
+  proprietario_id?: string;
+
   @ApiPropertyOptional({ description: 'Filtrar por equipamento' })
   @IsOptional()
   @IsString()

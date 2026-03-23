@@ -17,9 +17,23 @@ export class TarefasService {
   constructor(private readonly prisma: PrismaService) {}
 
   async criar(createDto: CreateTarefaDto): Promise<TarefaResponseDto> {
-    // Verificar se plano existe e está ativo
-    const plano = await this.verificarPlanoExiste(createDto.plano_manutencao_id);
-    
+    let plano = null;
+    let equipamento_id = null;
+    let planta_id = null;
+
+    // Se tem plano, verificar se existe e está ativo
+    if (createDto.plano_manutencao_id) {
+      plano = await this.verificarPlanoExiste(createDto.plano_manutencao_id);
+      equipamento_id = plano.equipamento_id;
+      planta_id = plano.equipamento.unidade?.planta_id;
+
+      // Verificar se ordem já existe no plano
+      await this.verificarOrdemDisponivel(createDto.plano_manutencao_id, createDto.ordem);
+    } else {
+      // Tarefa independente - ordem não é obrigatória
+      createDto.ordem = null;
+    }
+
     // Se não foi fornecida TAG, gerar automaticamente
     if (!createDto.tag) {
       createDto.tag = await this.gerarTagUnica(createDto.plano_manutencao_id);
@@ -28,20 +42,19 @@ export class TarefasService {
       await this.verificarTagUnica(createDto.tag);
     }
 
-    // Validar frequência personalizada
-    this.validarFrequenciaPersonalizada(createDto.frequencia, createDto.frequencia_personalizada);
-
-    // Verificar se ordem já existe no plano
-    await this.verificarOrdemDisponivel(createDto.plano_manutencao_id, createDto.ordem);
+    // Validar frequência personalizada apenas se frequência foi fornecida
+    if (createDto.frequencia) {
+      this.validarFrequenciaPersonalizada(createDto.frequencia, createDto.frequencia_personalizada);
+    }
 
     // Transação para criar tarefa com sub-estruturas
     const tarefa = await this.prisma.$transaction(async (tx) => {
       // Criar tarefa principal
       const novaTarefa = await tx.tarefas.create({
         data: {
-          plano_manutencao_id: createDto.plano_manutencao_id,
-          equipamento_id: plano.equipamento_id,
-          planta_id: plano.equipamento.unidade?.planta_id,
+          plano_manutencao_id: createDto.plano_manutencao_id || null,
+          equipamento_id: equipamento_id,
+          planta_id: planta_id,
           tag: createDto.tag,
           nome: createDto.nome,
           descricao: createDto.descricao,
@@ -287,6 +300,43 @@ export class TarefasService {
     return tarefas.map(tarefa => this.mapearParaResponse(tarefa));
   }
 
+  async listarSemPlano(queryDto?: Partial<QueryTarefasDto>): Promise<{
+    data: TarefaResponseDto[];
+    total: number;
+    page: number;
+    limit: number;
+    totalPages: number;
+  }> {
+    const page = queryDto?.page || 1;
+    const limit = queryDto?.limit || 10;
+    const skip = (page - 1) * limit;
+
+    const where: Prisma.tarefasWhereInput = {
+      plano_manutencao_id: null,
+      deleted_at: null,
+      ...(queryDto && this.construirFiltros(queryDto, queryDto.search))
+    };
+
+    const [tarefas, total] = await Promise.all([
+      this.prisma.tarefas.findMany({
+        where,
+        include: this.includeRelacionamentosLista(),
+        orderBy: { created_at: 'desc' },
+        skip,
+        take: limit
+      }),
+      this.prisma.tarefas.count({ where })
+    ]);
+
+    return {
+      data: tarefas.map(tarefa => this.mapearParaResponse(tarefa)),
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit)
+    };
+  }
+
   async atualizar(id: string, updateDto: UpdateTarefaDto): Promise<TarefaResponseDto> {
     const tarefaExistente = await this.verificarTarefaExiste(id);
 
@@ -304,10 +354,12 @@ export class TarefasService {
       dadosAtualizacao.equipamento_id = novoPlano.equipamento_id;
     }
 
-    // Validar frequência personalizada se alterada
-    if (updateDto.frequencia || updateDto.frequencia_personalizada !== undefined) {
+    // Validar frequência personalizada se alterada e se frequência existe
+    if ((updateDto.frequencia || tarefaExistente.frequencia) && updateDto.frequencia_personalizada !== undefined) {
       const frequencia = updateDto.frequencia || tarefaExistente.frequencia;
-      this.validarFrequenciaPersonalizada(frequencia, updateDto.frequencia_personalizada);
+      if (frequencia) {
+        this.validarFrequenciaPersonalizada(frequencia, updateDto.frequencia_personalizada);
+      }
     }
 
     // Se mudou ordem, verificar disponibilidade

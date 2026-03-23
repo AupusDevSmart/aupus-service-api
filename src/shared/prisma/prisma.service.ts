@@ -39,13 +39,13 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
       const query = e.query;
       const params = e.params;
 
-      // Log estruturado com Pino
-      loggers.database.debug({
-        query,
-        params,
-        duration,
-        target: e.target,
-      }, 'Query executada');
+      // Log estruturado com Pino - TEMPORARIAMENTE DESABILITADO PARA DEBUG
+      // loggers.database.debug({
+      //   query,
+      //   params,
+      //   duration,
+      //   target: e.target,
+      // }, 'Query executada');
 
       // Detectar queries lentas
       if (duration > slowQueryThreshold) {

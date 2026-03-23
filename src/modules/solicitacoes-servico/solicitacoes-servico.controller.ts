@@ -37,7 +37,6 @@ import {
   SolicitacaoResponseDto,
   ListarSolicitacoesResponseDto,
   SolicitacaoStatsDto,
-  AnalisarSolicitacaoDto,
   AprovarSolicitacaoDto,
   RejeitarSolicitacaoDto,
   CancelarSolicitacaoDto,
@@ -80,6 +79,14 @@ export class SolicitacoesServicoController {
     return this.solicitacoesService.findAll(filters);
   }
 
+  @Get('debug-unidade')
+  @ApiOperation({ summary: 'DEBUG - Check last solicitacao unidade data' })
+  async debugUnidade(): Promise<any> {
+    // Temporary debug endpoint - remove after fixing issue
+    const solicitacao = await this.solicitacoesService.debugCheckUnidade();
+    return solicitacao;
+  }
+
   @Get('stats')
   @ApiOperation({ summary: 'Obter estatísticas das solicitações' })
   @ApiResponse({
@@ -104,7 +111,14 @@ export class SolicitacoesServicoController {
     description: 'Solicitação não encontrada',
   })
   async findOne(@Param('id') id: string): Promise<SolicitacaoResponseDto> {
-    return this.solicitacoesService.findOne(id);
+    console.log(`[CONTROLLER] GET /solicitacoes-servico/${id} chamado`);
+    const result = await this.solicitacoesService.findOne(id);
+    console.log('[CONTROLLER] Resposta enviada:', {
+      numero: result.numero,
+      unidade_id: result.unidade_id,
+      hasUnidade: !!result.unidade,
+    });
+    return result;
   }
 
   @Patch(':id')
@@ -152,27 +166,6 @@ export class SolicitacoesServicoController {
     return this.solicitacoesService.enviar(id, usuarioId);
   }
 
-  @Patch(':id/analisar')
-  @ApiOperation({ summary: 'Iniciar análise da solicitação' })
-  @ApiParam({ name: 'id', description: 'ID da solicitação' })
-  @ApiResponse({
-    status: HttpStatus.OK,
-    description: 'Análise iniciada',
-    type: SolicitacaoResponseDto,
-  })
-  @ApiResponse({
-    status: HttpStatus.CONFLICT,
-    description: 'Solicitação não está aguardando análise',
-  })
-  async analisar(
-    @Param('id') id: string,
-    @Body() dto: AnalisarSolicitacaoDto,
-    @Request() req?: any,
-  ): Promise<SolicitacaoResponseDto> {
-    const analisadorNome = req?.user?.nome || 'Sistema';
-    const analisadorId = req?.user?.id;
-    return this.solicitacoesService.analisar(id, dto, analisadorNome, analisadorId);
-  }
 
   @Patch(':id/aprovar')
   @ApiOperation({ summary: 'Aprovar solicitação' })

@@ -107,26 +107,98 @@ export class SolicitacoesServicoService {
       // Gerar número único
       const numero = await this.gerarNumeroSolicitacao();
 
-      // Criar solicitação
+      // Se temos o usuarioId, buscar o nome do usuário
+      let solicitante_nome = 'Sistema';
+      if (usuarioId) {
+        const usuario = await prisma.usuarios.findUnique({
+          where: { id: usuarioId },
+          select: { nome: true },
+        });
+        if (usuario) {
+          solicitante_nome = usuario.nome;
+        }
+      }
+
+      // Determinar o planta_id
+      let planta_id = createDto.planta_id?.trim(); // Adicionar trim() para remover espaços
+
+      // Se não foi fornecido planta_id mas foi fornecido unidade_id, buscar da unidade
+      if (!planta_id && createDto.unidade_id) {
+        const unidade = await prisma.unidades.findUnique({
+          where: { id: createDto.unidade_id.trim() }, // Adicionar trim() aqui também
+          select: { planta_id: true },
+        });
+
+        if (!unidade) {
+          throw new NotFoundException(`Unidade com ID ${createDto.unidade_id} não encontrada`);
+        }
+
+        planta_id = unidade.planta_id?.trim(); // Adicionar trim() ao resultado também
+      }
+
+      // Validar se planta_id foi definido
+      if (!planta_id) {
+        throw new BadRequestException('É necessário informar planta_id ou unidade_id');
+      }
+
+      // Verificar se a planta existe e não está deletada
+      const plantaExiste = await prisma.plantas.findFirst({
+        where: {
+          id: planta_id.trim(), // Garantir que o ID está sem espaços
+          deleted_at: null  // Garantir que a planta não está deletada
+        },
+        select: { id: true },
+      });
+
+      if (!plantaExiste) {
+        throw new NotFoundException(`Planta com ID ${planta_id} não encontrada ou foi deletada`);
+      }
+
+      // Criar solicitação com solicitante_id e solicitante_nome preenchidos
+      // Removido o include da planta para evitar erro com soft delete
       const solicitacao = await prisma.solicitacoes_servico.create({
         data: {
           ...createDto,
+          planta_id, // Usar o planta_id determinado
           numero,
           status: createDto.status || StatusSolicitacaoServico.RASCUNHO,
-          solicitante_id: createDto.solicitante_id || usuarioId,
+          solicitante_id: usuarioId || null,
+          solicitante_nome: solicitante_nome,
         } as Prisma.solicitacoes_servicoUncheckedCreateInput,
         include: {
-          planta: true,
+          // Removido planta do include pois pode estar com deleted_at
           equipamento: true,
+          unidade: true, // Incluir unidade
+          proprietario: true, // Incluir proprietário
+          solicitante: true,
         },
       });
+
+      // Buscar a planta manualmente apenas se não estiver deletada
+      const planta = await prisma.plantas.findFirst({
+        where: {
+          id: planta_id.trim(), // Garantir que o ID está sem espaços
+          deleted_at: null
+        },
+      });
+
+      // Associar tarefas se fornecidas
+      if (createDto.tarefas_ids && createDto.tarefas_ids.length > 0) {
+        await this.associarTarefas(prisma, solicitacao.id, createDto.tarefas_ids);
+      }
+
+      // Adicionar a planta ao objeto de resposta
+      const solicitacaoCompleta = {
+        ...solicitacao,
+        planta: planta,
+      };
 
       // Registrar histórico
       await this.registrarHistorico(
         prisma,
         solicitacao.id,
         'CRIACAO',
-        createDto.solicitante_nome,
+        solicitante_nome,
         usuarioId,
         'Solicitação criada',
         null,
@@ -134,7 +206,7 @@ export class SolicitacoesServicoService {
       );
 
       this.logger.log(`Solicitação ${numero} criada com sucesso`);
-      return this.mapToResponseDto(solicitacao);
+      return this.mapToResponseDto(solicitacaoCompleta);
     });
   }
 
@@ -153,6 +225,8 @@ export class SolicitacoesServicoService {
       prioridade,
       origem,
       planta_id,
+      unidade_id,
+      proprietario_id,
       equipamento_id,
       departamento,
       solicitante_nome,
@@ -182,6 +256,8 @@ export class SolicitacoesServicoService {
     if (prioridade) where.prioridade = prioridade;
     if (origem) where.origem = origem as any;
     if (planta_id) where.planta_id = planta_id;
+    if (unidade_id) (where as any).unidade_id = unidade_id;
+    if (proprietario_id) (where as any).proprietario_id = proprietario_id;
     if (equipamento_id) where.equipamento_id = equipamento_id;
     if (departamento) where.departamento = { contains: departamento, mode: 'insensitive' };
     if (solicitante_nome) where.solicitante_nome = { contains: solicitante_nome, mode: 'insensitive' };
@@ -196,18 +272,11 @@ export class SolicitacoesServicoService {
     // Contar total
     const total = await this.prisma.solicitacoes_servico.count({ where });
 
-    // Buscar dados
+    // Buscar dados - removendo unidade do include pois pode ter problemas com espaços
     const solicitacoes = await this.prisma.solicitacoes_servico.findMany({
       where,
       include: {
-        planta: {
-          select: {
-            id: true,
-            nome: true,
-            cidade: true,
-            uf: true,
-          },
-        },
+        // Removido planta e unidade do include - serão buscados manualmente
         equipamento: {
           select: {
             id: true,
@@ -216,6 +285,7 @@ export class SolicitacoesServicoService {
             tipo_equipamento: true,
           },
         },
+        proprietario: true, // Incluir proprietário
         anexos: {
           select: {
             id: true,
@@ -238,8 +308,47 @@ export class SolicitacoesServicoService {
       },
     });
 
+    // Buscar plantas e unidades manualmente para evitar problemas com soft delete e espaços
+    const solicitacoesCompletas = await Promise.all(
+      solicitacoes.map(async (solicitacao) => {
+        // Buscar planta
+        let planta = null;
+        if (solicitacao.planta_id) {
+          // Usar raw query com TRIM para garantir match mesmo com espaços
+          const plantaResult = await this.prisma.$queryRaw`
+            SELECT id, nome, cidade, uf
+            FROM plantas
+            WHERE TRIM(id) = TRIM(${solicitacao.planta_id})
+              AND deleted_at IS NULL
+            LIMIT 1
+          `;
+          planta = plantaResult[0] || null;
+        }
+
+        // Buscar unidade
+        let unidade = null;
+        if (solicitacao.unidade_id) {
+          // Usar raw query com TRIM para garantir match mesmo com espaços
+          const unidadeResult = await this.prisma.$queryRaw`
+            SELECT id, nome, tipo, cidade, estado
+            FROM unidades
+            WHERE TRIM(id) = TRIM(${solicitacao.unidade_id})
+              AND deleted_at IS NULL
+            LIMIT 1
+          `;
+          unidade = unidadeResult[0] || null;
+        }
+
+        return {
+          ...solicitacao,
+          planta: planta,
+          unidade: unidade
+        };
+      })
+    );
+
     return {
-      data: solicitacoes.map(s => this.mapToResponseDto(s)),
+      data: solicitacoesCompletas.map(s => this.mapToResponseDto(s)),
       pagination: {
         page,
         limit,
@@ -256,8 +365,10 @@ export class SolicitacoesServicoService {
     const solicitacao = await this.prisma.solicitacoes_servico.findUnique({
       where: { id },
       include: {
-        planta: true,
+        // Removido planta e unidade do include - serão buscados manualmente
         equipamento: true,
+        proprietario: true, // Incluir proprietário
+        solicitante: true, // Incluir solicitante
         anexos: true,
         historico: {
           orderBy: { data: 'desc' },
@@ -265,14 +376,71 @@ export class SolicitacoesServicoService {
         comentarios: {
           orderBy: { created_at: 'desc' },
         },
-        },
+        tarefas: {
+          include: {
+            tarefa: {
+              select: {
+                id: true,
+                tag: true,
+                nome: true,
+                descricao: true,
+                categoria: true,
+                criticidade: true,
+                tempo_estimado: true,
+                tipo_manutencao: true
+              }
+            }
+          },
+          orderBy: { ordem: 'asc' }
+        }
+      },
     });
 
     if (!solicitacao || solicitacao.deleted_at) {
       throw new NotFoundException('Solicitação não encontrada');
     }
 
-    return this.mapToResponseDto(solicitacao);
+    // Buscar a planta manualmente usando TRIM
+    let planta = null;
+    if (solicitacao.planta_id) {
+      const plantaResult = await this.prisma.$queryRaw`
+        SELECT id, nome, cidade, uf, cnpj
+        FROM plantas
+        WHERE TRIM(id) = TRIM(${solicitacao.planta_id})
+          AND deleted_at IS NULL
+        LIMIT 1
+      `;
+      planta = plantaResult[0] || null;
+    }
+
+    // Buscar a unidade manualmente usando TRIM
+    let unidade = null;
+    if (solicitacao.unidade_id) {
+      const unidadeResult = await this.prisma.$queryRaw`
+        SELECT id, nome, tipo, cidade, estado, potencia, status
+        FROM unidades
+        WHERE TRIM(id) = TRIM(${solicitacao.unidade_id})
+          AND deleted_at IS NULL
+        LIMIT 1
+      `;
+      unidade = unidadeResult[0] || null;
+    }
+
+    // Mapear tarefas associadas
+    const tarefas = solicitacao.tarefas?.map(ts => ({
+      ...ts.tarefa,
+      ordem: ts.ordem,
+      observacoes: ts.observacoes
+    })) || [];
+
+    const solicitacaoCompleta = {
+      ...solicitacao,
+      planta: planta,
+      unidade: unidade,
+      tarefas: tarefas
+    };
+
+    return this.mapToResponseDto(solicitacaoCompleta);
   }
 
   /**
@@ -286,9 +454,9 @@ export class SolicitacoesServicoService {
     const solicitacao = await this.findOne(id);
 
     // Verificar se pode ser editada
-    if (!['RASCUNHO', 'AGUARDANDO'].includes(solicitacao.status)) {
+    if (solicitacao.status !== 'RASCUNHO') {
       throw new ConflictException(
-        'Apenas solicitações em rascunho ou aguardando podem ser editadas',
+        'Apenas solicitações em rascunho podem ser editadas',
       );
     }
 
@@ -297,10 +465,28 @@ export class SolicitacoesServicoService {
         where: { id },
         data: updateDto as Prisma.solicitacoes_servicoUncheckedUpdateInput,
         include: {
-          planta: true,
+          // Removido planta do include para evitar erro com soft delete
           equipamento: true,
+          unidade: true, // Incluir unidade
+          proprietario: true, // Incluir proprietário
         },
       });
+
+      // Buscar a planta manualmente se existir e não estiver deletada
+      let planta = null;
+      if (solicitacaoAtualizada.planta_id) {
+        planta = await prisma.plantas.findFirst({
+          where: {
+            id: solicitacaoAtualizada.planta_id,
+            deleted_at: null
+          }
+        });
+      }
+
+      const solicitacaoCompleta = {
+        ...solicitacaoAtualizada,
+        planta: planta
+      };
 
       // Registrar histórico
       await this.registrarHistorico(
@@ -312,7 +498,7 @@ export class SolicitacoesServicoService {
         'Solicitação atualizada',
       );
 
-      return this.mapToResponseDto(solicitacaoAtualizada);
+      return this.mapToResponseDto(solicitacaoCompleta);
     });
   }
 
@@ -333,13 +519,31 @@ export class SolicitacoesServicoService {
       const solicitacaoAtualizada = await prisma.solicitacoes_servico.update({
         where: { id },
         data: {
-          status: StatusSolicitacaoServico.AGUARDANDO,
+          status: StatusSolicitacaoServico.EM_ANALISE,
         },
         include: {
-          planta: true,
+          // Removido planta do include para evitar erro com soft delete
           equipamento: true,
+          unidade: true, // Incluir unidade
+          proprietario: true, // Incluir proprietário
         },
       });
+
+      // Buscar a planta manualmente
+      let planta = null;
+      if (solicitacaoAtualizada.planta_id) {
+        planta = await prisma.plantas.findFirst({
+          where: {
+            id: solicitacaoAtualizada.planta_id,
+            deleted_at: null
+          }
+        });
+      }
+
+      const solicitacaoCompleta = {
+        ...solicitacaoAtualizada,
+        planta: planta
+      };
 
       await this.registrarHistorico(
         prisma,
@@ -349,60 +553,14 @@ export class SolicitacoesServicoService {
         usuarioId,
         'Solicitação enviada para análise',
         StatusSolicitacaoServico.RASCUNHO,
-        StatusSolicitacaoServico.AGUARDANDO,
-      );
-
-      this.logger.log(`Solicitação ${solicitacao.numero} enviada para análise`);
-      return this.mapToResponseDto(solicitacaoAtualizada);
-    });
-  }
-
-  /**
-   * Iniciar análise da solicitação
-   */
-  async analisar(
-    id: string,
-    dto: AnalisarSolicitacaoDto,
-    analisadorNome: string,
-    analisadorId?: string,
-  ): Promise<SolicitacaoResponseDto> {
-    const solicitacao = await this.findOne(id);
-
-    if (solicitacao.status !== StatusSolicitacaoServico.AGUARDANDO) {
-      throw new ConflictException('Apenas solicitações aguardando podem ser analisadas');
-    }
-
-    return await this.prisma.$transaction(async (prisma) => {
-      const solicitacaoAtualizada = await prisma.solicitacoes_servico.update({
-        where: { id },
-        data: {
-          status: StatusSolicitacaoServico.EM_ANALISE,
-          analisado_por_nome: analisadorNome,
-          analisado_por_id: analisadorId,
-          data_analise: new Date(),
-          ...dto,
-        },
-        include: {
-          planta: true,
-          equipamento: true,
-        },
-      });
-
-      await this.registrarHistorico(
-        prisma,
-        id,
-        'INICIO_ANALISE',
-        analisadorNome,
-        analisadorId,
-        dto.observacoes_analise,
-        StatusSolicitacaoServico.AGUARDANDO,
         StatusSolicitacaoServico.EM_ANALISE,
       );
 
-      this.logger.log(`Análise iniciada para solicitação ${solicitacao.numero}`);
-      return this.mapToResponseDto(solicitacaoAtualizada);
+      this.logger.log(`Solicitação ${solicitacao.numero} enviada para análise`);
+      return this.mapToResponseDto(solicitacaoCompleta);
     });
   }
+
 
   /**
    * Aprovar solicitação
@@ -439,8 +597,10 @@ export class SolicitacoesServicoService {
         where: { id },
         data: updateData,
         include: {
-          planta: true,
+          // Removido planta do include para evitar erro com soft delete
           equipamento: true,
+          unidade: true, // Incluir unidade
+          proprietario: true, // Incluir proprietário
         },
       });
 
@@ -455,8 +615,24 @@ export class SolicitacoesServicoService {
         StatusSolicitacaoServico.APROVADA,
       );
 
+      // Buscar a planta manualmente
+      let planta = null;
+      if (solicitacaoAtualizada.planta_id) {
+        planta = await prisma.plantas.findFirst({
+          where: {
+            id: solicitacaoAtualizada.planta_id,
+            deleted_at: null
+          }
+        });
+      }
+
+      const solicitacaoCompleta = {
+        ...solicitacaoAtualizada,
+        planta: planta
+      };
+
       this.logger.log(`Solicitação ${solicitacao.numero} aprovada`);
-      return this.mapToResponseDto(solicitacaoAtualizada);
+      return this.mapToResponseDto(solicitacaoCompleta);
     });
   }
 
@@ -484,8 +660,10 @@ export class SolicitacoesServicoService {
           sugestoes_alternativas: dto.sugestoes_alternativas,
         },
         include: {
-          planta: true,
+          // Removido planta do include para evitar erro com soft delete
           equipamento: true,
+          unidade: true, // Incluir unidade
+          proprietario: true, // Incluir proprietário
         },
       });
 
@@ -500,8 +678,24 @@ export class SolicitacoesServicoService {
         StatusSolicitacaoServico.REJEITADA,
       );
 
+      // Buscar a planta manualmente
+      let planta = null;
+      if (solicitacaoAtualizada.planta_id) {
+        planta = await prisma.plantas.findFirst({
+          where: {
+            id: solicitacaoAtualizada.planta_id,
+            deleted_at: null
+          }
+        });
+      }
+
+      const solicitacaoCompleta = {
+        ...solicitacaoAtualizada,
+        planta: planta
+      };
+
       this.logger.log(`Solicitação ${solicitacao.numero} rejeitada`);
-      return this.mapToResponseDto(solicitacaoAtualizada);
+      return this.mapToResponseDto(solicitacaoCompleta);
     });
   }
 
@@ -537,8 +731,10 @@ export class SolicitacoesServicoService {
           data_cancelamento: new Date(),
         },
         include: {
-          planta: true,
+          // Removido planta do include para evitar erro com soft delete
           equipamento: true,
+          unidade: true, // Incluir unidade
+          proprietario: true, // Incluir proprietário
         },
       });
 
@@ -553,8 +749,24 @@ export class SolicitacoesServicoService {
         StatusSolicitacaoServico.CANCELADA,
       );
 
+      // Buscar a planta manualmente
+      let planta = null;
+      if (solicitacaoAtualizada.planta_id) {
+        planta = await prisma.plantas.findFirst({
+          where: {
+            id: solicitacaoAtualizada.planta_id,
+            deleted_at: null
+          }
+        });
+      }
+
+      const solicitacaoCompleta = {
+        ...solicitacaoAtualizada,
+        planta: planta
+      };
+
       this.logger.log(`Solicitação ${solicitacao.numero} cancelada`);
-      return this.mapToResponseDto(solicitacaoAtualizada);
+      return this.mapToResponseDto(solicitacaoCompleta);
     });
   }
 
@@ -564,8 +776,18 @@ export class SolicitacoesServicoService {
   async remove(id: string, usuarioId?: string): Promise<void> {
     const solicitacao = await this.findOne(id);
 
-    if (solicitacao.status !== StatusSolicitacaoServico.RASCUNHO) {
-      throw new ConflictException('Apenas rascunhos podem ser excluídos');
+    // Debug para ver o valor real do status
+    this.logger.log(`[DEBUG] Status da solicitação ${id}: ${solicitacao.status}, tipo: ${typeof solicitacao.status}`);
+    this.logger.log(`[DEBUG] RASCUNHO value: ${StatusSolicitacaoServico.RASCUNHO}`);
+    this.logger.log(`[DEBUG] REJEITADA value: ${StatusSolicitacaoServico.REJEITADA}`);
+    this.logger.log(`[DEBUG] CANCELADA value: ${StatusSolicitacaoServico.CANCELADA}`);
+
+    // Permitir exclusão de rascunhos, rejeitadas e canceladas
+    // Comparar diretamente com as strings do enum
+    if (solicitacao.status !== StatusSolicitacaoServico.RASCUNHO &&
+        solicitacao.status !== StatusSolicitacaoServico.REJEITADA &&
+        solicitacao.status !== StatusSolicitacaoServico.CANCELADA) {
+      throw new ConflictException('Apenas rascunhos, solicitações rejeitadas ou canceladas podem ser excluídas');
     }
 
     await this.prisma.solicitacoes_servico.update({
@@ -618,7 +840,7 @@ export class SolicitacoesServicoService {
   async getStats(): Promise<SolicitacaoStatsDto> {
     const [
       total,
-      aguardando,
+      rascunhos,
       emAnalise,
       aprovadas,
       osGerada,
@@ -633,7 +855,7 @@ export class SolicitacoesServicoService {
         where: { deleted_at: null },
       }),
       this.prisma.solicitacoes_servico.count({
-        where: { status: StatusSolicitacaoServico.AGUARDANDO, deleted_at: null },
+        where: { status: StatusSolicitacaoServico.RASCUNHO, deleted_at: null },
       }),
       this.prisma.solicitacoes_servico.count({
         where: { status: StatusSolicitacaoServico.EM_ANALISE, deleted_at: null },
@@ -699,7 +921,7 @@ export class SolicitacoesServicoService {
 
     return {
       total,
-      aguardando,
+      aguardando: rascunhos, // Usando rascunhos no lugar de aguardando já que AGUARDANDO foi removido
       emAnalise,
       aprovadas,
       osGerada,
@@ -711,6 +933,44 @@ export class SolicitacoesServicoService {
       porTipo: tipoMap,
       taxaAprovacao,
       tempoMedioResposta,
+    };
+  }
+
+  /**
+   * DEBUG - Check unidade data
+   */
+  async debugCheckUnidade(): Promise<any> {
+    // Get last created solicitacao
+    const lastSolicitacao = await this.prisma.solicitacoes_servico.findFirst({
+      orderBy: { created_at: 'desc' },
+      include: {
+        unidade: true,
+        planta: true,
+        proprietario: true,
+      },
+    });
+
+    if (!lastSolicitacao) {
+      return { message: 'No solicitacoes found' };
+    }
+
+    // Also check the raw unidade
+    let unidadeData = null;
+    if (lastSolicitacao.unidade_id) {
+      unidadeData = await this.prisma.unidades.findUnique({
+        where: { id: lastSolicitacao.unidade_id },
+      });
+    }
+
+    return {
+      numero: lastSolicitacao.numero,
+      unidade_id: lastSolicitacao.unidade_id,
+      unidade_included: lastSolicitacao.unidade,
+      unidade_raw: unidadeData,
+      planta_id: lastSolicitacao.planta_id,
+      planta_included: lastSolicitacao.planta,
+      proprietario_id: lastSolicitacao.proprietario_id,
+      proprietario_included: lastSolicitacao.proprietario,
     };
   }
 
@@ -741,5 +1001,49 @@ export class SolicitacoesServicoService {
         StatusSolicitacaoServico.OS_GERADA,
       );
     });
+  }
+
+  /**
+   * Associar tarefas independentes à solicitação
+   */
+  private async associarTarefas(
+    prisma: any,
+    solicitacaoId: string,
+    tarefasIds: string[]
+  ) {
+    // Verificar se todas as tarefas existem e não têm plano
+    const tarefas = await prisma.tarefas.findMany({
+      where: {
+        id: { in: tarefasIds },
+        plano_manutencao_id: null,
+        deleted_at: null
+      }
+    });
+
+    if (tarefas.length !== tarefasIds.length) {
+      throw new BadRequestException('Algumas tarefas não existem ou já estão associadas a um plano');
+    }
+
+    // Criar associações
+    const associacoes = tarefasIds.map((tarefaId, index) => ({
+      id: this.generateId(), // Gerar ID único
+      tarefa_id: tarefaId,
+      solicitacao_id: solicitacaoId,
+      ordem: index + 1
+    }));
+
+    await prisma.tarefas_solicitacoes.createMany({
+      data: associacoes
+    });
+  }
+
+  /**
+   * Gerar ID único (CUID)
+   */
+  private generateId(): string {
+    // Implementação simplificada de CUID
+    const timestamp = Date.now().toString(36);
+    const randomStr = Math.random().toString(36).substr(2, 9);
+    return `c${timestamp}${randomStr}`.substr(0, 26);
   }
 }

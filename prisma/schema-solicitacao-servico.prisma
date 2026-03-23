@@ -58,6 +58,8 @@ model solicitacoes_servico {
 
   // Localização
   planta_id               String?                        @db.Char(26)
+  unidade_id              String?                        @db.Char(26)
+  proprietario_id         String?                        @db.Char(26)
   equipamento_id          String?                        @db.Char(26)
   local                   String                         @db.VarChar(255)
   area                    String?                        @db.VarChar(255)
@@ -121,6 +123,8 @@ model solicitacoes_servico {
 
   // Relacionamentos
   planta                  plantas?                       @relation(fields: [planta_id], references: [id])
+  unidade                 unidades?                      @relation(fields: [unidade_id], references: [id])
+  proprietario            usuarios?                      @relation("solicitacoes_proprietario", fields: [proprietario_id], references: [id])
   equipamento             equipamentos?                  @relation(fields: [equipamento_id], references: [id])
   solicitante             usuarios?                      @relation("solicitacoes_solicitante", fields: [solicitante_id], references: [id])
   analisado_por           usuarios?                      @relation("solicitacoes_analisador", fields: [analisado_por_id], references: [id])
@@ -138,6 +142,8 @@ model solicitacoes_servico {
   @@index([prioridade])
   @@index([data_solicitacao])
   @@index([planta_id])
+  @@index([unidade_id])
+  @@index([proprietario_id])
   @@index([equipamento_id])
   @@index([solicitante_id])
   @@index([deleted_at])

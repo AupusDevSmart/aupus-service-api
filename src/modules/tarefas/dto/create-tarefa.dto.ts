@@ -27,8 +27,8 @@ import { CreateRecursoTarefaDto } from './create-recurso-tarefa.dto';
 
 export class CreateTarefaDto {
   @IsString()
-  @IsNotEmpty()
-  plano_manutencao_id: string;
+  @IsOptional()
+  plano_manutencao_id?: string;
 
   @IsString()
   @IsOptional()
@@ -51,7 +51,8 @@ export class CreateTarefaDto {
   tipo_manutencao: TipoManutencao;
 
   @IsEnum(FrequenciaTarefa)
-  frequencia: FrequenciaTarefa;
+  @IsOptional()
+  frequencia?: FrequenciaTarefa;
 
   @IsInt()
   @IsOptional()

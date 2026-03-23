@@ -8,6 +8,7 @@ import {
   IsNotEmpty,
   MaxLength,
   IsDecimal,
+  IsArray,
 } from 'class-validator';
 import {
   TipoSolicitacaoServico,
@@ -70,6 +71,16 @@ export class CreateSolicitacaoDto {
   @IsOptional()
   @IsString()
   planta_id?: string;
+
+  @ApiPropertyOptional({ description: 'ID da unidade' })
+  @IsOptional()
+  @IsString()
+  unidade_id?: string;
+
+  @ApiPropertyOptional({ description: 'ID do proprietário' })
+  @IsOptional()
+  @IsString()
+  proprietario_id?: string;
 
   @ApiPropertyOptional({ description: 'ID do equipamento' })
   @IsOptional()
@@ -151,17 +162,8 @@ export class CreateSolicitacaoDto {
   @IsString()
   mao_obra_necessaria?: string;
 
-  // Responsáveis
-  @ApiProperty({ description: 'Nome do solicitante', maxLength: 255 })
-  @IsNotEmpty()
-  @IsString()
-  @MaxLength(255)
-  solicitante_nome: string;
-
-  @ApiPropertyOptional({ description: 'ID do solicitante' })
-  @IsOptional()
-  @IsString()
-  solicitante_id?: string;
+  // Responsáveis - o solicitante_id será preenchido automaticamente pelo service
+  // O solicitante_nome também será preenchido automaticamente baseado no usuário logado
 
   @ApiPropertyOptional({ description: 'Departamento do solicitante', maxLength: 100 })
   @IsOptional()
@@ -174,4 +176,14 @@ export class CreateSolicitacaoDto {
   @IsString()
   @MaxLength(100)
   contato?: string;
+
+  // Tarefas associadas (opcional)
+  @ApiPropertyOptional({
+    description: 'IDs das tarefas independentes a serem executadas',
+    type: [String]
+  })
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  tarefas_ids?: string[];
 }
