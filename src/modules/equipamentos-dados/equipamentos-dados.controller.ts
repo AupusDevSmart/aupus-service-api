@@ -290,7 +290,8 @@ export class EquipamentosDadosController {
     }
 
     // MODO 2 e 3: Dia ou Mês com data de referência
-    // ✅ TIMEZONE: Extrair ano/mês/dia no fuso de Brasília (não UTC)
+    // O banco armazena timestamps em BRT sem timezone (Prisma trata como UTC)
+    // Então criamos datas UTC com os valores de BRT para comparação direta
     let ano: number, mes: number, dia: number;
 
     if (query.data) {
@@ -308,17 +309,16 @@ export class EquipamentosDadosController {
     }
 
     if (query.periodo === PeriodoTipo.DIA) {
-      // Dia completo em horário de Brasília: 00:00:00 até 23:59:59
-      const dataInicio = this.criarDataBrasilia(ano, mes, dia, 0, 0, 0, 0);
-      const dataFim = this.criarDataBrasilia(ano, mes, dia, 23, 59, 59, 999);
+      // Dia completo: enviar BRT como UTC literal (banco armazena BRT sem tz)
+      const dataInicio = new Date(Date.UTC(ano, mes - 1, dia, 0, 0, 0, 0));
+      const dataFim = new Date(Date.UTC(ano, mes - 1, dia, 23, 59, 59, 999));
 
       return { dataInicio, dataFim };
     } else if (query.periodo === PeriodoTipo.MES) {
-      // Mês completo em horário de Brasília
       const ultimoDia = new Date(ano, mes, 0).getDate();
 
-      const dataInicio = this.criarDataBrasilia(ano, mes, 1, 0, 0, 0, 0);
-      const dataFim = this.criarDataBrasilia(ano, mes, ultimoDia, 23, 59, 59, 999);
+      const dataInicio = new Date(Date.UTC(ano, mes - 1, 1, 0, 0, 0, 0));
+      const dataFim = new Date(Date.UTC(ano, mes - 1, ultimoDia, 23, 59, 59, 999));
 
       return { dataInicio, dataFim };
     }
@@ -326,8 +326,8 @@ export class EquipamentosDadosController {
     // Default: mês atual em Brasília (backward compatibility)
     const agora = this.obterDataAtualBrasilia();
     const ultimoDiaDefault = new Date(agora.ano, agora.mes, 0).getDate();
-    const dataInicio = this.criarDataBrasilia(agora.ano, agora.mes, 1, 0, 0, 0, 0);
-    const dataFim = this.criarDataBrasilia(agora.ano, agora.mes, ultimoDiaDefault, 23, 59, 59, 999);
+    const dataInicio = new Date(Date.UTC(agora.ano, agora.mes - 1, 1, 0, 0, 0, 0));
+    const dataFim = new Date(Date.UTC(agora.ano, agora.mes - 1, ultimoDiaDefault, 23, 59, 59, 999));
 
     return { dataInicio, dataFim };
   }
