@@ -47,6 +47,7 @@ export interface LeituraMQTT {
   timestamp: Date;
   energia_kwh: number;
   potencia_kw: number;
+  _forcaForaPonta?: boolean; // Leitura virtual de compensação de gap - sempre Fora Ponta
 }
 
 export interface AgregacaoEnergia {

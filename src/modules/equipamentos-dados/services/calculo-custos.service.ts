@@ -199,9 +199,17 @@ export class CalculoCustosService {
     return parseFloat(value.toString());
   }
 
+  // Limite máximo de energia por leitura (kWh) - valores acima são glitches de medição
+  private readonly MAX_CONSUMO_POR_LEITURA = 5;
+
+  // Intervalo máximo (ms) entre leituras antes de considerar como gap de dados
+  private readonly GAP_THRESHOLD_MS = 10 * 60 * 1000; // 10 minutos
+
   /**
    * Busca leituras MQTT do período
    * ✅ USA consumo_phf DIRETAMENTE DO JSON (fonte de verdade)
+   * ✅ Filtra spikes de consumo_phf acima do limite por leitura
+   * ✅ Detecta gaps de dados e compensa energia faltante como Fora Ponta
    */
   private async buscarLeiturasPeriodo(
     equipamentoId: string,
@@ -226,12 +234,24 @@ export class CalculoCustosService {
       },
     });
 
-    return dados.map((d) => {
-      // ✅ PRIORIDADE: consumo_phf do JSON (energia real medida pelo equipamento)
+    const leituras: LeituraMQTT[] = [];
+
+    for (let i = 0; i < dados.length; i++) {
+      const d = dados[i];
       const dadosJson = d.dados as any;
-      const energia_kwh = dadosJson.consumo_phf
+
+      // ✅ PRIORIDADE: consumo_phf do JSON (energia real medida pelo equipamento)
+      let energia_kwh = dadosJson.consumo_phf
         ? parseFloat(dadosJson.consumo_phf.toString())
         : 0;
+
+      // ✅ FILTRO DE SPIKE: cap no máximo por leitura
+      if (energia_kwh > this.MAX_CONSUMO_POR_LEITURA) {
+        console.log(
+          `   ⚠️ Spike filtrado: ${energia_kwh.toFixed(2)} kWh em ${d.timestamp_dados.toISOString()} (max: ${this.MAX_CONSUMO_POR_LEITURA} kWh)`,
+        );
+        energia_kwh = 0;
+      }
 
       // Potência: tentar coluna primeiro, depois JSON
       let potencia_kw = d.potencia_ativa_kw
@@ -243,12 +263,56 @@ export class CalculoCustosService {
         potencia_kw = parseFloat(dadosJson.Pt.toString()) / 1000; // W para kW
       }
 
-      return {
+      // ✅ DETECÇÃO DE GAP: verificar intervalo desde a leitura anterior
+      if (i > 0) {
+        const timestampAnterior = dados[i - 1].timestamp_dados.getTime();
+        const timestampAtual = d.timestamp_dados.getTime();
+        const intervalo = timestampAtual - timestampAnterior;
+
+        if (intervalo > this.GAP_THRESHOLD_MS) {
+          const phfAnterior = this.extrairPhf(dados[i - 1].dados);
+          const phfAtual = this.extrairPhf(d.dados);
+
+          if (phfAnterior !== null && phfAtual !== null && phfAtual > phfAnterior) {
+            const energiaGap = phfAtual - phfAnterior;
+            const horasGap = intervalo / (1000 * 3600);
+
+            console.log(
+              `   📊 Gap detectado: ${horasGap.toFixed(1)}h sem dados. ` +
+              `PHF ${phfAnterior} → ${phfAtual} = ${energiaGap.toFixed(2)} kWh compensados como Fora Ponta`,
+            );
+
+            // Inserir leitura virtual de compensação com flag para forçar Fora Ponta
+            leituras.push({
+              timestamp: new Date(timestampAnterior + 1000), // 1s após última leitura
+              energia_kwh: energiaGap,
+              potencia_kw: 0,
+              _forcaForaPonta: true, // Flag interna para agregarEnergiaPorTipo
+            });
+          }
+        }
+      }
+
+      leituras.push({
         timestamp: d.timestamp_dados,
         energia_kwh,
         potencia_kw,
-      };
-    });
+      });
+    }
+
+    return leituras;
+  }
+
+  /**
+   * Extrai o valor phf do JSON de dados
+   */
+  private extrairPhf(dados: any): number | null {
+    const json = dados as any;
+    if (json?.phf !== undefined && json.phf !== null) {
+      const val = parseFloat(json.phf.toString());
+      return val > 0 ? val : null; // Ignorar phf=0 (glitch)
+    }
+    return null;
   }
 
   /**
@@ -270,6 +334,14 @@ export class CalculoCustosService {
     };
 
     for (const leitura of leituras) {
+      // ✅ Leitura virtual de gap: jogar direto para Fora Ponta
+      if (leitura._forcaForaPonta) {
+        agregacao.energia_fora_ponta_kwh += leitura.energia_kwh;
+        agregacao.energia_total_kwh += leitura.energia_kwh;
+        agregacao.num_leituras++;
+        continue;
+      }
+
       // Classificar horário
       const classificacao = this.classificacaoService.classificar(
         leitura.timestamp,
