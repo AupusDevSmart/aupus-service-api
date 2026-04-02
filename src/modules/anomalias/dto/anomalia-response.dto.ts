@@ -1,6 +1,7 @@
 // src/modules/anomalias/dto/anomalia-response.dto.ts
 import { ApiProperty } from '@nestjs/swagger';
-import { CondicaoAnomalia, OrigemAnomalia, PrioridadeAnomalia, StatusAnomalia } from './create-anomalia.dto';
+import { CondicaoAnomalia, OrigemAnomalia, PrioridadeAnomalia } from './create-anomalia.dto';
+import { StatusAnomalia } from '@prisma/client';
 import { AnexoAnomaliaResponseDto } from './anexo-anomalia.dto';
 export class AnomaliaResponseDto {
   @ApiProperty()
@@ -69,4 +70,7 @@ export class AnomaliaResponseDto {
 
   @ApiProperty({ required: false, type: [AnexoAnomaliaResponseDto] })
   anexos?: AnexoAnomaliaResponseDto[];
+
+  @ApiProperty({ required: false, type: [Object], description: 'Instruções associadas a esta anomalia' })
+  anomalias_instrucoes?: any[];
 }

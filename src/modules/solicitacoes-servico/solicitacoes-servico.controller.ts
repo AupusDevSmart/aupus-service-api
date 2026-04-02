@@ -37,9 +37,6 @@ import {
   SolicitacaoResponseDto,
   ListarSolicitacoesResponseDto,
   SolicitacaoStatsDto,
-  AprovarSolicitacaoDto,
-  RejeitarSolicitacaoDto,
-  CancelarSolicitacaoDto,
   AdicionarComentarioDto,
   GerarProgramacaoOSDto,
 } from './dto';
@@ -146,93 +143,6 @@ export class SolicitacoesServicoController {
     return this.solicitacoesService.update(id, updateDto, usuarioId);
   }
 
-  @Patch(':id/enviar')
-  @ApiOperation({ summary: 'Enviar solicitação para análise' })
-  @ApiParam({ name: 'id', description: 'ID da solicitação' })
-  @ApiResponse({
-    status: HttpStatus.OK,
-    description: 'Solicitação enviada para análise',
-    type: SolicitacaoResponseDto,
-  })
-  @ApiResponse({
-    status: HttpStatus.CONFLICT,
-    description: 'Apenas rascunhos podem ser enviados',
-  })
-  async enviar(
-    @Param('id') id: string,
-    @Request() req?: any,
-  ): Promise<SolicitacaoResponseDto> {
-    const usuarioId = req?.user?.id;
-    return this.solicitacoesService.enviar(id, usuarioId);
-  }
-
-
-  @Patch(':id/aprovar')
-  @ApiOperation({ summary: 'Aprovar solicitação' })
-  @ApiParam({ name: 'id', description: 'ID da solicitação' })
-  @ApiResponse({
-    status: HttpStatus.OK,
-    description: 'Solicitação aprovada',
-    type: SolicitacaoResponseDto,
-  })
-  @ApiResponse({
-    status: HttpStatus.CONFLICT,
-    description: 'Solicitação não está em análise',
-  })
-  async aprovar(
-    @Param('id') id: string,
-    @Body() dto: AprovarSolicitacaoDto,
-    @Request() req?: any,
-  ): Promise<SolicitacaoResponseDto> {
-    const aprovadorNome = req?.user?.nome || 'Sistema';
-    const aprovadorId = req?.user?.id;
-    return this.solicitacoesService.aprovar(id, dto, aprovadorNome, aprovadorId);
-  }
-
-  @Patch(':id/rejeitar')
-  @ApiOperation({ summary: 'Rejeitar solicitação' })
-  @ApiParam({ name: 'id', description: 'ID da solicitação' })
-  @ApiResponse({
-    status: HttpStatus.OK,
-    description: 'Solicitação rejeitada',
-    type: SolicitacaoResponseDto,
-  })
-  @ApiResponse({
-    status: HttpStatus.CONFLICT,
-    description: 'Solicitação não está em análise',
-  })
-  async rejeitar(
-    @Param('id') id: string,
-    @Body() dto: RejeitarSolicitacaoDto,
-    @Request() req?: any,
-  ): Promise<SolicitacaoResponseDto> {
-    const rejeitadorNome = req?.user?.nome || 'Sistema';
-    const rejeitadorId = req?.user?.id;
-    return this.solicitacoesService.rejeitar(id, dto, rejeitadorNome, rejeitadorId);
-  }
-
-  @Patch(':id/cancelar')
-  @ApiOperation({ summary: 'Cancelar solicitação' })
-  @ApiParam({ name: 'id', description: 'ID da solicitação' })
-  @ApiResponse({
-    status: HttpStatus.OK,
-    description: 'Solicitação cancelada',
-    type: SolicitacaoResponseDto,
-  })
-  @ApiResponse({
-    status: HttpStatus.CONFLICT,
-    description: 'Solicitação não pode ser cancelada',
-  })
-  async cancelar(
-    @Param('id') id: string,
-    @Body() dto: CancelarSolicitacaoDto,
-    @Request() req?: any,
-  ): Promise<SolicitacaoResponseDto> {
-    const canceladorNome = req?.user?.nome || 'Sistema';
-    const canceladorId = req?.user?.id;
-    return this.solicitacoesService.cancelar(id, dto, canceladorNome, canceladorId);
-  }
-
   @Delete(':id')
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({ summary: 'Remover solicitação (soft delete)' })
@@ -243,7 +153,7 @@ export class SolicitacoesServicoController {
   })
   @ApiResponse({
     status: HttpStatus.CONFLICT,
-    description: 'Apenas rascunhos podem ser excluídos',
+    description: 'Apenas solicitações registradas podem ser excluídas',
   })
   async remove(
     @Param('id') id: string,
@@ -291,7 +201,7 @@ export class SolicitacoesServicoController {
   })
   @ApiResponse({
     status: HttpStatus.CONFLICT,
-    description: 'Apenas solicitações aprovadas podem gerar OS',
+    description: 'Apenas solicitações registradas podem gerar OS',
   })
   async gerarProgramacaoOS(
     @Param('id') id: string,
@@ -301,8 +211,8 @@ export class SolicitacoesServicoController {
     // Verificar se a solicitação está aprovada
     const solicitacao = await this.solicitacoesService.findOne(id);
 
-    if (solicitacao.status !== 'APROVADA') {
-      throw new ConflictException('Apenas solicitações aprovadas podem gerar OS');
+    if (solicitacao.status !== 'REGISTRADA') {
+      throw new ConflictException('Apenas solicitações registradas podem gerar OS');
     }
 
     if (solicitacao.programacao_os_id) {

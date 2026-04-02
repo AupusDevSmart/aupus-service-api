@@ -1,7 +1,7 @@
 import { Injectable, ConflictException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../../shared/prisma/prisma.service';
 import { CreateTipoEquipamentoDto } from './dto/create-tipo-equipamento.dto';
-import * as crypto from 'crypto';
+
 
 export interface CampoTecnico {
   campo: string;
@@ -112,7 +112,6 @@ export class TiposEquipamentosService {
     // Criar tipo
     const tipo = await this.prisma.tipos_equipamentos.create({
       data: {
-        id: crypto.randomUUID(),
         codigo: dto.codigo,
         nome: dto.nome,
         fabricante: dto.fabricante,

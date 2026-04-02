@@ -353,17 +353,33 @@ export class PlantasService {
     }
   }
 
-  async findProprietarios() {
+  async findProprietarios(comUnidades?: boolean) {
+    const where: any = {
+      is_active: true,
+      deleted_at: null,
+      OR: [
+        { role: 'proprietario' },
+        { role: 'admin' },
+        { role: 'gerente' }
+      ]
+    };
+
+    // Filtrar apenas proprietários que possuem plantas com unidades
+    if (comUnidades) {
+      where.plantas_proprietario = {
+        some: {
+          deleted_at: null,
+          unidades: {
+            some: {
+              deleted_at: null,
+            }
+          }
+        }
+      };
+    }
+
     const proprietarios = await this.prisma.usuarios.findMany({
-      where: {
-        is_active: true,
-        deleted_at: null,
-        OR: [
-          { role: 'proprietario' },
-          { role: 'admin' },
-          { role: 'gerente' }
-        ]
-      },
+      where,
       select: {
         id: true,
         nome: true,

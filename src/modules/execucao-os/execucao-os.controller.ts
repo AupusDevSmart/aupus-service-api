@@ -14,6 +14,7 @@ import {
   Res,
   StreamableFile,
 } from '@nestjs/common';
+import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import {
   ApiTags,
   ApiOperation,
@@ -29,7 +30,6 @@ import { ExecucaoOSService } from './execucao-os.service';
 import { AnexosOSService } from './anexos-os.service';
 import {
   OSFiltersDto,
-  ProgramarOSDto,
   IniciarExecucaoDto,
   PausarExecucaoDto,
   RetomarExecucaoDto,
@@ -38,6 +38,9 @@ import {
   RegistrarFerramentasDto,
   ConcluirTarefaDto,
   CancelarTarefaDto,
+  ExecutarOSDto,
+  AuditarOSDto,
+  ReabrirOSDto,
   FinalizarOSDto,
   CancelarOSDto,
   AdicionarAnexoDto,
@@ -103,81 +106,20 @@ export class ExecucaoOSController {
     return this.execucaoOSService.buscarPorId(id.trim());
   }
 
-  @Patch(':id/programar')
-  @ApiOperation({
-    summary: 'Programar OS',
-    description: 'Define data/hora e confirma recursos para a OS',
-  })
-  @ApiParam({ name: 'id', description: 'ID da OS' })
-  @ApiResponse({
-    status: HttpStatus.OK,
-    description: 'OS programada com sucesso',
-  })
-  @ApiResponse({
-    status: HttpStatus.CONFLICT,
-    description: 'OS não está em status adequado para programação',
-  })
-  async programar(
-    @Param('id') id: string,
-    @Body() dto: ProgramarOSDto,
-  ): Promise<{ message: string }> {
-    // TODO: Obter usuarioId da sessão quando implementar autenticação
-    const usuarioId = undefined;
-    await this.execucaoOSService.programar(id.trim(), dto, usuarioId);
-    return { message: 'OS programada com sucesso' };
-  }
-
-  @Post('iniciar-de-programacao/:programacao_id')
-  @ApiOperation({
-    summary: '✅ Criar execução de OS a partir de uma programação APROVADA',
-    description: 'Cria uma nova ordem de serviço (execução) a partir de uma programação aprovada, copiando todos os dados (materiais, ferramentas, técnicos, tarefas)',
-  })
-  @ApiParam({ name: 'programacao_id', description: 'ID da programação aprovada' })
-  @ApiResponse({
-    status: HttpStatus.CREATED,
-    description: 'Ordem de serviço criada e execução iniciada com sucesso',
-  })
-  @ApiResponse({
-    status: HttpStatus.NOT_FOUND,
-    description: 'Programação não encontrada',
-  })
-  @ApiResponse({
-    status: HttpStatus.CONFLICT,
-    description: 'Programação não está aprovada ou já possui uma OS criada',
-  })
-  async iniciarDeProgramacao(
-    @Param('programacao_id') programacaoId: string,
-    @Body() dto: IniciarExecucaoDto,
-  ): Promise<{ message: string; os_id: string }> {
-    const usuarioId = undefined; // TODO: Obter da sessão
-    const result = await this.execucaoOSService.iniciarDeProgramacao(programacaoId, dto, usuarioId);
-    return {
-      message: 'Ordem de serviço criada e execução iniciada com sucesso',
-      os_id: result.os_id
-    };
-  }
-
   @Patch(':id/iniciar')
   @ApiOperation({
     summary: 'Iniciar execução da OS',
-    description: 'Inicia a execução da OS com equipe definida',
+    description: 'Inicia a execução (PENDENTE → EM_EXECUCAO)',
   })
   @ApiParam({ name: 'id', description: 'ID da OS' })
-  @ApiResponse({
-    status: HttpStatus.OK,
-    description: 'Execução iniciada com sucesso',
-  })
-  @ApiResponse({
-    status: HttpStatus.CONFLICT,
-    description: 'OS não está programada',
-  })
+  @ApiResponse({ status: HttpStatus.OK, description: 'Execução iniciada' })
+  @ApiResponse({ status: HttpStatus.CONFLICT, description: 'OS não está pendente' })
   async iniciar(
     @Param('id') id: string,
     @Body() dto: IniciarExecucaoDto,
+    @CurrentUser() user?: any,
   ): Promise<{ message: string }> {
-    // TODO: Obter usuarioId da sessão quando implementar autenticação
-    const usuarioId = undefined;
-    await this.execucaoOSService.iniciar(id.trim(), dto, usuarioId);
+    await this.execucaoOSService.iniciar(id.trim(), dto, user?.id);
     return { message: 'Execução iniciada com sucesso' };
   }
 
@@ -198,10 +140,9 @@ export class ExecucaoOSController {
   async pausar(
     @Param('id') id: string,
     @Body() dto: PausarExecucaoDto,
+    @CurrentUser() user?: any,
   ): Promise<{ message: string }> {
-    // TODO: Obter usuarioId da sessão quando implementar autenticação
-    const usuarioId = undefined;
-    await this.execucaoOSService.pausar(id.trim(), dto, usuarioId);
+    await this.execucaoOSService.pausar(id.trim(), dto, user?.id);
     return { message: 'Execução pausada' };
   }
 
@@ -222,10 +163,9 @@ export class ExecucaoOSController {
   async retomar(
     @Param('id') id: string,
     @Body() dto: RetomarExecucaoDto,
+    @CurrentUser() user?: any,
   ): Promise<{ message: string }> {
-    // TODO: Obter usuarioId da sessão quando implementar autenticação
-    const usuarioId = undefined;
-    await this.execucaoOSService.retomar(id.trim(), dto, usuarioId);
+    await this.execucaoOSService.retomar(id.trim(), dto, user?.id);
     return { message: 'Execução retomada' };
   }
 
@@ -242,10 +182,9 @@ export class ExecucaoOSController {
   async atualizarChecklist(
     @Param('id') id: string,
     @Body() dto: AtualizarChecklistDto,
+    @CurrentUser() user?: any,
   ): Promise<{ message: string }> {
-    // TODO: Obter usuarioId da sessão quando implementar autenticação
-    const usuarioId = undefined;
-    await this.execucaoOSService.atualizarChecklist(id.trim(), dto, usuarioId);
+    await this.execucaoOSService.atualizarChecklist(id.trim(), dto, user?.id);
     return { message: 'Checklist atualizado com sucesso' };
   }
 
@@ -262,10 +201,9 @@ export class ExecucaoOSController {
   async registrarMateriais(
     @Param('id') id: string,
     @Body() dto: RegistrarMateriaisDto,
+    @CurrentUser() user?: any,
   ): Promise<{ message: string }> {
-    // TODO: Obter usuarioId da sessão quando implementar autenticação
-    const usuarioId = undefined;
-    await this.execucaoOSService.registrarMateriais(id.trim(), dto, usuarioId);
+    await this.execucaoOSService.registrarMateriais(id.trim(), dto, user?.id);
     return { message: 'Consumo de materiais registrado' };
   }
 
@@ -282,10 +220,9 @@ export class ExecucaoOSController {
   async registrarFerramentas(
     @Param('id') id: string,
     @Body() dto: RegistrarFerramentasDto,
+    @CurrentUser() user?: any,
   ): Promise<{ message: string }> {
-    // TODO: Obter usuarioId da sessão quando implementar autenticação
-    const usuarioId = undefined;
-    await this.execucaoOSService.registrarFerramentas(id.trim(), dto, usuarioId);
+    await this.execucaoOSService.registrarFerramentas(id.trim(), dto, user?.id);
     return { message: 'Uso de ferramentas registrado' };
   }
 
@@ -319,10 +256,9 @@ export class ExecucaoOSController {
     @Param('id') id: string,
     @Param('tarefaId') tarefaId: string,
     @Body() dto: ConcluirTarefaDto,
+    @CurrentUser() user?: any,
   ): Promise<{ message: string }> {
-    // TODO: Obter usuarioId da sessão quando implementar autenticação
-    const usuarioId = undefined;
-    await this.execucaoOSService.concluirTarefa(id.trim(), tarefaId.trim(), dto, usuarioId);
+    await this.execucaoOSService.concluirTarefa(id.trim(), tarefaId.trim(), dto, user?.id);
     return { message: 'Tarefa concluída com sucesso' };
   }
 
@@ -341,10 +277,9 @@ export class ExecucaoOSController {
     @Param('id') id: string,
     @Param('tarefaId') tarefaId: string,
     @Body() dto: CancelarTarefaDto,
+    @CurrentUser() user?: any,
   ): Promise<{ message: string }> {
-    // TODO: Obter usuarioId da sessão quando implementar autenticação
-    const usuarioId = undefined;
-    await this.execucaoOSService.cancelarTarefa(id.trim(), tarefaId.trim(), dto, usuarioId);
+    await this.execucaoOSService.cancelarTarefa(id.trim(), tarefaId.trim(), dto, user?.id);
     return { message: 'Tarefa cancelada' };
   }
 
@@ -366,16 +301,15 @@ export class ExecucaoOSController {
     @UploadedFile() file: any,
     @Body() dto: AdicionarAnexoDto,
     @Query('tipo') tipo: TipoAnexoOS,
+    @CurrentUser() user?: any,
   ): Promise<AnexoOSResponseDto> {
-    // TODO: Obter usuarioId da sessão quando implementar autenticação
-    const usuarioId = undefined;
     return this.anexosOSService.uploadAnexo(
       id.trim(),
       file,
       tipo,
       dto.descricao,
       dto.fase_execucao,
-      usuarioId,
+      user?.id,
     );
   }
 
@@ -456,58 +390,94 @@ export class ExecucaoOSController {
   async removerAnexo(
     @Param('id') id: string,
     @Param('anexoId') anexoId: string,
+    @CurrentUser() user?: any,
   ): Promise<{ message: string }> {
-    // TODO: Obter usuarioId da sessão quando implementar autenticação
-    const usuarioId = undefined;
-    await this.anexosOSService.removerAnexo(anexoId.trim(), usuarioId);
+    await this.anexosOSService.removerAnexo(anexoId.trim(), user?.id);
     return { message: 'Anexo removido com sucesso' };
+  }
+
+  @Patch(':id/executar')
+  @ApiOperation({
+    summary: 'Marcar OS como executada',
+    description: 'EM_EXECUCAO/PAUSADA → EXECUTADA, registra resultados da execução',
+  })
+  @ApiParam({ name: 'id', description: 'ID da OS' })
+  @ApiResponse({ status: HttpStatus.OK, description: 'OS marcada como executada' })
+  @ApiResponse({ status: HttpStatus.CONFLICT, description: 'OS não está em execução/pausada' })
+  async executar(
+    @Param('id') id: string,
+    @Body() dto: ExecutarOSDto,
+    @CurrentUser() user?: any,
+  ): Promise<{ message: string }> {
+    await this.execucaoOSService.executar(id.trim(), dto, user?.id);
+    return { message: 'OS marcada como executada' };
+  }
+
+  @Patch(':id/auditar')
+  @ApiOperation({
+    summary: 'Auditar OS',
+    description: 'EXECUTADA → AUDITADA, avaliação de qualidade',
+  })
+  @ApiParam({ name: 'id', description: 'ID da OS' })
+  @ApiResponse({ status: HttpStatus.OK, description: 'OS auditada' })
+  @ApiResponse({ status: HttpStatus.CONFLICT, description: 'OS não está executada' })
+  async auditar(
+    @Param('id') id: string,
+    @Body() dto: AuditarOSDto,
+    @CurrentUser() user?: any,
+  ): Promise<{ message: string }> {
+    await this.execucaoOSService.auditar(id.trim(), dto, user?.id);
+    return { message: 'OS auditada com sucesso' };
+  }
+
+  @Patch(':id/reabrir')
+  @ApiOperation({
+    summary: 'Reabrir OS',
+    description: 'AUDITADA → EM_EXECUCAO, reabre para correções',
+  })
+  @ApiParam({ name: 'id', description: 'ID da OS' })
+  @ApiResponse({ status: HttpStatus.OK, description: 'OS reaberta' })
+  @ApiResponse({ status: HttpStatus.CONFLICT, description: 'OS não está auditada' })
+  async reabrir(
+    @Param('id') id: string,
+    @Body() dto: ReabrirOSDto,
+    @CurrentUser() user?: any,
+  ): Promise<{ message: string }> {
+    await this.execucaoOSService.reabrir(id.trim(), dto, user?.id);
+    return { message: 'OS reaberta para execução' };
   }
 
   @Patch(':id/finalizar')
   @ApiOperation({
     summary: 'Finalizar OS',
-    description: 'Finaliza a execução da OS com resultados',
+    description: 'AUDITADA → FINALIZADA, finalização definitiva',
   })
   @ApiParam({ name: 'id', description: 'ID da OS' })
-  @ApiResponse({
-    status: HttpStatus.OK,
-    description: 'OS finalizada com sucesso',
-  })
-  @ApiResponse({
-    status: HttpStatus.CONFLICT,
-    description: 'OS não pode ser finalizada no status atual',
-  })
+  @ApiResponse({ status: HttpStatus.OK, description: 'OS finalizada' })
+  @ApiResponse({ status: HttpStatus.CONFLICT, description: 'OS não está auditada' })
   async finalizar(
     @Param('id') id: string,
     @Body() dto: FinalizarOSDto,
+    @CurrentUser() user?: any,
   ): Promise<{ message: string }> {
-    // TODO: Obter usuarioId da sessão quando implementar autenticação
-    const usuarioId = undefined;
-    await this.execucaoOSService.finalizar(id.trim(), dto, usuarioId);
+    await this.execucaoOSService.finalizar(id.trim(), dto, user?.id);
     return { message: 'OS finalizada com sucesso' };
   }
 
   @Patch(':id/cancelar')
   @ApiOperation({
     summary: 'Cancelar OS',
-    description: 'Cancela a OS com motivo',
+    description: 'Cancela a OS (não pode cancelar FINALIZADA/CANCELADA)',
   })
   @ApiParam({ name: 'id', description: 'ID da OS' })
-  @ApiResponse({
-    status: HttpStatus.OK,
-    description: 'OS cancelada',
-  })
-  @ApiResponse({
-    status: HttpStatus.CONFLICT,
-    description: 'OS não pode ser cancelada',
-  })
+  @ApiResponse({ status: HttpStatus.OK, description: 'OS cancelada' })
+  @ApiResponse({ status: HttpStatus.CONFLICT, description: 'OS não pode ser cancelada' })
   async cancelar(
     @Param('id') id: string,
     @Body() dto: CancelarOSDto,
+    @CurrentUser() user?: any,
   ): Promise<{ message: string }> {
-    // TODO: Obter usuarioId da sessão quando implementar autenticação
-    const usuarioId = undefined;
-    await this.execucaoOSService.cancelar(id.trim(), dto, usuarioId);
+    await this.execucaoOSService.cancelar(id.trim(), dto, user?.id);
     return { message: 'OS cancelada' };
   }
 

@@ -76,13 +76,13 @@ export class DashboardSimpleService {
       console.log(`   - Tarefas: ${tarefas}`);
       console.log(`   - Planos de Manutenção: ${planosManutencao}`);
 
-      // Buscar anomalias abertas (AGUARDANDO, EM_ANALISE, OS_GERADA)
+      // Buscar anomalias abertas (REGISTRADA, PROGRAMADA)
       console.log('📊 [DASHBOARD] Buscando anomalias abertas...');
       const anomaliasAbertas = await this.prisma.anomalias.count({
         where: {
-          ...baseFilter, // ✅ Aplicar mesmo filtro (deleted_at + permissões)
+          ...baseFilter,
           status: {
-            in: ['AGUARDANDO', 'EM_ANALISE', 'OS_GERADA']
+            in: ['REGISTRADA', 'PROGRAMADA']
           }
         }
       });
@@ -140,7 +140,7 @@ export class DashboardSimpleService {
       const anomaliasResolvidas = await this.prisma.anomalias.count({
         where: {
           ...baseFilter,
-          status: 'RESOLVIDA'
+          status: 'FINALIZADA'
         }
       });
 

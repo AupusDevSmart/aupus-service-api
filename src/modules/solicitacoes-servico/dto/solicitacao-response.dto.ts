@@ -101,33 +101,6 @@ export class SolicitacaoResponseDto {
   contato?: string;
 
   @ApiPropertyOptional()
-  analisado_por_nome?: string;
-
-  @ApiPropertyOptional()
-  data_analise?: Date;
-
-  @ApiPropertyOptional()
-  parecer_tecnico?: string;
-
-  @ApiPropertyOptional()
-  observacoes_analise?: string;
-
-  @ApiPropertyOptional()
-  aprovado_por_nome?: string;
-
-  @ApiPropertyOptional()
-  data_aprovacao?: Date;
-
-  @ApiPropertyOptional()
-  observacoes_aprovacao?: string;
-
-  @ApiPropertyOptional()
-  motivo_rejeicao?: string;
-
-  @ApiPropertyOptional()
-  motivo_cancelamento?: string;
-
-  @ApiPropertyOptional()
   programacao_os_id?: string;
 
   @ApiPropertyOptional()
@@ -166,6 +139,12 @@ export class SolicitacaoResponseDto {
     type: [Object]
   })
   tarefas?: any[];
+
+  @ApiPropertyOptional({
+    description: 'Instruções associadas à solicitação',
+    type: [Object]
+  })
+  instrucoes?: any[];
 }
 
 export class ListarSolicitacoesResponseDto {
@@ -192,29 +171,14 @@ export class SolicitacaoStatsDto {
   @ApiProperty({ description: 'Total de solicitações' })
   total: number;
 
-  @ApiProperty({ description: 'Solicitações aguardando análise' })
-  aguardando: number;
+  @ApiProperty({ description: 'Solicitações registradas' })
+  registradas: number;
 
-  @ApiProperty({ description: 'Solicitações em análise' })
-  emAnalise: number;
+  @ApiProperty({ description: 'Solicitações programadas' })
+  programadas: number;
 
-  @ApiProperty({ description: 'Solicitações aprovadas' })
-  aprovadas: number;
-
-  @ApiProperty({ description: 'Solicitações com OS gerada' })
-  osGerada: number;
-
-  @ApiProperty({ description: 'Solicitações em execução' })
-  emExecucao: number;
-
-  @ApiProperty({ description: 'Solicitações concluídas' })
-  concluidas: number;
-
-  @ApiProperty({ description: 'Solicitações canceladas' })
-  canceladas: number;
-
-  @ApiProperty({ description: 'Solicitações rejeitadas' })
-  rejeitadas: number;
+  @ApiProperty({ description: 'Solicitações finalizadas' })
+  finalizadas: number;
 
   @ApiProperty({ description: 'Por prioridade' })
   porPrioridade: {
@@ -226,10 +190,4 @@ export class SolicitacaoStatsDto {
 
   @ApiProperty({ description: 'Por tipo' })
   porTipo: Record<string, number>;
-
-  @ApiProperty({ description: 'Taxa de aprovação (%)' })
-  taxaAprovacao: number;
-
-  @ApiProperty({ description: 'Tempo médio de resposta (dias)' })
-  tempoMedioResposta: number;
 }

@@ -1,48 +1,34 @@
 import { IsString, IsOptional, IsNumber, IsDateString, IsArray, IsNotEmpty, Length, ValidateIf } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
-export class AnalisarProgramacaoDto {
-  @ApiPropertyOptional({ description: 'Observações da análise' })
-  @IsOptional()
-  @IsString()
-  observacoes_analise?: string;
-}
-
 export class AprovarProgramacaoDto {
   @ApiPropertyOptional({ description: 'Observações da aprovação' })
   @IsOptional()
   @IsString()
-  observacoes_aprovacao?: string;
+  observacoes?: string;
 
   @ApiPropertyOptional({ description: 'Ajustes no orçamento' })
   @IsOptional()
   @IsNumber({ maxDecimalPlaces: 2 })
   ajustes_orcamento?: number;
 
-  @ApiPropertyOptional({ description: 'Data programada sugerida (obrigatório se hora_programada_sugerida for informada)', example: '2025-02-15' })
-  @ValidateIf(o => o.hora_programada_sugerida !== undefined && o.hora_programada_sugerida !== null)
-  @IsNotEmpty({ message: 'data_programada_sugerida é obrigatória quando hora_programada_sugerida é informada' })
+  @ApiPropertyOptional({ description: 'Data programada sugerida', example: '2025-02-15' })
+  @IsOptional()
   @IsDateString()
   data_programada_sugerida?: string;
 
-  @ApiPropertyOptional({ description: 'Hora programada sugerida (obrigatório se data_programada_sugerida for informada)', example: '08:00' })
-  @ValidateIf(o => o.data_programada_sugerida !== undefined && o.data_programada_sugerida !== null)
-  @IsNotEmpty({ message: 'hora_programada_sugerida é obrigatória quando data_programada_sugerida é informada' })
+  @ApiPropertyOptional({ description: 'Hora programada sugerida', example: '08:00' })
+  @IsOptional()
   @IsString()
   @Length(5, 5)
   hora_programada_sugerida?: string;
 }
 
-export class RejeitarProgramacaoDto {
-  @ApiProperty({ description: 'Motivo da rejeição' })
-  @IsString()
-  @IsNotEmpty()
-  motivo_rejeicao: string;
-
-  @ApiPropertyOptional({ description: 'Sugestões de melhoria' })
+export class FinalizarProgramacaoDto {
+  @ApiPropertyOptional({ description: 'Observações da finalização' })
   @IsOptional()
   @IsString()
-  sugestoes_melhoria?: string;
+  observacoes?: string;
 }
 
 export class CancelarProgramacaoDto {

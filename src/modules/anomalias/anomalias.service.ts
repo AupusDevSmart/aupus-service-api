@@ -1,21 +1,23 @@
 // src/anomalias/anomalias.service.ts
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import { Injectable, NotFoundException, ConflictException, BadRequestException, Logger } from '@nestjs/common';
 import { PrismaService } from '../../shared/prisma/prisma.service';
 import { CreateAnomaliaDto, UpdateAnomaliaDto, AnomaliaFiltersDto, AnomaliaStatsDto } from './dto';
 import { Prisma } from '@prisma/client';
 
 @Injectable()
 export class AnomaliasService {
+  private readonly logger = new Logger(AnomaliasService.name);
+
   constructor(private readonly prisma: PrismaService) {}
 
   async create(createAnomaliaDto: CreateAnomaliaDto, userId?: string) {
-    const { localizacao, anexos, ...anomaliaData } = createAnomaliaDto;
+    const { localizacao, anexos, instrucoes_ids, ...anomaliaData } = createAnomaliaDto;
 
     const data: Prisma.anomaliasCreateInput = {
       ...anomaliaData,
       local: localizacao.local,
       ativo: localizacao.ativo,
-      status: 'AGUARDANDO',
+      status: 'REGISTRADA',
       criado_por: userId ? `Usuário ${userId}` : 'Sistema',
       ...(localizacao.equipamentoId && {
         equipamento: { connect: { id: localizacao.equipamentoId } }
@@ -32,17 +34,44 @@ export class AnomaliasService {
       }
     };
 
-    return this.prisma.anomalias.create({
+    const anomalia = await this.prisma.anomalias.create({
       data,
       include: {
         planta: true,
-        equipamento: true,
+        equipamento: {
+          include: {
+            unidade: {
+              select: {
+                id: true,
+                nome: true,
+                planta_id: true,
+                planta: { select: { id: true, nome: true } }
+              }
+            }
+          }
+        },
         usuario: true,
         historico: {
+          orderBy: { created_at: 'desc' }
+        },
+        anomalias_instrucoes: {
+          include: {
+            instrucao: {
+              select: { id: true, tag: true, nome: true, status: true, ativo: true }
+            }
+          },
           orderBy: { created_at: 'desc' }
         }
       }
     });
+
+    // Associar instruções se fornecidas
+    if (instrucoes_ids && instrucoes_ids.length > 0) {
+      await this.associarInstrucoes(anomalia.id, instrucoes_ids);
+      return this.findOne(anomalia.id);
+    }
+
+    return anomalia;
   }
 
   async findAll(filters: AnomaliaFiltersDto) {
@@ -84,8 +113,26 @@ export class AnomaliasService {
         where,
         include: {
           planta: true,
-          equipamento: true,
-          usuario: true
+          equipamento: {
+          include: {
+            unidade: {
+              select: {
+                id: true,
+                nome: true,
+                planta_id: true,
+                planta: { select: { id: true, nome: true } }
+              }
+            }
+          }
+        },
+          usuario: true,
+          anomalias_instrucoes: {
+            include: {
+              instrucao: {
+                select: { id: true, tag: true, nome: true, status: true, ativo: true }
+              }
+            }
+          }
         },
         orderBy: { created_at: 'desc' },
         skip: (page - 1) * limit,
@@ -110,9 +157,28 @@ export class AnomaliasService {
       where: { id, deleted_at: null },
       include: {
         planta: true,
-        equipamento: true,
+        equipamento: {
+          include: {
+            unidade: {
+              select: {
+                id: true,
+                nome: true,
+                planta_id: true,
+                planta: { select: { id: true, nome: true } }
+              }
+            }
+          }
+        },
         usuario: true,
         historico: {
+          orderBy: { created_at: 'desc' }
+        },
+        anomalias_instrucoes: {
+          include: {
+            instrucao: {
+              select: { id: true, tag: true, nome: true, status: true, ativo: true }
+            }
+          },
           orderBy: { created_at: 'desc' }
         }
       }
@@ -128,14 +194,11 @@ export class AnomaliasService {
   async update(id: string, updateAnomaliaDto: UpdateAnomaliaDto, userId?: string) {
     const anomalia = await this.findOne(id);
 
-    // ✅ VALIDAÇÃO: Bloquear edição de anomalias já analisadas
-    if (anomalia.status !== 'AGUARDANDO' && anomalia.status !== 'EM_ANALISE') {
-      throw new BadRequestException(
-        `Não é possível editar uma anomalia com status "${anomalia.status}". Apenas anomalias com status "AGUARDANDO" ou "EM_ANALISE" podem ser editadas.`
-      );
+    if (anomalia.status !== 'REGISTRADA') {
+      throw new ConflictException('Apenas anomalias registradas podem ser editadas');
     }
 
-    const { localizacao, anexos, ...updateData } = updateAnomaliaDto;
+    const { localizacao, anexos, instrucoes_ids, ...updateData } = updateAnomaliaDto;
 
     const data: Prisma.anomaliasUpdateInput = {
       ...updateData,
@@ -152,27 +215,35 @@ export class AnomaliasService {
           usuario: userId ? `Usuário ${userId}` : 'Sistema',
           observacoes: 'Dados da anomalia foram modificados',
           status_anterior: anomalia.status,
-          status_novo: updateData.status || anomalia.status
+          status_novo: anomalia.status
         }
       }
     };
 
-    return this.prisma.anomalias.update({
+    await this.prisma.anomalias.update({
       where: { id },
       data,
-      include: {
-        planta: true,
-        equipamento: true,
-        usuario: true,
-        historico: {
-          orderBy: { created_at: 'desc' }
-        }
-      }
     });
+
+    // Atualizar instruções vinculadas se fornecidas
+    if (instrucoes_ids !== undefined) {
+      await this.prisma.anomalias_instrucoes.deleteMany({
+        where: { anomalia_id: id },
+      });
+      if (instrucoes_ids && instrucoes_ids.length > 0) {
+        await this.associarInstrucoes(id, instrucoes_ids);
+      }
+    }
+
+    return this.findOne(id);
   }
 
   async remove(id: string, userId?: string) {
-    await this.findOne(id);
+    const anomalia = await this.findOne(id);
+
+    if (anomalia.status !== 'REGISTRADA') {
+      throw new ConflictException('Apenas anomalias registradas podem ser excluídas');
+    }
 
     return this.prisma.anomalias.update({
       where: { id },
@@ -189,130 +260,65 @@ export class AnomaliasService {
     });
   }
 
-  async gerarOS(id: string, userId?: string) {
-    const anomalia = await this.findOne(id);
+  async getStats(periodo?: string): Promise<AnomaliaStatsDto> {
+    const whereBase: any = { deleted_at: null };
 
-    if (!['AGUARDANDO', 'EM_ANALISE'].includes(anomalia.status)) {
-      throw new Error('Anomalia não está em status válido para gerar OS');
+    if (periodo) {
+      const now = new Date();
+      let dataInicio: Date;
+      switch (periodo) {
+        case '7d': dataInicio = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000); break;
+        case '30d': dataInicio = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000); break;
+        case '90d': dataInicio = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000); break;
+        default: dataInicio = null;
+      }
+      if (dataInicio) {
+        whereBase.created_at = { gte: dataInicio };
+      }
     }
 
-    const osId = `OS-${new Date().getFullYear()}-${Date.now().toString().slice(-3)}`;
-
-    return this.prisma.anomalias.update({
-      where: { id },
-      data: {
-        status: 'OS_GERADA',
-        ordem_servico_id: osId,
-        historico: {
-          create: {
-            acao: 'Ordem de Serviço gerada',
-            usuario: userId ? `Usuário ${userId}` : 'Sistema',
-            observacoes: `${osId} criada`,
-            status_anterior: anomalia.status,
-            status_novo: 'OS_GERADA'
-          }
-        }
-      },
-      include: {
-        planta: true,
-        equipamento: true,
-        usuario: true,
-        historico: {
-          orderBy: { created_at: 'desc' }
-        }
-      }
-    });
-  }
-
-  async resolver(id: string, observacoes?: string, userId?: string) {
-    const anomalia = await this.findOne(id);
-
-    return this.prisma.anomalias.update({
-      where: { id },
-      data: {
-        status: 'RESOLVIDA',
-        historico: {
-          create: {
-            acao: 'Anomalia resolvida',
-            usuario: userId ? `Usuário ${userId}` : 'Sistema',
-            observacoes: observacoes || 'Anomalia foi resolvida',
-            status_anterior: anomalia.status,
-            status_novo: 'RESOLVIDA'
-          }
-        }
-      },
-      include: {
-        planta: true,
-        equipamento: true,
-        usuario: true,
-        historico: {
-          orderBy: { created_at: 'desc' }
-        }
-      }
-    });
-  }
-
-  async cancelar(id: string, motivo?: string, userId?: string) {
-    const anomalia = await this.findOne(id);
-
-    return this.prisma.anomalias.update({
-      where: { id },
-      data: {
-        status: 'CANCELADA',
-        historico: {
-          create: {
-            acao: 'Anomalia cancelada',
-            usuario: userId ? `Usuário ${userId}` : 'Sistema',
-            observacoes: motivo || 'Anomalia foi cancelada',
-            status_anterior: anomalia.status,
-            status_novo: 'CANCELADA'
-          }
-        }
-      },
-      include: {
-        planta: true,
-        equipamento: true,
-        usuario: true,
-        historico: {
-          orderBy: { created_at: 'desc' }
-        }
-      }
-    });
-  }
-
-  async getStats(filters?: Pick<AnomaliaFiltersDto, 'periodo'>): Promise<AnomaliaStatsDto> {
-    const where: Prisma.anomaliasWhereInput = {
-      deleted_at: null,
-      ...(filters?.periodo && this.buildPeriodoFilter(filters.periodo))
-    };
-
-    const [
-      total,
-      aguardando,
-      emAnalise,
-      osGerada,
-      resolvida,
-      cancelada,
-      criticas
-    ] = await Promise.all([
-      this.prisma.anomalias.count({ where }),
-      this.prisma.anomalias.count({ where: { ...where, status: 'AGUARDANDO' } }),
-      this.prisma.anomalias.count({ where: { ...where, status: 'EM_ANALISE' } }),
-      this.prisma.anomalias.count({ where: { ...where, status: 'OS_GERADA' } }),
-      this.prisma.anomalias.count({ where: { ...where, status: 'RESOLVIDA' } }),
-      this.prisma.anomalias.count({ where: { ...where, status: 'CANCELADA' } }),
-      this.prisma.anomalias.count({ where: { ...where, prioridade: 'CRITICA' } })
+    const [total, registradas, programadas, finalizadas, criticas] = await Promise.all([
+      this.prisma.anomalias.count({ where: whereBase }),
+      this.prisma.anomalias.count({ where: { ...whereBase, status: 'REGISTRADA' } }),
+      this.prisma.anomalias.count({ where: { ...whereBase, status: 'PROGRAMADA' } }),
+      this.prisma.anomalias.count({ where: { ...whereBase, status: 'FINALIZADA' } }),
+      this.prisma.anomalias.count({ where: { ...whereBase, prioridade: 'CRITICA' } }),
     ]);
 
-    return {
-      total,
-      aguardando,
-      emAnalise,
-      osGerada,
-      resolvida,
-      cancelada,
-      criticas
-    };
+    return { total, registradas, programadas, finalizadas, criticas };
+  }
+
+  async marcarComoProgramada(id: string, programacao_os_id?: string): Promise<void> {
+    const anomalia = await this.findOne(id);
+
+    await this.prisma.anomalias.update({
+      where: { id },
+      data: {
+        status: 'PROGRAMADA',
+      },
+    });
+
+    this.logger.log(`Anomalia ${id} marcada como programada`);
+  }
+
+  async marcarComoFinalizada(id: string): Promise<void> {
+    await this.prisma.anomalias.update({
+      where: { id },
+      data: { status: 'FINALIZADA' },
+    });
+
+    this.logger.log(`Anomalia ${id} marcada como finalizada`);
+  }
+
+  async voltarParaRegistrada(id: string): Promise<void> {
+    await this.prisma.anomalias.update({
+      where: { id },
+      data: {
+        status: 'REGISTRADA',
+      },
+    });
+
+    this.logger.log(`Anomalia ${id} voltou para registrada`);
   }
 
   private buildPeriodoFilter(periodo: string): Prisma.anomaliasWhereInput {
@@ -420,5 +426,28 @@ export class AnomaliasService {
       },
       orderBy: { nome: 'asc' }
     });
+  }
+
+  private async associarInstrucoes(anomaliaId: string, instrucoesIds: string[]) {
+    const instrucoes = await this.prisma.instrucoes.findMany({
+      where: {
+        id: { in: instrucoesIds },
+        deleted_at: null
+      }
+    });
+
+    if (instrucoes.length !== instrucoesIds.length) {
+      throw new BadRequestException('Algumas instruções não foram encontradas');
+    }
+
+    // Criar associações uma a uma para que o Prisma gere os IDs via @default(cuid())
+    for (const instrucaoId of instrucoesIds) {
+      await this.prisma.anomalias_instrucoes.create({
+        data: {
+          anomalia_id: anomaliaId,
+          instrucao_id: instrucaoId,
+        }
+      });
+    }
   }
 }

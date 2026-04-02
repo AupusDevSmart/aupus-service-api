@@ -85,7 +85,7 @@ export class AnomaliasController {
     type: AnomaliaStatsDto 
   })
   async getStats(@Query('periodo') periodo?: string): Promise<AnomaliaStatsDto> {
-    return this.anomaliasService.getStats({ periodo });
+    return this.anomaliasService.getStats(periodo);
   }
 
   @Get(':id')
@@ -122,45 +122,6 @@ export class AnomaliasController {
   })
   async remove(@Param('id') id: string) {
     return this.anomaliasService.remove(id);
-  }
-
-  @Post(':id/gerar-os')
-  @ApiOperation({ summary: 'Gerar Ordem de Serviço para anomalia' })
-  @ApiResponse({ 
-    status: HttpStatus.OK, 
-    description: 'OS gerada com sucesso',
-    type: AnomaliaResponseDto 
-  })
-  async gerarOS(@Param('id') id: string) {
-    return this.anomaliasService.gerarOS(id);
-  }
-
-  @Post(':id/resolver')
-  @ApiOperation({ summary: 'Resolver anomalia' })
-  @ApiResponse({ 
-    status: HttpStatus.OK, 
-    description: 'Anomalia resolvida com sucesso',
-    type: AnomaliaResponseDto 
-  })
-  async resolver(
-    @Param('id') id: string, 
-    @Body('observacoes') observacoes?: string
-  ) {
-    return this.anomaliasService.resolver(id, observacoes);
-  }
-
-  @Post(':id/cancelar')
-  @ApiOperation({ summary: 'Cancelar anomalia' })
-  @ApiResponse({ 
-    status: HttpStatus.OK, 
-    description: 'Anomalia cancelada com sucesso',
-    type: AnomaliaResponseDto 
-  })
-  async cancelar(
-    @Param('id') id: string, 
-    @Body('motivo') motivo?: string
-  ) {
-    return this.anomaliasService.cancelar(id, motivo);
   }
 
   @Get('selects/plantas')

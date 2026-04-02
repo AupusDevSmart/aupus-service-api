@@ -30,6 +30,10 @@ export class QueryTarefasDto {
   unidade_id?: string;
 
   @IsOptional()
+  @IsString()
+  instrucao_id?: string;
+
+  @IsOptional()
   @IsEnum(StatusTarefa)
   status?: StatusTarefa;
 

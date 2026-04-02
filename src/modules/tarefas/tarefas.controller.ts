@@ -22,6 +22,7 @@ import { ApiTags, ApiOperation, ApiResponse, ApiParam, ApiQuery, ApiConsumes } f
 import { Response } from 'express';
 import * as path from 'path';
 import { TarefasService } from './tarefas.service';
+import { TarefasSchedulerService } from './tarefas-scheduler.service';
 import { AnexosTarefasService } from './anexos-tarefas.service';
 import {
   CreateTarefaDto,
@@ -40,8 +41,22 @@ import {
 export class TarefasController {
   constructor(
     private readonly tarefasService: TarefasService,
+    private readonly tarefasSchedulerService: TarefasSchedulerService,
     private readonly anexosTarefasService: AnexosTarefasService
   ) {}
+
+  // Geração automática de programações
+
+  @Post('gerar-programacoes')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Gerar programações OS automaticamente a partir de tarefas próximas do prazo' })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Resultado da geração automática',
+  })
+  async gerarProgramacoes() {
+    return this.tarefasSchedulerService.gerarProgramacoesAutomaticas();
+  }
 
   // CRUD Básico de Tarefas
 

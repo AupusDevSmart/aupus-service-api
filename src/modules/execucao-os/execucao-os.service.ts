@@ -1,10 +1,8 @@
 import { Injectable, NotFoundException, BadRequestException, ConflictException, Logger } from '@nestjs/common';
 import { PrismaService } from '../../shared/prisma/prisma.service';
 import { AnomaliasService } from '../anomalias/anomalias.service';
-import { StatusAnomalia } from '../anomalias/dto/create-anomalia.dto';
 import {
   OSFiltersDto,
-  ProgramarOSDto,
   IniciarExecucaoDto,
   PausarExecucaoDto,
   RetomarExecucaoDto,
@@ -13,13 +11,16 @@ import {
   RegistrarFerramentasDto,
   ConcluirTarefaDto,
   CancelarTarefaDto,
+  ExecutarOSDto,
+  AuditarOSDto,
+  ReabrirOSDto,
   FinalizarOSDto,
   CancelarOSDto,
   OrdemServicoResponseDto,
   OrdemServicoDetalhesResponseDto,
   ListarOSResponseDto,
 } from './dto';
-import { StatusOS, Prisma } from '@prisma/client';
+import { StatusOS, PrioridadeOS, Prisma } from '@prisma/client';
 
 @Injectable()
 export class ExecucaoOSService {
@@ -43,8 +44,8 @@ export class ExecucaoOSService {
       data_inicio,
       data_fim,
       atrasadas,
-      sortBy = 'data_hora_programada',
-      sortOrder = 'asc',
+      sortBy = 'criado_em',
+      sortOrder = 'desc',
     } = filters;
 
     // Construir filtros
@@ -137,8 +138,13 @@ export class ExecucaoOSService {
             descricao: true,
           },
         },
-        // solicitacao_servico: relação não existe no schema
-        // reserva_veiculo: relação não existe no schema (buscar manualmente depois)
+        reserva_veiculo: {
+          include: {
+            veiculo: {
+              select: { id: true, placa: true, modelo: true, marca: true },
+            },
+          },
+        },
       },
       orderBy: { [sortBy]: sortOrder },
       skip: (page - 1) * limit,
@@ -193,26 +199,20 @@ export class ExecucaoOSService {
         }
       }
 
-      // Buscar reserva_veiculo se o ID existir mas a relação não veio
-      // COMENTADO: reserva_veiculo não é uma relação no schema, usar query manual se necessário
-      // if (ordem.reserva_id) {
-      //   const reservaId = ordem.reserva_id.trim();
-      //   if (reservaId) {
-      //     (ordem as any).reserva_veiculo = await this.prisma.reserva_veiculo.findUnique({
-      //       where: { id: reservaId },
-      //       include: {
-      //         veiculo: {
-      //           select: {
-      //             id: true,
-      //             placa: true,
-      //             modelo: true,
-      //             marca: true,
-      //           },
-      //         },
-      //       },
-      //     });
-      //   }
-      // }
+      // Buscar reserva_veiculo se o ID existir mas a relação não veio (CHAR(26) padding)
+      if (ordem.reserva_id && !ordem.reserva_veiculo) {
+        const reservaId = ordem.reserva_id.trim();
+        if (reservaId) {
+          (ordem as any).reserva_veiculo = await this.prisma.reserva_veiculo.findUnique({
+            where: { id: reservaId },
+            include: {
+              veiculo: {
+                select: { id: true, placa: true, modelo: true, marca: true },
+              },
+            },
+          });
+        }
+      }
     }
 
     // Buscar estatísticas
@@ -237,7 +237,24 @@ export class ExecucaoOSService {
         deletado_em: null,
       },
       include: {
-        programacao: true,
+        programacao: {
+          include: {
+            solicitacao_servico: {
+              select: {
+                id: true,
+                numero: true,
+                titulo: true,
+                descricao: true,
+                tipo: true,
+                prioridade: true,
+                status: true,
+                local: true,
+                solicitante_nome: true,
+                data_solicitacao: true,
+              },
+            },
+          },
+        },
         // ✅ ADICIONADO: Include anomalia
         anomalia: {
           select: {
@@ -328,19 +345,13 @@ export class ExecucaoOSService {
         historico: {
           orderBy: { data: 'desc' },
         },
-        // reserva_veiculo não é uma relação no schema
-        // reserva_veiculo: {
-        //   include: {
-        //     veiculo: {
-        //       select: {
-        //         id: true,
-        //         placa: true,
-        //         modelo: true,
-        //         marca: true,
-        //       },
-        //     },
-        //   },
-        // },
+        reserva_veiculo: {
+          include: {
+            veiculo: {
+              select: { id: true, placa: true, modelo: true, marca: true },
+            },
+          },
+        },
       },
     });
 
@@ -348,115 +359,75 @@ export class ExecucaoOSService {
       throw new NotFoundException('Ordem de serviço não encontrada');
     }
 
+    // Fallback manual para reserva_veiculo (CHAR(26) padding)
+    if (os.reserva_id && !os.reserva_veiculo) {
+      const reservaId = os.reserva_id.trim();
+      if (reservaId) {
+        (os as any).reserva_veiculo = await this.prisma.reserva_veiculo.findUnique({
+          where: { id: reservaId },
+          include: {
+            veiculo: {
+              select: { id: true, placa: true, modelo: true, marca: true },
+            },
+          },
+        });
+      }
+    }
+
     return this.mapearParaDetalhes(os);
   }
 
-  async programar(id: string, dto: ProgramarOSDto, usuarioId?: string): Promise<void> {
+  async iniciar(id: string, dto: IniciarExecucaoDto, usuarioId?: string): Promise<void> {
     const os = await this.buscarPorId(id);
 
-    // Removida validação de estado PLANEJADA - OS já são criadas como PROGRAMADA
-    if (os.status !== StatusOS.PROGRAMADA && os.status !== StatusOS.PLANEJADA) {
-      throw new ConflictException('Esta OS não pode ser reprogramada neste status');
+    if (os.status !== StatusOS.PENDENTE) {
+      throw new ConflictException('Apenas OS pendentes podem ser iniciadas');
     }
 
+    const dataHoraInicio = dto.data_hora_inicio_real ? new Date(dto.data_hora_inicio_real) : new Date();
+
     await this.prisma.$transaction(async (prisma) => {
-      // Atualizar OS
       await prisma.ordens_servico.update({
         where: { id },
         data: {
-          status: StatusOS.PROGRAMADA,
-          data_hora_programada: new Date(dto.data_hora_programada),
-          responsavel: dto.responsavel,
-          responsavel_id: dto.responsavel_id,
-          time_equipe: dto.time_equipe,
-          observacoes_programacao: dto.observacoes_programacao,
-          programado_por_id: usuarioId,
+          status: StatusOS.EM_EXECUCAO,
+          data_hora_inicio_real: dataHoraInicio,
+          responsavel: dto.responsavel_execucao || os.responsavel,
+          equipe_presente: dto.equipe_presente as any || undefined,
+          observacoes_execucao: dto.observacoes,
         },
       });
 
-      // Confirmar materiais
-      if (dto.materiais_confirmados && dto.materiais_confirmados.length > 0) {
-        await prisma.materiais_os.updateMany({
-          where: {
-            os_id: id,
-            id: { in: dto.materiais_confirmados },
-          },
-          data: { confirmado: true },
-        });
-      }
-
-      // Confirmar ferramentas
-      if (dto.ferramentas_confirmadas && dto.ferramentas_confirmadas.length > 0) {
-        await prisma.ferramentas_os.updateMany({
-          where: {
-            os_id: id,
-            id: { in: dto.ferramentas_confirmadas },
-          },
-          data: { confirmada: true },
-        });
-      }
-
-      // Confirmar técnicos
-      if (dto.tecnicos_confirmados && dto.tecnicos_confirmados.length > 0) {
-        await prisma.tecnicos_os.updateMany({
-          where: {
-            os_id: id,
-            id: { in: dto.tecnicos_confirmados },
-          },
-          data: { disponivel: true },
-        });
-      }
-
-      // Criar reserva de veículo se necessário
-      if (dto.reserva_veiculo) {
-        const reserva = await prisma.reserva_veiculo.create({
-          data: {
-            veiculo_id: dto.reserva_veiculo.veiculo_id,
-            solicitante_id: id,
-            tipo_solicitante: 'ordem_servico',
-            data_inicio: new Date(dto.reserva_veiculo.data_inicio),
-            data_fim: new Date(dto.reserva_veiculo.data_fim),
-            hora_inicio: dto.reserva_veiculo.hora_inicio,
-            hora_fim: dto.reserva_veiculo.hora_fim,
-            responsavel: dto.responsavel,
-            responsavel_id: dto.responsavel_id,
-            finalidade: dto.reserva_veiculo.finalidade,
-            status: 'ativa',
-            km_inicial: dto.reserva_veiculo.km_inicial,
-            criado_por_id: usuarioId,
-          },
-        });
-
-        // Atualizar OS com o reserva_id para estabelecer a relação
-        await prisma.ordens_servico.update({
-          where: { id },
-          data: { reserva_id: reserva.id },
-        });
-      }
+      // Criar registro de tempo inicial
+      await prisma.registros_tempo_os.create({
+        data: {
+          os_id: id,
+          tecnico_nome: dto.responsavel_execucao || os.responsavel || 'Sistema',
+          data_hora_inicio: dataHoraInicio,
+          atividade: 'Início da execução',
+          observacoes: dto.observacoes,
+        },
+      });
 
       // Gerar checklist padrão se não existir
       await this.gerarChecklistPadrao(prisma, id);
 
-      // Registrar histórico
       await this.registrarHistorico(
         prisma,
         id,
-        'PROGRAMACAO',
+        'INICIO_EXECUCAO',
         'Sistema',
         usuarioId,
-        'OS reprogramada com recursos confirmados',
-        os.status,
-        StatusOS.PROGRAMADA,
+        `Execução iniciada. Equipe: ${dto.equipe_presente?.join(', ') || 'N/A'}`,
+        StatusOS.PENDENTE,
+        StatusOS.EM_EXECUCAO,
       );
     });
   }
 
   /**
-   * ✅ Cria uma ordem de serviço (execução) a partir de uma programação APROVADA
-   * @param programacaoId - ID da programação aprovada
-   * @param dto - Dados para iniciar a execução
-   * @param usuarioId - ID do usuário que está iniciando
-   * @returns ID da ordem de serviço criada
+   * Cria uma ordem de serviço a partir de uma programação APROVADA (chamado internamente ao aprovar OP)
+   * A OS é criada já pelo gerarOrdemServico da programação. Este método é para criação manual.
    */
   async iniciarDeProgramacao(programacaoId: string, dto: IniciarExecucaoDto, usuarioId?: string): Promise<{ os_id: string }> {
     // 1️⃣ Buscar programação com todos os dados
@@ -515,7 +486,7 @@ export class ExecucaoOSService {
           local: programacao.local || '',
           ativo: programacao.ativo || '',
           condicoes: programacao.condicoes,
-          status: StatusOS.EM_EXECUCAO,
+          status: StatusOS.PENDENTE,
           tipo: programacao.tipo,
           prioridade: programacao.prioridade,
           origem: programacao.origem,
@@ -536,7 +507,7 @@ export class ExecucaoOSService {
           orcamento_previsto: programacao.orcamento_previsto,
           observacoes: programacao.observacoes,
           observacoes_programacao: programacao.observacoes_programacao,
-          observacoes_execucao: dto.observacoes_inicio,
+          observacoes_execucao: dto.observacoes,
           criado_por: programacao.criado_por,
           criado_por_id: programacao.criado_por_id,
         },
@@ -614,7 +585,7 @@ export class ExecucaoOSService {
           tecnico_nome: dto.responsavel_execucao,
           data_hora_inicio: dataHoraInicio,
           atividade: 'Início da execução',
-          observacoes: dto.observacoes_inicio,
+          observacoes: dto.observacoes,
         },
       });
 
@@ -622,66 +593,16 @@ export class ExecucaoOSService {
       await this.registrarHistorico(
         prisma,
         osId,
-        'INICIO_EXECUCAO',
+        'CRIACAO',
         dto.responsavel_execucao,
         usuarioId,
-        `Execução iniciada a partir da programação ${programacao.codigo}. Equipe: ${dto.equipe_presente.join(', ')}`,
+        `OS criada a partir da programação ${programacao.codigo}`,
         undefined,
-        StatusOS.EM_EXECUCAO,
+        StatusOS.PENDENTE,
       );
     });
 
     return { os_id: osId! };
-  }
-
-  /**
-   * ⚠️ DEPRECATED - Use iniciarDeProgramacao para criar OS a partir de programação
-   * Este método só atualiza uma OS já existente
-   */
-  async iniciar(id: string, dto: IniciarExecucaoDto, usuarioId?: string): Promise<void> {
-    const os = await this.buscarPorId(id);
-
-    if (os.status !== StatusOS.PROGRAMADA) {
-      throw new ConflictException('Apenas OS programadas podem ser iniciadas');
-    }
-
-    const dataHoraInicio = dto.data_hora_inicio_real ? new Date(dto.data_hora_inicio_real) : new Date();
-
-    await this.prisma.$transaction(async (prisma) => {
-      // Atualizar OS
-      await prisma.ordens_servico.update({
-        where: { id },
-        data: {
-          status: StatusOS.EM_EXECUCAO,
-          data_hora_inicio_real: dataHoraInicio,
-          equipe_presente: dto.equipe_presente as any,
-          observacoes_execucao: dto.observacoes_inicio,
-        },
-      });
-
-      // Criar registro de tempo inicial
-      await prisma.registros_tempo_os.create({
-        data: {
-          os_id: id,
-          tecnico_nome: dto.responsavel_execucao,
-          data_hora_inicio: dataHoraInicio,
-          atividade: 'Início da execução',
-          observacoes: dto.observacoes_inicio,
-        },
-      });
-
-      // Registrar histórico
-      await this.registrarHistorico(
-        prisma,
-        id,
-        'INICIO_EXECUCAO',
-        dto.responsavel_execucao,
-        usuarioId,
-        `Execução iniciada. Equipe: ${dto.equipe_presente.join(', ')}`,
-        StatusOS.PROGRAMADA,
-        StatusOS.EM_EXECUCAO,
-      );
-    });
   }
 
   /**
@@ -935,39 +856,33 @@ export class ExecucaoOSService {
     });
   }
 
-  async finalizar(id: string, dto: FinalizarOSDto, usuarioId?: string): Promise<void> {
+  async executar(id: string, dto: ExecutarOSDto, usuarioId?: string): Promise<void> {
     const os = await this.buscarPorId(id);
 
     if (os.status !== StatusOS.EM_EXECUCAO && os.status !== StatusOS.PAUSADA) {
-      throw new ConflictException('Apenas OS em execução ou pausadas podem ser finalizadas');
+      throw new ConflictException('Apenas OS em execução ou pausadas podem ser marcadas como executadas');
     }
 
     const dataHoraFim = dto.data_hora_fim_real ? new Date(dto.data_hora_fim_real) : new Date();
 
-    // Calcular tempo real de execução
     const tempoRealExecucao = this.calcularTempoExecucao(
       os.data_hora_inicio_real ? new Date(os.data_hora_inicio_real) : null,
       dataHoraFim
     );
 
-    // Calcular custo real
     const custoReal = await this.calcularCustoReal(id, dto);
 
     await this.prisma.$transaction(async (prisma) => {
-      // Atualizar OS
       await prisma.ordens_servico.update({
         where: { id },
         data: {
-          status: StatusOS.FINALIZADA,
+          status: StatusOS.EXECUTADA,
           data_hora_fim_real: dataHoraFim,
           custo_real: custoReal,
           resultado_servico: dto.resultado_servico,
           problemas_encontrados: dto.problemas_encontrados,
           recomendacoes: dto.recomendacoes,
           proxima_manutencao: dto.proxima_manutencao,
-          avaliacao_qualidade: dto.avaliacao_qualidade,
-          observacoes_qualidade: dto.observacoes_qualidade,
-          // Novos campos adicionados
           atividades_realizadas: dto.atividades_realizadas,
           checklist_concluido: dto.checklist_concluido,
           procedimentos_seguidos: dto.procedimentos_seguidos,
@@ -975,11 +890,10 @@ export class ExecucaoOSService {
           incidentes_seguranca: dto.incidentes_seguranca,
           medidas_seguranca_adicionais: dto.medidas_seguranca_adicionais,
           custos_adicionais: dto.custos_adicionais,
-          finalizado_por_id: usuarioId,
         },
       });
 
-      // Atualizar materiais consumidos finais
+      // Atualizar materiais consumidos
       if (dto.materiais_consumidos && dto.materiais_consumidos.length > 0) {
         for (const material of dto.materiais_consumidos) {
           await prisma.materiais_os.update({
@@ -992,7 +906,7 @@ export class ExecucaoOSService {
         }
       }
 
-      // Atualizar ferramentas utilizadas finais
+      // Atualizar ferramentas utilizadas
       if (dto.ferramentas_utilizadas && dto.ferramentas_utilizadas.length > 0) {
         for (const ferramenta of dto.ferramentas_utilizadas) {
           await prisma.ferramentas_os.update({
@@ -1006,7 +920,7 @@ export class ExecucaoOSService {
         }
       }
 
-      // ✅ Finalizar reserva de veículo se existir
+      // Finalizar reserva de veículo se existir
       if (os.reserva_id) {
         const reservaId = os.reserva_id.trim();
         const reserva = await prisma.reserva_veiculo.findUnique({
@@ -1027,35 +941,192 @@ export class ExecucaoOSService {
         }
       }
 
-      // Registrar histórico
+      await this.registrarHistorico(
+        prisma,
+        id,
+        'EXECUCAO',
+        'Sistema',
+        usuarioId,
+        `OS executada. ${dto.resultado_servico || ''}`,
+        os.status,
+        StatusOS.EXECUTADA,
+      );
+    });
+  }
+
+  async auditar(id: string, dto: AuditarOSDto, usuarioId?: string): Promise<void> {
+    const os = await this.buscarPorId(id);
+
+    if (os.status !== StatusOS.EXECUTADA) {
+      throw new ConflictException('Apenas OS executadas podem ser auditadas');
+    }
+
+    let nomeAuditor: string | null = null;
+    if (usuarioId) {
+      try {
+        const usuario = await this.prisma.usuarios.findUnique({ where: { id: usuarioId }, select: { nome: true } });
+        if (usuario) nomeAuditor = usuario.nome;
+      } catch {}
+    }
+
+    await this.prisma.$transaction(async (prisma) => {
+      await prisma.ordens_servico.update({
+        where: { id },
+        data: {
+          status: StatusOS.AUDITADA,
+          avaliacao_qualidade: dto.avaliacao_qualidade,
+          observacoes_qualidade: dto.observacoes_qualidade,
+          aprovado_por: nomeAuditor,
+          aprovado_por_id: usuarioId,
+          data_aprovacao: new Date(),
+        },
+      });
+
+      await this.registrarHistorico(
+        prisma,
+        id,
+        'AUDITORIA',
+        nomeAuditor || 'Sistema',
+        usuarioId,
+        `OS auditada. Qualidade: ${dto.avaliacao_qualidade}/5. ${dto.observacoes_qualidade || ''}`,
+        StatusOS.EXECUTADA,
+        StatusOS.AUDITADA,
+      );
+    });
+  }
+
+  async reabrir(id: string, dto: ReabrirOSDto, usuarioId?: string): Promise<void> {
+    const os = await this.buscarPorId(id);
+
+    if (os.status !== StatusOS.AUDITADA) {
+      throw new ConflictException('Apenas OS auditadas podem ser reabertas');
+    }
+
+    await this.prisma.$transaction(async (prisma) => {
+      await prisma.ordens_servico.update({
+        where: { id },
+        data: {
+          status: StatusOS.EM_EXECUCAO,
+          data_hora_fim_real: null,
+        },
+      });
+
+      await this.registrarHistorico(
+        prisma,
+        id,
+        'REABERTURA',
+        'Sistema',
+        usuarioId,
+        dto.observacoes || 'OS reaberta para execução',
+        StatusOS.AUDITADA,
+        StatusOS.EM_EXECUCAO,
+      );
+    });
+  }
+
+  async finalizar(id: string, dto: FinalizarOSDto, usuarioId?: string): Promise<void> {
+    const os = await this.buscarPorId(id);
+
+    if (os.status !== StatusOS.AUDITADA) {
+      throw new ConflictException('Apenas OS auditadas podem ser finalizadas');
+    }
+
+    let nomeFinalizador: string | null = null;
+    if (usuarioId) {
+      try {
+        const usuario = await this.prisma.usuarios.findUnique({ where: { id: usuarioId }, select: { nome: true } });
+        if (usuario) nomeFinalizador = usuario.nome;
+      } catch {}
+    }
+
+    await this.prisma.$transaction(async (prisma) => {
+      await prisma.ordens_servico.update({
+        where: { id },
+        data: {
+          status: StatusOS.FINALIZADA,
+          finalizado_por: nomeFinalizador,
+          finalizado_por_id: usuarioId,
+        },
+      });
+
       await this.registrarHistorico(
         prisma,
         id,
         'FINALIZACAO',
-        'Sistema',
+        nomeFinalizador || 'Sistema',
         usuarioId,
-        `OS finalizada. Qualidade: ${dto.avaliacao_qualidade}/5. ${dto.resultado_servico}`,
-        os.status,
+        dto.observacoes || 'OS finalizada',
+        StatusOS.AUDITADA,
         StatusOS.FINALIZADA,
       );
 
-      // ✅ NOVO: Atualizar status da anomalia para RESOLVIDA
+      // Propagar status para origem: anomalia → FINALIZADA
       if (os.anomalia_id) {
         try {
-          const observacoes = `OS ${os.numero_os} finalizada com sucesso. ` +
-            `Resultado: ${dto.resultado_servico}. ` +
-            `Qualidade: ${dto.avaliacao_qualidade}/5`;
-
-          await this.anomaliasService.resolver(
-            os.anomalia_id,
-            observacoes,
-            usuarioId
-          );
-          this.logger.log(`Anomalia ${os.anomalia_id} marcada como RESOLVIDA após finalização da OS`);
+          await this.anomaliasService.marcarComoFinalizada(os.anomalia_id);
+          this.logger.log(`Anomalia ${os.anomalia_id} marcada como FINALIZADA`);
         } catch (error) {
           this.logger.warn(`Erro ao atualizar status da anomalia: ${error.message}`);
-          // Não interromper o fluxo se houver erro
         }
+      }
+
+      // Propagar status para origem: programação → FINALIZADA
+      if (os.programacao_id) {
+        try {
+          const programacao = await prisma.programacoes_os.update({
+            where: { id: os.programacao_id },
+            data: {
+              status: 'FINALIZADA',
+              finalizado_por: nomeFinalizador,
+              finalizado_por_id: usuarioId,
+              data_finalizacao: new Date(),
+              observacoes_finalizacao: dto.observacoes || 'Finalizada automaticamente via OS',
+            },
+          });
+          this.logger.log(`Programação ${os.programacao_id} marcada como FINALIZADA`);
+
+          // Propagar status para origem: solicitação → FINALIZADA
+          const solIdFin = programacao.solicitacao_servico_id?.trim()
+            || (programacao.dados_origem as any)?.solicitacaoServicoId?.trim();
+          if (solIdFin) {
+            try {
+              await prisma.solicitacoes_servico.update({
+                where: { id: solIdFin },
+                data: { status: 'FINALIZADA' },
+              });
+              this.logger.log(`Solicitação ${solIdFin} marcada como FINALIZADA`);
+            } catch (error) {
+              this.logger.warn(`Erro ao atualizar status da solicitação: ${error.message}`);
+            }
+          }
+        } catch (error) {
+          this.logger.warn(`Erro ao atualizar status da programação: ${error.message}`);
+        }
+      }
+
+      // Atualizar data_ultima_execucao e numero_execucoes das tarefas vinculadas
+      try {
+        const tarefasVinculadas = await prisma.tarefas_os.findMany({
+          where: { os_id: id, tarefa_id: { not: null } },
+          select: { tarefa_id: true },
+        });
+
+        const tarefaIds = tarefasVinculadas
+          .map((t) => t.tarefa_id?.trim())
+          .filter((id): id is string => !!id);
+
+        if (tarefaIds.length > 0) {
+          await prisma.tarefas.updateMany({
+            where: { id: { in: tarefaIds } },
+            data: {
+              data_ultima_execucao: new Date(),
+              numero_execucoes: { increment: 1 },
+            },
+          });
+          this.logger.log(`Atualizadas ${tarefaIds.length} tarefas com data_ultima_execucao`);
+        }
+      } catch (error) {
+        this.logger.warn(`Erro ao atualizar execução das tarefas: ${error.message}`);
       }
     });
   }
@@ -1063,14 +1134,13 @@ export class ExecucaoOSService {
   async cancelar(id: string, dto: CancelarOSDto, usuarioId?: string): Promise<void> {
     const os = await this.buscarPorId(id);
 
-    if (os.status === StatusOS.FINALIZADA) {
-      throw new ConflictException('OS finalizada não pode ser cancelada');
+    if (os.status === StatusOS.FINALIZADA || os.status === StatusOS.CANCELADA) {
+      throw new ConflictException('OS finalizada ou cancelada não pode ser cancelada');
     }
 
     const statusAnterior = os.status;
 
     await this.prisma.$transaction(async (prisma) => {
-      // Atualizar OS
       await prisma.ordens_servico.update({
         where: { id },
         data: {
@@ -1079,7 +1149,7 @@ export class ExecucaoOSService {
         },
       });
 
-      // ✅ Cancelar reserva de veículo se existir
+      // Cancelar reserva de veículo se existir
       if (os.reserva_id) {
         const reservaId = os.reserva_id.trim();
         const reserva = await prisma.reserva_veiculo.findUnique({
@@ -1099,7 +1169,6 @@ export class ExecucaoOSService {
         }
       }
 
-      // Registrar histórico
       await this.registrarHistorico(
         prisma,
         id,
@@ -1111,18 +1180,33 @@ export class ExecucaoOSService {
         StatusOS.CANCELADA,
       );
 
-      // ✅ NOVO: Se tiver anomalia vinculada, retornar para AGUARDANDO
+      // Retornar anomalia vinculada para REGISTRADA
       if (os.anomalia_id) {
         try {
-          await this.anomaliasService.update(
-            os.anomalia_id,
-            { status: StatusAnomalia.AGUARDANDO },
-            usuarioId
-          );
-          this.logger.log(`Anomalia ${os.anomalia_id} retornada para AGUARDANDO após cancelamento da OS`);
+          await this.anomaliasService.voltarParaRegistrada(os.anomalia_id);
+          this.logger.log(`Anomalia ${os.anomalia_id} retornada para REGISTRADA`);
         } catch (error) {
           this.logger.warn(`Erro ao atualizar status da anomalia: ${error.message}`);
-          // Não interromper o fluxo se houver erro
+        }
+      }
+
+      // Retornar solicitação vinculada para REGISTRADA (via programação)
+      if (os.programacao_id) {
+        try {
+          const programacao = await prisma.programacoes_os.findUnique({
+            where: { id: os.programacao_id },
+            select: { solicitacao_servico_id: true, dados_origem: true },
+          });
+          const solIdCanc = programacao?.solicitacao_servico_id?.trim()
+            || (programacao?.dados_origem as any)?.solicitacaoServicoId?.trim();
+          if (solIdCanc) {
+            await prisma.solicitacoes_servico.update({
+              where: { id: solIdCanc },
+              data: { status: 'REGISTRADA' },
+            });
+          }
+        } catch (error) {
+          this.logger.warn(`Erro ao atualizar status da solicitação: ${error.message}`);
         }
       }
     });
@@ -1165,7 +1249,7 @@ export class ExecucaoOSService {
     return Math.round((dataHoraFim.getTime() - dataHoraInicio.getTime()) / (1000 * 60)); // em minutos
   }
 
-  private async calcularCustoReal(osId: string, dto: FinalizarOSDto): Promise<number> {
+  private async calcularCustoReal(osId: string, dto: ExecutarOSDto): Promise<number> {
     // Buscar materiais consumidos
     const materiais = await this.prisma.materiais_os.findMany({
       where: { os_id: osId },
@@ -1226,28 +1310,34 @@ export class ExecucaoOSService {
       _count: true,
     });
 
-    const resultado = {
-      planejadas: 0,
-      programadas: 0,
+    const resultado: Record<string, number> = {
+      pendentes: 0,
       em_execucao: 0,
       pausadas: 0,
+      executadas: 0,
+      auditadas: 0,
       finalizadas: 0,
       canceladas: 0,
+      atrasadas: 0,
+      criticas: 0,
     };
 
     stats.forEach(stat => {
       switch (stat.status) {
-        case StatusOS.PLANEJADA:
-          resultado.planejadas = stat._count;
-          break;
-        case StatusOS.PROGRAMADA:
-          resultado.programadas = stat._count;
+        case StatusOS.PENDENTE:
+          resultado.pendentes = stat._count;
           break;
         case StatusOS.EM_EXECUCAO:
           resultado.em_execucao = stat._count;
           break;
         case StatusOS.PAUSADA:
           resultado.pausadas = stat._count;
+          break;
+        case StatusOS.EXECUTADA:
+          resultado.executadas = stat._count;
+          break;
+        case StatusOS.AUDITADA:
+          resultado.auditadas = stat._count;
           break;
         case StatusOS.FINALIZADA:
           resultado.finalizadas = stat._count;
@@ -1256,6 +1346,26 @@ export class ExecucaoOSService {
           resultado.canceladas = stat._count;
           break;
       }
+    });
+
+    // Contar atrasadas (data programada < hoje, excluindo finalizadas/canceladas)
+    const hoje = new Date();
+    hoje.setHours(0, 0, 0, 0);
+    resultado.atrasadas = await this.prisma.ordens_servico.count({
+      where: {
+        deletado_em: null,
+        data_hora_programada: { lt: hoje },
+        status: { notIn: [StatusOS.FINALIZADA, StatusOS.CANCELADA] },
+      },
+    });
+
+    // Contar críticas
+    resultado.criticas = await this.prisma.ordens_servico.count({
+      where: {
+        deletado_em: null,
+        prioridade: PrioridadeOS.CRITICA,
+        status: { notIn: [StatusOS.FINALIZADA, StatusOS.CANCELADA] },
+      },
     });
 
     return resultado;
@@ -1400,6 +1510,7 @@ export class ExecucaoOSService {
     return {
       ...base,
       programacao_origem: os.programacao,
+      solicitacao_servico: os.programacao?.solicitacao_servico || undefined,
       materiais: os.materiais?.map((m: any) => ({
         id: m.id,
         os_id: m.os_id,

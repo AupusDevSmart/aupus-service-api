@@ -13,10 +13,6 @@ import {
   SolicitacaoResponseDto,
   ListarSolicitacoesResponseDto,
   SolicitacaoStatsDto,
-  AnalisarSolicitacaoDto,
-  AprovarSolicitacaoDto,
-  RejeitarSolicitacaoDto,
-  CancelarSolicitacaoDto,
   AdicionarComentarioDto,
 } from './dto';
 import { Prisma } from '@prisma/client';
@@ -154,14 +150,17 @@ export class SolicitacoesServicoService {
         throw new NotFoundException(`Planta com ID ${planta_id} não encontrada ou foi deletada`);
       }
 
+      // Extrair campos que não são colunas da tabela antes de criar
+      const { instrucoes_ids, tarefas_ids, ...createData } = createDto as any;
+
       // Criar solicitação com solicitante_id e solicitante_nome preenchidos
       // Removido o include da planta para evitar erro com soft delete
       const solicitacao = await prisma.solicitacoes_servico.create({
         data: {
-          ...createDto,
+          ...createData,
           planta_id, // Usar o planta_id determinado
           numero,
-          status: createDto.status || StatusSolicitacaoServico.RASCUNHO,
+          status: StatusSolicitacaoServico.REGISTRADA,
           solicitante_id: usuarioId || null,
           solicitante_nome: solicitante_nome,
         } as Prisma.solicitacoes_servicoUncheckedCreateInput,
@@ -183,8 +182,13 @@ export class SolicitacoesServicoService {
       });
 
       // Associar tarefas se fornecidas
-      if (createDto.tarefas_ids && createDto.tarefas_ids.length > 0) {
-        await this.associarTarefas(prisma, solicitacao.id, createDto.tarefas_ids);
+      if (tarefas_ids && tarefas_ids.length > 0) {
+        await this.associarTarefas(prisma, solicitacao.id, tarefas_ids);
+      }
+
+      // Associar instruções se fornecidas
+      if (instrucoes_ids && instrucoes_ids.length > 0) {
+        await this.associarInstrucoes(prisma, solicitacao.id, instrucoes_ids);
       }
 
       // Adicionar a planta ao objeto de resposta
@@ -392,6 +396,23 @@ export class SolicitacoesServicoService {
             }
           },
           orderBy: { ordem: 'asc' }
+        },
+        solicitacoes_instrucoes: {
+          include: {
+            instrucao: {
+              select: {
+                id: true,
+                tag: true,
+                nome: true,
+                descricao: true,
+                categoria: true,
+                criticidade: true,
+                tempo_estimado: true,
+                tipo_manutencao: true
+              }
+            }
+          },
+          orderBy: { ordem: 'asc' }
         }
       },
     });
@@ -433,11 +454,19 @@ export class SolicitacoesServicoService {
       observacoes: ts.observacoes
     })) || [];
 
+    // Mapear instruções associadas
+    const instrucoes = (solicitacao as any).solicitacoes_instrucoes?.map((si: any) => ({
+      ...si.instrucao,
+      ordem: si.ordem,
+      observacoes: si.observacoes
+    })) || [];
+
     const solicitacaoCompleta = {
       ...solicitacao,
       planta: planta,
       unidade: unidade,
-      tarefas: tarefas
+      tarefas: tarefas,
+      instrucoes: instrucoes
     };
 
     return this.mapToResponseDto(solicitacaoCompleta);
@@ -454,16 +483,19 @@ export class SolicitacoesServicoService {
     const solicitacao = await this.findOne(id);
 
     // Verificar se pode ser editada
-    if (solicitacao.status !== 'RASCUNHO') {
+    if (solicitacao.status !== 'REGISTRADA') {
       throw new ConflictException(
-        'Apenas solicitações em rascunho podem ser editadas',
+        'Apenas solicitações registradas podem ser editadas',
       );
     }
+
+    // Extrair instrucoes_ids antes de passar para o Prisma (não é coluna da tabela)
+    const { instrucoes_ids, ...prismaData } = updateDto as any;
 
     return await this.prisma.$transaction(async (prisma) => {
       const solicitacaoAtualizada = await prisma.solicitacoes_servico.update({
         where: { id },
-        data: updateDto as Prisma.solicitacoes_servicoUncheckedUpdateInput,
+        data: prismaData as Prisma.solicitacoes_servicoUncheckedUpdateInput,
         include: {
           // Removido planta do include para evitar erro com soft delete
           equipamento: true,
@@ -471,6 +503,18 @@ export class SolicitacoesServicoService {
           proprietario: true, // Incluir proprietário
         },
       });
+
+      // Atualizar instruções vinculadas se fornecidas
+      if (instrucoes_ids !== undefined) {
+        // Remover associações existentes
+        await prisma.solicitacoes_instrucoes.deleteMany({
+          where: { solicitacao_id: id },
+        });
+        // Criar novas associações
+        if (instrucoes_ids && instrucoes_ids.length > 0) {
+          await this.associarInstrucoes(prisma, id, instrucoes_ids);
+        }
+      }
 
       // Buscar a planta manualmente se existir e não estiver deletada
       let planta = null;
@@ -503,291 +547,13 @@ export class SolicitacoesServicoService {
   }
 
   /**
-   * Enviar solicitação para análise
-   */
-  async enviar(
-    id: string,
-    usuarioId?: string,
-  ): Promise<SolicitacaoResponseDto> {
-    const solicitacao = await this.findOne(id);
-
-    if (solicitacao.status !== StatusSolicitacaoServico.RASCUNHO) {
-      throw new ConflictException('Apenas rascunhos podem ser enviados para análise');
-    }
-
-    return await this.prisma.$transaction(async (prisma) => {
-      const solicitacaoAtualizada = await prisma.solicitacoes_servico.update({
-        where: { id },
-        data: {
-          status: StatusSolicitacaoServico.EM_ANALISE,
-        },
-        include: {
-          // Removido planta do include para evitar erro com soft delete
-          equipamento: true,
-          unidade: true, // Incluir unidade
-          proprietario: true, // Incluir proprietário
-        },
-      });
-
-      // Buscar a planta manualmente
-      let planta = null;
-      if (solicitacaoAtualizada.planta_id) {
-        planta = await prisma.plantas.findFirst({
-          where: {
-            id: solicitacaoAtualizada.planta_id,
-            deleted_at: null
-          }
-        });
-      }
-
-      const solicitacaoCompleta = {
-        ...solicitacaoAtualizada,
-        planta: planta
-      };
-
-      await this.registrarHistorico(
-        prisma,
-        id,
-        'ENVIO_ANALISE',
-        'Sistema',
-        usuarioId,
-        'Solicitação enviada para análise',
-        StatusSolicitacaoServico.RASCUNHO,
-        StatusSolicitacaoServico.EM_ANALISE,
-      );
-
-      this.logger.log(`Solicitação ${solicitacao.numero} enviada para análise`);
-      return this.mapToResponseDto(solicitacaoCompleta);
-    });
-  }
-
-
-  /**
-   * Aprovar solicitação
-   */
-  async aprovar(
-    id: string,
-    dto: AprovarSolicitacaoDto,
-    aprovadorNome: string,
-    aprovadorId?: string,
-  ): Promise<SolicitacaoResponseDto> {
-    const solicitacao = await this.findOne(id);
-
-    if (solicitacao.status !== StatusSolicitacaoServico.EM_ANALISE) {
-      throw new ConflictException('Apenas solicitações em análise podem ser aprovadas');
-    }
-
-    return await this.prisma.$transaction(async (prisma) => {
-      const updateData: any = {
-        status: StatusSolicitacaoServico.APROVADA,
-        aprovado_por_nome: aprovadorNome,
-        aprovado_por_id: aprovadorId,
-        data_aprovacao: new Date(),
-        observacoes_aprovacao: dto.observacoes_aprovacao,
-      };
-
-      if (dto.data_prevista_inicio) {
-        updateData.data_prevista_inicio = new Date(dto.data_prevista_inicio);
-      }
-      if (dto.data_prevista_fim) {
-        updateData.data_prevista_fim = new Date(dto.data_prevista_fim);
-      }
-
-      const solicitacaoAtualizada = await prisma.solicitacoes_servico.update({
-        where: { id },
-        data: updateData,
-        include: {
-          // Removido planta do include para evitar erro com soft delete
-          equipamento: true,
-          unidade: true, // Incluir unidade
-          proprietario: true, // Incluir proprietário
-        },
-      });
-
-      await this.registrarHistorico(
-        prisma,
-        id,
-        'APROVACAO',
-        aprovadorNome,
-        aprovadorId,
-        dto.observacoes_aprovacao,
-        StatusSolicitacaoServico.EM_ANALISE,
-        StatusSolicitacaoServico.APROVADA,
-      );
-
-      // Buscar a planta manualmente
-      let planta = null;
-      if (solicitacaoAtualizada.planta_id) {
-        planta = await prisma.plantas.findFirst({
-          where: {
-            id: solicitacaoAtualizada.planta_id,
-            deleted_at: null
-          }
-        });
-      }
-
-      const solicitacaoCompleta = {
-        ...solicitacaoAtualizada,
-        planta: planta
-      };
-
-      this.logger.log(`Solicitação ${solicitacao.numero} aprovada`);
-      return this.mapToResponseDto(solicitacaoCompleta);
-    });
-  }
-
-  /**
-   * Rejeitar solicitação
-   */
-  async rejeitar(
-    id: string,
-    dto: RejeitarSolicitacaoDto,
-    rejeitadorNome: string,
-    rejeitadorId?: string,
-  ): Promise<SolicitacaoResponseDto> {
-    const solicitacao = await this.findOne(id);
-
-    if (solicitacao.status !== StatusSolicitacaoServico.EM_ANALISE) {
-      throw new ConflictException('Apenas solicitações em análise podem ser rejeitadas');
-    }
-
-    return await this.prisma.$transaction(async (prisma) => {
-      const solicitacaoAtualizada = await prisma.solicitacoes_servico.update({
-        where: { id },
-        data: {
-          status: StatusSolicitacaoServico.REJEITADA,
-          motivo_rejeicao: dto.motivo_rejeicao,
-          sugestoes_alternativas: dto.sugestoes_alternativas,
-        },
-        include: {
-          // Removido planta do include para evitar erro com soft delete
-          equipamento: true,
-          unidade: true, // Incluir unidade
-          proprietario: true, // Incluir proprietário
-        },
-      });
-
-      await this.registrarHistorico(
-        prisma,
-        id,
-        'REJEICAO',
-        rejeitadorNome,
-        rejeitadorId,
-        dto.motivo_rejeicao,
-        StatusSolicitacaoServico.EM_ANALISE,
-        StatusSolicitacaoServico.REJEITADA,
-      );
-
-      // Buscar a planta manualmente
-      let planta = null;
-      if (solicitacaoAtualizada.planta_id) {
-        planta = await prisma.plantas.findFirst({
-          where: {
-            id: solicitacaoAtualizada.planta_id,
-            deleted_at: null
-          }
-        });
-      }
-
-      const solicitacaoCompleta = {
-        ...solicitacaoAtualizada,
-        planta: planta
-      };
-
-      this.logger.log(`Solicitação ${solicitacao.numero} rejeitada`);
-      return this.mapToResponseDto(solicitacaoCompleta);
-    });
-  }
-
-  /**
-   * Cancelar solicitação
-   */
-  async cancelar(
-    id: string,
-    dto: CancelarSolicitacaoDto,
-    canceladorNome: string,
-    canceladorId?: string,
-  ): Promise<SolicitacaoResponseDto> {
-    const solicitacao = await this.findOne(id);
-
-    if (
-      solicitacao.status === StatusSolicitacaoServico.CONCLUIDA ||
-      solicitacao.status === StatusSolicitacaoServico.CANCELADA ||
-      solicitacao.status === StatusSolicitacaoServico.REJEITADA
-    ) {
-      throw new ConflictException('Esta solicitação não pode ser cancelada');
-    }
-
-    return await this.prisma.$transaction(async (prisma) => {
-      const statusAnterior = solicitacao.status;
-
-      const solicitacaoAtualizada = await prisma.solicitacoes_servico.update({
-        where: { id },
-        data: {
-          status: StatusSolicitacaoServico.CANCELADA,
-          motivo_cancelamento: dto.motivo_cancelamento,
-          cancelado_por_nome: canceladorNome,
-          cancelado_por_id: canceladorId,
-          data_cancelamento: new Date(),
-        },
-        include: {
-          // Removido planta do include para evitar erro com soft delete
-          equipamento: true,
-          unidade: true, // Incluir unidade
-          proprietario: true, // Incluir proprietário
-        },
-      });
-
-      await this.registrarHistorico(
-        prisma,
-        id,
-        'CANCELAMENTO',
-        canceladorNome,
-        canceladorId,
-        dto.motivo_cancelamento,
-        statusAnterior,
-        StatusSolicitacaoServico.CANCELADA,
-      );
-
-      // Buscar a planta manualmente
-      let planta = null;
-      if (solicitacaoAtualizada.planta_id) {
-        planta = await prisma.plantas.findFirst({
-          where: {
-            id: solicitacaoAtualizada.planta_id,
-            deleted_at: null
-          }
-        });
-      }
-
-      const solicitacaoCompleta = {
-        ...solicitacaoAtualizada,
-        planta: planta
-      };
-
-      this.logger.log(`Solicitação ${solicitacao.numero} cancelada`);
-      return this.mapToResponseDto(solicitacaoCompleta);
-    });
-  }
-
-  /**
    * Remover solicitação (soft delete)
    */
   async remove(id: string, usuarioId?: string): Promise<void> {
     const solicitacao = await this.findOne(id);
 
-    // Debug para ver o valor real do status
-    this.logger.log(`[DEBUG] Status da solicitação ${id}: ${solicitacao.status}, tipo: ${typeof solicitacao.status}`);
-    this.logger.log(`[DEBUG] RASCUNHO value: ${StatusSolicitacaoServico.RASCUNHO}`);
-    this.logger.log(`[DEBUG] REJEITADA value: ${StatusSolicitacaoServico.REJEITADA}`);
-    this.logger.log(`[DEBUG] CANCELADA value: ${StatusSolicitacaoServico.CANCELADA}`);
-
-    // Permitir exclusão de rascunhos, rejeitadas e canceladas
-    // Comparar diretamente com as strings do enum
-    if (solicitacao.status !== StatusSolicitacaoServico.RASCUNHO &&
-        solicitacao.status !== StatusSolicitacaoServico.REJEITADA &&
-        solicitacao.status !== StatusSolicitacaoServico.CANCELADA) {
-      throw new ConflictException('Apenas rascunhos, solicitações rejeitadas ou canceladas podem ser excluídas');
+    if (solicitacao.status !== StatusSolicitacaoServico.REGISTRADA) {
+      throw new ConflictException('Apenas solicitações registradas podem ser excluídas');
     }
 
     await this.prisma.solicitacoes_servico.update({
@@ -840,14 +606,9 @@ export class SolicitacoesServicoService {
   async getStats(): Promise<SolicitacaoStatsDto> {
     const [
       total,
-      rascunhos,
-      emAnalise,
-      aprovadas,
-      osGerada,
-      emExecucao,
-      concluidas,
-      canceladas,
-      rejeitadas,
+      registradas,
+      programadas,
+      finalizadas,
       porPrioridade,
       porTipo,
     ] = await Promise.all([
@@ -855,36 +616,19 @@ export class SolicitacoesServicoService {
         where: { deleted_at: null },
       }),
       this.prisma.solicitacoes_servico.count({
-        where: { status: StatusSolicitacaoServico.RASCUNHO, deleted_at: null },
+        where: { status: StatusSolicitacaoServico.REGISTRADA, deleted_at: null },
       }),
       this.prisma.solicitacoes_servico.count({
-        where: { status: StatusSolicitacaoServico.EM_ANALISE, deleted_at: null },
+        where: { status: StatusSolicitacaoServico.PROGRAMADA, deleted_at: null },
       }),
       this.prisma.solicitacoes_servico.count({
-        where: { status: StatusSolicitacaoServico.APROVADA, deleted_at: null },
+        where: { status: StatusSolicitacaoServico.FINALIZADA, deleted_at: null },
       }),
-      this.prisma.solicitacoes_servico.count({
-        where: { status: StatusSolicitacaoServico.OS_GERADA, deleted_at: null },
-      }),
-      this.prisma.solicitacoes_servico.count({
-        where: { status: StatusSolicitacaoServico.EM_EXECUCAO, deleted_at: null },
-      }),
-      this.prisma.solicitacoes_servico.count({
-        where: { status: StatusSolicitacaoServico.CONCLUIDA, deleted_at: null },
-      }),
-      this.prisma.solicitacoes_servico.count({
-        where: { status: StatusSolicitacaoServico.CANCELADA, deleted_at: null },
-      }),
-      this.prisma.solicitacoes_servico.count({
-        where: { status: StatusSolicitacaoServico.REJEITADA, deleted_at: null },
-      }),
-      // Por prioridade
       this.prisma.solicitacoes_servico.groupBy({
         by: ['prioridade'],
         where: { deleted_at: null },
         _count: true,
       }),
-      // Por tipo
       this.prisma.solicitacoes_servico.groupBy({
         by: ['tipo'],
         where: { deleted_at: null },
@@ -892,47 +636,23 @@ export class SolicitacoesServicoService {
       }),
     ]);
 
-    // Processar dados de prioridade
-    const prioridadeMap = {
-      baixa: 0,
-      media: 0,
-      alta: 0,
-      urgente: 0,
-    };
-
+    const prioridadeMap = { baixa: 0, media: 0, alta: 0, urgente: 0 };
     porPrioridade.forEach((item) => {
       prioridadeMap[item.prioridade.toLowerCase()] = item._count;
     });
 
-    // Processar dados de tipo
     const tipoMap: Record<string, number> = {};
     porTipo.forEach((item) => {
       tipoMap[item.tipo] = item._count;
     });
 
-    // Calcular taxa de aprovação
-    const totalAnalisadas = aprovadas + rejeitadas;
-    const taxaAprovacao = totalAnalisadas > 0
-      ? Math.round((aprovadas / totalAnalisadas) * 100)
-      : 0;
-
-    // Calcular tempo médio de resposta (simplificado)
-    const tempoMedioResposta = 3; // dias (placeholder)
-
     return {
       total,
-      aguardando: rascunhos, // Usando rascunhos no lugar de aguardando já que AGUARDANDO foi removido
-      emAnalise,
-      aprovadas,
-      osGerada,
-      emExecucao,
-      concluidas,
-      canceladas,
-      rejeitadas,
+      registradas,
+      programadas,
+      finalizadas,
       porPrioridade: prioridadeMap,
       porTipo: tipoMap,
-      taxaAprovacao,
-      tempoMedioResposta,
     };
   }
 
@@ -975,9 +695,9 @@ export class SolicitacoesServicoService {
   }
 
   /**
-   * Atualizar status para OS_GERADA
+   * Marcar solicitação como programada
    */
-  async marcarComoOSGerada(
+  async marcarComoProgramada(
     id: string,
     programacao_os_id: string,
   ): Promise<void> {
@@ -985,7 +705,7 @@ export class SolicitacoesServicoService {
       await prisma.solicitacoes_servico.update({
         where: { id },
         data: {
-          status: StatusSolicitacaoServico.OS_GERADA,
+          status: StatusSolicitacaoServico.PROGRAMADA,
           programacao_os_id,
         },
       });
@@ -993,12 +713,73 @@ export class SolicitacoesServicoService {
       await this.registrarHistorico(
         prisma,
         id,
-        'GERACAO_OS',
+        'PROGRAMACAO',
         'Sistema',
         null,
         `Programação OS gerada: ${programacao_os_id}`,
-        StatusSolicitacaoServico.APROVADA,
-        StatusSolicitacaoServico.OS_GERADA,
+        StatusSolicitacaoServico.REGISTRADA,
+        StatusSolicitacaoServico.PROGRAMADA,
+      );
+    });
+  }
+
+  /**
+   * Marcar solicitação como finalizada
+   */
+  async marcarComoFinalizada(
+    id: string,
+    ordem_servico_id?: string,
+  ): Promise<void> {
+    await this.prisma.$transaction(async (prisma) => {
+      const updateData: any = {
+        status: StatusSolicitacaoServico.FINALIZADA,
+      };
+      if (ordem_servico_id) {
+        updateData.ordem_servico_id = ordem_servico_id;
+      }
+
+      await prisma.solicitacoes_servico.update({
+        where: { id },
+        data: updateData,
+      });
+
+      await this.registrarHistorico(
+        prisma,
+        id,
+        'FINALIZACAO',
+        'Sistema',
+        null,
+        ordem_servico_id ? `OS finalizada: ${ordem_servico_id}` : 'Solicitação finalizada',
+        StatusSolicitacaoServico.PROGRAMADA,
+        StatusSolicitacaoServico.FINALIZADA,
+      );
+    });
+  }
+
+  /**
+   * Voltar solicitação para registrada (quando programação OS é rejeitada)
+   */
+  async voltarParaRegistrada(
+    id: string,
+  ): Promise<void> {
+    await this.prisma.$transaction(async (prisma) => {
+      await prisma.solicitacoes_servico.update({
+        where: { id },
+        data: {
+          status: StatusSolicitacaoServico.REGISTRADA,
+          programacao_os_id: null,
+        },
+      });
+
+      await this.registrarHistorico(
+        prisma,
+        id,
+        'RETORNO_REGISTRADA',
+        'Sistema',
+        null,
+        'Programação OS rejeitada - solicitação retornou para registrada',
+        StatusSolicitacaoServico.PROGRAMADA,
+        StatusSolicitacaoServico.REGISTRADA,
       );
     });
   }
@@ -1033,6 +814,35 @@ export class SolicitacoesServicoService {
     }));
 
     await prisma.tarefas_solicitacoes.createMany({
+      data: associacoes
+    });
+  }
+
+  private async associarInstrucoes(
+    prisma: any,
+    solicitacaoId: string,
+    instrucoesIds: string[]
+  ) {
+    // Verificar se todas as instruções existem
+    const instrucoes = await prisma.instrucoes.findMany({
+      where: {
+        id: { in: instrucoesIds },
+        deleted_at: null
+      }
+    });
+
+    if (instrucoes.length !== instrucoesIds.length) {
+      throw new BadRequestException('Algumas instruções não foram encontradas');
+    }
+
+    const associacoes = instrucoesIds.map((instrucaoId, index) => ({
+      id: this.generateId(),
+      instrucao_id: instrucaoId,
+      solicitacao_id: solicitacaoId,
+      ordem: index + 1
+    }));
+
+    await prisma.solicitacoes_instrucoes.createMany({
       data: associacoes
     });
   }

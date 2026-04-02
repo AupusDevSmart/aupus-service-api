@@ -35,7 +35,7 @@ export class DashboardService {
           anomalias: {
             some: {
               deleted_at: null,
-              status: { in: ['AGUARDANDO', 'EM_ANALISE', 'OS_GERADA'] },
+              status: { in: ['REGISTRADA', 'PROGRAMADA'] },
             },
           },
         },
@@ -53,7 +53,7 @@ export class DashboardService {
       this.prisma.ordens_servico.count({
         where: {
           deletado_em: null,
-          status: { in: ['PLANEJADA', 'PROGRAMADA'] },
+          status: 'PENDENTE',
         },
       }),
 
@@ -96,7 +96,7 @@ export class DashboardService {
         this.prisma.ordens_servico.count({
           where: {
             deletado_em: null,
-            status: { in: ['PLANEJADA', 'PROGRAMADA'] },
+            status: 'PENDENTE',
           },
         }),
 
@@ -211,7 +211,7 @@ export class DashboardService {
       by: ['prioridade'],
       where: {
         deleted_at: null,
-        status: { in: ['AGUARDANDO', 'EM_ANALISE', 'OS_GERADA'] }, // Anomalias ativas
+        status: { in: ['REGISTRADA', 'PROGRAMADA'] }, // Anomalias ativas
       },
       _count: true,
     });
@@ -219,7 +219,7 @@ export class DashboardService {
     const totalAnomalias = await this.prisma.anomalias.count({
       where: {
         deleted_at: null,
-        status: { in: ['AGUARDANDO', 'EM_ANALISE', 'OS_GERADA'] },
+        status: { in: ['REGISTRADA', 'PROGRAMADA'] },
       },
     });
 
@@ -366,7 +366,7 @@ export class DashboardService {
         where: {
           deleted_at: null,
           prioridade: 'CRITICA',
-          status: { in: ['AGUARDANDO', 'EM_ANALISE', 'OS_GERADA'] },
+          status: { in: ['REGISTRADA', 'PROGRAMADA'] },
         },
       }),
     ]);

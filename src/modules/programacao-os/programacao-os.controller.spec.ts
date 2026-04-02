@@ -5,9 +5,8 @@ import { CreateProgramacaoDto } from './dto/create-programacao.dto';
 import { UpdateProgramacaoDto } from './dto/update-programacao.dto';
 import { ProgramacaoFiltersDto } from './dto/programacao-filters.dto';
 import {
-  AnalisarProgramacaoDto,
   AprovarProgramacaoDto,
-  RejeitarProgramacaoDto,
+  FinalizarProgramacaoDto,
   CancelarProgramacaoDto,
   CreateProgramacaoAnomaliaDto,
   CreateProgramacaoTarefasDto,
@@ -47,11 +46,9 @@ describe('ProgramacaoOSController', () => {
       totalPages: 1,
     },
     stats: {
-      rascunho: 0,
       pendentes: 1,
-      em_analise: 0,
       aprovadas: 0,
-      rejeitadas: 0,
+      finalizadas: 0,
       canceladas: 0,
     },
   };
@@ -69,9 +66,8 @@ describe('ProgramacaoOSController', () => {
     buscarPorId: jest.fn(),
     criar: jest.fn(),
     atualizar: jest.fn(),
-    analisar: jest.fn(),
     aprovar: jest.fn(),
-    rejeitar: jest.fn(),
+    finalizar: jest.fn(),
     cancelar: jest.fn(),
     criarDeAnomalia: jest.fn(),
     criarDeTarefas: jest.fn(),
@@ -230,27 +226,11 @@ describe('ProgramacaoOSController', () => {
     });
   });
 
-  describe('analisar', () => {
-    it('deve iniciar análise da programação', async () => {
-      const id = 'clrx1234567890123456789012';
-      const dto: AnalisarProgramacaoDto = {
-        observacoes_analise: 'Iniciando análise técnica',
-      };
-
-      mockProgramacaoOSService.analisar.mockResolvedValue(undefined);
-
-      const result = await controller.analisar(id, dto);
-
-      expect(service.analisar).toHaveBeenCalledWith(id, dto, undefined);
-      expect(result).toEqual({ message: 'Análise iniciada com sucesso' });
-    });
-  });
-
   describe('aprovar', () => {
     it('deve aprovar uma programação', async () => {
       const id = 'clrx1234567890123456789012';
       const dto: AprovarProgramacaoDto = {
-        observacoes_aprovacao: 'Aprovado para execução',
+        observacoes: 'Aprovado para execução',
         ajustes_orcamento: 1500.00,
       };
 
@@ -260,23 +240,6 @@ describe('ProgramacaoOSController', () => {
 
       expect(service.aprovar).toHaveBeenCalledWith(id, dto, undefined);
       expect(result).toEqual({ message: 'Programação aprovada e OS gerada com sucesso' });
-    });
-  });
-
-  describe('rejeitar', () => {
-    it('deve rejeitar uma programação', async () => {
-      const id = 'clrx1234567890123456789012';
-      const dto: RejeitarProgramacaoDto = {
-        motivo_rejeicao: 'Dados insuficientes',
-        sugestoes_melhoria: 'Adicionar mais detalhes técnicos',
-      };
-
-      mockProgramacaoOSService.rejeitar.mockResolvedValue(undefined);
-
-      const result = await controller.rejeitar(id, dto);
-
-      expect(service.rejeitar).toHaveBeenCalledWith(id, dto, undefined);
-      expect(result).toEqual({ message: 'Programação rejeitada' });
     });
   });
 

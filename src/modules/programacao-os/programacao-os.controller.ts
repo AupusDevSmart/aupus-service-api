@@ -10,6 +10,7 @@ import {
   Post,
   Query,
 } from '@nestjs/common';
+import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { ParseULIDPipe } from '../../shared/pipes/parse-ulid.pipe';
 import {
   ApiOperation,
@@ -20,7 +21,6 @@ import {
 } from '@nestjs/swagger';
 import {
   AdicionarTarefasDto,
-  AnalisarProgramacaoDto,
   AprovarProgramacaoDto,
   AtualizarTarefasDto,
   CancelarProgramacaoDto,
@@ -31,7 +31,6 @@ import {
   ProgramacaoDetalhesResponseDto,
   ProgramacaoFiltersDto,
   ProgramacaoResponseDto,
-  RejeitarProgramacaoDto,
   UpdateProgramacaoDto,
 } from './dto';
 import { ProgramacaoOSService } from './programacao-os.service';
@@ -84,10 +83,8 @@ export class ProgramacaoOSController {
     description: 'Dados inválidos',
   })
   
-  async criar(@Body() createDto: CreateProgramacaoDto): Promise<ProgramacaoResponseDto> {
-    // TODO: Obter usuarioId da sessão quando implementar autenticação
-    const usuarioId = undefined;
-    return this.programacaoOSService.criar(createDto, usuarioId);
+  async criar(@Body() createDto: CreateProgramacaoDto, @CurrentUser() user?: any): Promise<ProgramacaoResponseDto> {
+    return this.programacaoOSService.criar(createDto, user?.id);
   }
 
   @Get('por-unidade/:unidadeId')
@@ -141,7 +138,7 @@ export class ProgramacaoOSController {
   @Patch(':id')
   @ApiOperation({
     summary: 'Atualizar programação',
-    description: 'Atualiza uma programação existente (apenas status RASCUNHO ou PENDENTE)',
+    description: 'Atualiza uma programação existente (apenas status PENDENTE)',
   })
   @ApiParam({ name: 'id', description: 'ID da programação' })
   @ApiResponse({
@@ -160,105 +157,44 @@ export class ProgramacaoOSController {
   async atualizar(
     @Param('id', ParseULIDPipe) id: string,
     @Body() updateDto: UpdateProgramacaoDto,
+    @CurrentUser() user?: any,
   ): Promise<ProgramacaoResponseDto> {
-    // TODO: Obter usuarioId da sessão quando implementar autenticação
-    const usuarioId = undefined;
-    return this.programacaoOSService.atualizar(id, updateDto, usuarioId);
-  }
-
-  @Patch(':id/analisar')
-  @ApiOperation({
-    summary: 'Iniciar análise da programação',
-    description: 'Muda o status para EM_ANALISE',
-  })
-  @ApiParam({ name: 'id', description: 'ID da programação' })
-  @ApiResponse({
-    status: HttpStatus.OK,
-    description: 'Análise iniciada com sucesso',
-  })
-  @ApiResponse({
-    status: HttpStatus.CONFLICT,
-    description: 'Programação não está em status adequado para análise',
-  })
-  async analisar(
-    @Param('id', ParseULIDPipe) id: string,
-    @Body() dto: AnalisarProgramacaoDto,
-  ): Promise<{ message: string }> {
-    // TODO: Obter usuarioId da sessão quando implementar autenticação
-    const usuarioId = undefined;
-    await this.programacaoOSService.analisar(id, dto, usuarioId);
-    return { message: 'Análise iniciada com sucesso' };
+    return this.programacaoOSService.atualizar(id, updateDto, user?.id);
   }
 
   @Patch(':id/aprovar')
   @ApiOperation({
     summary: 'Aprovar programação',
-    description: 'Aprova a programação e gera automaticamente a OS',
+    description: 'Aprova a programação (PENDENTE → APROVADA) e gera automaticamente a OS',
   })
   @ApiParam({ name: 'id', description: 'ID da programação' })
-  @ApiResponse({
-    status: HttpStatus.OK,
-    description: 'Programação aprovada e OS gerada',
-  })
-  @ApiResponse({
-    status: HttpStatus.CONFLICT,
-    description: 'Programação não está em análise',
-  })
+  @ApiResponse({ status: HttpStatus.OK, description: 'Programação aprovada e OS gerada' })
+  @ApiResponse({ status: HttpStatus.CONFLICT, description: 'Programação não está pendente' })
   async aprovar(
     @Param('id', ParseULIDPipe) id: string,
     @Body() dto: AprovarProgramacaoDto,
+    @CurrentUser() user?: any,
   ): Promise<{ message: string }> {
-    // TODO: Obter usuarioId da sessão quando implementar autenticação
-    const usuarioId = undefined;
-    await this.programacaoOSService.aprovar(id, dto, usuarioId);
+    await this.programacaoOSService.aprovar(id, dto, user?.id);
     return { message: 'Programação aprovada e OS gerada com sucesso' };
   }
 
-  @Patch(':id/rejeitar')
-  @ApiOperation({
-    summary: 'Rejeitar programação',
-    description: 'Rejeita a programação com motivo',
-  })
-  @ApiParam({ name: 'id', description: 'ID da programação' })
-  @ApiResponse({
-    status: HttpStatus.OK,
-    description: 'Programação rejeitada',
-  })
-  @ApiResponse({
-    status: HttpStatus.CONFLICT,
-    description: 'Programação não está em análise',
-  })
-  async rejeitar(
-    @Param('id', ParseULIDPipe) id: string,
-    @Body() dto: RejeitarProgramacaoDto,
-  ): Promise<{ message: string }> {
-    // TODO: Obter usuarioId da sessão quando implementar autenticação
-    const usuarioId = undefined;
-    await this.programacaoOSService.rejeitar(id, dto, usuarioId);
-    return { message: 'Programação rejeitada' };
-  }
+  // Finalização da programação é automática (via finalização da OS)
 
   @Patch(':id/cancelar')
   @ApiOperation({
     summary: 'Cancelar programação',
-    description: 'Cancela a programação com motivo',
+    description: 'Cancela a programação com motivo (PENDENTE/APROVADA → CANCELADA)',
   })
   @ApiParam({ name: 'id', description: 'ID da programação' })
-  @ApiResponse({
-    status: HttpStatus.OK,
-    description: 'Programação cancelada',
-  })
-  @ApiResponse({
-    status: HttpStatus.CONFLICT,
-    description: 'Programação não pode ser cancelada',
-  })
+  @ApiResponse({ status: HttpStatus.OK, description: 'Programação cancelada' })
+  @ApiResponse({ status: HttpStatus.CONFLICT, description: 'Programação não pode ser cancelada' })
   async cancelar(
     @Param('id', ParseULIDPipe) id: string,
     @Body() dto: CancelarProgramacaoDto,
+    @CurrentUser() user?: any,
   ): Promise<{ message: string }> {
-    // TODO: Obter usuarioId da sessão quando implementar autenticação
-    const usuarioId = undefined;
-    await this.programacaoOSService.cancelar(id, dto, usuarioId);
+    await this.programacaoOSService.cancelar(id, dto, user?.id);
     return { message: 'Programação cancelada' };
   }
 
@@ -280,10 +216,9 @@ export class ProgramacaoOSController {
   async criarDeAnomalia(
     @Param('anomaliaId', ParseULIDPipe) anomaliaId: string,
     @Body() dto: CreateProgramacaoAnomaliaDto,
+    @CurrentUser() user?: any,
   ): Promise<ProgramacaoResponseDto> {
-    // TODO: Obter usuarioId da sessão quando implementar autenticação
-    const usuarioId = undefined;
-    return this.programacaoOSService.criarDeAnomalia(anomaliaId, dto, usuarioId);
+    return this.programacaoOSService.criarDeAnomalia(anomaliaId, dto, user?.id);
   }
 
   @Post('from-tarefas')
@@ -300,10 +235,8 @@ export class ProgramacaoOSController {
     status: HttpStatus.NOT_FOUND,
     description: 'Uma ou mais tarefas não encontradas',
   })
-  async criarDeTarefas(@Body() dto: CreateProgramacaoTarefasDto): Promise<ProgramacaoResponseDto> {
-    // TODO: Obter usuarioId da sessão quando implementar autenticação
-    const usuarioId = undefined;
-    return this.programacaoOSService.criarDeTarefas(dto, usuarioId);
+  async criarDeTarefas(@Body() dto: CreateProgramacaoTarefasDto, @CurrentUser() user?: any): Promise<ProgramacaoResponseDto> {
+    return this.programacaoOSService.criarDeTarefas(dto, user?.id);
   }
 
   @Post('from-solicitacao/:solicitacaoId')
@@ -328,10 +261,9 @@ export class ProgramacaoOSController {
   async criarDeSolicitacao(
     @Param('solicitacaoId', ParseULIDPipe) solicitacaoId: string,
     @Body() dto?: any,
+    @CurrentUser() user?: any,
   ): Promise<ProgramacaoResponseDto> {
-    // TODO: Obter usuarioId da sessão quando implementar autenticação
-    const usuarioId = undefined;
-    return this.programacaoOSService.criarDeSolicitacao(solicitacaoId, dto, usuarioId);
+    return this.programacaoOSService.criarDeSolicitacao(solicitacaoId, dto, user?.id);
   }
 
   @Post(':id/tarefas')
@@ -351,10 +283,9 @@ export class ProgramacaoOSController {
   async adicionarTarefas(
     @Param('id', ParseULIDPipe) id: string,
     @Body() dto: AdicionarTarefasDto,
+    @CurrentUser() user?: any,
   ): Promise<{ message: string }> {
-    // TODO: Obter usuarioId da sessão quando implementar autenticação
-    const usuarioId = undefined;
-    await this.programacaoOSService.adicionarTarefasProgramacao(id, dto, usuarioId);
+    await this.programacaoOSService.adicionarTarefasProgramacao(id, dto, user?.id);
     return { message: 'Tarefas adicionadas com sucesso' };
   }
 
@@ -371,10 +302,9 @@ export class ProgramacaoOSController {
   async atualizarTarefas(
     @Param('id', ParseULIDPipe) id: string,
     @Body() dto: AtualizarTarefasDto,
+    @CurrentUser() user?: any,
   ): Promise<{ message: string }> {
-    // TODO: Obter usuarioId da sessão quando implementar autenticação
-    const usuarioId = undefined;
-    await this.programacaoOSService.atualizarTarefasProgramacao(id, dto, usuarioId);
+    await this.programacaoOSService.atualizarTarefasProgramacao(id, dto, user?.id);
     return { message: 'Tarefas atualizadas com sucesso' };
   }
 
@@ -396,10 +326,9 @@ export class ProgramacaoOSController {
   async removerTarefa(
     @Param('id', ParseULIDPipe) id: string,
     @Param('tarefaId', ParseULIDPipe) tarefaId: string,
+    @CurrentUser() user?: any,
   ): Promise<{ message: string }> {
-    // TODO: Obter usuarioId da sessão quando implementar autenticação
-    const usuarioId = undefined;
-    await this.programacaoOSService.removerTarefaProgramacao(id, tarefaId, usuarioId);
+    await this.programacaoOSService.removerTarefaProgramacao(id, tarefaId, user?.id);
     return { message: 'Tarefa removida com sucesso' };
   }
 
@@ -417,10 +346,8 @@ export class ProgramacaoOSController {
     status: HttpStatus.CONFLICT,
     description: 'Programações aprovadas não podem ser deletadas',
   })
-  async deletar(@Param('id', ParseULIDPipe) id: string): Promise<{ message: string }> {
-    // TODO: Obter usuarioId da sessão quando implementar autenticação
-    const usuarioId = undefined;
-    await this.programacaoOSService.deletar(id, usuarioId);
+  async deletar(@Param('id', ParseULIDPipe) id: string, @CurrentUser() user?: any): Promise<{ message: string }> {
+    await this.programacaoOSService.deletar(id, user?.id);
     return { message: 'Programação deletada com sucesso' };
   }
 }

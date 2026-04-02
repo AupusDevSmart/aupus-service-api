@@ -100,7 +100,7 @@ async function seedProgramacaoOS() {
       local: 'Câmara Fria - Armazém 3',
       ativo: 'Sistema de Refrigeração',
       condicoes: 'FUNCIONANDO',
-      status: 'EM_ANALISE',
+      status: 'APROVADA',
       tipo: 'CORRETIVA',
       prioridade: 'CRITICA',
       origem: 'ANOMALIA',
@@ -166,7 +166,7 @@ async function seedProgramacaoOS() {
       local: 'Subsolo - Casa de Máquinas',
       ativo: 'Grupo Gerador de Emergência',
       condicoes: 'FUNCIONANDO',
-      status: 'RASCUNHO',
+      status: 'PENDENTE',
       tipo: 'INSPECAO',
       prioridade: 'MEDIA',
       origem: 'TAREFA',
@@ -397,15 +397,6 @@ async function seedProgramacaoOS() {
         usuario: usuarios[2].nome,
         usuario_id: usuarios[2].id,
         status_anterior: 'PENDENTE',
-        status_novo: 'EM_ANALISE',
-        observacoes: 'Análise técnica realizada - recursos confirmados'
-      },
-      {
-        programacao_id: prog1.id,
-        acao: 'Programação aprovada',
-        usuario: usuarios[2].nome,
-        usuario_id: usuarios[2].id,
-        status_anterior: 'EM_ANALISE',
         status_novo: 'APROVADA',
         observacoes: 'Programação aprovada - pode gerar OS'
       }
@@ -423,7 +414,7 @@ async function seedProgramacaoOS() {
       local: prog1.local,
       ativo: prog1.ativo,
       condicoes: prog1.condicoes,
-      status: 'PROGRAMADA',
+      status: 'PENDENTE',
       tipo: prog1.tipo,
       prioridade: prog1.prioridade,
       origem: prog1.origem,
@@ -634,17 +625,8 @@ async function seedProgramacaoOS() {
         usuario: 'Sistema',
         usuario_id: usuarios[0].id,
         status_anterior: null,
-        status_novo: 'PLANEJADA',
+        status_novo: 'PENDENTE',
         observacoes: 'OS gerada a partir da programação aprovada PRG-2025-001'
-      },
-      {
-        os_id: os1.id,
-        acao: 'OS programada com recursos',
-        usuario: usuarios[2].nome,
-        usuario_id: usuarios[2].id,
-        status_anterior: 'PLANEJADA',
-        status_novo: 'PROGRAMADA',
-        observacoes: 'Recursos confirmados e data programada definida'
       }
     ]
   });
@@ -680,7 +662,7 @@ async function seedProgramacaoOS() {
       local: 'Painel Principal',
       ativo: 'Sistema de Controle Principal',
       condicoes: 'PARADO',
-      status: 'REJEITADA',
+      status: 'CANCELADA',
       tipo: 'PREVENTIVA',
       prioridade: 'BAIXA',
       origem: 'MANUAL',

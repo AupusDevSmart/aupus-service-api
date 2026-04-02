@@ -35,6 +35,14 @@ export class PlantaResumoDto {
   localizacao: string;
 }
 
+export class InstrucaoResumoDto {
+  id: string;
+  tag: string;
+  nome: string;
+  categoria: CategoriaTarefa;
+  tipo_manutencao: TipoManutencao;
+}
+
 export class SubTarefaResponseDto {
   id: string;
   descricao: string;
@@ -84,6 +92,7 @@ export class TarefaResponseDto {
   ordem?: number;
   planta_id?: string;
   equipamento_id: string;
+  instrucao_id?: string;
   planejador?: string;
   responsavel?: string;
   observacoes?: string;
@@ -102,6 +111,7 @@ export class TarefaResponseDto {
   equipamento?: EquipamentoResumoDto;
   usuario_criador?: UsuarioResumoDto;
   usuario_atualizador?: UsuarioResumoDto;
+  instrucao?: InstrucaoResumoDto;
 
   // Sub-estruturas
   sub_tarefas?: SubTarefaResponseDto[];

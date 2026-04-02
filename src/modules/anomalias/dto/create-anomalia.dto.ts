@@ -3,14 +3,6 @@ import { ApiProperty } from '@nestjs/swagger';
 import { IsString, IsNotEmpty, IsOptional, IsEnum, IsArray, ValidateNested } from 'class-validator';
 import { Type } from 'class-transformer';
 
-export enum StatusAnomalia {
-  AGUARDANDO = 'AGUARDANDO',
-  EM_ANALISE = 'EM_ANALISE',
-  OS_GERADA = 'OS_GERADA',
-  CANCELADA = 'CANCELADA',
-  RESOLVIDA = 'RESOLVIDA',
-}
-
 export enum PrioridadeAnomalia {
   BAIXA = 'BAIXA',
   MEDIA = 'MEDIA',
@@ -106,4 +98,15 @@ export class CreateAnomaliaDto {
   @IsOptional()
   @IsArray()
   anexos?: any[];
+
+  @ApiProperty({
+    description: 'IDs das instruções a vincular',
+    type: [String],
+    required: false,
+    example: ['id1', 'id2']
+  })
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  instrucoes_ids?: string[];
 }

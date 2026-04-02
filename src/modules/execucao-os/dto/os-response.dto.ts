@@ -616,6 +616,9 @@ export class OrdemServicoDetalhesResponseDto extends OrdemServicoResponseDto {
   @ApiProperty({ description: 'Programação origem' })
   programacao_origem: any;
 
+  @ApiPropertyOptional({ description: 'Dados da solicitação de serviço (via programação)' })
+  solicitacao_servico?: any;
+
   @ApiProperty({ description: 'Materiais da OS', type: [MaterialOSResponseDto] })
   materiais: MaterialOSResponseDto[];
 
@@ -656,17 +659,20 @@ export class PaginationDto {
 }
 
 export class OSStatsDto {
-  @ApiProperty({ description: 'OS planejadas' })
-  planejadas: number;
-
-  @ApiProperty({ description: 'OS programadas' })
-  programadas: number;
+  @ApiProperty({ description: 'OS pendentes' })
+  pendentes: number;
 
   @ApiProperty({ description: 'OS em execução' })
   em_execucao: number;
 
   @ApiProperty({ description: 'OS pausadas' })
   pausadas: number;
+
+  @ApiProperty({ description: 'OS executadas' })
+  executadas: number;
+
+  @ApiProperty({ description: 'OS auditadas' })
+  auditadas: number;
 
   @ApiProperty({ description: 'OS finalizadas' })
   finalizadas: number;

@@ -7,7 +7,6 @@ import { StreamableFile } from '@nestjs/common';
 import { StatusOS, TipoOS, PrioridadeOS, OrigemOS, CondicaoOS, TipoAnexoOS } from '@prisma/client';
 import {
   OSFiltersDto,
-  ProgramarOSDto,
   IniciarExecucaoDto,
   PausarExecucaoDto,
   RetomarExecucaoDto,
@@ -34,7 +33,7 @@ describe('ExecucaoOSController', () => {
     local: 'Planta A',
     ativo: 'Motor 001',
     condicoes: CondicaoOS.FUNCIONANDO,
-    status: StatusOS.PROGRAMADA,
+    status: StatusOS.PENDENTE,
     tipo: TipoOS.PREVENTIVA,
     prioridade: PrioridadeOS.MEDIA,
     origem: OrigemOS.PLANO_MANUTENCAO,
@@ -65,10 +64,11 @@ describe('ExecucaoOSController', () => {
       totalPages: 1,
     },
     stats: {
-      planejadas: 0,
-      programadas: 1,
+      pendentes: 1,
       em_execucao: 0,
       pausadas: 0,
+      executadas: 0,
+      auditadas: 0,
       finalizadas: 0,
       canceladas: 0,
     },
@@ -90,7 +90,6 @@ describe('ExecucaoOSController', () => {
   const mockExecucaoOSService = {
     listar: jest.fn(),
     buscarPorId: jest.fn(),
-    programar: jest.fn(),
     iniciar: jest.fn(),
     pausar: jest.fn(),
     retomar: jest.fn(),
@@ -145,7 +144,7 @@ describe('ExecucaoOSController', () => {
         page: 1,
         limit: 10,
         search: 'motor',
-        status: StatusOS.PROGRAMADA,
+        status: StatusOS.PENDENTE,
       };
 
       mockExecucaoOSService.listar.mockResolvedValue(mockListResponse);
@@ -182,60 +181,13 @@ describe('ExecucaoOSController', () => {
     });
   });
 
-  describe('programar', () => {
-    it('deve programar uma OS', async () => {
-      const id = 'clrx1234567890123456789012';
-      const dto: ProgramarOSDto = {
-        data_hora_programada: '2025-02-15T08:00:00Z',
-        responsavel: 'João Silva',
-        materiais_confirmados: [],
-        ferramentas_confirmadas: [],
-        tecnicos_confirmados: [],
-      };
-
-      mockExecucaoOSService.programar.mockResolvedValue(undefined);
-
-      const result = await controller.programar(id, dto);
-
-      expect(execucaoService.programar).toHaveBeenCalledWith(id, dto, undefined);
-      expect(result).toEqual({ message: 'OS programada com sucesso' });
-    });
-
-    it('deve programar OS com reserva de veículo', async () => {
-      const id = 'clrx1234567890123456789012';
-      const dto: ProgramarOSDto = {
-        data_hora_programada: '2025-02-15T08:00:00Z',
-        responsavel: 'João Silva',
-        materiais_confirmados: [],
-        ferramentas_confirmadas: [],
-        tecnicos_confirmados: [],
-        reserva_veiculo: {
-          veiculo_id: 'clrx9876543210987654321098',
-          data_inicio: '2025-02-15',
-          data_fim: '2025-02-15',
-          hora_inicio: '08:00',
-          hora_fim: '17:00',
-          finalidade: 'Transporte da equipe',
-          km_inicial: 50000,
-        },
-      };
-
-      mockExecucaoOSService.programar.mockResolvedValue(undefined);
-
-      const result = await controller.programar(id, dto);
-
-      expect(execucaoService.programar).toHaveBeenCalledWith(id, dto, undefined);
-      expect(result).toEqual({ message: 'OS programada com sucesso' });
-    });
-  });
-
   describe('iniciar', () => {
     it('deve iniciar execução da OS', async () => {
       const id = 'clrx1234567890123456789012';
       const dto: IniciarExecucaoDto = {
         equipe_presente: ['João Silva', 'Maria Santos'],
         responsavel_execucao: 'João Silva',
-        observacoes_inicio: 'Início da execução',
+        observacoes: 'Início da execução',
       };
 
       mockExecucaoOSService.iniciar.mockResolvedValue(undefined);
@@ -524,23 +476,7 @@ describe('ExecucaoOSController', () => {
     it('deve finalizar OS', async () => {
       const id = 'clrx1234567890123456789012';
       const dto: FinalizarOSDto = {
-        resultado_servico: 'Manutenção concluída com sucesso',
-        materiais_consumidos: [
-          {
-            id: 'clrx1234567890123456789012',
-            quantidade_consumida: 5.0,
-            observacoes: 'Consumo total',
-          },
-        ],
-        ferramentas_utilizadas: [
-          {
-            id: 'clrx9876543210987654321098',
-            condicao_depois: 'Boa',
-            observacoes: 'Ferramenta em bom estado',
-          },
-        ],
-        avaliacao_qualidade: 5,
-        observacoes_qualidade: 'Serviço executado perfeitamente',
+        observacoes: 'Serviço executado perfeitamente',
       };
 
       mockExecucaoOSService.finalizar.mockResolvedValue(undefined);

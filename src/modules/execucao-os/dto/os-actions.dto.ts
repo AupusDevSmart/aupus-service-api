@@ -102,20 +102,21 @@ export class ProgramarOSDto {
 }
 
 export class IniciarExecucaoDto {
-  @ApiProperty({ description: 'Equipe presente na execução' })
+  @ApiPropertyOptional({ description: 'Equipe presente na execução' })
+  @IsOptional()
   @IsArray()
   @IsString({ each: true })
-  equipe_presente: string[];
+  equipe_presente?: string[];
 
-  @ApiProperty({ description: 'Responsável pela execução' })
+  @ApiPropertyOptional({ description: 'Responsável pela execução' })
+  @IsOptional()
   @IsString()
-  @IsNotEmpty()
-  responsavel_execucao: string;
+  responsavel_execucao?: string;
 
   @ApiPropertyOptional({ description: 'Observações do início' })
   @IsOptional()
   @IsString()
-  observacoes_inicio?: string;
+  observacoes?: string;
 
   @ApiPropertyOptional({ description: 'Data e hora de início real', example: '2025-02-15T08:00:00Z' })
   @IsOptional()
@@ -294,7 +295,7 @@ export class FerramentaFinalizacaoDto {
   observacoes?: string;
 }
 
-export class FinalizarOSDto {
+export class ExecutarOSDto {
   @ApiPropertyOptional({ description: 'Data e hora de fim real', example: '2025-02-15T17:00:00Z' })
   @IsOptional()
   @IsDateString()
@@ -320,30 +321,19 @@ export class FinalizarOSDto {
   @IsDateString()
   proxima_manutencao?: string;
 
-  @ApiPropertyOptional({ description: 'Materiais consumidos finais (lista vazia significa nenhum material consumido)', type: [MaterialFinalizacaoDto] })
+  @ApiPropertyOptional({ description: 'Materiais consumidos', type: [MaterialFinalizacaoDto] })
   @IsOptional()
   @IsArray()
   @ValidateNested({ each: true })
   @Type(() => MaterialFinalizacaoDto)
   materiais_consumidos?: MaterialFinalizacaoDto[];
 
-  @ApiPropertyOptional({ description: 'Ferramentas utilizadas finais (lista vazia significa nenhuma ferramenta utilizada)', type: [FerramentaFinalizacaoDto] })
+  @ApiPropertyOptional({ description: 'Ferramentas utilizadas', type: [FerramentaFinalizacaoDto] })
   @IsOptional()
   @IsArray()
   @ValidateNested({ each: true })
   @Type(() => FerramentaFinalizacaoDto)
   ferramentas_utilizadas?: FerramentaFinalizacaoDto[];
-
-  @ApiProperty({ description: 'Avaliação da qualidade (1-5)' })
-  @IsNumber()
-  @Min(1)
-  @Max(5)
-  avaliacao_qualidade: number;
-
-  @ApiPropertyOptional({ description: 'Observações sobre a qualidade' })
-  @IsOptional()
-  @IsString()
-  observacoes_qualidade?: string;
 
   @ApiPropertyOptional({ description: 'KM final do veículo' })
   @IsOptional()
@@ -356,7 +346,6 @@ export class FinalizarOSDto {
   @IsString()
   observacoes_veiculo?: string;
 
-  // Novos campos adicionados
   @ApiPropertyOptional({ description: 'Atividades realizadas durante a execução' })
   @IsOptional()
   @IsString()
@@ -394,6 +383,34 @@ export class FinalizarOSDto {
   @IsNumber({ maxDecimalPlaces: 2 })
   @Min(0)
   custos_adicionais?: number;
+}
+
+export class AuditarOSDto {
+  @ApiPropertyOptional({ description: 'Avaliação da qualidade (1-5)' })
+  @IsOptional()
+  @IsNumber()
+  @Min(1)
+  @Max(5)
+  avaliacao_qualidade?: number;
+
+  @ApiPropertyOptional({ description: 'Observações sobre a qualidade' })
+  @IsOptional()
+  @IsString()
+  observacoes_qualidade?: string;
+}
+
+export class ReabrirOSDto {
+  @ApiPropertyOptional({ description: 'Observações sobre a reabertura' })
+  @IsOptional()
+  @IsString()
+  observacoes?: string;
+}
+
+export class FinalizarOSDto {
+  @ApiPropertyOptional({ description: 'Observações sobre a finalização' })
+  @IsOptional()
+  @IsString()
+  observacoes?: string;
 }
 
 export class CancelarOSDto {

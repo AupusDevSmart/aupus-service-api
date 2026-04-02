@@ -38,7 +38,9 @@ export class PlanosManutencaoMapper {
         tempo_estimado: tarefa.tempo_estimado,
         total_sub_tarefas: tarefa._count?.sub_tarefas || 0,
         total_recursos: tarefa._count?.recursos || 0,
-        total_anexos: tarefa._count?.anexos || 0
+        total_anexos: tarefa._count?.anexos || 0,
+        instrucao_id: tarefa.instrucao_id || null,
+        instrucao_nome: tarefa.instrucao?.nome || null
       })),
       total_tarefas: plano._count?.tarefas || plano.tarefas?.length || 0,
       tarefas_ativas: plano.tarefas?.filter((t: any) => t.ativo)?.length || 0,

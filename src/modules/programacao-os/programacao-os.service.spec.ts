@@ -1,15 +1,15 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { ProgramacaoOSService } from './programacao-os.service';
 import { PrismaService } from '../../shared/prisma/prisma.service';
+import { AnomaliasService } from '../anomalias/anomalias.service';
 import { NotFoundException, BadRequestException, ConflictException } from '@nestjs/common';
 import { StatusProgramacaoOS, CondicaoOS, TipoOS, PrioridadeOS, OrigemOS } from '@prisma/client';
 import {
   CreateProgramacaoDto,
   UpdateProgramacaoDto,
   ProgramacaoFiltersDto,
-  AnalisarProgramacaoDto,
   AprovarProgramacaoDto,
-  RejeitarProgramacaoDto,
+  FinalizarProgramacaoDto,
   CancelarProgramacaoDto,
   CreateProgramacaoAnomaliaDto,
   CreateProgramacaoTarefasDto,
@@ -80,9 +80,11 @@ describe('ProgramacaoOSService', () => {
       equipamento: {
         id: 'clrx1234567890123456789012',
         nome: 'Motor 001',
-        planta: {
-          id: 'clrx1234567890123456789012',
-          nome: 'Planta A',
+        unidade: {
+          planta: {
+            id: 'clrx1234567890123456789012',
+            nome: 'Planta A',
+          },
         },
       },
     },
@@ -98,9 +100,11 @@ describe('ProgramacaoOSService', () => {
       equipamento: {
         id: 'clrx1234567890123456789012',
         nome: 'Motor 001',
-        planta: {
-          id: 'clrx1234567890123456789012',
-          nome: 'Planta A',
+        unidade: {
+          planta: {
+            id: 'clrx1234567890123456789012',
+            nome: 'Planta A',
+          },
         },
       },
     },
@@ -151,6 +155,9 @@ describe('ProgramacaoOSService', () => {
     historico_programacao_os: {
       create: jest.fn(),
     },
+    historico_os: {
+      create: jest.fn(),
+    },
     ordens_servico: {
       create: jest.fn(),
       count: jest.fn(),
@@ -177,6 +184,14 @@ describe('ProgramacaoOSService', () => {
         {
           provide: PrismaService,
           useValue: mockPrismaService,
+        },
+        {
+          provide: AnomaliasService,
+          useValue: {
+            marcarComoFinalizada: jest.fn(),
+            marcarComoProgramada: jest.fn(),
+            voltarParaRegistrada: jest.fn(),
+          },
         },
       ],
     }).compile();
@@ -219,8 +234,6 @@ describe('ProgramacaoOSService', () => {
           status: StatusProgramacaoOS.PENDENTE,
           OR: expect.arrayContaining([
             { descricao: { contains: 'motor', mode: 'insensitive' } },
-            { local: { contains: 'motor', mode: 'insensitive' } },
-            { ativo: { contains: 'motor', mode: 'insensitive' } },
             { codigo: { contains: 'motor', mode: 'insensitive' } },
           ]),
         }),
@@ -326,22 +339,21 @@ describe('ProgramacaoOSService', () => {
       const result = await service.criar(createDto, 'user123');
 
       expect(mockPrismaService.$transaction).toHaveBeenCalled();
-      expect(mockPrismaService.programacoes_os.create).toHaveBeenCalledWith({
-        data: expect.objectContaining({
-          codigo: 'PRG-2025-001',
-          descricao: createDto.descricao,
-          local: createDto.local,
-          ativo: createDto.ativo,
-          condicoes: createDto.condicoes,
-          tipo: createDto.tipo,
-          prioridade: createDto.prioridade,
-          origem: createDto.origem,
-          tempo_estimado: createDto.tempo_estimado,
-          duracao_estimada: createDto.duracao_estimada,
-          criado_por_id: 'user123',
-        }),
-        include: expect.any(Object),
-      });
+      const createCall = mockPrismaService.programacoes_os.create.mock.calls[0][0];
+      expect(createCall.data).toEqual(expect.objectContaining({
+        codigo: expect.stringMatching(/^PRG-\d{4}-001$/),
+        descricao: createDto.descricao,
+        local: createDto.local,
+        ativo: createDto.ativo,
+        condicoes: createDto.condicoes,
+        tipo: createDto.tipo,
+        prioridade: createDto.prioridade,
+        origem: createDto.origem,
+        tempo_estimado: createDto.tempo_estimado,
+        duracao_estimada: createDto.duracao_estimada,
+        criado_por_id: 'user123',
+      }));
+      expect(createCall.include).toBeDefined();
 
       expect(result).toEqual(expect.objectContaining({
         id: mockProgramacaoData.id,
@@ -470,54 +482,42 @@ describe('ProgramacaoOSService', () => {
     });
   });
 
-  describe('analisar', () => {
-    const analisarDto: AnalisarProgramacaoDto = {
-      observacoes_analise: 'Iniciando análise técnica',
+  describe('finalizar', () => {
+    const finalizarDto: FinalizarProgramacaoDto = {
+      observacoes: 'Finalização da programação',
     };
 
-    it('deve iniciar análise de programação pendente', async () => {
-      mockPrismaService.programacoes_os.findFirst.mockResolvedValue({
-        ...mockProgramacaoData,
-        status: StatusProgramacaoOS.PENDENTE,
-      });
-
-      mockPrismaService.programacoes_os.update.mockResolvedValue({
-        ...mockProgramacaoData,
-        status: StatusProgramacaoOS.EM_ANALISE,
-      });
-
-      mockPrismaService.historico_programacao_os.create.mockResolvedValue({});
-
-      await service.analisar('clrx1234567890123456789012', analisarDto, 'user123');
-
-      expect(mockPrismaService.programacoes_os.update).toHaveBeenCalledWith({
-        where: { id: 'clrx1234567890123456789012' },
-        data: {
-          status: StatusProgramacaoOS.EM_ANALISE,
-          analisado_por_id: 'user123',
-          data_analise: expect.any(Date),
-        },
-      });
-    });
-
-    it('deve lançar ConflictException para status inadequado', async () => {
+    it('deve finalizar programação aprovada', async () => {
       mockPrismaService.programacoes_os.findFirst.mockResolvedValue({
         ...mockProgramacaoData,
         status: StatusProgramacaoOS.APROVADA,
       });
 
-      await expect(service.analisar('clrx1234567890123456789012', analisarDto, 'user123'))
-        .rejects.toThrow(ConflictException);
+      mockPrismaService.programacoes_os.update.mockResolvedValue({
+        ...mockProgramacaoData,
+        status: StatusProgramacaoOS.FINALIZADA,
+      });
+
+      mockPrismaService.historico_programacao_os.create.mockResolvedValue({});
+
+      await service.finalizar('clrx1234567890123456789012', finalizarDto, 'user123');
+
+      expect(mockPrismaService.programacoes_os.update).toHaveBeenCalledWith({
+        where: { id: 'clrx1234567890123456789012' },
+        data: expect.objectContaining({
+          status: StatusProgramacaoOS.FINALIZADA,
+        }),
+      });
     });
   });
 
   describe('aprovar', () => {
     const aprovarDto: AprovarProgramacaoDto = {
-      observacoes_aprovacao: 'Aprovado para execução',
+      observacoes: 'Aprovado para execução',
       ajustes_orcamento: 1500.00,
     };
 
-    it('deve aprovar programação em análise e gerar OS', async () => {
+    it('deve aprovar programação pendente e gerar OS', async () => {
       const mockTransaction = jest.fn(async (callback) => {
         return await callback(mockPrismaService);
       });
@@ -526,7 +526,7 @@ describe('ProgramacaoOSService', () => {
 
       mockPrismaService.programacoes_os.findFirst.mockResolvedValue({
         ...mockProgramacaoData,
-        status: StatusProgramacaoOS.EM_ANALISE,
+        status: StatusProgramacaoOS.PENDENTE,
       });
 
       mockPrismaService.programacoes_os.update.mockResolvedValue({
@@ -540,12 +540,13 @@ describe('ProgramacaoOSService', () => {
         materiais: [],
         ferramentas: [],
         tecnicos: [],
+        historico: [],
       });
 
       mockPrismaService.ordens_servico.count.mockResolvedValue(0);
       mockPrismaService.ordens_servico.create.mockResolvedValue({
-        id: 'clrx1234567890123456789012',
-        numero_os: 'OS-2025-001',
+        id: 'os_generated_id',
+        numero_os: `OS-${new Date().getFullYear()}-001`,
       });
 
       mockPrismaService.historico_programacao_os.create.mockResolvedValue({});
@@ -562,48 +563,129 @@ describe('ProgramacaoOSService', () => {
         }),
       });
 
-      expect(mockPrismaService.ordens_servico.create).toHaveBeenCalled();
+      // Verificar que a OS foi criada com dados herdados da programação
+      expect(mockPrismaService.ordens_servico.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({
+          programacao_id: 'clrx1234567890123456789012',
+          numero_os: expect.stringMatching(/^OS-\d{4}-001$/),
+          descricao: mockProgramacaoData.descricao,
+          status: 'PENDENTE',
+          tipo: mockProgramacaoData.tipo,
+          prioridade: mockProgramacaoData.prioridade,
+          origem: mockProgramacaoData.origem,
+          condicoes: mockProgramacaoData.condicoes,
+          tempo_estimado: mockProgramacaoData.tempo_estimado,
+          duracao_estimada: mockProgramacaoData.duracao_estimada,
+        }),
+      });
+    });
+
+    it('deve copiar recursos (materiais, ferramentas, tecnicos, tarefas) para a OS gerada', async () => {
+      const mockTransaction = jest.fn(async (callback) => {
+        return await callback(mockPrismaService);
+      });
+
+      mockPrismaService.$transaction.mockImplementation(mockTransaction);
+
+      const programacaoComRecursos = {
+        ...mockProgramacaoData,
+        status: StatusProgramacaoOS.PENDENTE,
+      };
+
+      mockPrismaService.programacoes_os.findFirst.mockResolvedValue(programacaoComRecursos);
+      mockPrismaService.programacoes_os.update.mockResolvedValue({
+        ...mockProgramacaoData,
+        status: StatusProgramacaoOS.APROVADA,
+      });
+
+      // Programação com recursos para copiar
+      mockPrismaService.programacoes_os.findUnique.mockResolvedValue({
+        ...mockProgramacaoData,
+        tarefas_programacao: [
+          { id: 'tp1', tarefa_id: 'tarefa1', ordem: 1 },
+          { id: 'tp2', tarefa_id: 'tarefa2', ordem: 2 },
+        ],
+        materiais: [
+          { id: 'm1', descricao: 'Óleo', quantidade_planejada: 5, unidade: 'L', custo_unitario: 15.50, custo_total: 77.50, confirmado: true, disponivel: true, observacoes: null },
+        ],
+        ferramentas: [
+          { id: 'f1', descricao: 'Chave inglesa', quantidade: 2, confirmada: true, disponivel: true, observacoes: null },
+        ],
+        tecnicos: [
+          { id: 't1', nome: 'João', especialidade: 'Mecânico', horas_estimadas: 4, custo_hora: 50, custo_total: 200, disponivel: true, tecnico_id: 'tec1' },
+        ],
+        historico: [],
+      });
+
+      const osId = 'os_generated_id';
+      mockPrismaService.ordens_servico.count.mockResolvedValue(0);
+      mockPrismaService.ordens_servico.create.mockResolvedValue({
+        id: osId,
+        numero_os: `OS-${new Date().getFullYear()}-001`,
+      });
+
+      mockPrismaService.tarefas_os.createMany.mockResolvedValue({ count: 2 });
+      mockPrismaService.materiais_os.createMany.mockResolvedValue({ count: 1 });
+      mockPrismaService.ferramentas_os.createMany.mockResolvedValue({ count: 1 });
+      mockPrismaService.tecnicos_os.createMany.mockResolvedValue({ count: 1 });
+      mockPrismaService.historico_programacao_os.create.mockResolvedValue({});
+
+      await service.aprovar('clrx1234567890123456789012', aprovarDto, 'user123');
+
+      // Verificar cópia de tarefas
+      expect(mockPrismaService.tarefas_os.createMany).toHaveBeenCalledWith({
+        data: [
+          { os_id: osId, tarefa_id: 'tarefa1', ordem: 1 },
+          { os_id: osId, tarefa_id: 'tarefa2', ordem: 2 },
+        ],
+      });
+
+      // Verificar cópia de materiais
+      expect(mockPrismaService.materiais_os.createMany).toHaveBeenCalledWith({
+        data: expect.arrayContaining([
+          expect.objectContaining({
+            os_id: osId,
+            descricao: 'Óleo',
+            quantidade_planejada: 5,
+            unidade: 'L',
+            custo_unitario: 15.50,
+          }),
+        ]),
+      });
+
+      // Verificar cópia de ferramentas
+      expect(mockPrismaService.ferramentas_os.createMany).toHaveBeenCalledWith({
+        data: expect.arrayContaining([
+          expect.objectContaining({
+            os_id: osId,
+            descricao: 'Chave inglesa',
+            quantidade: 2,
+          }),
+        ]),
+      });
+
+      // Verificar cópia de técnicos
+      expect(mockPrismaService.tecnicos_os.createMany).toHaveBeenCalledWith({
+        data: expect.arrayContaining([
+          expect.objectContaining({
+            os_id: osId,
+            nome: 'João',
+            especialidade: 'Mecânico',
+            horas_estimadas: 4,
+            tecnico_id: 'tec1',
+          }),
+        ]),
+      });
     });
 
     it('deve lançar ConflictException para status inadequado', async () => {
       mockPrismaService.programacoes_os.findFirst.mockResolvedValue({
         ...mockProgramacaoData,
-        status: StatusProgramacaoOS.PENDENTE,
+        status: StatusProgramacaoOS.CANCELADA,
       });
 
       await expect(service.aprovar('clrx1234567890123456789012', aprovarDto, 'user123'))
         .rejects.toThrow(ConflictException);
-    });
-  });
-
-  describe('rejeitar', () => {
-    const rejeitarDto: RejeitarProgramacaoDto = {
-      motivo_rejeicao: 'Dados insuficientes',
-      sugestoes_melhoria: 'Adicionar mais detalhes',
-    };
-
-    it('deve rejeitar programação em análise', async () => {
-      mockPrismaService.programacoes_os.findFirst.mockResolvedValue({
-        ...mockProgramacaoData,
-        status: StatusProgramacaoOS.EM_ANALISE,
-      });
-
-      mockPrismaService.programacoes_os.update.mockResolvedValue({
-        ...mockProgramacaoData,
-        status: StatusProgramacaoOS.REJEITADA,
-      });
-
-      mockPrismaService.historico_programacao_os.create.mockResolvedValue({});
-
-      await service.rejeitar('clrx1234567890123456789012', rejeitarDto, 'user123');
-
-      expect(mockPrismaService.programacoes_os.update).toHaveBeenCalledWith({
-        where: { id: 'clrx1234567890123456789012' },
-        data: {
-          status: StatusProgramacaoOS.REJEITADA,
-          motivo_rejeicao: rejeitarDto.motivo_rejeicao,
-        },
-      });
     });
   });
 
@@ -639,7 +721,7 @@ describe('ProgramacaoOSService', () => {
     it('deve lançar ConflictException para status não cancelável', async () => {
       mockPrismaService.programacoes_os.findFirst.mockResolvedValue({
         ...mockProgramacaoData,
-        status: StatusProgramacaoOS.APROVADA,
+        status: StatusProgramacaoOS.FINALIZADA,
       });
 
       await expect(service.cancelar('clrx1234567890123456789012', cancelarDto, 'user123'))
@@ -723,7 +805,11 @@ describe('ProgramacaoOSService', () => {
         },
         include: {
           equipamento: {
-            include: { planta: true },
+            include: {
+              unidade: {
+                include: { planta: true },
+              },
+            },
           },
         },
       });

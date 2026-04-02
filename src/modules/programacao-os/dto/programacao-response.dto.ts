@@ -414,6 +414,18 @@ export class ProgramacaoResponseDto {
 
   @ApiPropertyOptional({ description: 'Hora sugerida para programação (HH:mm)' })
   hora_programada_sugerida?: string;
+
+  @ApiPropertyOptional({ description: 'Finalizado por' })
+  finalizado_por?: string;
+
+  @ApiPropertyOptional({ description: 'ID do finalizador' })
+  finalizado_por_id?: string;
+
+  @ApiPropertyOptional({ description: 'Data da finalização' })
+  data_finalizacao?: string;
+
+  @ApiPropertyOptional({ description: 'Observações da finalização' })
+  observacoes_finalizacao?: string;
 }
 
 export class ProgramacaoDetalhesResponseDto extends ProgramacaoResponseDto {
@@ -465,20 +477,14 @@ export class PaginationDto {
 }
 
 export class ProgramacaoStatsDto {
-  @ApiProperty({ description: 'Programações em rascunho' })
-  rascunho: number;
-
   @ApiProperty({ description: 'Programações pendentes' })
   pendentes: number;
-
-  @ApiProperty({ description: 'Programações em análise' })
-  em_analise: number;
 
   @ApiProperty({ description: 'Programações aprovadas' })
   aprovadas: number;
 
-  @ApiProperty({ description: 'Programações rejeitadas' })
-  rejeitadas: number;
+  @ApiProperty({ description: 'Programações finalizadas' })
+  finalizadas: number;
 
   @ApiProperty({ description: 'Programações canceladas' })
   canceladas: number;

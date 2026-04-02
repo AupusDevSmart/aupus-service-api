@@ -93,17 +93,17 @@ export class CreateProgramacaoDto {
   @IsNotEmpty()
   descricao: string;
 
-  @ApiProperty({ description: 'Local da execução', example: 'Planta Industrial A - Setor 1' })
+  @ApiPropertyOptional({ description: 'Local da execução', example: 'Planta Industrial A - Setor 1' })
+  @IsOptional()
   @IsString()
-  @IsNotEmpty()
   @Length(1, 255)
-  local: string;
+  local?: string;
 
-  @ApiProperty({ description: 'Ativo/equipamento', example: 'Motor 001' })
+  @ApiPropertyOptional({ description: 'Ativo/equipamento', example: 'Motor 001' })
+  @IsOptional()
   @IsString()
-  @IsNotEmpty()
   @Length(1, 255)
-  ativo: string;
+  ativo?: string;
 
   @ApiProperty({ enum: CondicaoOS, description: 'Condição do equipamento' })
   @IsEnum(CondicaoOS)

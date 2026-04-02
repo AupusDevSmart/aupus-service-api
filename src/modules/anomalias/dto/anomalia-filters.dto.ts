@@ -2,7 +2,8 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { IsString, IsOptional, IsEnum } from 'class-validator';
 import { Transform } from 'class-transformer';
-import { StatusAnomalia, PrioridadeAnomalia, OrigemAnomalia } from './create-anomalia.dto';
+import { PrioridadeAnomalia, OrigemAnomalia } from './create-anomalia.dto';
+import { StatusAnomalia } from '@prisma/client';
 
 export class AnomaliaFiltersDto {
   @ApiProperty({ required: false, description: 'Busca por texto livre' })

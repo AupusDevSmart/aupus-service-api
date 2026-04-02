@@ -92,6 +92,20 @@ export class EquipamentoQueryDto {
   mqtt_habilitado?: boolean;
 
   @ApiPropertyOptional({
+    example: true,
+    description: 'Filtrar apenas equipamentos SEM plano de manutenção',
+    type: Boolean
+  })
+  @IsOptional()
+  @Transform(({ value }) => {
+    if (value === 'true') return true;
+    if (value === 'false') return false;
+    return value;
+  })
+  @IsBoolean()
+  semPlano?: boolean;
+
+  @ApiPropertyOptional({
     example: 'nome',
     enum: ['nome', 'criticidade', 'created_at', 'fabricante', 'valor_contabil'],
     description: 'Campo para ordenação'

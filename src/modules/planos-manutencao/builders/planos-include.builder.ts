@@ -14,6 +14,8 @@ export class PlanosIncludeBuilder {
           classificacao: true,
           unidade: {
             select: {
+              id: true,
+              nome: true,
               planta: {
                 select: {
                   id: true,

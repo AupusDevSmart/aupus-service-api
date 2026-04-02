@@ -33,6 +33,8 @@ export class TarefaResumoDto {
   total_sub_tarefas?: number;
   total_recursos?: number;
   total_anexos?: number;
+  instrucao_id?: string;
+  instrucao_nome?: string;
 }
 
 export class PlanoManutencaoResponseDto {

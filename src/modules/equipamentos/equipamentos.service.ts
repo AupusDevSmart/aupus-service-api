@@ -212,6 +212,7 @@ export class EquipamentosService {
       criticidade,
       equipamento_pai_id,
       semDiagrama,
+      semPlano,
       tipo,
       mqtt_habilitado,
       orderBy = 'created_at',
@@ -273,6 +274,15 @@ export class EquipamentosService {
     // Filtro por tipo de equipamento
     if (tipo) {
       where.tipo_equipamento_id = tipo;
+    }
+
+    // Filtro semPlano - equipamentos sem plano de manutenção
+    if (semPlano !== undefined) {
+      if (semPlano === true) {
+        where.planos_manutencao = null;
+      } else {
+        where.planos_manutencao = { isNot: null };
+      }
     }
 
     // Filtro por MQTT habilitado

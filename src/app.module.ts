@@ -36,6 +36,7 @@ import { ConfiguracaoDemandaModule } from './modules/configuracao-demanda/config
 import { CoaModule } from './modules/coa/coa.module';
 import { DashboardModule } from './modules/dashboard/dashboard.module';
 import { SolicitacoesServicoModule } from './modules/solicitacoes-servico/solicitacoes-servico.module';
+import { InstrucoesModule } from './modules/instrucoes/instrucoes.module';
 
 @Module({
   imports: [
@@ -83,6 +84,7 @@ import { SolicitacoesServicoModule } from './modules/solicitacoes-servico/solici
     ProgramacaoOSModule,
     ExecucaoOSModule,
     SolicitacoesServicoModule, // Novo módulo de Solicitações de Serviço
+    InstrucoesModule, // Módulo de Instruções (templates de tarefas)
     ConcessionariasModule,
     EquipamentosDadosModule,
     ConfiguracaoDemandaModule,

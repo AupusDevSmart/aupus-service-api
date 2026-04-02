@@ -14,7 +14,6 @@ import {
   TipoSolicitacaoServico,
   PrioridadeSolicitacao,
   OrigemSolicitacao,
-  StatusSolicitacaoServico,
 } from '@prisma/client';
 
 
@@ -38,15 +37,6 @@ export class CreateSolicitacaoDto {
   @IsNotEmpty()
   @IsEnum(TipoSolicitacaoServico)
   tipo: TipoSolicitacaoServico;
-
-  @ApiPropertyOptional({
-    description: 'Status inicial da solicitação',
-    enum: StatusSolicitacaoServico,
-    default: StatusSolicitacaoServico.RASCUNHO,
-  })
-  @IsOptional()
-  @IsEnum(StatusSolicitacaoServico)
-  status?: StatusSolicitacaoServico;
 
   @ApiPropertyOptional({
     description: 'Prioridade da solicitação',
@@ -186,4 +176,14 @@ export class CreateSolicitacaoDto {
   @IsArray()
   @IsString({ each: true })
   tarefas_ids?: string[];
+
+  // Instruções associadas (opcional)
+  @ApiPropertyOptional({
+    description: 'IDs das instruções associadas à solicitação',
+    type: [String]
+  })
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  instrucoes_ids?: string[];
 }

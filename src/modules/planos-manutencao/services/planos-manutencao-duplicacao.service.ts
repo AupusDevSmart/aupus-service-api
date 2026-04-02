@@ -240,6 +240,7 @@ export class PlanosManutencaoDuplicacaoService {
             observacoes: tarefaOriginal.observacoes,
             status: tarefaOriginal.status,
             ativo: tarefaOriginal.ativo,
+            instrucao_id: tarefaOriginal.instrucao_id || null,
             ...(criadoPor && { criado_por: criadoPor })
           }
         });

@@ -1,4 +1,4 @@
-import { IsNotEmpty, IsString, IsUUID, MaxLength } from 'class-validator';
+import { IsNotEmpty, IsString, MaxLength } from 'class-validator';
 
 export class CreateTipoEquipamentoDto {
   @IsNotEmpty({ message: 'O código é obrigatório' })
@@ -12,7 +12,7 @@ export class CreateTipoEquipamentoDto {
   nome: string;
 
   @IsNotEmpty({ message: 'A categoria é obrigatória' })
-  @IsUUID('4', { message: 'O ID da categoria deve ser um UUID válido' })
+  @IsString({ message: 'O ID da categoria deve ser uma string válida' })
   categoriaId: string;
 
   @IsNotEmpty({ message: 'O fabricante é obrigatório' })

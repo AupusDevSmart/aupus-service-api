@@ -1,53 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsString, IsOptional, IsNotEmpty, IsDateString } from 'class-validator';
-
-export class AnalisarSolicitacaoDto {
-  @ApiPropertyOptional({ description: 'Observações da análise' })
-  @IsOptional()
-  @IsString()
-  observacoes_analise?: string;
-
-  @ApiPropertyOptional({ description: 'Parecer técnico' })
-  @IsOptional()
-  @IsString()
-  parecer_tecnico?: string;
-}
-
-export class AprovarSolicitacaoDto {
-  @ApiPropertyOptional({ description: 'Observações da aprovação' })
-  @IsOptional()
-  @IsString()
-  observacoes_aprovacao?: string;
-
-  @ApiPropertyOptional({ description: 'Data prevista de início' })
-  @IsOptional()
-  @IsDateString()
-  data_prevista_inicio?: string;
-
-  @ApiPropertyOptional({ description: 'Data prevista de fim' })
-  @IsOptional()
-  @IsDateString()
-  data_prevista_fim?: string;
-}
-
-export class RejeitarSolicitacaoDto {
-  @ApiProperty({ description: 'Motivo da rejeição' })
-  @IsNotEmpty()
-  @IsString()
-  motivo_rejeicao: string;
-
-  @ApiPropertyOptional({ description: 'Sugestões alternativas' })
-  @IsOptional()
-  @IsString()
-  sugestoes_alternativas?: string;
-}
-
-export class CancelarSolicitacaoDto {
-  @ApiProperty({ description: 'Motivo do cancelamento' })
-  @IsNotEmpty()
-  @IsString()
-  motivo_cancelamento: string;
-}
+import { IsString, IsOptional, IsNotEmpty } from 'class-validator';
 
 export class AdicionarComentarioDto {
   @ApiProperty({ description: 'Comentário' })

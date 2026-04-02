@@ -74,7 +74,8 @@ export class TarefasService {
           ativo: createDto.ativo !== undefined ? createDto.ativo : true,
           data_ultima_execucao: createDto.data_ultima_execucao,
           numero_execucoes: createDto.numero_execucoes || 0,
-          criado_por: createDto.criado_por
+          criado_por: createDto.criado_por,
+          instrucao_id: createDto.instrucao_id || null
         }
       });
 
@@ -225,8 +226,16 @@ export class TarefasService {
               tipo_equipamento: true,
               classificacao: true
             }
+          },
+          instrucao: {
+            select: {
+              id: true,
+              tag: true,
+              nome: true,
+              categoria: true,
+              tipo_manutencao: true
+            }
           }
-          // ✅ Removido usuario_criador e usuario_atualizador - raramente usados
         }
       }),
       // Buscar sub_tarefas em paralelo
@@ -758,7 +767,15 @@ export class TarefasService {
           classificacao: true
         }
       },
-      // ✅ MANTIDO _count mas otimizado - Prisma faz LEFT JOIN mas é necessário para UI
+      instrucao: {
+        select: {
+          id: true,
+          tag: true,
+          nome: true,
+          categoria: true,
+          tipo_manutencao: true
+        }
+      },
       _count: {
         select: {
           sub_tarefas: true,
@@ -792,6 +809,15 @@ export class TarefasService {
           nome: true,
           tipo_equipamento: true,
           classificacao: true
+        }
+      },
+      instrucao: {
+        select: {
+          id: true,
+          tag: true,
+          nome: true,
+          categoria: true,
+          tipo_manutencao: true
         }
       },
       usuario_criador: {
@@ -838,6 +864,10 @@ export class TarefasService {
       where.equipamento = {
         unidade_id: filters.unidade_id
       };
+    }
+
+    if (filters.instrucao_id) {
+      where.instrucao_id = filters.instrucao_id;
     }
 
     if (filters.status) {
@@ -927,6 +957,7 @@ export class TarefasService {
       ordem: tarefa.ordem,
       planta_id: tarefa.planta_id?.trim() || tarefa.planta_id, // ✅ TRIM
       equipamento_id: tarefa.equipamento_id?.trim() || tarefa.equipamento_id, // ✅ TRIM
+      instrucao_id: tarefa.instrucao_id?.trim() || tarefa.instrucao_id,
       planejador: tarefa.planejador,
       responsavel: tarefa.responsavel,
       observacoes: tarefa.observacoes,
@@ -941,6 +972,7 @@ export class TarefasService {
       plano_manutencao: tarefa.plano_manutencao,
       planta: tarefa.planta,
       equipamento: tarefa.equipamento,
+      instrucao: tarefa.instrucao,
       usuario_criador: tarefa.usuario_criador,
       usuario_atualizador: tarefa.usuario_atualizador,
       sub_tarefas: tarefa.sub_tarefas,
