@@ -23,9 +23,10 @@ export class FeriadosNacionaisService {
    * @returns true se for feriado nacional, false caso contrário
    */
   isFeriadoNacional(date: Date): boolean {
-    const dia = date.getDate();
-    const mes = date.getMonth() + 1; // 0-11 → 1-12
-    const ano = date.getFullYear();
+    // O banco armazena BRT como se fosse UTC — usar UTC methods
+    const dia = date.getUTCDate();
+    const mes = date.getUTCMonth() + 1; // 0-11 → 1-12
+    const ano = date.getUTCFullYear();
 
     // Verificar feriados fixos primeiro (mais rápido)
     if (this.isFeriadoFixo(dia, mes)) {
@@ -61,7 +62,7 @@ export class FeriadosNacionaisService {
    * @param date Data a ser verificada
    */
   private isFeriadoMovel(date: Date): boolean {
-    const ano = date.getFullYear();
+    const ano = date.getUTCFullYear();
 
     // Buscar no cache
     if (!this.feriadosCache.has(ano)) {
@@ -148,9 +149,9 @@ export class FeriadosNacionaisService {
    * @param date Data a formatar
    */
   private formatarData(date: Date): string {
-    const ano = date.getFullYear();
-    const mes = String(date.getMonth() + 1).padStart(2, '0');
-    const dia = String(date.getDate()).padStart(2, '0');
+    const ano = date.getUTCFullYear();
+    const mes = String(date.getUTCMonth() + 1).padStart(2, '0');
+    const dia = String(date.getUTCDate()).padStart(2, '0');
     return `${ano}-${mes}-${dia}`;
   }
 

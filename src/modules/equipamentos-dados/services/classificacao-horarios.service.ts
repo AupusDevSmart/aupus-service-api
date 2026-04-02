@@ -44,14 +44,12 @@ export class ClassificacaoHorariosService {
     unidade: DadosUnidade,
     tarifas: TarifasConcessionaria,
   ): ClassificacaoHorario {
-    // ✅ CONVERSÃO CORRETA: UTC → America/Sao_Paulo usando date-fns-tz
-    // Independente de como o timestamp está armazenado no banco,
-    // esta função converte corretamente para o timezone de Brasília
-    const timestampBrasilia = toZonedTime(timestamp, 'America/Sao_Paulo');
-    const hora = timestampBrasilia.getHours();
-    const minutos = timestampBrasilia.getMinutes();
+    // O banco armazena timestamps em BRT sem timezone (Prisma lê como UTC)
+    // Usar os componentes UTC diretamente pois já representam horário de Brasília
+    const hora = timestamp.getUTCHours();
+    const minutos = timestamp.getUTCMinutes();
     const horaDecimal = hora + minutos / 60;
-    const diaSemana = timestampBrasilia.getDay(); // 0 = domingo, 6 = sábado
+    const diaSemana = timestamp.getUTCDay(); // 0 = domingo, 6 = sábado
 
     // ✅ PRIORIDADE 1: Feriado/Fim de semana + Irrigante = HR 24h
     const isFeriado = this.feriadosService.isFeriadoNacional(timestamp);

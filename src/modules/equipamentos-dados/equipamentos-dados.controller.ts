@@ -290,48 +290,56 @@ export class EquipamentosDadosController {
     }
 
     // MODO 2 e 3: Dia ou Mês com data de referência
-    // ✅ TIMEZONE: Usar conversão dinâmica para America/Sao_Paulo
-    const dataRef = query.data ? new Date(query.data) : new Date();
+    // O banco armazena timestamps em BRT sem timezone (Prisma trata como UTC)
+    // Então criamos datas UTC com os valores de BRT para comparação direta
+    let ano: number, mes: number, dia: number;
+
+    if (query.data) {
+      // query.data vem como "YYYY-MM-DD" — parsear diretamente os componentes
+      const parts = query.data.split('-');
+      ano = parseInt(parts[0]);
+      mes = parseInt(parts[1]);
+      dia = parseInt(parts[2]) || 1; // Para periodo=mes, data pode ser "YYYY-MM"
+    } else {
+      // Sem data informada: pegar data atual em Brasília
+      const { ano: a, mes: m, dia: d } = this.obterDataAtualBrasilia();
+      ano = a;
+      mes = m;
+      dia = d;
+    }
 
     if (query.periodo === PeriodoTipo.DIA) {
-      // ✅ Dia completo em horário de Brasília: 00:00:00 até 23:59:59
-      const ano = dataRef.getFullYear();
-      const mes = String(dataRef.getMonth() + 1).padStart(2, '0');
-      const dia = String(dataRef.getDate()).padStart(2, '0');
-
-      // Criar timestamps interpretando como America/Sao_Paulo
-      const dataInicio = this.criarDataBrasilia(ano, parseInt(mes), parseInt(dia), 0, 0, 0, 0);
-      const dataFim = this.criarDataBrasilia(ano, parseInt(mes), parseInt(dia), 23, 59, 59, 999);
+      // Dia completo: enviar BRT como UTC literal (banco armazena BRT sem tz)
+      const dataInicio = new Date(Date.UTC(ano, mes - 1, dia, 0, 0, 0, 0));
+      const dataFim = new Date(Date.UTC(ano, mes - 1, dia, 23, 59, 59, 999));
 
       return { dataInicio, dataFim };
     } else if (query.periodo === PeriodoTipo.MES) {
-      // ✅ Mês completo em horário de Brasília
-      const ano = dataRef.getFullYear();
-      const mes = dataRef.getMonth() + 1;
-
-      // Último dia do mês
       const ultimoDia = new Date(ano, mes, 0).getDate();
 
-      // Primeiro e último dia do mês
-      const dataInicio = this.criarDataBrasilia(ano, mes, 1, 0, 0, 0, 0);
-      const dataFim = this.criarDataBrasilia(ano, mes, ultimoDia, 23, 59, 59, 999);
+      const dataInicio = new Date(Date.UTC(ano, mes - 1, 1, 0, 0, 0, 0));
+      const dataFim = new Date(Date.UTC(ano, mes - 1, ultimoDia, 23, 59, 59, 999));
 
       return { dataInicio, dataFim };
     }
 
-    // Default: mês atual (backward compatibility)
-    const dataInicio = new Date(new Date().getFullYear(), new Date().getMonth(), 1, 0, 0, 0, 0);
-    const dataFim = new Date(
-      new Date().getFullYear(),
-      new Date().getMonth() + 1,
-      0,
-      23,
-      59,
-      59,
-      999,
-    );
+    // Default: mês atual em Brasília (backward compatibility)
+    const agora = this.obterDataAtualBrasilia();
+    const ultimoDiaDefault = new Date(agora.ano, agora.mes, 0).getDate();
+    const dataInicio = new Date(Date.UTC(agora.ano, agora.mes - 1, 1, 0, 0, 0, 0));
+    const dataFim = new Date(Date.UTC(agora.ano, agora.mes - 1, ultimoDiaDefault, 23, 59, 59, 999));
 
     return { dataInicio, dataFim };
+  }
+
+  /**
+   * Retorna ano, mês e dia atuais no fuso de Brasília (America/Sao_Paulo)
+   */
+  private obterDataAtualBrasilia(): { ano: number; mes: number; dia: number } {
+    const now = new Date();
+    const brasilStr = now.toLocaleDateString('en-CA', { timeZone: 'America/Sao_Paulo' }); // formato YYYY-MM-DD
+    const [ano, mes, dia] = brasilStr.split('-').map(Number);
+    return { ano, mes, dia };
   }
 
   /**
