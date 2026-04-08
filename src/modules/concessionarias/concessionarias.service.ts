@@ -21,6 +21,7 @@ export class ConcessionariasService {
     const data: any = {
       nome: createDto.nome,
       estado: createDto.estado.toUpperCase(),
+      numero_reh: createDto.numero_reh || null,
       data_inicio: dataInicio,
       data_validade: dataValidade,
     };
@@ -163,6 +164,7 @@ export class ConcessionariasService {
     // Atualizar campos básicos
     if (updateDto.nome !== undefined) data.nome = updateDto.nome;
     if (updateDto.estado !== undefined) data.estado = updateDto.estado.toUpperCase();
+    if (updateDto.numero_reh !== undefined) data.numero_reh = updateDto.numero_reh || null;
     if (updateDto.data_inicio !== undefined) data.data_inicio = new Date(updateDto.data_inicio);
     if (updateDto.data_validade !== undefined)
       data.data_validade = new Date(updateDto.data_validade);
@@ -231,6 +233,7 @@ export class ConcessionariasService {
       id: concessionaria.id,
       nome: concessionaria.nome,
       estado: concessionaria.estado,
+      numero_reh: concessionaria.numero_reh || null,
       data_inicio: concessionaria.data_inicio,
       data_validade: concessionaria.data_validade,
       a4_verde: {

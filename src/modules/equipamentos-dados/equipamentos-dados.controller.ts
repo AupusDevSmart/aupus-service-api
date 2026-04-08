@@ -1,8 +1,10 @@
-import { Controller, Get, Param, Query, Logger, Post, Body } from '@nestjs/common';
+import { Controller, Get, Param, Query, Logger, Post, Put, Body } from '@nestjs/common';
 import { EquipamentosDadosService } from './equipamentos-dados.service';
 import { CalculoCustosService } from './services/calculo-custos.service';
+import { ConfiguracaoCustoService } from './services/configuracao-custo.service';
 import { EquipamentoDadosQueryDto } from './dto/equipamento-dados-query.dto';
 import { CustosEnergiaQueryDto, PeriodoTipo } from './dto/custos-energia-query.dto';
+import { UpsertConfiguracaoCustoDto } from './dto/configuracao-custo.dto';
 
 @Controller('equipamentos-dados')
 export class EquipamentosDadosController {
@@ -12,6 +14,7 @@ export class EquipamentosDadosController {
   constructor(
     private readonly service: EquipamentosDadosService,
     private readonly custosService: CalculoCustosService,
+    private readonly configuracaoCustoService: ConfiguracaoCustoService,
   ) {}
 
   /**
@@ -225,13 +228,31 @@ export class EquipamentosDadosController {
   }
 
   /**
+   * GET /equipamentos-dados/:id/configuracao-custo
+   * Retorna configuracao de tributos e tarifas personalizadas do equipamento
+   */
+  @Get(':id/configuracao-custo')
+  async getConfiguracaoCusto(@Param('id') id: string) {
+    this.logger.log(`GET /equipamentos-dados/${id}/configuracao-custo`);
+    return this.configuracaoCustoService.buscarOuDefault(id);
+  }
+
+  /**
+   * PUT /equipamentos-dados/:id/configuracao-custo
+   * Cria ou atualiza configuracao de tributos e tarifas personalizadas
+   */
+  @Put(':id/configuracao-custo')
+  async upsertConfiguracaoCusto(
+    @Param('id') id: string,
+    @Body() dto: UpsertConfiguracaoCustoDto,
+  ) {
+    this.logger.log(`PUT /equipamentos-dados/${id}/configuracao-custo`);
+    return this.configuracaoCustoService.upsert(id, dto);
+  }
+
+  /**
    * GET /equipamentos-dados/:id/custos-energia
-   * Retorna cálculo de custos de energia para um equipamento M160
-   *
-   * ✅ ATUALIZADO: Suporta 3 modos de filtro:
-   * 1. periodo=dia&data=YYYY-MM-DD (dia completo)
-   * 2. periodo=mes&data=YYYY-MM (mês completo)
-   * 3. periodo=custom&timestamp_inicio=ISO8601&timestamp_fim=ISO8601 (range customizado)
+   * Retorna calculo de custos de energia com tributos aplicados
    */
   @Get(':id/custos-energia')
   async getCustosEnergia(
@@ -413,7 +434,7 @@ export class EquipamentosDadosController {
     dataInicio: Date,
     dataFim: Date,
   ) {
-    const { unidade, tarifas, agregacao, custos } = resultado;
+    const { unidade, tarifas, agregacao, custos, tributos, tarifa_fonte } = resultado;
 
     return {
       periodo: {
@@ -432,6 +453,7 @@ export class EquipamentosDadosController {
         id: unidade.concessionaria_id,
       },
       tarifas_aplicadas: this.montarTarifasAplicadas(unidade, tarifas),
+      tarifa_fonte: tarifa_fonte || 'CONCESSIONARIA',
       consumo: {
         energia_ponta_kwh: agregacao.energia_ponta_kwh,
         energia_fora_ponta_kwh: agregacao.energia_fora_ponta_kwh,
@@ -449,7 +471,19 @@ export class EquipamentosDadosController {
         custo_demanda: custos.custo_demanda,
         custo_total: custos.custo_total,
         custo_medio_kwh: custos.custo_medio_kwh,
+        custo_total_sem_tributos: custos.custo_total_sem_tributos,
+        fator_tributos: custos.fator_tributos,
+        fator_perdas: custos.fator_perdas,
       },
+      tributos: tributos
+        ? {
+            icms: tributos.icms,
+            pis: tributos.pis,
+            cofins: tributos.cofins,
+            perdas: tributos.perdas,
+            fator_multiplicador: custos.fator_tributos,
+          }
+        : { icms: 0, pis: 0, cofins: 0, perdas: 0, fator_multiplicador: 1 },
       irrigante: unidade.irrigante
         ? {
             energia_periodo_kwh: agregacao.energia_irrigante_kwh,

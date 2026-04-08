@@ -116,6 +116,7 @@ export class ExecucaoOSService {
         materiais: true,
         ferramentas: true,
         tecnicos: true,
+        itens_orcamento: true,
         programacao: {
           select: {
             id: true,
@@ -332,6 +333,7 @@ export class ExecucaoOSService {
         materiais: true,
         ferramentas: true,
         tecnicos: true,
+        itens_orcamento: true,
         checklist_atividades: {
           orderBy: { ordem: 'asc' },
         },
@@ -440,6 +442,7 @@ export class ExecucaoOSService {
         materiais: true,
         ferramentas: true,
         tecnicos: true,
+        itens_orcamento: true,
         tarefas_programacao: {
           include: {
             tarefa: true,
@@ -558,6 +561,17 @@ export class ExecucaoOSService {
             custo_total: t.custo_total,
             disponivel: t.disponivel,
             tecnico_id: t.tecnico_id,
+          })),
+        });
+      }
+
+      // Copiar itens de orçamento
+      if (programacao.itens_orcamento && programacao.itens_orcamento.length > 0) {
+        await prisma.itens_orcamento_os.createMany({
+          data: programacao.itens_orcamento.map(i => ({
+            os_id: osId,
+            descricao: i.descricao,
+            valor: i.valor,
           })),
         });
       }
@@ -1539,6 +1553,14 @@ export class ExecucaoOSService {
         observacoes: f.observacoes,
         created_at: f.created_at,
         updated_at: f.updated_at,
+      })) || [],
+      itens_orcamento: os.itens_orcamento?.map((i: any) => ({
+        id: i.id,
+        os_id: i.os_id,
+        descricao: i.descricao,
+        valor: Number(i.valor),
+        created_at: i.created_at,
+        updated_at: i.updated_at,
       })) || [],
       tecnicos: os.tecnicos?.map((t: any) => ({
         id: t.id,

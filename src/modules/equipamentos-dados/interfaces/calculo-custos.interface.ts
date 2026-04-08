@@ -60,6 +60,13 @@ export interface AgregacaoEnergia {
   num_leituras: number;
 }
 
+export interface TributosConfig {
+  icms: number;
+  pis: number;
+  cofins: number;
+  perdas: number;
+}
+
 export interface CalculoCustos {
   custo_ponta: number;
   custo_fora_ponta: number;
@@ -69,6 +76,10 @@ export interface CalculoCustos {
   custo_total: number;
   custo_medio_kwh: number;
   economia_irrigante?: number;
+  // Tributos
+  custo_total_sem_tributos: number;
+  fator_tributos: number;
+  fator_perdas: number;
 }
 
 export interface ConfiguracaoHorarios {

@@ -1,10 +1,12 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../../shared/prisma/prisma.service';
 import { ClassificacaoHorariosService } from './classificacao-horarios.service';
+import { ConfiguracaoCustoService, ConfiguracaoCustoData } from './configuracao-custo.service';
 import {
   TipoHorario,
   DadosUnidade,
   TarifasConcessionaria,
+  TributosConfig,
   LeituraMQTT,
   AgregacaoEnergia,
   CalculoCustos,
@@ -24,6 +26,7 @@ export class CalculoCustosService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly classificacaoService: ClassificacaoHorariosService,
+    private readonly configuracaoCustoService: ConfiguracaoCustoService,
   ) {}
 
   /**
@@ -33,52 +36,61 @@ export class CalculoCustosService {
     equipamentoId: string,
     dataInicio: Date,
     dataFim: Date,
-    periodo?: 'dia' | 'mes' | 'custom', // ✅ NOVO: tipo de período
+    periodo?: 'dia' | 'mes' | 'custom',
   ): Promise<{
     unidade: DadosUnidade;
     tarifas: TarifasConcessionaria;
     agregacao: AgregacaoEnergia;
     custos: CalculoCustos;
-    periodo_tipo?: string; // ✅ NOVO: informar tipo de período
+    periodo_tipo?: string;
+    tributos: TributosConfig;
+    tarifa_fonte: 'CONCESSIONARIA' | 'PERSONALIZADA';
   }> {
-    console.log(`\n💵 [CUSTOS] Iniciando cálculo de custos`);
+    console.log(`\n[CUSTOS] Iniciando calculo de custos`);
     console.log(`   Equipamento: ${equipamentoId}`);
-    console.log(`   Período: ${dataInicio.toLocaleString('pt-BR')} até ${dataFim.toLocaleString('pt-BR')}`);
+    console.log(`   Periodo: ${dataInicio.toLocaleString('pt-BR')} ate ${dataFim.toLocaleString('pt-BR')}`);
     console.log(`   Tipo: ${periodo || 'custom'}`);
 
-    // 1. Buscar dados da unidade e tarifas
-    const { unidade, tarifas } = await this.buscarDadosUnidadeETarifas(equipamentoId);
-    console.log(`   Unidade: ${unidade.nome} (Grupo ${unidade.grupo}, Irrigante: ${unidade.irrigante ? 'SIM' : 'NÃO'})`);
+    // 1. Buscar dados da unidade e tarifas da concessionaria
+    const { unidade, tarifas: tarifasConcessionaria } = await this.buscarDadosUnidadeETarifas(equipamentoId);
+    console.log(`   Unidade: ${unidade.nome} (Grupo ${unidade.grupo}, Irrigante: ${unidade.irrigante ? 'SIM' : 'NAO'})`);
 
-    // 2. Buscar leituras MQTT do período
+    // 2. Buscar configuracao de custo (tributos + tarifa personalizada)
+    const config = await this.configuracaoCustoService.buscarOuDefault(equipamentoId);
+    const tributos: TributosConfig = {
+      icms: config.icms,
+      pis: config.pis,
+      cofins: config.cofins,
+      perdas: config.perdas,
+    };
+
+    // 3. Determinar tarifas finais (personalizada ou concessionaria)
+    let tarifas = tarifasConcessionaria;
+    let tarifaFonte: 'CONCESSIONARIA' | 'PERSONALIZADA' = 'CONCESSIONARIA';
+
+    if (config.usa_tarifa_personalizada) {
+      tarifas = this.aplicarTarifaPersonalizada(tarifasConcessionaria, config);
+      tarifaFonte = 'PERSONALIZADA';
+      console.log(`   Usando tarifa PERSONALIZADA`);
+    }
+
+    console.log(`   Tributos: ICMS=${(tributos.icms * 100).toFixed(2)}% PIS=${(tributos.pis * 100).toFixed(2)}% COFINS=${(tributos.cofins * 100).toFixed(2)}% Perdas=${(tributos.perdas || 0).toFixed(2)}%`);
+
+    // 4. Buscar leituras MQTT do periodo
     const leituras = await this.buscarLeiturasPeriodo(equipamentoId, dataInicio, dataFim);
     console.log(`   Leituras encontradas: ${leituras.length}`);
 
-    if (leituras.length === 0) {
-      console.log(`   ⚠️  ATENÇÃO: Nenhuma leitura encontrada no período!`);
-    }
-
-    // 3. Agregar energia por tipo de horário
+    // 5. Agregar energia por tipo de horario
     const agregacao = this.agregarEnergiaPorTipo(leituras, unidade, tarifas);
     console.log(`   Energia total: ${agregacao.energia_total_kwh.toFixed(3)} kWh`);
-    console.log(`   - Ponta: ${agregacao.energia_ponta_kwh.toFixed(3)} kWh`);
-    console.log(`   - Fora Ponta: ${agregacao.energia_fora_ponta_kwh.toFixed(3)} kWh`);
-    console.log(`   - Reservado: ${agregacao.energia_reservado_kwh.toFixed(3)} kWh`);
-    console.log(`   - Irrigante: ${agregacao.energia_irrigante_kwh.toFixed(3)} kWh`);
 
-    // 4. Decidir se inclui demanda no custo
-    // ✅ CENÁRIO C: Demanda só é cobrada em períodos mensais ou customizados >= 28 dias
+    // 6. Decidir se inclui demanda no custo
     const incluirDemanda = this.deveIncluirDemanda(periodo, dataInicio, dataFim);
-    console.log(`   Incluir demanda no custo: ${incluirDemanda ? 'SIM' : 'NÃO'}`);
 
-    const custos = this.calcularCustosPorCategoria(agregacao, unidade, tarifas, incluirDemanda);
-    console.log(`   Custo total: R$ ${custos.custo_total.toFixed(2)}`);
-    if (custos.custo_demanda > 0) {
-      console.log(`   - Custo demanda: R$ ${custos.custo_demanda.toFixed(2)}`);
-    }
-    if (custos.economia_irrigante > 0) {
-      console.log(`   Economia irrigante: R$ ${custos.economia_irrigante.toFixed(2)}`);
-    }
+    // 7. Calcular custos com tributos
+    const custos = this.calcularCustosPorCategoria(agregacao, unidade, tarifas, incluirDemanda, tributos);
+    console.log(`   Custo s/ tributos: R$ ${custos.custo_total_sem_tributos.toFixed(2)}`);
+    console.log(`   Custo c/ tributos: R$ ${custos.custo_total.toFixed(2)} (fator: ${custos.fator_tributos.toFixed(4)}x)`);
     console.log('');
 
     return {
@@ -87,7 +99,38 @@ export class CalculoCustosService {
       agregacao,
       custos,
       periodo_tipo: periodo,
+      tributos,
+      tarifa_fonte: tarifaFonte,
     };
+  }
+
+  /**
+   * Aplica tarifas personalizadas, usando concessionaria como fallback para campos null
+   */
+  private aplicarTarifaPersonalizada(
+    tarifasConcessionaria: TarifasConcessionaria,
+    config: ConfiguracaoCustoData,
+  ): TarifasConcessionaria {
+    return {
+      tusd_p: config.tusd_p ?? tarifasConcessionaria.tusd_p,
+      te_p: config.te_p ?? tarifasConcessionaria.te_p,
+      tusd_fp: config.tusd_fp ?? tarifasConcessionaria.tusd_fp,
+      te_fp: config.te_fp ?? tarifasConcessionaria.te_fp,
+      tusd_d: config.tusd_d ?? tarifasConcessionaria.tusd_d,
+      te_d: config.te_d ?? tarifasConcessionaria.te_d,
+      tusd_b: config.tusd_b ?? tarifasConcessionaria.tusd_b,
+      te_b: config.te_b ?? tarifasConcessionaria.te_b,
+    };
+  }
+
+  /**
+   * Calcula fator multiplicador dos tributos
+   * Formula: Preco = (TE + TUSD) / ((1 - ICMS) * (1 - PIS - COFINS))
+   * Fator = 1 / ((1 - ICMS) * (1 - PIS - COFINS))
+   */
+  private calcularFatorTributos(tributos: TributosConfig): number {
+    const denominador = (1 - tributos.icms) * (1 - tributos.pis - tributos.cofins);
+    return denominador > 0 ? 1 / denominador : 1;
   }
 
   /**
@@ -385,8 +428,12 @@ export class CalculoCustosService {
     agregacao: AgregacaoEnergia,
     unidade: DadosUnidade,
     tarifas: TarifasConcessionaria,
-    incluirDemanda: boolean = false, // ✅ NOVO: só calcular demanda se true
+    incluirDemanda: boolean = false,
+    tributos: TributosConfig = { icms: 0, pis: 0, cofins: 0, perdas: 0 },
   ): CalculoCustos {
+    const fatorTributos = this.calcularFatorTributos(tributos);
+    const fatorPerdas = 1 + (tributos.perdas || 0) / 100;
+
     const custos: CalculoCustos = {
       custo_ponta: 0,
       custo_fora_ponta: 0,
@@ -396,63 +443,62 @@ export class CalculoCustosService {
       custo_total: 0,
       custo_medio_kwh: 0,
       economia_irrigante: 0,
+      custo_total_sem_tributos: 0,
+      fator_tributos: fatorTributos,
+      fator_perdas: fatorPerdas,
     };
 
     if (unidade.grupo === 'A') {
-      // Ponta
+      // Ponta: (TUSD_P + TE_P) * fatorTributos
       const tarifa_ponta = (tarifas.tusd_p || 0) + (tarifas.te_p || 0);
-      custos.custo_ponta = agregacao.energia_ponta_kwh * tarifa_ponta;
+      custos.custo_ponta = agregacao.energia_ponta_kwh * fatorPerdas * tarifa_ponta * fatorTributos;
 
       // Fora Ponta
       const tarifa_fp = (tarifas.tusd_fp || 0) + (tarifas.te_fp || 0);
-      custos.custo_fora_ponta = agregacao.energia_fora_ponta_kwh * tarifa_fp;
+      custos.custo_fora_ponta = agregacao.energia_fora_ponta_kwh * fatorPerdas * tarifa_fp * fatorTributos;
 
       // Reservado (= FP na Verde)
-      custos.custo_reservado = agregacao.energia_reservado_kwh * tarifa_fp;
+      custos.custo_reservado = agregacao.energia_reservado_kwh * fatorPerdas * tarifa_fp * fatorTributos;
 
-      // Irrigante (com 80% desconto na TE)
+      // Irrigante (com 80% desconto na TE, tributos aplicados sobre tarifa com desconto)
       if (agregacao.energia_irrigante_kwh > 0) {
         const tusd = tarifas.tusd_fp || 0;
         const te_original = tarifas.te_fp || 0;
-        const te_com_desconto = te_original * 0.20; // 80% desconto
+        const te_com_desconto = te_original * 0.20;
         const tarifa_irrigante = tusd + te_com_desconto;
 
-        custos.custo_irrigante = agregacao.energia_irrigante_kwh * tarifa_irrigante;
+        custos.custo_irrigante = agregacao.energia_irrigante_kwh * fatorPerdas * tarifa_irrigante * fatorTributos;
 
-        // Calcular economia
-        const custo_sem_desconto = agregacao.energia_irrigante_kwh * tarifa_fp;
+        const custo_sem_desconto = agregacao.energia_irrigante_kwh * fatorPerdas * tarifa_fp * fatorTributos;
         custos.economia_irrigante = custo_sem_desconto - custos.custo_irrigante;
       }
 
-      // Demanda (✅ só calcular se incluirDemanda = true, ou seja, período mensal)
+      // Demanda
       if (incluirDemanda && unidade.demanda_contratada && tarifas.tusd_d) {
-        custos.custo_demanda = unidade.demanda_contratada * tarifas.tusd_d;
+        custos.custo_demanda = unidade.demanda_contratada * fatorPerdas * tarifas.tusd_d * fatorTributos;
       }
     } else {
-      // Grupo B (tarifa única)
+      // Grupo B (tarifa unica)
       const tarifa_b = (tarifas.tusd_b || 0) + (tarifas.te_b || 0);
 
-      // Consumo normal
       const energia_normal =
         agregacao.energia_total_kwh - agregacao.energia_irrigante_kwh;
-      custos.custo_fora_ponta = energia_normal * tarifa_b;
+      custos.custo_fora_ponta = energia_normal * fatorPerdas * tarifa_b * fatorTributos;
 
-      // Irrigante (se aplicável)
       if (agregacao.energia_irrigante_kwh > 0) {
         const tusd = tarifas.tusd_b || 0;
         const te_original = tarifas.te_b || 0;
-        const te_com_desconto = te_original * 0.20; // 80% desconto
+        const te_com_desconto = te_original * 0.20;
         const tarifa_irrigante = tusd + te_com_desconto;
 
-        custos.custo_irrigante = agregacao.energia_irrigante_kwh * tarifa_irrigante;
+        custos.custo_irrigante = agregacao.energia_irrigante_kwh * fatorPerdas * tarifa_irrigante * fatorTributos;
 
-        // Calcular economia
-        const custo_sem_desconto = agregacao.energia_irrigante_kwh * tarifa_b;
+        const custo_sem_desconto = agregacao.energia_irrigante_kwh * fatorPerdas * tarifa_b * fatorTributos;
         custos.economia_irrigante = custo_sem_desconto - custos.custo_irrigante;
       }
     }
 
-    // Total
+    // Total com tributos
     custos.custo_total =
       custos.custo_ponta +
       custos.custo_fora_ponta +
@@ -460,7 +506,12 @@ export class CalculoCustosService {
       custos.custo_irrigante +
       custos.custo_demanda;
 
-    // Custo médio por kWh
+    // Total sem tributos (para comparacao)
+    custos.custo_total_sem_tributos = fatorTributos > 0
+      ? custos.custo_total / fatorTributos
+      : custos.custo_total;
+
+    // Custo medio por kWh
     if (agregacao.energia_total_kwh > 0) {
       custos.custo_medio_kwh = custos.custo_total / agregacao.energia_total_kwh;
     }

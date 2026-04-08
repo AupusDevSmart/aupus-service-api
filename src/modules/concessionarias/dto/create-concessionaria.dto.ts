@@ -7,6 +7,7 @@ import {
   IsNumber,
   IsPositive,
   Length,
+  MaxLength,
   Matches,
 } from 'class-validator';
 
@@ -119,6 +120,16 @@ export class CreateConcessionariaDto {
   @Length(2, 2)
   @Matches(/^[A-Z]{2}$/, { message: 'Estado deve ser uma sigla válida de 2 letras maiúsculas' })
   estado: string;
+
+  @ApiProperty({
+    description: 'Numero da Resolucao Homologatoria (REH) da ANEEL',
+    example: '3.166/2024',
+    required: false,
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(50)
+  numero_reh?: string;
 
   @ApiProperty({
     description: 'Data de início da vigência das tarifas',

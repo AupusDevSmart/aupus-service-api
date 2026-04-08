@@ -72,7 +72,7 @@ model solicitacoes_servico {
   data_prevista_fim       DateTime?
 
   // Justificativa e benefícios
-  justificativa           String                         @db.Text
+  justificativa           String?                        @db.Text
   beneficios_esperados    String?                        @db.Text
   riscos_nao_execucao     String?                        @db.Text
 

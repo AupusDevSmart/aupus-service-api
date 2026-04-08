@@ -37,6 +37,7 @@ import { CoaModule } from './modules/coa/coa.module';
 import { DashboardModule } from './modules/dashboard/dashboard.module';
 import { SolicitacoesServicoModule } from './modules/solicitacoes-servico/solicitacoes-servico.module';
 import { InstrucoesModule } from './modules/instrucoes/instrucoes.module';
+import { MailModule } from './shared/mail/mail.module';
 
 @Module({
   imports: [
@@ -54,6 +55,9 @@ import { InstrucoesModule } from './modules/instrucoes/instrucoes.module';
 
     // ✅ Database
     PrismaModule,
+
+    // ✅ Email
+    MailModule,
 
     // ✅ MQTT e WebSocket para dados em tempo real
     MqttModule,

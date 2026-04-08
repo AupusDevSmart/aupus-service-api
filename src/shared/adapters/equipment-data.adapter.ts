@@ -131,7 +131,7 @@ export class PowerMeterAdapter {
     const FPa = data.FPa || 0;
     const FPb = data.FPb || 0;
     const FPc = data.FPc || 0;
-    const FP_total = St > 0 ? Pt / St : 0;
+    const FP_total = St > 0 ? Pt / St : 1;
 
     // Energia (phf já vem em kWh)
     const phf = data.phf || data.consumo_phf || 0;

@@ -86,6 +86,19 @@ export class TecnicoProgramacaoDto {
   tecnico_id?: string;
 }
 
+export class ItemOrcamentoProgramacaoDto {
+  @ApiProperty({ description: 'Descrição do item de orçamento', example: 'Transporte de equipamentos' })
+  @IsString()
+  @IsNotEmpty()
+  @Length(1, 255)
+  descricao: string;
+
+  @ApiProperty({ description: 'Valor do item', example: 500.00 })
+  @IsNumber({ maxDecimalPlaces: 2 })
+  @Min(0)
+  valor: number;
+}
+
 export class CreateProgramacaoDto {
   // Informações básicas
   @ApiProperty({ description: 'Descrição da programação', example: 'Manutenção preventiva do motor principal' })
@@ -295,6 +308,13 @@ export class CreateProgramacaoDto {
   @ValidateNested({ each: true })
   @Type(() => TecnicoProgramacaoDto)
   tecnicos?: TecnicoProgramacaoDto[];
+
+  @ApiPropertyOptional({ description: 'Itens de orçamento adicionais' })
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => ItemOrcamentoProgramacaoDto)
+  itens_orcamento?: ItemOrcamentoProgramacaoDto[];
 
   // Custos
   @ApiPropertyOptional({ description: 'Orçamento previsto', example: 15000.00 })

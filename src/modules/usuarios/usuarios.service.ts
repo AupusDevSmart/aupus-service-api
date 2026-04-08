@@ -28,6 +28,7 @@ import {
 } from './dto';
 import * as bcrypt from 'bcryptjs';
 import { customAlphabet } from 'nanoid';
+import { MailService } from '../../shared/mail/mail.service';
 
 @Injectable()
 export class UsuariosService {
@@ -36,7 +37,8 @@ export class UsuariosService {
   constructor(
     private prisma: PrismaService,
     private rolesService: RolesService,
-    private permissionsService: PermissionsService
+    private permissionsService: PermissionsService,
+    private mailService: MailService,
   ) {}
 
   async findAll(query: UsuarioQueryDto, requestingUserId?: string) {
@@ -242,14 +244,20 @@ export class UsuariosService {
 
       // Verificar se email já existe
       const existingUser = await this.prisma.usuarios.findFirst({
-        where: {
-          email: data.email,
-          deleted_at: null
-        },
+        where: { email: data.email },
       });
 
       if (existingUser) {
-        throw new ConflictException('Email já está em uso');
+        if (existingUser.deleted_at) {
+          // Liberar o email do registro soft-deleted para permitir reutilização
+          await this.prisma.usuarios.update({
+            where: { id: existingUser.id },
+            data: { email: `deleted_${existingUser.id}_${existingUser.email}` },
+          });
+          console.log(`♻️ [CREATE USER] Email liberado do usuário soft-deleted ${existingUser.id}`);
+        } else {
+          throw new ConflictException('Email já está em uso');
+        }
       }
 
       // ============================================================================
@@ -355,6 +363,11 @@ export class UsuariosService {
       await this.processInitialRoleAndPermissionAssignment(userId, data);
 
       console.log('✅ [CREATE USER] Usuário criado com sucesso');
+
+      // Enviar email de boas-vindas (fire-and-forget)
+      this.mailService
+        .sendWelcomeEmail(data.email, data.nome, senhaTemporaria)
+        .catch(err => this.logger.error(`Erro ao enviar email de boas-vindas: ${err.message}`));
 
       const result = await this.mapToUsuarioResponseDto(novoUsuario);
 

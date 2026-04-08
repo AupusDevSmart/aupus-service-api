@@ -195,6 +195,26 @@ export class TecnicoProgramacaoResponseDto {
   updated_at: string;
 }
 
+export class ItemOrcamentoProgramacaoResponseDto {
+  @ApiProperty({ description: 'ID do item' })
+  id: string;
+
+  @ApiProperty({ description: 'ID da programação' })
+  programacao_id: string;
+
+  @ApiProperty({ description: 'Descrição do item de orçamento' })
+  descricao: string;
+
+  @ApiProperty({ description: 'Valor do item' })
+  valor: number;
+
+  @ApiProperty({ description: 'Data de criação' })
+  created_at: string;
+
+  @ApiProperty({ description: 'Data de atualização' })
+  updated_at: string;
+}
+
 export class HistoricoProgramacaoResponseDto {
   @ApiProperty({ description: 'ID do histórico' })
   id: string;
@@ -437,6 +457,9 @@ export class ProgramacaoDetalhesResponseDto extends ProgramacaoResponseDto {
 
   @ApiProperty({ description: 'Técnicos da programação', type: [TecnicoProgramacaoResponseDto] })
   tecnicos: TecnicoProgramacaoResponseDto[];
+
+  @ApiProperty({ description: 'Itens de orçamento da programação', type: [ItemOrcamentoProgramacaoResponseDto] })
+  itens_orcamento: ItemOrcamentoProgramacaoResponseDto[];
 
   @ApiProperty({ description: 'Histórico da programação', type: [HistoricoProgramacaoResponseDto] })
   historico: HistoricoProgramacaoResponseDto[];

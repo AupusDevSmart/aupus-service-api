@@ -15,6 +15,7 @@ import {
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiQuery } from '@nestjs/swagger';
 import { ReservasService } from './reservas.service';
+import { ReservasSchedulerService } from './reservas-scheduler.service';
 import {
   CreateReservaDto,
   UpdateReservaDto,
@@ -26,7 +27,10 @@ import {
 @ApiTags('Reservas de Veículos')
 @Controller('reservas')
 export class ReservasController {
-  constructor(private readonly reservasService: ReservasService) {}
+  constructor(
+    private readonly reservasService: ReservasService,
+    private readonly reservasSchedulerService: ReservasSchedulerService,
+  ) {}
 
   @Post()
   @ApiOperation({ summary: 'Criar nova reserva de veículo' })
@@ -157,6 +161,18 @@ export class ReservasController {
   })
   async finalizarReserva(@Param('id') id: string): Promise<void> {
     return this.reservasService.finalizar(id);
+  }
+
+  @Post('verificar-vencidas')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Verificar e marcar reservas vencidas manualmente' })
+  @ApiResponse({
+    status: 200,
+    description: 'Quantidade de reservas marcadas como vencidas',
+  })
+  async verificarVencidas(): Promise<{ vencidas: number }> {
+    const count = await this.reservasSchedulerService.marcarReservasVencidas();
+    return { vencidas: count };
   }
 
   @Get('veiculo/:veiculoId')

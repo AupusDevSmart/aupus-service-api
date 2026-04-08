@@ -64,8 +64,8 @@ export class SolicitacaoResponseDto {
   @ApiPropertyOptional()
   data_prevista_fim?: Date;
 
-  @ApiProperty()
-  justificativa: string;
+  @ApiPropertyOptional()
+  justificativa?: string;
 
   @ApiPropertyOptional()
   beneficios_esperados?: string;

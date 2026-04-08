@@ -129,6 +129,37 @@ async function cleanOldPermissions() {
   console.log(`\n📊 Total de permissões legadas removidas: ${deleted}`);
 }
 
+async function seedRoles() {
+  console.log('\n🔑 Verificando roles do sistema...\n');
+
+  const requiredRoles = [
+    'super_admin',
+    'admin',
+    'gerente',
+    'analista',
+    'proprietario',
+    'operador',
+  ];
+
+  for (const roleName of requiredRoles) {
+    const existing = await prisma.roles.findFirst({
+      where: { name: roleName },
+    });
+
+    if (existing) {
+      console.log(`⏭️  Role já existe: ${roleName}`);
+    } else {
+      await prisma.roles.create({
+        data: {
+          name: roleName,
+          guard_name: 'web',
+        },
+      });
+      console.log(`✅ Role criada: ${roleName}`);
+    }
+  }
+}
+
 async function main() {
   console.log('═'.repeat(60));
   console.log('  SEED DE PERMISSÕES - SISTEMA PADRONIZADO');
@@ -139,10 +170,13 @@ async function main() {
     // Criar permissões modernas
     await seedPermissions();
 
+    // Garantir que todas as roles necessárias existam
+    await seedRoles();
+
     // Perguntar se quer limpar as antigas (comentado por segurança)
     // await cleanOldPermissions();
 
-    console.log('\n✅ Seed de permissões concluído com sucesso!\n');
+    console.log('\n✅ Seed de permissões e roles concluído com sucesso!\n');
 
   } catch (error) {
     console.error('\n❌ Erro durante o seed:', error);

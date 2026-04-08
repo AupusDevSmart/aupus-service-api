@@ -176,6 +176,7 @@ export class ProgramacaoOSService {
         materiais: true,
         ferramentas: true,
         tecnicos: true,
+        itens_orcamento: true,
         historico: {
           orderBy: { data: 'desc' },
         },
@@ -339,6 +340,11 @@ export class ProgramacaoOSService {
         await this.criarTecnicos(prisma, programacao.id, createDto.tecnicos);
       }
 
+      // Criar itens de orçamento
+      if (createDto.itens_orcamento && createDto.itens_orcamento.length > 0) {
+        await this.criarItensOrcamento(prisma, programacao.id, createDto.itens_orcamento);
+      }
+
       // Criar reserva de veículo imediatamente (vinculada à programação)
       if (createDto.necessita_veiculo && createDto.veiculo_id) {
         await this.criarReservaVeiculoProgramacao(prisma, programacao, usuarioId);
@@ -394,7 +400,7 @@ export class ProgramacaoOSService {
 
     // Prepare data without undefined fields to avoid Prisma issues
     // ✅ Separar campos de relacionamentos (materiais, ferramentas, tecnicos)
-    const { materiais, ferramentas, tecnicos, tarefas_ids, ...restDto } = updateDto as any;
+    const { materiais, ferramentas, tecnicos, itens_orcamento, tarefas_ids, ...restDto } = updateDto as any;
     const updateData: any = {};
 
     Object.keys(restDto).forEach(key => {
@@ -432,6 +438,51 @@ export class ProgramacaoOSService {
           ordem_servico: true,
         },
       });
+
+      // Atualizar recursos (delete + recreate)
+      if (materiais !== undefined) {
+        await prisma.materiais_programacao_os.deleteMany({ where: { programacao_id: id } });
+        if (materiais.length > 0) {
+          await this.criarMateriais(prisma, id, materiais);
+        }
+      }
+
+      if (ferramentas !== undefined) {
+        await prisma.ferramentas_programacao_os.deleteMany({ where: { programacao_id: id } });
+        if (ferramentas.length > 0) {
+          await this.criarFerramentas(prisma, id, ferramentas);
+        }
+      }
+
+      if (tecnicos !== undefined) {
+        await prisma.tecnicos_programacao_os.deleteMany({ where: { programacao_id: id } });
+        if (tecnicos.length > 0) {
+          await this.criarTecnicos(prisma, id, tecnicos);
+        }
+      }
+
+      if (itens_orcamento !== undefined) {
+        await prisma.itens_orcamento_programacao_os.deleteMany({ where: { programacao_id: id } });
+        if (itens_orcamento.length > 0) {
+          await this.criarItensOrcamento(prisma, id, itens_orcamento);
+        }
+      }
+
+      // Recalcular orcamento_previsto se recursos foram alterados
+      if (materiais !== undefined || tecnicos !== undefined || itens_orcamento !== undefined) {
+        const orcamento = this.calcularOrcamentoPrevisto({
+          materiais: materiais || programacao.materiais || [],
+          tecnicos: tecnicos || programacao.tecnicos || [],
+          itens_orcamento: itens_orcamento || programacao.itens_orcamento || [],
+        } as any);
+
+        if (orcamento > 0) {
+          await prisma.programacoes_os.update({
+            where: { id },
+            data: { orcamento_previsto: orcamento },
+          });
+        }
+      }
 
       // Criar/atualizar/cancelar reserva de veículo vinculada à programação
       // ✅ CORREÇÃO: Só criar/atualizar reserva se necessita_veiculo for true E houver veiculo_id
@@ -684,6 +735,29 @@ export class ProgramacaoOSService {
       statusAnterior as StatusProgramacaoOS,
       StatusProgramacaoOS.CANCELADA,
     );
+
+    // Cancelar reserva de veículo vinculada
+    if (programacao.reserva_id) {
+      try {
+        const reservaId = programacao.reserva_id.trim();
+        const reserva = await this.prisma.reserva_veiculo.findUnique({
+          where: { id: reservaId },
+        });
+        if (reserva && reserva.status === 'ativa') {
+          await this.prisma.reserva_veiculo.update({
+            where: { id: reservaId },
+            data: {
+              status: 'cancelada',
+              motivo_cancelamento: `Programação ${id} foi cancelada: ${dto.motivo_cancelamento}`,
+              data_cancelamento: new Date(),
+            },
+          });
+          this.logger.log(`Reserva ${reservaId} cancelada após cancelamento da programação`);
+        }
+      } catch (error) {
+        this.logger.warn(`Erro ao cancelar reserva da programação: ${error.message}`);
+      }
+    }
 
     // Retornar anomalia vinculada para REGISTRADA
     if (programacao.anomalia_id) {
@@ -1097,6 +1171,12 @@ export class ProgramacaoOSService {
       }, 0);
     }
 
+    if (dto.itens_orcamento) {
+      total += dto.itens_orcamento.reduce((acc, item) => {
+        return acc + (item.valor || 0);
+      }, 0);
+    }
+
     return total;
   }
 
@@ -1172,6 +1252,16 @@ export class ProgramacaoOSService {
     await prisma.tecnicos_programacao_os.createMany({ data: dados });
   }
 
+  private async criarItensOrcamento(prisma: any, programacaoId: string, itensOrcamento: any[]): Promise<void> {
+    const dados = itensOrcamento.map(item => ({
+      programacao_id: programacaoId,
+      descricao: item.descricao,
+      valor: item.valor,
+    }));
+
+    await prisma.itens_orcamento_programacao_os.createMany({ data: dados });
+  }
+
   private async registrarHistorico(
     prismaOrTransaction: any,
     programacaoId: string,
@@ -1206,6 +1296,7 @@ export class ProgramacaoOSService {
         materiais: true,
         ferramentas: true,
         tecnicos: true,
+        itens_orcamento: true,
         historico: {
           orderBy: { data: 'asc' },
         },
@@ -1314,6 +1405,16 @@ export class ProgramacaoOSService {
         tecnico_id: t.tecnico_id,
       }));
       await prisma.tecnicos_os.createMany({ data: tecnicosOS });
+    }
+
+    // Copiar itens de orçamento para a OS
+    if (programacao.itens_orcamento.length > 0) {
+      const itensOrcamentoOS = programacao.itens_orcamento.map(i => ({
+        os_id: os.id,
+        descricao: i.descricao,
+        valor: i.valor,
+      }));
+      await prisma.itens_orcamento_os.createMany({ data: itensOrcamentoOS });
     }
 
     // ✅ NOVO: Copiar histórico da programação para o histórico da OS
@@ -1766,6 +1867,14 @@ export class ProgramacaoOSService {
         tecnico_id: t.tecnico_id,
         created_at: t.created_at,
         updated_at: t.updated_at,
+      })) || [],
+      itens_orcamento: programacao.itens_orcamento?.map((i: any) => ({
+        id: i.id,
+        programacao_id: i.programacao_id,
+        descricao: i.descricao,
+        valor: Number(i.valor),
+        created_at: i.created_at,
+        updated_at: i.updated_at,
       })) || [],
       historico: programacao.historico?.map((h: any) => ({
         id: h.id,

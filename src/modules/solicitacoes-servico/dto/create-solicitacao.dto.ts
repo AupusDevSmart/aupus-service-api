@@ -111,10 +111,10 @@ export class CreateSolicitacaoDto {
   data_prevista_fim?: string;
 
   // Justificativa e benefícios
-  @ApiProperty({ description: 'Justificativa para a solicitação' })
-  @IsNotEmpty()
+  @ApiPropertyOptional({ description: 'Justificativa para a solicitação' })
+  @IsOptional()
   @IsString()
-  justificativa: string;
+  justificativa?: string;
 
   @ApiPropertyOptional({ description: 'Benefícios esperados com o serviço' })
   @IsOptional()

@@ -293,6 +293,26 @@ export class RegistroTempoOSResponseDto {
   updated_at: string;
 }
 
+export class ItemOrcamentoOSResponseDto {
+  @ApiProperty({ description: 'ID do item' })
+  id: string;
+
+  @ApiProperty({ description: 'ID da OS' })
+  os_id: string;
+
+  @ApiProperty({ description: 'Descrição do item de orçamento' })
+  descricao: string;
+
+  @ApiProperty({ description: 'Valor do item' })
+  valor: number;
+
+  @ApiProperty({ description: 'Data de criação' })
+  created_at: string;
+
+  @ApiProperty({ description: 'Data de atualização' })
+  updated_at: string;
+}
+
 export class HistoricoOSResponseDto {
   @ApiProperty({ description: 'ID do histórico' })
   id: string;
@@ -564,6 +584,9 @@ export class OrdemServicoResponseDto {
   @ApiPropertyOptional({ description: 'Técnicos da OS', type: [TecnicoOSResponseDto] })
   tecnicos?: TecnicoOSResponseDto[];
 
+  @ApiPropertyOptional({ description: 'Itens de orçamento da OS', type: [ItemOrcamentoOSResponseDto] })
+  itens_orcamento?: ItemOrcamentoOSResponseDto[];
+
   // Auditoria
   @ApiPropertyOptional({ description: 'Criado por' })
   criado_por?: string;
@@ -627,6 +650,9 @@ export class OrdemServicoDetalhesResponseDto extends OrdemServicoResponseDto {
 
   @ApiProperty({ description: 'Técnicos da OS', type: [TecnicoOSResponseDto] })
   tecnicos: TecnicoOSResponseDto[];
+
+  @ApiProperty({ description: 'Itens de orçamento da OS', type: [ItemOrcamentoOSResponseDto] })
+  itens_orcamento: ItemOrcamentoOSResponseDto[];
 
   @ApiProperty({ description: 'Checklist de atividades', type: [ChecklistAtividadeResponseDto] })
   checklist: ChecklistAtividadeResponseDto[];
