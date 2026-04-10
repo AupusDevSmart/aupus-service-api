@@ -37,6 +37,8 @@ import { CoaModule } from './modules/coa/coa.module';
 import { DashboardModule } from './modules/dashboard/dashboard.module';
 import { SolicitacoesServicoModule } from './modules/solicitacoes-servico/solicitacoes-servico.module';
 import { InstrucoesModule } from './modules/instrucoes/instrucoes.module';
+import { RegrasLogsMqttModule } from './modules/regras-logs-mqtt/regras-logs-mqtt.module';
+import { LogsMqttModule } from './modules/logs-mqtt/logs-mqtt.module';
 import { MailModule } from './shared/mail/mail.module';
 
 @Module({
@@ -95,6 +97,8 @@ import { MailModule } from './shared/mail/mail.module';
     CoaModule, // Centro de Operações Avançadas
     DashboardModule, // Dashboard com métricas e estatísticas
     UploadsModule, // Módulo para servir arquivos de upload
+    RegrasLogsMqttModule, // Cadastro de regras de logs MQTT
+    LogsMqttModule, // Visualização de logs MQTT gerados
   ],
   controllers: [AppController],
   providers: [

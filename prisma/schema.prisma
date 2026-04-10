@@ -1162,6 +1162,8 @@ model equipamentos {
   solicitacoes_servico   solicitacoes_servico[]
   tarefas                tarefas[]
   configuracao_custo     configuracoes_custo_equipamento?
+  regras_logs_mqtt       regras_logs_mqtt[]
+  logs_mqtt              logs_mqtt[]
 
   @@index([unidade_id])
   @@index([planta_id])
@@ -2816,4 +2818,49 @@ enum OrigemSolicitacao {
   PRESENCIAL
   SISTEMA
   APLICATIVO
+}
+
+// =============================================
+// REGRAS DE LOGS MQTT
+// =============================================
+
+model regras_logs_mqtt {
+  id                String       @id @default(cuid()) @db.Char(26)
+  equipamento_id    String       @db.Char(26)
+  nome              String       @db.VarChar(100)
+  campo_json        String       @db.VarChar(255)
+  operador          String       @db.VarChar(10)
+  valor             Decimal      @db.Decimal(15, 4)
+  mensagem          String       @db.VarChar(500)
+  severidade        String       @default("MEDIA") @db.VarChar(20)
+  cooldown_minutos  Int          @default(5)
+  ativo             Boolean      @default(true)
+  created_at        DateTime     @default(now()) @db.Timestamp(0)
+  updated_at        DateTime     @updatedAt @db.Timestamp(0)
+  deleted_at        DateTime?    @db.Timestamp(0)
+  equipamento       equipamentos @relation(fields: [equipamento_id], references: [id], onDelete: Cascade)
+  logs              logs_mqtt[]
+
+  @@index([equipamento_id])
+  @@index([ativo])
+  @@map("regras_logs_mqtt")
+}
+
+model logs_mqtt {
+  id              String           @id @default(cuid()) @db.Char(26)
+  regra_id        String           @db.Char(26)
+  equipamento_id  String           @db.Char(26)
+  valor_lido      Decimal          @db.Decimal(15, 4)
+  mensagem        String           @db.VarChar(500)
+  severidade      String           @db.VarChar(20)
+  dados_snapshot  Json
+  created_at      DateTime         @default(now()) @db.Timestamp(0)
+  regra           regras_logs_mqtt @relation(fields: [regra_id], references: [id], onDelete: Cascade)
+  equipamento     equipamentos     @relation(fields: [equipamento_id], references: [id], onDelete: Cascade)
+
+  @@index([regra_id])
+  @@index([equipamento_id])
+  @@index([created_at(sort: Desc)])
+  @@index([severidade])
+  @@map("logs_mqtt")
 }

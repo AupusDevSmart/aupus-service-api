@@ -5,12 +5,14 @@ import { MqttDiagnosticsController } from './mqtt-diagnostics.controller';
 import { MqttRedisBufferService } from './mqtt-redis-buffer.service';
 import { PrismaModule } from '../prisma/prisma.module';
 import { EquipamentosDadosModule } from '../../modules/equipamentos-dados/equipamentos-dados.module';
+import { RegrasLogsMqttModule } from '../../modules/regras-logs-mqtt/regras-logs-mqtt.module';
 
 @Global()
 @Module({
   imports: [
     PrismaModule,
     EquipamentosDadosModule, // ✅ Import para usar MqttIngestionService
+    RegrasLogsMqttModule, // ✅ Import para verificação de regras de logs
   ],
   controllers: [MqttDiagnosticsController],
   providers: [

@@ -3,6 +3,7 @@ import * as mqtt from 'mqtt';
 import { PrismaService } from '../prisma/prisma.service';
 import { MqttIngestionService } from '../../modules/equipamentos-dados/services/mqtt-ingestion.service';
 import { MqttRedisBufferService } from './mqtt-redis-buffer.service';
+import { RegrasLogsMqttEngine } from '../../modules/regras-logs-mqtt/regras-logs-mqtt.engine';
 import { EventEmitter } from 'events';
 import Ajv from 'ajv';
 import addFormats from 'ajv-formats';
@@ -34,6 +35,7 @@ export class MqttService extends EventEmitter implements OnModuleInit, OnModuleD
     @Inject(forwardRef(() => MqttIngestionService))
     private readonly mqttIngestionService: MqttIngestionService,
     @Optional() private readonly redisBuffer?: MqttRedisBufferService,
+    @Optional() private readonly regrasLogsMqttEngine?: RegrasLogsMqttEngine,
   ) {
     super();
     // Inicializar Ajv com formatos adicionais
@@ -472,6 +474,13 @@ export class MqttService extends EventEmitter implements OnModuleInit, OnModuleD
           qualidade,
         },
       });
+
+      // Verificar regras de logs MQTT
+      if (this.regrasLogsMqttEngine) {
+        this.regrasLogsMqttEngine.verificar(equipamentoId, dados).catch((err) => {
+          console.error(`❌ Erro ao verificar regras de log para ${equipamentoId}:`, err.message);
+        });
+      }
     } catch (error) {
       console.error(
         `❌ Erro ao processar dados do equipamento ${equipamentoId}:`,
