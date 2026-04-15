@@ -22,6 +22,12 @@ export class PlantaBasica {
   @ApiPropertyOptional({ example: 'São Paulo - SP' })
   localizacao?: string;
 
+  @ApiPropertyOptional({ example: 'São Paulo' })
+  cidade?: string;
+
+  @ApiPropertyOptional({ example: 'SP' })
+  uf?: string;
+
   @ApiPropertyOptional({ type: ProprietarioBasico })
   proprietario?: ProprietarioBasico;
 }
@@ -83,6 +89,18 @@ export class UnidadeResponse {
 
   @ApiPropertyOptional({ example: 'con_01234567890123456789012345' })
   concessionariaId?: string;
+
+  @ApiPropertyOptional({ example: '0,38 kV', description: 'Tensão nominal' })
+  tensaoNominal?: string;
+
+  @ApiPropertyOptional({ example: false })
+  sazonal?: boolean;
+
+  @ApiPropertyOptional({ example: false })
+  industrial?: boolean;
+
+  @ApiPropertyOptional({ example: false })
+  geracao?: boolean;
 
   @ApiPropertyOptional({ type: PlantaBasica })
   planta?: PlantaBasica;

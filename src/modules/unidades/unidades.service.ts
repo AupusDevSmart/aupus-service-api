@@ -68,6 +68,7 @@ export class UnidadesService {
         planta_id: plantaIdTrimmed,
         pontos_medicao: pontos_medicao ? pontos_medicao : null,
         concessionaria_id: concessionariaIdTrimmed || null,
+        potencia: unidadeData.potencia ?? 0,
         status: 'ativo',
       };
 
@@ -83,6 +84,8 @@ export class UnidadesService {
               id: true,
               nome: true,
               localizacao: true,
+              cidade: true,
+              uf: true,
               proprietario: {
                 select: {
                   id: true,
@@ -202,6 +205,8 @@ export class UnidadesService {
                 id: true,
                 nome: true,
                 localizacao: true,
+                cidade: true,
+                uf: true,
               },
             },
             _count: {
@@ -254,6 +259,8 @@ export class UnidadesService {
               id: true,
               nome: true,
               localizacao: true,
+              cidade: true,
+              uf: true,
               proprietario: {
                 select: {
                   id: true,
@@ -312,6 +319,8 @@ export class UnidadesService {
               id: true,
               nome: true,
               localizacao: true,
+              cidade: true,
+              uf: true,
               proprietario: {
                 select: {
                   id: true,
@@ -442,6 +451,8 @@ export class UnidadesService {
               id: true,
               nome: true,
               localizacao: true,
+              cidade: true,
+              uf: true,
               proprietario: {
                 select: {
                   id: true,
@@ -667,12 +678,18 @@ export class UnidadesService {
       tipoUnidade: unidadeDb.tipo_unidade,
       demandaCarga: unidadeDb.demanda_carga ? Number(unidadeDb.demanda_carga) : undefined,
       demandaGeracao: unidadeDb.demanda_geracao ? Number(unidadeDb.demanda_geracao) : undefined,
+      tensaoNominal: unidadeDb.tensao_nominal || undefined,
+      sazonal: unidadeDb.sazonal,
+      industrial: unidadeDb.industrial,
+      geracao: unidadeDb.geracao,
       concessionariaId: formatId(unidadeDb.concessionaria_id), // ✅ CORREÇÃO: usar helper
       planta: unidadeDb.planta
         ? {
             id: unidadeDb.planta.id?.trim() || unidadeDb.planta.id, // ✅ TRIM
             nome: unidadeDb.planta.nome,
             localizacao: unidadeDb.planta.localizacao,
+            cidade: unidadeDb.planta.cidade,
+            uf: unidadeDb.planta.uf,
             proprietario: unidadeDb.planta.proprietario
               ? {
                   id: unidadeDb.planta.proprietario.id,

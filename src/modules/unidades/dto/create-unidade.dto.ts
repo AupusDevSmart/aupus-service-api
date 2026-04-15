@@ -109,10 +109,13 @@ export class CreateUnidadeDto {
     description: 'Potência em kW',
     example: 1000.5,
     minimum: 0,
+    required: false,
+    default: 0,
   })
   @IsNumber({}, { message: 'Potência deve ser um número' })
   @Min(0, { message: 'Potência não pode ser negativa' })
-  potencia: number;
+  @IsOptional()
+  potencia?: number;
 
   @ApiProperty({
     description: 'Pontos de medição (array de strings em formato JSON)',
@@ -203,4 +206,43 @@ export class CreateUnidadeDto {
   @IsString()
   @IsOptional()
   concessionaria_id?: string;
+
+  @ApiProperty({
+    description: 'Tensão nominal (ex: 0,38 kV)',
+    example: '0,38 kV',
+    required: false,
+  })
+  @IsString()
+  @IsOptional()
+  tensao_nominal?: string;
+
+  @ApiProperty({
+    description: 'Indica se a unidade é sazonal',
+    example: false,
+    required: false,
+    default: false,
+  })
+  @IsBoolean({ message: 'Sazonal deve ser um booleano' })
+  @IsOptional()
+  sazonal?: boolean;
+
+  @ApiProperty({
+    description: 'Indica se a unidade é industrial',
+    example: false,
+    required: false,
+    default: false,
+  })
+  @IsBoolean({ message: 'Industrial deve ser um booleano' })
+  @IsOptional()
+  industrial?: boolean;
+
+  @ApiProperty({
+    description: 'Indica se a unidade possui geração',
+    example: false,
+    required: false,
+    default: false,
+  })
+  @IsBoolean({ message: 'Geração deve ser um booleano' })
+  @IsOptional()
+  geracao?: boolean;
 }

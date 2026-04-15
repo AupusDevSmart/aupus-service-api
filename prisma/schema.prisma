@@ -1030,6 +1030,10 @@ model unidades {
   subgrupo          String?                  @db.VarChar(50)
   tipo_unidade      String?                  @db.VarChar(20)
   numero_uc         String?                  @db.VarChar(255)
+  tensao_nominal    String?                  @db.VarChar(20)
+  sazonal           Boolean                  @default(false)
+  industrial        Boolean                  @default(false)
+  geracao           Boolean                  @default(false)
   equipamentos      equipamentos[]
   solicitacoes_servico solicitacoes_servico[]
   concessionaria    concessionarias_energia? @relation(fields: [concessionaria_id], references: [id])
