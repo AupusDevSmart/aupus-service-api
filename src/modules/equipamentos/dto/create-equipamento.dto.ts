@@ -155,6 +155,11 @@ export class CreateEquipamentoDto {
   @IsString()
   observacoes?: string;
 
+  @ApiPropertyOptional({ example: 'Ativo', description: 'Status do equipamento: Ativo ou Inativo' })
+  @IsOptional()
+  @IsString()
+  status?: string;
+
   @ApiPropertyOptional({ example: 'TAG-001' })
   @IsOptional()
   @IsString()
