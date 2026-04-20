@@ -1,5 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { PrismaService } from '../../shared/prisma/prisma.service';
+import { PrismaService } from '@aupus/api-shared';
 import { MqttService } from '../../shared/mqtt/mqtt.service';
 
 export interface MqttMetrics {

@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { PrismaService } from '../../../shared/prisma/prisma.service';
+import { PrismaService } from '@aupus/api-shared';
 import { UpsertConfiguracaoCustoDto } from '../dto/configuracao-custo.dto';
 
 export interface ConfiguracaoCustoData {

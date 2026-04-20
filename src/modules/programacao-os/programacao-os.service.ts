@@ -1,6 +1,6 @@
 import { ConflictException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { Prisma, StatusProgramacaoOS } from '@prisma/client';
-import { PrismaService } from '../../shared/prisma/prisma.service';
+import { PrismaService } from '@aupus/api-shared';
 import { AnomaliasService } from '../anomalias/anomalias.service';
 import {
   AdicionarTarefasDto,

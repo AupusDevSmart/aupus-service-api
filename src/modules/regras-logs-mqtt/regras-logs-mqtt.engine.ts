@@ -1,5 +1,5 @@
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
-import { PrismaService } from '../../shared/prisma/prisma.service';
+import { PrismaService } from '@aupus/api-shared';
 import { getValueByPath, avaliarCondicao } from './regras-logs-mqtt.helpers';
 
 interface RegraCache {

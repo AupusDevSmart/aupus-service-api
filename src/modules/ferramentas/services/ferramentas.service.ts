@@ -7,7 +7,7 @@ import {
   ConflictException,
   BadRequestException,
 } from '@nestjs/common';
-import { PrismaService } from '../../../shared/prisma/prisma.service';
+import { PrismaService } from '@aupus/api-shared';
 import { CreateFerramentaDto } from '../dto/create-ferramenta.dto';
 import { UpdateFerramentaDto } from '../dto/update-ferramenta.dto';
 import { QueryFerramentasDto } from '../dto/query-ferramentas.dto';

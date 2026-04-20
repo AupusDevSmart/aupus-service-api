@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Cron } from '@nestjs/schedule';
-import { PrismaService } from '../../shared/prisma/prisma.service';
+import { PrismaService } from '@aupus/api-shared';
 
 @Injectable()
 export class ReservasSchedulerService {

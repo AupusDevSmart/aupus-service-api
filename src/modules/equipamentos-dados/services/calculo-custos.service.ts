@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { PrismaService } from '../../../shared/prisma/prisma.service';
+import { PrismaService } from '@aupus/api-shared';
 import { ClassificacaoHorariosService } from './classificacao-horarios.service';
 import { ConfiguracaoCustoService, ConfiguracaoCustoData } from './configuracao-custo.service';
 import {

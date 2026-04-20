@@ -2,7 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { INestApplication, ValidationPipe } from '@nestjs/common';
 import * as request from 'supertest';
 import { AppModule } from '../src/app.module';
-import { PrismaService } from '../src/shared/prisma/prisma.service';
+import { PrismaService } from '@aupus/api-shared';
 import { generateMockToken } from './helpers/auth.helper';
 
 /**

@@ -2,7 +2,7 @@
 // src/modules/ferramentas/ferramentas.module.ts
 // ===============================
 import { Module } from '@nestjs/common';
-import { PrismaModule } from '../../shared/prisma/prisma.module';
+import { PrismaModule } from '@aupus/api-shared';
 import { FerramentasController } from './controllers/ferramentas.controller';
 import { CalibracaoController } from './controllers/calibracao.controller';
 import { ManutencaoController } from './controllers/manutencao.controller';

@@ -1,7 +1,7 @@
 // src/modules/tarefas/tarefas-scheduler.service.ts
 import { Injectable, Logger } from '@nestjs/common';
 import { Cron } from '@nestjs/schedule';
-import { PrismaService } from '../../shared/prisma/prisma.service';
+import { PrismaService } from '@aupus/api-shared';
 import { ProgramacaoOSService } from '../programacao-os/programacao-os.service';
 
 /** Mapa frequência → dias */

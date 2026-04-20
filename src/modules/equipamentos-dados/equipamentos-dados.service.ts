@@ -1,5 +1,5 @@
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
-import { PrismaService } from '../../shared/prisma/prisma.service';
+import { PrismaService } from '@aupus/api-shared';
 import { EquipamentoDadosQueryDto } from './dto/equipamento-dados-query.dto';
 
 @Injectable()

@@ -3,7 +3,7 @@ import { MqttService } from './mqtt.service';
 import { MqttDiagnosticsService } from './mqtt-diagnostics.service';
 import { MqttDiagnosticsController } from './mqtt-diagnostics.controller';
 import { MqttRedisBufferService } from './mqtt-redis-buffer.service';
-import { PrismaModule } from '../prisma/prisma.module';
+import { PrismaModule } from '@aupus/api-shared';
 import { EquipamentosDadosModule } from '../../modules/equipamentos-dados/equipamentos-dados.module';
 import { RegrasLogsMqttModule } from '../../modules/regras-logs-mqtt/regras-logs-mqtt.module';
 

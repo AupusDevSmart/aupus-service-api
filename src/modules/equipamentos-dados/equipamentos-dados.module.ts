@@ -6,7 +6,7 @@ import { CalculoCustosService } from './services/calculo-custos.service';
 import { ConfiguracaoCustoService } from './services/configuracao-custo.service';
 import { FeriadosNacionaisService } from './services/feriados-nacionais.service';
 import { MqttIngestionService } from './services/mqtt-ingestion.service';
-import { PrismaModule } from '../../shared/prisma/prisma.module';
+import { PrismaModule } from '@aupus/api-shared';
 
 @Module({
   imports: [PrismaModule],

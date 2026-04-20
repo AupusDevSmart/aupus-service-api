@@ -24,22 +24,14 @@ export class ResponseInterceptor<T> implements NestInterceptor<T, Response<T>> {
     const timestamp = new Date().toISOString();
 
     return next.handle().pipe(
-      map((data) => {
-        // Se a resposta já tem estrutura com success, data, meta, retorna como está
-        if (data && typeof data === 'object' && 'success' in data) {
-          return data;
-        }
-
-        // Caso contrário, envolve com a estrutura padrão
-        return {
-          success: true,
-          data,
-          meta: {
-            timestamp,
-            requestId,
-          },
-        };
-      }),
+      map((data) => ({
+        success: true,
+        data,
+        meta: {
+          timestamp,
+          requestId,
+        },
+      })),
     );
   }
 }

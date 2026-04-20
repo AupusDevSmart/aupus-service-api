@@ -4,7 +4,7 @@ import {
   BadRequestException,
   Logger,
 } from '@nestjs/common';
-import { PrismaService } from '../../shared/prisma/prisma.service';
+import { PrismaService } from '@aupus/api-shared';
 import { SolicitacoesServicoService } from './solicitacoes-servico.service';
 import * as fs from 'fs/promises';
 import * as path from 'path';

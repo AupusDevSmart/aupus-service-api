@@ -1,5 +1,5 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
-import { PrismaService } from '../../shared/prisma/prisma.service';
+import { PrismaService } from '@aupus/api-shared';
 import { QueryLogsMqttDto } from './dto/query-logs-mqtt.dto';
 
 @Injectable()

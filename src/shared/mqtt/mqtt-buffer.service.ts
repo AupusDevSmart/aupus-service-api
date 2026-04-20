@@ -1,7 +1,7 @@
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import * as fs from 'fs';
 import * as path from 'path';
-import { PrismaService } from '../prisma/prisma.service';
+import { PrismaService } from '@aupus/api-shared';
 
 /**
  * Serviço de Buffer Persistente para dados MQTT

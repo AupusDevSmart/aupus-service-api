@@ -1,5 +1,5 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
-import { PrismaService } from '../../shared/prisma/prisma.service';
+import { PrismaService } from '@aupus/api-shared';
 import { CreateRegraLogDto } from './dto/create-regra-log.dto';
 import { UpdateRegraLogDto } from './dto/update-regra-log.dto';
 import { QueryRegrasLogsDto } from './dto/query-regras-logs.dto';
@@ -25,6 +25,7 @@ export class RegrasLogsMqttService {
         mensagem: dto.mensagem.trim(),
         severidade: dto.severidade || 'MEDIA',
         cooldown_minutos: dto.cooldown_minutos || 5,
+        ativo: dto.ativo ?? true,
       },
       include: { equipamento: { select: { id: true, nome: true } } },
     });

@@ -1,6 +1,6 @@
 // src/modules/instrucoes/instrucoes.service.ts
 import { Injectable, NotFoundException, ConflictException, BadRequestException } from '@nestjs/common';
-import { PrismaService } from '../../shared/prisma/prisma.service';
+import { PrismaService } from '@aupus/api-shared';
 import {
   CreateInstrucaoDto,
   UpdateInstrucaoDto,

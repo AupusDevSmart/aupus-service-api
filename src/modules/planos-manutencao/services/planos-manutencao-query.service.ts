@@ -1,6 +1,6 @@
 // src/modules/planos-manutencao/services/planos-manutencao-query.service.ts
 import { Injectable } from '@nestjs/common';
-import { PrismaService } from '../../../shared/prisma/prisma.service';
+import { PrismaService } from '@aupus/api-shared';
 import { Prisma } from '@prisma/client';
 import {
   QueryPlanosDto,

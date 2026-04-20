@@ -1,6 +1,6 @@
 // src/modules/planos-manutencao/services/planos-manutencao-crud.service.ts
 import { Injectable, ConflictException } from '@nestjs/common';
-import { PrismaService } from '../../../shared/prisma/prisma.service';
+import { PrismaService } from '@aupus/api-shared';
 import { StatusPlano } from '@prisma/client';
 import {
   CreatePlanoManutencaoDto,

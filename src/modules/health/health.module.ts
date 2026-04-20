@@ -3,7 +3,7 @@ import { HealthController } from './health.controller';
 import { HealthService } from './health.service';
 import { AlertService } from './alert.service';
 import { MetricsService } from './metrics.service';
-import { PrismaModule } from '../../shared/prisma/prisma.module';
+import { PrismaModule } from '@aupus/api-shared';
 import { MqttModule } from '../../shared/mqtt/mqtt.module';
 
 @Module({

@@ -1,23 +1,19 @@
-// src/app.module.ts - ATUALIZADO COM USUARIOS MODULE E AUTH MODULE
+// aupus-service-api - modulo raiz
+// Importa modulos compartilhados de @aupus/api-shared + modulos especificos do Service
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { ScheduleModule } from '@nestjs/schedule';
 import { SentryModule } from '@sentry/nestjs/setup';
 import { SentryGlobalFilter } from '@sentry/nestjs/setup';
 import { APP_FILTER } from '@nestjs/core';
+
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
-import { PrismaModule } from './shared/prisma/prisma.module';
 import { MqttModule } from './shared/mqtt/mqtt.module';
 import { WebSocketModule } from './websocket/websocket.module';
-import { AuthModule } from './modules/auth/auth.module';
+
+// Modulos Service-only
 import { HealthModule } from './modules/health/health.module';
-import { UsuariosModule } from './modules/usuarios/usuarios.module';
-import { RolesModule } from './modules/roles/roles.module';
-import { PermissionsModule } from './modules/permissions/permissions.module';
-import { PlantasModule } from './modules/plantas/plantas.module';
-import { UnidadesModule } from './modules/unidades/unidades.module';
-import { EquipamentosModule } from './modules/equipamentos/equipamentos.module';
 import { AnomaliasModule } from './modules/anomalias/anomalias.module';
 import { PlanosManutencaoModule } from './modules/planos-manutencao/planos-manutencao.module';
 import { TarefasModule } from './modules/tarefas/tarefas.module';
@@ -26,61 +22,60 @@ import { VeiculosModule } from './modules/veiculos/veiculos.module';
 import { ReservasModule } from './modules/reservas/reservas.module';
 import { ProgramacaoOSModule } from './modules/programacao-os/programacao-os.module';
 import { ExecucaoOSModule } from './modules/execucao-os/execucao-os.module';
-import { DiagramasModule } from './modules/diagramas/diagramas.module';
-import { TiposEquipamentosModule } from './modules/tipos-equipamentos/tipos-equipamentos.module';
-import { CategoriasEquipamentosModule } from './modules/categorias-equipamentos/categorias-equipamentos.module';
-import { ConcessionariasModule } from './modules/concessionarias/concessionarias.module';
-import { EquipamentosDadosModule } from './modules/equipamentos-dados/equipamentos-dados.module';
 import { UploadsModule } from './modules/uploads/uploads.module';
-import { ConfiguracaoDemandaModule } from './modules/configuracao-demanda/configuracao-demanda.module';
-import { CoaModule } from './modules/coa/coa.module';
 import { DashboardModule } from './modules/dashboard/dashboard.module';
 import { SolicitacoesServicoModule } from './modules/solicitacoes-servico/solicitacoes-servico.module';
 import { InstrucoesModule } from './modules/instrucoes/instrucoes.module';
+// Modulos MQTT-dependentes (mantidos por dependencia do MQTT infrastructure)
+import { EquipamentosDadosModule } from './modules/equipamentos-dados/equipamentos-dados.module';
 import { RegrasLogsMqttModule } from './modules/regras-logs-mqtt/regras-logs-mqtt.module';
 import { LogsMqttModule } from './modules/logs-mqtt/logs-mqtt.module';
-import { MailModule } from './shared/mail/mail.module';
+
+// Modulos compartilhados (de @aupus/api-shared)
+import {
+  PrismaModule,
+  MailModule,
+  AuthModule,
+  UsuariosModule,
+  RolesModule,
+  PermissionsModule,
+  PlantasModule,
+  UnidadesModule,
+  EquipamentosModule,
+  TiposEquipamentosModule,
+  CategoriasEquipamentosModule,
+  ConcessionariasModule,
+} from '@aupus/api-shared';
 
 @Module({
   imports: [
-    // ✅ Sentry (deve ser o primeiro import)
     SentryModule.forRoot(),
-
-    // ✅ Configuração global
     ConfigModule.forRoot({
       isGlobal: true,
       envFilePath: ['.env.local', '.env'],
     }),
-
-    // ✅ Cron Jobs e Tarefas Agendadas
     ScheduleModule.forRoot(),
 
-    // ✅ Database
     PrismaModule,
-
-    // ✅ Email
     MailModule,
-
-    // ✅ MQTT e WebSocket para dados em tempo real
     MqttModule,
     WebSocketModule,
 
-    // ✅ Health Check e Monitoramento
     HealthModule,
-
-    // ✅ Autenticação
     AuthModule,
 
-    // ✅ Módulos de negócio
+    // Compartilhados
     UsuariosModule,
     RolesModule,
     PermissionsModule,
     PlantasModule,
     UnidadesModule,
     EquipamentosModule,
-    DiagramasModule,
     TiposEquipamentosModule,
     CategoriasEquipamentosModule,
+    ConcessionariasModule,
+
+    // Service-only
     AnomaliasModule,
     PlanosManutencaoModule,
     TarefasModule,
@@ -89,16 +84,15 @@ import { MailModule } from './shared/mail/mail.module';
     ReservasModule,
     ProgramacaoOSModule,
     ExecucaoOSModule,
-    SolicitacoesServicoModule, // Novo módulo de Solicitações de Serviço
-    InstrucoesModule, // Módulo de Instruções (templates de tarefas)
-    ConcessionariasModule,
+    SolicitacoesServicoModule,
+    InstrucoesModule,
+    DashboardModule,
+    UploadsModule,
+
+    // Mantidos: dependencias do MQTT infrastructure
     EquipamentosDadosModule,
-    ConfiguracaoDemandaModule,
-    CoaModule, // Centro de Operações Avançadas
-    DashboardModule, // Dashboard com métricas e estatísticas
-    UploadsModule, // Módulo para servir arquivos de upload
-    RegrasLogsMqttModule, // Cadastro de regras de logs MQTT
-    LogsMqttModule, // Visualização de logs MQTT gerados
+    RegrasLogsMqttModule,
+    LogsMqttModule,
   ],
   controllers: [AppController],
   providers: [

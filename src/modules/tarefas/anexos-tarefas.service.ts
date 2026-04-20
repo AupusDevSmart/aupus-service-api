@@ -1,6 +1,6 @@
 // src/modules/tarefas/anexos-tarefas.service.ts
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
-import { PrismaService } from '../../shared/prisma/prisma.service';
+import { PrismaService } from '@aupus/api-shared';
 import { CreateAnexoTarefaDto, AnexoTarefaDetalhesDto } from './dto';
 import * as path from 'path';
 import * as fs from 'fs';

@@ -1,7 +1,7 @@
 import { Module, forwardRef } from '@nestjs/common';
 import { SolicitacoesServicoService } from './solicitacoes-servico.service';
 import { SolicitacoesServicoController } from './solicitacoes-servico.controller';
-import { PrismaModule } from '../../shared/prisma/prisma.module';
+import { PrismaModule } from '@aupus/api-shared';
 import { ProgramacaoOSModule } from '../programacao-os/programacao-os.module';
 
 @Module({

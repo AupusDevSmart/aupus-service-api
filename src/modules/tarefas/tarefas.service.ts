@@ -1,6 +1,6 @@
 // src/modules/tarefas/tarefas.service.ts
 import { Injectable, NotFoundException, BadRequestException, ConflictException } from '@nestjs/common';
-import { PrismaService } from '../../shared/prisma/prisma.service';
+import { PrismaService } from '@aupus/api-shared';
 import { 
   CreateTarefaDto, 
   UpdateTarefaDto, 

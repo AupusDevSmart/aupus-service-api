@@ -2,8 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { INestApplication, ValidationPipe, ExecutionContext } from '@nestjs/common';
 import * as request from 'supertest';
 import { AppModule } from '../src/app.module';
-import { PrismaService } from '../src/shared/prisma/prisma.service';
-import { JwtAuthGuard } from '../src/modules/auth/guards/jwt-auth.guard';
+import { PrismaService, JwtAuthGuard } from '@aupus/api-shared';
 import { APP_GUARD } from '@nestjs/core';
 import { generateMockToken } from './helpers/auth.helper';
 

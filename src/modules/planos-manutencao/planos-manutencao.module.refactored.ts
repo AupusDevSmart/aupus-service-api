@@ -2,7 +2,7 @@
 import { Module } from '@nestjs/common';
 import { PlanosManutencaoController } from './planos-manutencao.controller';
 import { PlanosManutencaoService } from './planos-manutencao.service';
-import { PrismaModule } from '../../shared/prisma/prisma.module';
+import { PrismaModule } from '@aupus/api-shared';
 
 // Services especializados
 import { PlanosManutencaoCrudService } from './services/planos-manutencao-crud.service';

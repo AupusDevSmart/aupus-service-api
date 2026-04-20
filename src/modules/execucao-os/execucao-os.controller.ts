@@ -14,7 +14,7 @@ import {
   Res,
   StreamableFile,
 } from '@nestjs/common';
-import { CurrentUser } from '../auth/decorators/current-user.decorator';
+import { CurrentUser } from '@aupus/api-shared';
 import {
   ApiTags,
   ApiOperation,

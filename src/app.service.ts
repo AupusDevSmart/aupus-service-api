@@ -1,6 +1,6 @@
 // src/app.service.ts - CORRIGIDO
 import { Injectable } from '@nestjs/common';
-import { PrismaService } from './shared/prisma/prisma.service';
+import { PrismaService } from '@aupus/api-shared';
 
 @Injectable()
 export class AppService {

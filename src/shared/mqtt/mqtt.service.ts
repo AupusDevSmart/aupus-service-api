@@ -1,6 +1,6 @@
 import { Injectable, OnModuleInit, OnModuleDestroy, Inject, forwardRef, Optional } from '@nestjs/common';
 import * as mqtt from 'mqtt';
-import { PrismaService } from '../prisma/prisma.service';
+import { PrismaService } from '@aupus/api-shared';
 import { MqttIngestionService } from '../../modules/equipamentos-dados/services/mqtt-ingestion.service';
 import { MqttRedisBufferService } from './mqtt-redis-buffer.service';
 import { RegrasLogsMqttEngine } from '../../modules/regras-logs-mqtt/regras-logs-mqtt.engine';

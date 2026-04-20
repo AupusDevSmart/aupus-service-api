@@ -1,6 +1,6 @@
 // src/modules/planos-manutencao/helpers/planos-manutencao.validators.ts
 import { NotFoundException } from '@nestjs/common';
-import { PrismaService } from '../../../shared/prisma/prisma.service';
+import { PrismaService } from '@aupus/api-shared';
 
 export class PlanosManutencaoValidators {
   constructor(private readonly prisma: PrismaService) {}
