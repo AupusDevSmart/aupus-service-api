@@ -17,6 +17,9 @@ pids
 *.seed
 *.pid.lock
 
+# Uploads (runtime data servida em /uploads)
+uploads/
+
 # Coverage directory used by tools like istanbul
 coverage/
 *.lcov

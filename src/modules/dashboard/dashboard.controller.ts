@@ -2,7 +2,7 @@ import { Controller, Get, Query } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiQuery } from '@nestjs/swagger';
 import { DashboardService } from './dashboard.service';
 import { DashboardSimpleService } from './dashboard-simple.service';
-import { Public } from '@aupus/api-shared';
+import { Public, Permissions, CurrentUser } from '@aupus/api-shared';
 import { DashboardOverviewDto } from './dto/overview.dto';
 import { DashboardWorkOrdersDto } from './dto/work-orders.dto';
 import { DashboardTaskPrioritiesDto } from './dto/task-priorities.dto';
@@ -12,6 +12,7 @@ import { DashboardSystemStatusDto } from './dto/system-status.dto';
 
 @ApiTags('Dashboard')
 @Controller('dashboard')
+@Permissions('dashboard.view')
 export class DashboardController {
   constructor(
     private readonly dashboardService: DashboardService,
@@ -25,8 +26,8 @@ export class DashboardController {
     description: 'Visão geral retornada com sucesso',
     type: DashboardOverviewDto,
   })
-  async getOverview(): Promise<DashboardOverviewDto> {
-    return this.dashboardService.getOverview();
+  async getOverview(@CurrentUser() user: any): Promise<DashboardOverviewDto> {
+    return this.dashboardService.getOverview(user);
   }
 
   @Get('work-orders')
@@ -36,8 +37,8 @@ export class DashboardController {
     description: 'Métricas de OS retornadas com sucesso',
     type: DashboardWorkOrdersDto,
   })
-  async getWorkOrders(): Promise<DashboardWorkOrdersDto> {
-    return this.dashboardService.getWorkOrders();
+  async getWorkOrders(@CurrentUser() user: any): Promise<DashboardWorkOrdersDto> {
+    return this.dashboardService.getWorkOrders(user);
   }
 
   @Get('task-priorities')
@@ -47,8 +48,8 @@ export class DashboardController {
     description: 'Tarefas prioritárias retornadas com sucesso',
     type: DashboardTaskPrioritiesDto,
   })
-  async getTaskPriorities(): Promise<DashboardTaskPrioritiesDto> {
-    return this.dashboardService.getTaskPriorities();
+  async getTaskPriorities(@CurrentUser() user: any): Promise<DashboardTaskPrioritiesDto> {
+    return this.dashboardService.getTaskPriorities(user);
   }
 
   @Get('severity-distribution')
@@ -58,8 +59,8 @@ export class DashboardController {
     description: 'Distribuição de prioridades retornada com sucesso',
     type: DashboardSeverityDistributionDto,
   })
-  async getSeverityDistribution(): Promise<DashboardSeverityDistributionDto> {
-    return this.dashboardService.getSeverityDistribution();
+  async getSeverityDistribution(@CurrentUser() user: any): Promise<DashboardSeverityDistributionDto> {
+    return this.dashboardService.getSeverityDistribution(user);
   }
 
   @Get('planned-vs-completed')
@@ -71,8 +72,8 @@ export class DashboardController {
     description: 'Comparação retornada com sucesso',
     type: DashboardPlannedVsCompletedDto,
   })
-  async getPlannedVsCompleted(): Promise<DashboardPlannedVsCompletedDto> {
-    return this.dashboardService.getPlannedVsCompleted();
+  async getPlannedVsCompleted(@CurrentUser() user: any): Promise<DashboardPlannedVsCompletedDto> {
+    return this.dashboardService.getPlannedVsCompleted(user);
   }
 
   @Get('system-status')
@@ -86,30 +87,19 @@ export class DashboardController {
     description: 'Status do sistema retornado com sucesso',
     type: DashboardSystemStatusDto,
   })
-  async getSystemStatus(): Promise<DashboardSystemStatusDto> {
-    return this.dashboardService.getSystemStatus();
+  async getSystemStatus(@CurrentUser() user: any): Promise<DashboardSystemStatusDto> {
+    return this.dashboardService.getSystemStatus(user);
   }
 
   @Get('advanced')
-  @Public()
   @ApiOperation({
     summary: 'Dashboard avançado com métricas detalhadas',
-    description: 'Retorna dados consolidados de todos os módulos com suporte a filtros contextuais',
+    description: 'Retorna dados consolidados de todos os módulos, com filtro por escopo do usuário.',
   })
-  @ApiQuery({ name: 'usuarioId', required: false, description: 'ID do usuário' })
-  @ApiQuery({ name: 'proprietarioId', required: false, description: 'ID do proprietário' })
-  @ApiQuery({ name: 'plantaId', required: false, description: 'ID da planta' })
-  @ApiQuery({ name: 'unidadeId', required: false, description: 'ID da unidade' })
-  @ApiQuery({
-    name: 'periodo',
-    required: false,
-    enum: ['hoje', '7dias', '30dias', '6meses', 'ano', 'custom'],
-    description: 'Período para análise',
-  })
-  @ApiQuery({ name: 'dataInicio', required: false, description: 'Data inicial (formato ISO)' })
-  @ApiQuery({ name: 'dataFim', required: false, description: 'Data final (formato ISO)' })
-  async getAdvancedDashboard(@Query() filters: any) {
-    // Usar o serviço simplificado enquanto o avançado tem erros
-    return this.dashboardSimpleService.getSimpleDashboard(filters);
+  @ApiQuery({ name: 'plantaId', required: false })
+  @ApiQuery({ name: 'unidadeId', required: false })
+  @ApiQuery({ name: 'periodo', required: false, enum: ['hoje', '7dias', '30dias', '6meses', 'ano', 'custom'] })
+  async getAdvancedDashboard(@Query() filters: any, @CurrentUser() user: any) {
+    return this.dashboardSimpleService.getSimpleDashboard(filters, user);
   }
 }

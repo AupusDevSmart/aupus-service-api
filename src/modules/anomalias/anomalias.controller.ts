@@ -16,6 +16,7 @@ import {
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { ApiTags, ApiOperation, ApiResponse, ApiConsumes, ApiQuery, ApiBody } from '@nestjs/swagger';
+import { Permissions, CurrentUser } from '@aupus/api-shared';
 import { AnomaliasService } from './anomalias.service';
 import { AnexosAnomaliasService } from './anexos-anomalias.service';
 import { 
@@ -39,19 +40,22 @@ export class AnomaliasController {
   ) {}
 
   @Post()
+  @Permissions('anomalias.manage')
   @ApiOperation({ summary: 'Criar nova anomalia' })
-  @ApiResponse({ 
-    status: HttpStatus.CREATED, 
+  @ApiResponse({
+    status: HttpStatus.CREATED,
     description: 'Anomalia criada com sucesso',
-    type: AnomaliaResponseDto 
+    type: AnomaliaResponseDto
   })
   async create(
-    @Body() createAnomaliaDto: CreateAnomaliaDto
+    @Body() createAnomaliaDto: CreateAnomaliaDto,
+    @CurrentUser() user: any,
   ) {
-    return this.anomaliasService.create(createAnomaliaDto);
+    return this.anomaliasService.create(createAnomaliaDto, user);
   }
 
   @Get()
+  @Permissions('anomalias.view')
   @ApiOperation({ summary: 'Listar anomalias com filtros e paginação' })
   @ApiResponse({ 
     status: HttpStatus.OK, 
@@ -72,11 +76,12 @@ export class AnomaliasController {
       }
     }
   })
-  async findAll(@Query() filters: AnomaliaFiltersDto) {
-    return this.anomaliasService.findAll(filters);
+  async findAll(@Query() filters: AnomaliaFiltersDto, @CurrentUser() user: any) {
+    return this.anomaliasService.findAll(filters, user);
   }
 
   @Get('stats')
+  @Permissions('anomalias.view')
   @ApiOperation({ summary: 'Obter estatísticas das anomalias' })
   @ApiQuery({ name: 'periodo', required: false, description: 'Período para filtrar (ex: "Janeiro de 2025")' })
   @ApiResponse({ 
@@ -84,11 +89,15 @@ export class AnomaliasController {
     description: 'Estatísticas das anomalias',
     type: AnomaliaStatsDto 
   })
-  async getStats(@Query('periodo') periodo?: string): Promise<AnomaliaStatsDto> {
-    return this.anomaliasService.getStats(periodo);
+  async getStats(
+    @CurrentUser() user: any,
+    @Query('periodo') periodo?: string,
+  ): Promise<AnomaliaStatsDto> {
+    return this.anomaliasService.getStats(user, periodo);
   }
 
   @Get(':id')
+  @Permissions('anomalias.view')
   @ApiOperation({ summary: 'Buscar anomalia por ID' })
   @ApiResponse({ 
     status: HttpStatus.OK, 
@@ -99,32 +108,39 @@ export class AnomaliasController {
     status: HttpStatus.NOT_FOUND, 
     description: 'Anomalia não encontrada' 
   })
-  async findOne(@Param('id') id: string) {
-    return this.anomaliasService.findOne(id);
+  async findOne(@Param('id') id: string, @CurrentUser() user: any) {
+    return this.anomaliasService.findOne(id, user);
   }
 
   @Patch(':id')
+  @Permissions('anomalias.manage')
   @ApiOperation({ summary: 'Atualizar anomalia' })
   @ApiResponse({ 
     status: HttpStatus.OK, 
     description: 'Anomalia atualizada com sucesso',
     type: AnomaliaResponseDto 
   })
-  async update(@Param('id') id: string, @Body() updateAnomaliaDto: UpdateAnomaliaDto) {
-    return this.anomaliasService.update(id, updateAnomaliaDto);
+  async update(
+    @Param('id') id: string,
+    @Body() updateAnomaliaDto: UpdateAnomaliaDto,
+    @CurrentUser() user: any,
+  ) {
+    return this.anomaliasService.update(id, updateAnomaliaDto, user);
   }
 
   @Delete(':id')
+  @Permissions('anomalias.manage')
   @ApiOperation({ summary: 'Remover anomalia (soft delete)' })
   @ApiResponse({ 
     status: HttpStatus.OK, 
     description: 'Anomalia removida com sucesso' 
   })
-  async remove(@Param('id') id: string) {
-    return this.anomaliasService.remove(id);
+  async remove(@Param('id') id: string, @CurrentUser() user: any) {
+    return this.anomaliasService.remove(id, user);
   }
 
   @Get('selects/plantas')
+  @Permissions('anomalias.view')
   @ApiOperation({ summary: 'Listar plantas para select' })
   @ApiResponse({
     status: HttpStatus.OK,
@@ -140,11 +156,12 @@ export class AnomaliasController {
       }
     }
   })
-  async getPlantasSelect() {
-    return this.anomaliasService.getPlantasSelect();
+  async getPlantasSelect(@CurrentUser() user: any) {
+    return this.anomaliasService.getPlantasSelect(user);
   }
 
   @Get('selects/unidades')
+  @Permissions('anomalias.view')
   @ApiOperation({ summary: 'Listar unidades para select' })
   @ApiQuery({ name: 'plantaId', required: false, description: 'Filtrar unidades por planta' })
   @ApiResponse({
@@ -168,11 +185,15 @@ export class AnomaliasController {
       }
     }
   })
-  async getUnidadesSelect(@Query('plantaId') plantaId?: string) {
-    return this.anomaliasService.getUnidadesSelect(plantaId);
+  async getUnidadesSelect(
+    @CurrentUser() user: any,
+    @Query('plantaId') plantaId?: string,
+  ) {
+    return this.anomaliasService.getUnidadesSelect(user, plantaId);
   }
 
   @Get('selects/equipamentos')
+  @Permissions('anomalias.view')
   @ApiOperation({ summary: 'Listar equipamentos para select' })
   @ApiQuery({ name: 'plantaId', required: false, description: 'Filtrar equipamentos por planta' })
   @ApiResponse({ 
@@ -191,11 +212,15 @@ export class AnomaliasController {
       }
     }
   })
-  async getEquipamentosSelect(@Query('plantaId') plantaId?: string) {
-    return this.anomaliasService.getEquipamentosSelect(plantaId);
+  async getEquipamentosSelect(
+    @CurrentUser() user: any,
+    @Query('plantaId') plantaId?: string,
+  ) {
+    return this.anomaliasService.getEquipamentosSelect(user, plantaId);
   }
 
   @Get('selects/usuarios')
+  @Permissions('anomalias.view')
   @ApiOperation({ summary: 'Listar usuários para select' })
   @ApiResponse({ 
     status: HttpStatus.OK, 
@@ -219,6 +244,7 @@ export class AnomaliasController {
   // ==================== ENDPOINTS DE ANEXOS ====================
 
   @Post(':id/anexos')
+  @Permissions('anomalias.manage')
   @UseInterceptors(FileInterceptor('file'))
   @ApiOperation({ summary: 'Fazer upload de anexo para anomalia' })
   @ApiConsumes('multipart/form-data')
@@ -258,6 +284,7 @@ export class AnomaliasController {
   }
 
   @Get(':id/anexos')
+  @Permissions('anomalias.view')
   @ApiOperation({ summary: 'Listar anexos de uma anomalia' })
   @ApiResponse({ 
     status: HttpStatus.OK, 
@@ -269,6 +296,7 @@ export class AnomaliasController {
   }
 
   @Get('anexos/:anexoId')
+  @Permissions('anomalias.view')
   @ApiOperation({ summary: 'Buscar informações de um anexo específico' })
   @ApiResponse({ 
     status: HttpStatus.OK, 
@@ -284,6 +312,7 @@ export class AnomaliasController {
   }
 
   @Get('anexos/:anexoId/download')
+  @Permissions('anomalias.view')
   @ApiOperation({ summary: 'Fazer download de um anexo' })
   @ApiResponse({ 
     status: HttpStatus.OK, 
@@ -313,6 +342,7 @@ export class AnomaliasController {
   }
 
   @Delete('anexos/:anexoId')
+  @Permissions('anomalias.manage')
   @ApiOperation({ summary: 'Remover anexo' })
   @ApiResponse({ 
     status: HttpStatus.OK, 

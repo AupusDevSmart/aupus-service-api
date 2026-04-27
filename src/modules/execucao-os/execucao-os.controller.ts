@@ -14,7 +14,7 @@ import {
   Res,
   StreamableFile,
 } from '@nestjs/common';
-import { CurrentUser } from '@aupus/api-shared';
+import { CurrentUser, Permissions } from '@aupus/api-shared';
 import {
   ApiTags,
   ApiOperation,
@@ -55,7 +55,7 @@ import * as path from 'path';
 
 @ApiTags('Execução OS')
 @Controller('execucao-os')
-// @ApiBearerAuth() // Descomentado quando implementar autenticação
+@Permissions('execucao_os.view')
 export class ExecucaoOSController {
   constructor(
     private readonly execucaoOSService: ExecucaoOSService,
@@ -397,6 +397,7 @@ export class ExecucaoOSController {
   }
 
   @Patch(':id/executar')
+  @Permissions('execucao_os.manage')
   @ApiOperation({
     summary: 'Marcar OS como executada',
     description: 'EM_EXECUCAO/PAUSADA → EXECUTADA, registra resultados da execução',
@@ -414,6 +415,7 @@ export class ExecucaoOSController {
   }
 
   @Patch(':id/auditar')
+  @Permissions('execucao_os.manage')
   @ApiOperation({
     summary: 'Auditar OS',
     description: 'EXECUTADA → AUDITADA, avaliação de qualidade',
@@ -431,6 +433,7 @@ export class ExecucaoOSController {
   }
 
   @Patch(':id/reabrir')
+  @Permissions('execucao_os.manage')
   @ApiOperation({
     summary: 'Reabrir OS',
     description: 'AUDITADA → EM_EXECUCAO, reabre para correções',
@@ -448,6 +451,7 @@ export class ExecucaoOSController {
   }
 
   @Patch(':id/finalizar')
+  @Permissions('execucao_os.aprovar')
   @ApiOperation({
     summary: 'Finalizar OS',
     description: 'AUDITADA → FINALIZADA, finalização definitiva',
@@ -465,6 +469,7 @@ export class ExecucaoOSController {
   }
 
   @Patch(':id/cancelar')
+  @Permissions('execucao_os.cancelar')
   @ApiOperation({
     summary: 'Cancelar OS',
     description: 'Cancela a OS (não pode cancelar FINALIZADA/CANCELADA)',

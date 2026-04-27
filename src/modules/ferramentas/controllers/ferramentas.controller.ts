@@ -21,6 +21,7 @@ import {
   ApiQuery,
   ApiParam,
 } from '@nestjs/swagger';
+import { Permissions } from '@aupus/api-shared';
 import { FerramentasService } from '../services/ferramentas.service';
 import { CreateFerramentaDto } from '../dto/create-ferramenta.dto';
 import { UpdateFerramentaDto } from '../dto/update-ferramenta.dto';
@@ -29,6 +30,7 @@ import { FerramentaEntity } from '../entities/ferramenta.entity';
 
 @ApiTags('Ferramentas')
 @Controller('ferramentas')
+@Permissions('recursos.manage')
 export class FerramentasController {
   constructor(private readonly ferramentasService: FerramentasService) {}
 

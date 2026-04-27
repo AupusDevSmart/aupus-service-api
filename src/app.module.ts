@@ -9,8 +9,6 @@ import { APP_FILTER } from '@nestjs/core';
 
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
-import { MqttModule } from './shared/mqtt/mqtt.module';
-import { WebSocketModule } from './websocket/websocket.module';
 
 // Modulos Service-only
 import { HealthModule } from './modules/health/health.module';
@@ -26,10 +24,6 @@ import { UploadsModule } from './modules/uploads/uploads.module';
 import { DashboardModule } from './modules/dashboard/dashboard.module';
 import { SolicitacoesServicoModule } from './modules/solicitacoes-servico/solicitacoes-servico.module';
 import { InstrucoesModule } from './modules/instrucoes/instrucoes.module';
-// Modulos MQTT-dependentes (mantidos por dependencia do MQTT infrastructure)
-import { EquipamentosDadosModule } from './modules/equipamentos-dados/equipamentos-dados.module';
-import { RegrasLogsMqttModule } from './modules/regras-logs-mqtt/regras-logs-mqtt.module';
-import { LogsMqttModule } from './modules/logs-mqtt/logs-mqtt.module';
 
 // Modulos compartilhados (de @aupus/api-shared)
 import {
@@ -40,6 +34,7 @@ import {
   RolesModule,
   PermissionsModule,
   PlantasModule,
+  PlantaOperadoresModule,
   UnidadesModule,
   EquipamentosModule,
   TiposEquipamentosModule,
@@ -58,8 +53,6 @@ import {
 
     PrismaModule,
     MailModule,
-    MqttModule,
-    WebSocketModule,
 
     HealthModule,
     AuthModule,
@@ -69,6 +62,7 @@ import {
     RolesModule,
     PermissionsModule,
     PlantasModule,
+    PlantaOperadoresModule,
     UnidadesModule,
     EquipamentosModule,
     TiposEquipamentosModule,
@@ -88,11 +82,6 @@ import {
     InstrucoesModule,
     DashboardModule,
     UploadsModule,
-
-    // Mantidos: dependencias do MQTT infrastructure
-    EquipamentosDadosModule,
-    RegrasLogsMqttModule,
-    LogsMqttModule,
   ],
   controllers: [AppController],
   providers: [

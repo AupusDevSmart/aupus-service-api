@@ -19,6 +19,7 @@ import {
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { ApiTags, ApiOperation, ApiResponse, ApiParam, ApiQuery, ApiConsumes } from '@nestjs/swagger';
+import { Permissions } from '@aupus/api-shared';
 import { Response } from 'express';
 import * as path from 'path';
 import { TarefasService } from './tarefas.service';
@@ -37,7 +38,7 @@ import {
 
 @ApiTags('Tarefas')
 @Controller('tarefas')
-// @UseGuards(JwtAuthGuard) // Descomente quando tiver autenticação
+@Permissions('manutencao.manage')
 export class TarefasController {
   constructor(
     private readonly tarefasService: TarefasService,

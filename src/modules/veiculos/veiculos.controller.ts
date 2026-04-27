@@ -14,6 +14,7 @@ import {
   Request
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiQuery } from '@nestjs/swagger';
+import { Permissions } from '@aupus/api-shared';
 import { VeiculosService } from './veiculos.service';
 import {
   CreateVeiculoDto,
@@ -27,6 +28,7 @@ import {
 
 @ApiTags('Veículos')
 @Controller('veiculos')
+@Permissions('recursos.manage')
 export class VeiculosController {
   constructor(private readonly veiculosService: VeiculosService) {}
 

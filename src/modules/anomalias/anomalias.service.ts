@@ -1,17 +1,62 @@
 // src/anomalias/anomalias.service.ts
-import { Injectable, NotFoundException, ConflictException, BadRequestException, Logger } from '@nestjs/common';
-import { PrismaService } from '@aupus/api-shared';
+import { Injectable, NotFoundException, ConflictException, BadRequestException, ForbiddenException, Logger } from '@nestjs/common';
+import { PrismaService, PermissionScopeService, PlantaScope } from '@aupus/api-shared';
 import { CreateAnomaliaDto, UpdateAnomaliaDto, AnomaliaFiltersDto, AnomaliaStatsDto } from './dto';
 import { Prisma } from '@prisma/client';
+
+type UserCtx = { id: string; role?: string | null } | undefined;
 
 @Injectable()
 export class AnomaliasService {
   private readonly logger = new Logger(AnomaliasService.name);
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly scopeService: PermissionScopeService,
+  ) {}
 
-  async create(createAnomaliaDto: CreateAnomaliaDto, userId?: string) {
+  private async getScope(user?: UserCtx): Promise<PlantaScope> {
+    if (!user?.id) {
+      this.logger.warn(`[SCOPE] user sem id, sem filtro`);
+      return null;
+    }
+    const scope = await this.scopeService.getPlantasDoUsuario(user.id, user.role);
+    this.logger.log(
+      `[SCOPE] userId=${user.id} role=${user.role ?? 'null'} -> ${scope === null ? 'SEM FILTRO (admin-like)' : `[${scope.length}] ${JSON.stringify(scope)}`}`,
+    );
+    return scope;
+  }
+
+  /**
+   * Retorna filtro where para anomalias restringindo ao escopo de plantas.
+   * Combina planta_id direto e equipamento.unidade.planta_id.
+   */
+  private scopeWhere(scope: PlantaScope): Prisma.anomaliasWhereInput | undefined {
+    if (!this.scopeService.isScoped(scope)) return undefined;
+    if (scope.length === 0) {
+      // Usuario sem plantas vinculadas: nao ve nada
+      return { id: '__NEVER__' };
+    }
+    return {
+      OR: [
+        { planta_id: { in: scope } },
+        { equipamento: { unidade: { planta_id: { in: scope } } } },
+      ],
+    };
+  }
+
+  async create(createAnomaliaDto: CreateAnomaliaDto, user?: UserCtx) {
     const { localizacao, anexos, instrucoes_ids, ...anomaliaData } = createAnomaliaDto;
+    const userId = user?.id;
+
+    // Validar escopo: se usuario tem scope, a planta da anomalia deve estar nele
+    const scope = await this.getScope(user);
+    if (this.scopeService.isScoped(scope)) {
+      const plantaDaAnomalia = await this.resolverPlantaIdDoInput(createAnomaliaDto);
+      if (!plantaDaAnomalia || !scope.includes(plantaDaAnomalia)) {
+        throw new ForbiddenException('Voce nao pode criar anomalia para uma planta fora do seu escopo');
+      }
+    }
 
     const data: Prisma.anomaliasCreateInput = {
       ...anomaliaData,
@@ -74,11 +119,14 @@ export class AnomaliasService {
     return anomalia;
   }
 
-  async findAll(filters: AnomaliaFiltersDto) {
+  async findAll(filters: AnomaliaFiltersDto, user?: UserCtx) {
     const { search, periodo, status, prioridade, origem, planta, unidade, page = 1, limit = 10 } = filters;
+    const scope = await this.getScope(user);
+    const scopeFilter = this.scopeWhere(scope);
 
     const where: Prisma.anomaliasWhereInput = {
       deleted_at: null,
+      ...(scopeFilter && { AND: [scopeFilter] }),
       ...(search && {
         OR: [
           { descricao: { contains: search, mode: 'insensitive' } },
@@ -108,6 +156,7 @@ export class AnomaliasService {
       ...(periodo && this.buildPeriodoFilter(periodo))
     };
 
+    this.logger.log(`[findAll] where=${JSON.stringify(where)}`);
     const [data, total] = await Promise.all([
       this.prisma.anomalias.findMany({
         where,
@@ -141,6 +190,8 @@ export class AnomaliasService {
       this.prisma.anomalias.count({ where })
     ]);
 
+    this.logger.log(`[findAll] data.length=${data.length} total=${total}`);
+
     return {
       data,
       pagination: {
@@ -152,9 +203,11 @@ export class AnomaliasService {
     };
   }
 
-  async findOne(id: string) {
+  async findOne(id: string, user?: UserCtx) {
+    const scope = await this.getScope(user);
+    const scopeFilter = this.scopeWhere(scope);
     const anomalia = await this.prisma.anomalias.findFirst({
-      where: { id, deleted_at: null },
+      where: { id, deleted_at: null, ...(scopeFilter && { AND: [scopeFilter] }) },
       include: {
         planta: true,
         equipamento: {
@@ -191,8 +244,9 @@ export class AnomaliasService {
     return anomalia;
   }
 
-  async update(id: string, updateAnomaliaDto: UpdateAnomaliaDto, userId?: string) {
-    const anomalia = await this.findOne(id);
+  async update(id: string, updateAnomaliaDto: UpdateAnomaliaDto, user?: UserCtx) {
+    const anomalia = await this.findOne(id, user);
+    const userId = user?.id;
 
     if (anomalia.status !== 'REGISTRADA') {
       throw new ConflictException('Apenas anomalias registradas podem ser editadas');
@@ -238,8 +292,9 @@ export class AnomaliasService {
     return this.findOne(id);
   }
 
-  async remove(id: string, userId?: string) {
-    const anomalia = await this.findOne(id);
+  async remove(id: string, user?: UserCtx) {
+    const anomalia = await this.findOne(id, user);
+    const userId = user?.id;
 
     if (anomalia.status !== 'REGISTRADA') {
       throw new ConflictException('Apenas anomalias registradas podem ser excluídas');
@@ -260,8 +315,10 @@ export class AnomaliasService {
     });
   }
 
-  async getStats(periodo?: string): Promise<AnomaliaStatsDto> {
-    const whereBase: any = { deleted_at: null };
+  async getStats(user?: UserCtx, periodo?: string): Promise<AnomaliaStatsDto> {
+    const scope = await this.getScope(user);
+    const scopeFilter = this.scopeWhere(scope);
+    const whereBase: any = { deleted_at: null, ...(scopeFilter && { AND: [scopeFilter] }) };
 
     if (periodo) {
       const now = new Date();
@@ -321,6 +378,20 @@ export class AnomaliasService {
     this.logger.log(`Anomalia ${id} voltou para registrada`);
   }
 
+  /**
+   * Resolve a planta_id de uma anomalia a partir do equipamentoId informado.
+   * Retorna null se nao houver equipamento ou nao conseguir resolver a planta.
+   */
+  private async resolverPlantaIdDoInput(dto: CreateAnomaliaDto): Promise<string | null> {
+    const equipamentoId = dto.localizacao?.equipamentoId;
+    if (!equipamentoId) return null;
+    const eq = await this.prisma.equipamentos.findUnique({
+      where: { id: equipamentoId },
+      select: { unidade: { select: { planta_id: true } } },
+    });
+    return eq?.unidade?.planta_id ?? null;
+  }
+
   private buildPeriodoFilter(periodo: string): Prisma.anomaliasWhereInput {
     // Formato esperado: "Janeiro de 2025"
     const [mes, , ano] = periodo.split(' ');
@@ -344,9 +415,14 @@ export class AnomaliasService {
     };
   }
 
-  async getPlantasSelect() {
+  async getPlantasSelect(user?: UserCtx) {
+    const scope = await this.getScope(user);
+    const where: Prisma.plantasWhereInput = { deleted_at: null };
+    if (this.scopeService.isScoped(scope)) {
+      where.id = { in: scope };
+    }
     return this.prisma.plantas.findMany({
-      where: { deleted_at: null },
+      where,
       select: {
         id: true,
         nome: true
@@ -355,11 +431,19 @@ export class AnomaliasService {
     });
   }
 
-  async getUnidadesSelect(plantaId?: string) {
+  async getUnidadesSelect(user?: UserCtx, plantaId?: string) {
+    const scope = await this.getScope(user);
     const where: any = { deleted_at: null };
 
     if (plantaId) {
       where.planta_id = plantaId;
+    }
+    if (this.scopeService.isScoped(scope)) {
+      where.planta_id = plantaId ? plantaId : { in: scope };
+      if (plantaId && !scope.includes(plantaId)) {
+        // planta fora do escopo: retorna vazio
+        where.planta_id = '__NEVER__';
+      }
     }
 
     return this.prisma.unidades.findMany({
@@ -378,13 +462,19 @@ export class AnomaliasService {
     });
   }
 
-  async getEquipamentosSelect(plantaId?: string) {
+  async getEquipamentosSelect(user?: UserCtx, plantaId?: string) {
+    const scope = await this.getScope(user);
     const where: any = { deleted_at: null };
 
     if (plantaId) {
-      where.unidade = {
-        planta_id: plantaId
-      };
+      where.unidade = { planta_id: plantaId };
+    }
+    if (this.scopeService.isScoped(scope)) {
+      if (plantaId && !scope.includes(plantaId)) {
+        where.unidade = { planta_id: '__NEVER__' };
+      } else if (!plantaId) {
+        where.unidade = { planta_id: { in: scope } };
+      }
     }
 
     return this.prisma.equipamentos.findMany({

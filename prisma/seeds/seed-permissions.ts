@@ -1,185 +1,122 @@
 /**
- * SEED: Permissões Modernas - Sistema Padronizado
+ * SEED: Permissoes e Roles (Aupus Service)
  *
- * Este seed popula a tabela `permissions` com todas as permissões
- * seguindo o padrão moderno: recurso.acao
+ * ATENCAO: este seed e DESTRUTIVO para permissoes:
+ * - Limpa role_has_permissions
+ * - Limpa model_has_permissions (permissoes diretas de usuarios)
+ * - Limpa permissions
+ * - Recria permissions conforme permissions-structure.ts
+ * - Garante que as 6 roles existam (sem recriar)
+ * - Re-mapeia role_has_permissions conforme ROLE_PERMISSIONS
+ *
+ * As roles NAO sao deletadas para preservar os ids referenciados em model_has_roles.
  */
 
 import { PrismaClient } from '@prisma/client';
-import { getAllPermissions } from '../permissions-structure';
+import { PERMISSIONS, ROLE_PERMISSIONS, ROLES } from '../permissions-structure';
 
 const prisma = new PrismaClient();
 
-async function seedPermissions() {
-  console.log('🌱 Iniciando seed de permissões...\n');
+async function resetPermissions() {
+  console.log('Limpando role_has_permissions...');
+  await prisma.role_has_permissions.deleteMany({});
 
-  const permissions = getAllPermissions();
+  console.log('Limpando model_has_permissions (permissoes diretas)...');
+  await prisma.model_has_permissions.deleteMany({});
 
-  console.log(`📋 Total de permissões a criar: ${permissions.length}\n`);
-
-  let created = 0;
-  let skipped = 0;
-
-  for (const permission of permissions) {
-    try {
-      // Verificar se já existe
-      const existing = await prisma.permissions.findFirst({
-        where: { name: permission.name }
-      });
-
-      if (existing) {
-        console.log(`⏭️  Pulando: ${permission.name} (já existe)`);
-        skipped++;
-
-        // Atualizar display_name e description se mudaram
-        await prisma.permissions.update({
-          where: { id: existing.id },
-          data: {
-            display_name: permission.display_name,
-            description: permission.description,
-          }
-        });
-
-        continue;
-      }
-
-      // Criar nova permissão
-      await prisma.permissions.create({
-        data: {
-          name: permission.name,
-          display_name: permission.display_name,
-          description: permission.description,
-          guard_name: 'web',
-        }
-      });
-
-      console.log(`✅ Criada: ${permission.name}`);
-      created++;
-
-    } catch (error) {
-      console.error(`❌ Erro ao criar ${permission.name}:`, error);
-    }
-  }
-
-  console.log(`\n📊 Resumo:`);
-  console.log(`   ✅ Criadas: ${created}`);
-  console.log(`   ⏭️  Puladas: ${skipped}`);
-  console.log(`   📋 Total: ${permissions.length}`);
+  console.log('Limpando permissions...');
+  await prisma.permissions.deleteMany({});
 }
 
-async function cleanOldPermissions() {
-  console.log('\n🧹 Limpando permissões antigas (opcional)...\n');
+async function createPermissions() {
+  console.log(`Criando ${PERMISSIONS.length} permissoes...`);
+  const now = new Date();
 
-  // Lista de permissões legadas que podem ser removidas
-  const legacyPermissions = [
-    'MonitoramentoConsumo',
-    'GeracaoEnergia',
-    'Oportunidades',
-    'Prospeccao',
-    'Financeiro',
-    'AreaDoAssociado',
-    'AreaDoProprietario',
-    'Associados',
-    'Organizacoes',
-    'Usuarios',
-    'UnidadesConsumidoras',
-    'Configuracoes',
-    'Documentos',
-    'Arquivos',
-    'CadastroConcessionarias',
-    'CadastroOrganizacoes',
-    'Cadastros',
-    'CadastroUnidadesConsumidoras',
-    'CadastroUsuarios',
-    'FinanceiroAdmin',
-    'FinanceiroConsultor',
-    'Monitoramento',
-    'MonitoramentoOrganizacoes',
-    'NET',
-    'PainelGeral',
-    'PainelGeralCativos',
-    'PainelGeralClube',
-    'PainelGeralOrganizacoes',
-    'Reclamacoes',
-    'SuperAdmin',
-    'CRM',
-    'MinhasUsinas',
-    'Equipamentos',
-    'Plantas',
-    'Dashboard',
-  ];
-
-  let deleted = 0;
-
-  for (const legacyName of legacyPermissions) {
-    try {
-      const result = await prisma.permissions.deleteMany({
-        where: { name: legacyName }
-      });
-
-      if (result.count > 0) {
-        console.log(`🗑️  Removida: ${legacyName}`);
-        deleted += result.count;
-      }
-    } catch (error) {
-      console.error(`❌ Erro ao remover ${legacyName}:`, error);
-    }
-  }
-
-  console.log(`\n📊 Total de permissões legadas removidas: ${deleted}`);
-}
-
-async function seedRoles() {
-  console.log('\n🔑 Verificando roles do sistema...\n');
-
-  const requiredRoles = [
-    'super_admin',
-    'admin',
-    'gerente',
-    'analista',
-    'proprietario',
-    'operador',
-  ];
-
-  for (const roleName of requiredRoles) {
-    const existing = await prisma.roles.findFirst({
-      where: { name: roleName },
+  for (const p of PERMISSIONS) {
+    await prisma.permissions.create({
+      data: {
+        name: p.name,
+        guard_name: 'web',
+        display_name: p.display_name,
+        description: p.description,
+        created_at: now,
+        updated_at: now,
+      },
     });
+    console.log(`  + ${p.name}`);
+  }
+}
 
-    if (existing) {
-      console.log(`⏭️  Role já existe: ${roleName}`);
-    } else {
+async function ensureRoles() {
+  console.log('Garantindo que as 6 roles existam (qualquer guard)...');
+  const now = new Date();
+
+  for (const roleName of ROLES) {
+    // Procura por nome, independente do guard (o DB pode ter variantes 'api' legacy)
+    const existing = await prisma.roles.findFirst({ where: { name: roleName } });
+
+    if (!existing) {
       await prisma.roles.create({
         data: {
           name: roleName,
           guard_name: 'web',
+          created_at: now,
+          updated_at: now,
         },
       });
-      console.log(`✅ Role criada: ${roleName}`);
+      console.log(`  + criada role ${roleName} (guard=web)`);
+    } else {
+      console.log(`  = role ${roleName} ja existe (guard=${existing.guard_name})`);
+    }
+  }
+}
+
+async function mapRolePermissions() {
+  console.log('Mapeando role_has_permissions (todos os guards)...');
+
+  const allPermissions = await prisma.permissions.findMany();
+  const permByName = new Map(allPermissions.map((p) => [p.name, p.id]));
+
+  for (const [roleName, permNames] of Object.entries(ROLE_PERMISSIONS)) {
+    // Mapear permissoes para TODAS as roles com esse nome, independente do guard_name.
+    // O DB tem versoes legacy com guard='api' alem das novas com guard='web'.
+    const rolesWithName = await prisma.roles.findMany({ where: { name: roleName } });
+
+    if (rolesWithName.length === 0) {
+      console.warn(`  ! nenhuma role encontrada com nome "${roleName}", pulando`);
+      continue;
+    }
+
+    for (const role of rolesWithName) {
+      for (const permName of permNames) {
+        const permId = permByName.get(permName);
+        if (!permId) {
+          console.warn(`  ! permissao ${permName} nao encontrada, pulando`);
+          continue;
+        }
+        await prisma.role_has_permissions.create({
+          data: { role_id: role.id, permission_id: permId },
+        });
+      }
+      console.log(`  ${roleName}[${role.guard_name}#${role.id}]: ${permNames.length} permissoes`);
     }
   }
 }
 
 async function main() {
-  console.log('═'.repeat(60));
-  console.log('  SEED DE PERMISSÕES - SISTEMA PADRONIZADO');
-  console.log('═'.repeat(60));
-  console.log();
+  console.log('='.repeat(60));
+  console.log('SEED: Permissoes e Roles (Aupus Service)');
+  console.log('='.repeat(60));
 
   try {
-    // Criar permissões modernas
-    await seedPermissions();
+    await resetPermissions();
+    await createPermissions();
+    await ensureRoles();
+    await mapRolePermissions();
 
-    // Garantir que todas as roles necessárias existam
-    await seedRoles();
-
-    // Perguntar se quer limpar as antigas (comentado por segurança)
-    // await cleanOldPermissions();
-
-    console.log('\n✅ Seed de permissões e roles concluído com sucesso!\n');
-
+    console.log('\nSeed de permissoes concluido.');
   } catch (error) {
-    console.error('\n❌ Erro durante o seed:', error);
+    console.error('\nErro durante o seed:', error);
     process.exit(1);
   } finally {
     await prisma.$disconnect();

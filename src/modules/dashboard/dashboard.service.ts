@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { PrismaService } from '@aupus/api-shared';
+import { PrismaService, PermissionScopeService, PlantaScope } from '@aupus/api-shared';
 import { DashboardOverviewDto } from './dto/overview.dto';
 import { DashboardWorkOrdersDto } from './dto/work-orders.dto';
 import { DashboardTaskPrioritiesDto } from './dto/task-priorities.dto';
@@ -7,14 +7,60 @@ import { DashboardSeverityDistributionDto } from './dto/severity-distribution.dt
 import { DashboardPlannedVsCompletedDto } from './dto/planned-vs-completed.dto';
 import { DashboardSystemStatusDto } from './dto/system-status.dto';
 
+type UserCtx = { id: string; role?: string | null } | undefined;
+
 @Injectable()
 export class DashboardService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly scopeService: PermissionScopeService,
+  ) {}
 
-  /**
-   * Retorna visão geral do dashboard com métricas de equipamentos e OS
-   */
-  async getOverview(): Promise<DashboardOverviewDto> {
+  // ---------------------------------------------------------------
+  // Helpers de data-scoping por role
+  // ---------------------------------------------------------------
+
+  private async getScope(user?: UserCtx): Promise<PlantaScope> {
+    if (!user?.id) return null;
+    return this.scopeService.getPlantasDoUsuario(user.id, user.role);
+  }
+
+  /** Filtro para `equipamentos` (planta via unidade). `{}` quando sem escopo. */
+  private eqFilter(scope: PlantaScope): Record<string, any> {
+    if (!Array.isArray(scope)) return {};
+    if (scope.length === 0) return { id: '__NEVER__' };
+    return { unidade: { planta_id: { in: scope } } };
+  }
+
+  /** Filtro para `anomalias` (pode ter planta_id direto OU via equipamento). */
+  private anomFilter(scope: PlantaScope): Record<string, any> {
+    if (!Array.isArray(scope)) return {};
+    if (scope.length === 0) return { id: '__NEVER__' };
+    return {
+      OR: [
+        { planta_id: { in: scope } },
+        { equipamento: { unidade: { planta_id: { in: scope } } } },
+      ],
+    };
+  }
+
+  /** Filtro para `ordens_servico` / `programacoes_os` / `tarefas` (tem `planta_id` direto). */
+  private plantaIdFilter(scope: PlantaScope): Record<string, any> {
+    if (!Array.isArray(scope)) return {};
+    if (scope.length === 0) return { id: '__NEVER__' };
+    return { planta_id: { in: scope } };
+  }
+
+  // ---------------------------------------------------------------
+  // Endpoints
+  // ---------------------------------------------------------------
+
+  async getOverview(user?: UserCtx): Promise<DashboardOverviewDto> {
+    const scope = await this.getScope(user);
+    const eq = this.eqFilter(scope);
+    const anom = this.anomFilter(scope);
+    const os = this.plantaIdFilter(scope);
+
     const [
       totalEquipamentos,
       equipamentosComFalhas,
@@ -23,15 +69,12 @@ export class DashboardService {
       osEmExecucao,
       osFinalizadas,
     ] = await Promise.all([
-      // Total de equipamentos ativos
-      this.prisma.equipamentos.count({
-        where: { deleted_at: null },
-      }),
+      this.prisma.equipamentos.count({ where: { deleted_at: null, ...eq } }),
 
-      // Equipamentos com anomalias ativas
       this.prisma.equipamentos.count({
         where: {
           deleted_at: null,
+          ...eq,
           anomalias: {
             some: {
               deleted_at: null,
@@ -41,36 +84,20 @@ export class DashboardService {
         },
       }),
 
-      // Equipamentos com status PARADO
       this.prisma.equipamentos.count({
-        where: {
-          deleted_at: null,
-          status: 'PARADO',
-        },
+        where: { deleted_at: null, status: 'PARADO', ...eq },
       }),
 
-      // OS abertas (PLANEJADA ou PROGRAMADA)
       this.prisma.ordens_servico.count({
-        where: {
-          deletado_em: null,
-          status: 'PENDENTE',
-        },
+        where: { deletado_em: null, status: 'PENDENTE', ...os },
       }),
 
-      // OS em execução
       this.prisma.ordens_servico.count({
-        where: {
-          deletado_em: null,
-          status: 'EM_EXECUCAO',
-        },
+        where: { deletado_em: null, status: 'EM_EXECUCAO', ...os },
       }),
 
-      // OS finalizadas
       this.prisma.ordens_servico.count({
-        where: {
-          deletado_em: null,
-          status: 'FINALIZADA',
-        },
+        where: { deletado_em: null, status: 'FINALIZADA', ...os },
       }),
     ]);
 
@@ -84,61 +111,47 @@ export class DashboardService {
     };
   }
 
-  /**
-   * Retorna métricas de ordens de serviço
-   */
-  async getWorkOrders(): Promise<DashboardWorkOrdersDto> {
+  async getWorkOrders(user?: UserCtx): Promise<DashboardWorkOrdersDto> {
+    const scope = await this.getScope(user);
+    const os = this.plantaIdFilter(scope);
     const hoje = new Date();
 
     const [osAbertas, osFinalizadas, osAtrasadas, avaliacaoMedia] =
       await Promise.all([
-        // OS abertas
         this.prisma.ordens_servico.count({
-          where: {
-            deletado_em: null,
-            status: 'PENDENTE',
-          },
+          where: { deletado_em: null, status: 'PENDENTE', ...os },
         }),
 
-        // OS finalizadas
         this.prisma.ordens_servico.count({
-          where: {
-            deletado_em: null,
-            status: 'FINALIZADA',
-          },
+          where: { deletado_em: null, status: 'FINALIZADA', ...os },
         }),
 
-        // OS atrasadas (data_previsao_fim da programação no passado e ainda não finalizadas)
         this.prisma.ordens_servico.count({
           where: {
             deletado_em: null,
             status: { notIn: ['FINALIZADA', 'CANCELADA'] },
+            ...os,
             programacao: {
               data_previsao_fim: { lt: hoje },
             },
           },
         }),
 
-        // Média de avaliação de qualidade das OS finalizadas
         this.prisma.ordens_servico.aggregate({
           where: {
             deletado_em: null,
             status: 'FINALIZADA',
             avaliacao_qualidade: { not: null },
+            ...os,
           },
-          _avg: {
-            avaliacao_qualidade: true,
-          },
+          _avg: { avaliacao_qualidade: true },
         }),
       ]);
 
-    // Calcular indicador de carga de trabalho (0-100)
-    // Fórmula: (OS abertas / (OS abertas + OS finalizadas)) * 100
     const totalOS = osAbertas + osFinalizadas;
     const indicadorCargaTrabalho =
       totalOS > 0 ? Math.round((osAbertas / totalOS) * 100) : 0;
 
-    // Nota de qualidade (0-100) - avaliacao_qualidade é escala 1-5
     const notaQualidade = avaliacaoMedia._avg.avaliacao_qualidade
       ? Math.round((avaliacaoMedia._avg.avaliacao_qualidade / 5) * 100)
       : 0;
@@ -152,40 +165,32 @@ export class DashboardService {
     };
   }
 
-  /**
-   * Retorna tarefas ordenadas por prioridade/criticidade
-   */
-  async getTaskPriorities(): Promise<DashboardTaskPrioritiesDto> {
-    // Buscar tarefas ativas ordenadas por criticidade (5 = mais crítico)
+  async getTaskPriorities(user?: UserCtx): Promise<DashboardTaskPrioritiesDto> {
+    const scope = await this.getScope(user);
+    const baseTarefaWhere: any = { deleted_at: null, status: 'ATIVA' };
+    if (Array.isArray(scope)) {
+      if (scope.length === 0) baseTarefaWhere.id = '__NEVER__';
+      else {
+        baseTarefaWhere.OR = [
+          { planta_id: { in: scope } },
+          { equipamento: { unidade: { planta_id: { in: scope } } } },
+        ];
+      }
+    }
+
     const tarefas = await this.prisma.tarefas.findMany({
-      where: {
-        deleted_at: null,
-        status: 'ATIVA',
-      },
+      where: baseTarefaWhere,
       include: {
-        equipamento: {
-          select: { nome: true },
-        },
+        equipamento: { select: { nome: true } },
       },
       orderBy: [{ criticidade: 'desc' }, { created_at: 'desc' }],
-      take: 10, // Top 10 tarefas mais críticas
+      take: 10,
     });
 
     const [totalAtivas, critMuitoAlta, critAlta] = await Promise.all([
-      // Total de tarefas ativas
-      this.prisma.tarefas.count({
-        where: { deleted_at: null, status: 'ATIVA' },
-      }),
-
-      // Criticidade muito alta (5)
-      this.prisma.tarefas.count({
-        where: { deleted_at: null, status: 'ATIVA', criticidade: 5 },
-      }),
-
-      // Criticidade alta (4)
-      this.prisma.tarefas.count({
-        where: { deleted_at: null, status: 'ATIVA', criticidade: 4 },
-      }),
+      this.prisma.tarefas.count({ where: baseTarefaWhere }),
+      this.prisma.tarefas.count({ where: { ...baseTarefaWhere, criticidade: 5 } }),
+      this.prisma.tarefas.count({ where: { ...baseTarefaWhere, criticidade: 4 } }),
     ]);
 
     return {
@@ -203,27 +208,23 @@ export class DashboardService {
     };
   }
 
-  /**
-   * Retorna distribuição de anomalias por prioridade
-   */
-  async getSeverityDistribution(): Promise<DashboardSeverityDistributionDto> {
+  async getSeverityDistribution(user?: UserCtx): Promise<DashboardSeverityDistributionDto> {
+    const scope = await this.getScope(user);
+    const anom = this.anomFilter(scope);
+    const baseWhere = {
+      deleted_at: null,
+      status: { in: ['REGISTRADA', 'PROGRAMADA'] as any },
+      ...anom,
+    };
+
     const distribuicao = await this.prisma.anomalias.groupBy({
       by: ['prioridade'],
-      where: {
-        deleted_at: null,
-        status: { in: ['REGISTRADA', 'PROGRAMADA'] }, // Anomalias ativas
-      },
+      where: baseWhere,
       _count: true,
     });
 
-    const totalAnomalias = await this.prisma.anomalias.count({
-      where: {
-        deleted_at: null,
-        status: { in: ['REGISTRADA', 'PROGRAMADA'] },
-      },
-    });
+    const totalAnomalias = await this.prisma.anomalias.count({ where: baseWhere });
 
-    // Helper para extrair count por prioridade
     const contarPorPrioridade = (prioridade: string): number => {
       const item = distribuicao.find((d) => d.prioridade === prioridade);
       return item?._count || 0;
@@ -238,64 +239,41 @@ export class DashboardService {
     };
   }
 
-  /**
-   * Retorna comparação de OS planejadas vs concluídas (últimos 6 meses)
-   */
-  async getPlannedVsCompleted(): Promise<DashboardPlannedVsCompletedDto> {
+  async getPlannedVsCompleted(user?: UserCtx): Promise<DashboardPlannedVsCompletedDto> {
+    const scope = await this.getScope(user);
+    const os = this.plantaIdFilter(scope);
+
     const hoje = new Date();
     const seiseMesesAtras = new Date(hoje);
     seiseMesesAtras.setMonth(hoje.getMonth() - 6);
 
-    // Buscar todas as OS dos últimos 6 meses
     const ordens = await this.prisma.ordens_servico.findMany({
       where: {
         deletado_em: null,
         criado_em: { gte: seiseMesesAtras },
+        ...os,
       },
-      select: {
-        id: true,
-        status: true,
-        criado_em: true,
-      },
+      select: { id: true, status: true, criado_em: true },
     });
 
-    // Agrupar por mês
     const mesesMap = new Map<
       number,
       { planejadas: number; concluidas: number }
     >();
 
-    ordens.forEach((os) => {
-      const mes = os.criado_em.getMonth(); // 0-11
-      if (!mesesMap.has(mes)) {
-        mesesMap.set(mes, { planejadas: 0, concluidas: 0 });
-      }
-
+    ordens.forEach((o) => {
+      const mes = o.criado_em.getMonth();
+      if (!mesesMap.has(mes)) mesesMap.set(mes, { planejadas: 0, concluidas: 0 });
       const stats = mesesMap.get(mes)!;
       stats.planejadas++;
-      if (os.status === 'FINALIZADA') {
-        stats.concluidas++;
-      }
+      if (o.status === 'FINALIZADA') stats.concluidas++;
     });
 
-    // Nomes dos meses
     const nomeMeses = [
-      'Jan',
-      'Fev',
-      'Mar',
-      'Abr',
-      'Mai',
-      'Jun',
-      'Jul',
-      'Ago',
-      'Set',
-      'Out',
-      'Nov',
-      'Dez',
+      'Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez',
     ];
 
-    // Construir array dos últimos 6 meses
-    const meses = [];
+    const meses: any[] = [];
     let totalPlanejadas = 0;
     let totalConcluidas = 0;
 
@@ -303,12 +281,10 @@ export class DashboardService {
       const data = new Date(hoje);
       data.setMonth(hoje.getMonth() - i);
       const mesNumero = data.getMonth();
-
       const stats = mesesMap.get(mesNumero) || { planejadas: 0, concluidas: 0 };
-      const taxaConclusao =
-        stats.planejadas > 0
-          ? Math.round((stats.concluidas / stats.planejadas) * 100)
-          : 0;
+      const taxaConclusao = stats.planejadas > 0
+        ? Math.round((stats.concluidas / stats.planejadas) * 100)
+        : 0;
 
       meses.push({
         mes: nomeMeses[mesNumero],
@@ -322,10 +298,9 @@ export class DashboardService {
       totalConcluidas += stats.concluidas;
     }
 
-    const taxaConclusaoMedia =
-      totalPlanejadas > 0
-        ? Math.round((totalConcluidas / totalPlanejadas) * 100 * 10) / 10
-        : 0;
+    const taxaConclusaoMedia = totalPlanejadas > 0
+      ? Math.round((totalConcluidas / totalPlanejadas) * 100 * 10) / 10
+      : 0;
 
     return {
       meses,
@@ -335,49 +310,41 @@ export class DashboardService {
     };
   }
 
-  /**
-   * Retorna status do sistema
-   * NOTA: Alguns campos retornam 0 (TODO) pois precisam de definição de regra de negócio
-   */
-  async getSystemStatus(): Promise<DashboardSystemStatusDto> {
+  async getSystemStatus(user?: UserCtx): Promise<DashboardSystemStatusDto> {
+    const scope = await this.getScope(user);
+    const eq = this.eqFilter(scope);
+    const anom = this.anomFilter(scope);
+
     const [
       equipamentosStatusCritico,
       equipamentosClasseCritica,
       falhasCausandoDanos,
     ] = await Promise.all([
-      // Equipamentos com status PARADO ou FALHA
       this.prisma.equipamentos.count({
-        where: {
-          deleted_at: null,
-          status: { in: ['PARADO', 'FALHA'] },
-        },
+        where: { deleted_at: null, status: { in: ['PARADO', 'FALHA'] }, ...eq },
       }),
 
-      // Equipamentos com classificação CRITICO
       this.prisma.equipamentos.count({
-        where: {
-          deleted_at: null,
-          classificacao: 'CRITICO',
-        },
+        where: { deleted_at: null, classificacao: 'CRITICO', ...eq },
       }),
 
-      // Anomalias com prioridade CRITICA
       this.prisma.anomalias.count({
         where: {
           deleted_at: null,
           prioridade: 'CRITICA',
           status: { in: ['REGISTRADA', 'PROGRAMADA'] },
+          ...anom,
         },
       }),
     ]);
 
     return {
-      paradas_programadas: 0, // TODO: definir critério (programacoes_os com data futura?)
+      paradas_programadas: 0, // TODO: definir criterio
       equipamentos_status_critico: equipamentosStatusCritico,
       equipamentos_classe_critica: equipamentosClasseCritica,
-      paradas_nao_programadas: 0, // TODO: definir critério
+      paradas_nao_programadas: 0, // TODO
       falhas_causando_danos: falhasCausandoDanos,
-      sensores_danificados: 0, // TODO: definir critério (campo específico?)
+      sensores_danificados: 0, // TODO
     };
   }
 }

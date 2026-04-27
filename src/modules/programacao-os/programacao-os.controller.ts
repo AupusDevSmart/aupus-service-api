@@ -10,7 +10,7 @@ import {
   Post,
   Query,
 } from '@nestjs/common';
-import { CurrentUser } from '@aupus/api-shared';
+import { CurrentUser, Permissions } from '@aupus/api-shared';
 import { ParseULIDPipe } from '../../shared/pipes/parse-ulid.pipe';
 import {
   ApiOperation,
@@ -37,7 +37,7 @@ import { ProgramacaoOSService } from './programacao-os.service';
 
 @ApiTags('Programação OS')
 @Controller('programacao-os')
-// @ApiBearerAuth() // Descomentado quando implementar autenticação
+@Permissions('programacao_os.view')
 export class ProgramacaoOSController {
   private readonly logger = new Logger(ProgramacaoOSController.name);
 
@@ -69,6 +69,7 @@ export class ProgramacaoOSController {
   }
 
   @Post()
+  @Permissions('programacao_os.manage')
   @ApiOperation({
     summary: 'Criar nova programação',
     description: 'Cria uma nova programação de ordem de serviço',
@@ -136,6 +137,7 @@ export class ProgramacaoOSController {
 
 
   @Patch(':id')
+  @Permissions('programacao_os.manage')
   @ApiOperation({
     summary: 'Atualizar programação',
     description: 'Atualiza uma programação existente (apenas status PENDENTE)',
@@ -163,6 +165,7 @@ export class ProgramacaoOSController {
   }
 
   @Patch(':id/aprovar')
+  @Permissions('programacao_os.aprovar')
   @ApiOperation({
     summary: 'Aprovar programação',
     description: 'Aprova a programação (PENDENTE → APROVADA) e gera automaticamente a OS',
@@ -182,6 +185,7 @@ export class ProgramacaoOSController {
   // Finalização da programação é automática (via finalização da OS)
 
   @Patch(':id/cancelar')
+  @Permissions('programacao_os.cancelar')
   @ApiOperation({
     summary: 'Cancelar programação',
     description: 'Cancela a programação com motivo (PENDENTE/APROVADA → CANCELADA)',
@@ -199,6 +203,7 @@ export class ProgramacaoOSController {
   }
 
   @Post('from-anomalia/:anomaliaId')
+  @Permissions('programacao_os.manage')
   @ApiOperation({
     summary: 'Criar programação a partir de anomalia',
     description: 'Cria automaticamente uma programação baseada em dados da anomalia',
@@ -222,6 +227,7 @@ export class ProgramacaoOSController {
   }
 
   @Post('from-tarefas')
+  @Permissions('programacao_os.manage')
   @ApiOperation({
     summary: 'Criar programação de múltiplas tarefas',
     description: 'Cria uma programação englobando múltiplas tarefas',
@@ -240,6 +246,7 @@ export class ProgramacaoOSController {
   }
 
   @Post('from-solicitacao/:solicitacaoId')
+  @Permissions('programacao_os.manage')
   @ApiOperation({
     summary: 'Criar programação a partir de solicitação de serviço',
     description: 'Cria automaticamente uma programação baseada em dados da solicitação de serviço aprovada',
@@ -267,6 +274,7 @@ export class ProgramacaoOSController {
   }
 
   @Post(':id/tarefas')
+  @Permissions('programacao_os.manage')
   @ApiOperation({
     summary: 'Adicionar tarefas à programação',
     description: 'Adiciona novas tarefas a uma programação existente',
@@ -290,6 +298,7 @@ export class ProgramacaoOSController {
   }
 
   @Patch(':id/tarefas')
+  @Permissions('programacao_os.manage')
   @ApiOperation({
     summary: 'Atualizar tarefas da programação',
     description: 'Atualiza ordem, status e observações das tarefas',
@@ -309,6 +318,7 @@ export class ProgramacaoOSController {
   }
 
   @Delete(':id/tarefas/:tarefaId')
+  @Permissions('programacao_os.manage')
   @ApiOperation({
     summary: 'Remover tarefa da programação',
     description: 'Remove uma tarefa específica da programação',
@@ -333,6 +343,7 @@ export class ProgramacaoOSController {
   }
 
   @Delete(':id')
+  @Permissions('programacao_os.cancelar')
   @ApiOperation({
     summary: 'Deletar programação',
     description: 'Deleta uma programação (soft delete)',

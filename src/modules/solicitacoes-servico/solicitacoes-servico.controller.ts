@@ -27,6 +27,7 @@ import {
   ApiConsumes,
   ApiBody,
 } from '@nestjs/swagger';
+import { Permissions } from '@aupus/api-shared';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { Response } from 'express';
 import { SolicitacoesServicoService } from './solicitacoes-servico.service';
@@ -43,6 +44,7 @@ import {
 
 @ApiTags('Solicitações de Serviço')
 @Controller('solicitacoes-servico')
+@Permissions('manutencao.manage')
 export class SolicitacoesServicoController {
   constructor(
     private readonly solicitacoesService: SolicitacoesServicoService,

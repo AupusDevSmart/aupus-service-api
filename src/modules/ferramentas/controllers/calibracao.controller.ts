@@ -15,11 +15,13 @@ import {
   ApiResponse,
   ApiParam,
 } from '@nestjs/swagger';
+import { Permissions } from '@aupus/api-shared';
 import { CalibracaoService } from '../services/calibracao.service';
 import { CreateCalibracaoDto } from '../dto/create-calibracao.dto';
 
 @ApiTags('Calibrações')
 @Controller('ferramentas/:ferramentaId/calibracoes')
+@Permissions('recursos.manage')
 export class CalibracaoController {
   constructor(private readonly calibracaoService: CalibracaoService) {}
 

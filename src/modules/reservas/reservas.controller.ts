@@ -14,6 +14,7 @@ import {
   Request
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiQuery } from '@nestjs/swagger';
+import { Permissions } from '@aupus/api-shared';
 import { ReservasService } from './reservas.service';
 import { ReservasSchedulerService } from './reservas-scheduler.service';
 import {
@@ -26,6 +27,7 @@ import {
 
 @ApiTags('Reservas de Veículos')
 @Controller('reservas')
+@Permissions('recursos.manage')
 export class ReservasController {
   constructor(
     private readonly reservasService: ReservasService,

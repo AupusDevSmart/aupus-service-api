@@ -14,6 +14,7 @@ import {
   ParseUUIDPipe
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiParam, ApiQuery } from '@nestjs/swagger';
+import { Permissions } from '@aupus/api-shared';
 import { PlanosManutencaoService } from './planos-manutencao.service';
 import {
   CreatePlanoManutencaoDto,
@@ -31,7 +32,7 @@ import {
 
 @ApiTags('Planos de Manutenção')
 @Controller('planos-manutencao')
-// @UseGuards(JwtAuthGuard) // Descomente quando tiver autenticação
+@Permissions('manutencao.manage')
 export class PlanosManutencaoController {
   constructor(
     private readonly planosManutencaoService: PlanosManutencaoService

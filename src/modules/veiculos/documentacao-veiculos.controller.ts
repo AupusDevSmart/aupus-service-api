@@ -18,6 +18,7 @@ import {
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { ApiTags, ApiOperation, ApiResponse, ApiConsumes, ApiBody, ApiQuery } from '@nestjs/swagger';
+import { Permissions } from '@aupus/api-shared';
 import { Response } from 'express';
 import { DocumentacaoVeiculosService } from './documentacao-veiculos.service';
 import {
@@ -29,6 +30,7 @@ import * as path from 'path';
 
 @ApiTags('Documentação de Veículos')
 @Controller('veiculos/:veiculoId/documentacao')
+@Permissions('recursos.manage')
 export class DocumentacaoVeiculosController {
   constructor(private readonly documentacaoService: DocumentacaoVeiculosService) {}
 
@@ -250,6 +252,7 @@ export class DocumentacaoVeiculosController {
 // Controller global para endpoints de documentação que não precisam de veiculoId específico
 @ApiTags('Documentação de Veículos')
 @Controller('documentacao/veiculos')
+@Permissions('recursos.manage')
 export class DocumentacaoVeiculosGlobalController {
   constructor(private readonly documentacaoService: DocumentacaoVeiculosService) {}
 

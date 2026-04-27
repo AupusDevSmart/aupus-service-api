@@ -1,302 +1,171 @@
 /**
- * ESTRUTURA DE PERMISSÕES MODERNA - AUPUS NEXON
+ * ESTRUTURA DE PERMISSOES - AUPUS SERVICE
  *
- * Padrão: recurso.acao
- * - Todas em minúsculas
- * - Separadas por ponto (.)
- * - Ações: view, create, edit, delete, manage
+ * Padrao: recurso.acao (minusculas, separadas por ponto)
+ *
+ * Roles (ordem de senioridade): operador < proprietario < analista < gerente < admin < super_admin
+ *
+ * Escopo de dados (aplicado em runtime, nao via permissao):
+ * - operador: ve apenas dados das plantas vinculadas via planta_operadores
+ * - proprietario: ve apenas dados das plantas onde plantas.proprietario_id = seu id
+ * - analista+: sem filtro de planta
  */
 
-export const PERMISSIONS_STRUCTURE = {
-  // ==============================================================================
-  // DASHBOARD & PAINEL
-  // ==============================================================================
-  dashboard: {
-    category: 'Dashboard',
-    permissions: [
-      { name: 'dashboard.view', display_name: 'Ver Dashboard', description: 'Visualizar dashboard principal' },
-      { name: 'dashboard.view_analytics', display_name: 'Ver Analytics', description: 'Visualizar analytics avançados' },
-    ]
-  },
+export interface PermissionDef {
+  name: string;
+  display_name: string;
+  description: string;
+  category: string;
+}
 
-  // ==============================================================================
-  // GESTÃO DE USUÁRIOS
-  // ==============================================================================
-  usuarios: {
-    category: 'Gestão',
-    permissions: [
-      { name: 'usuarios.view', display_name: 'Ver Usuários', description: 'Listar e visualizar usuários' },
-      { name: 'usuarios.create', display_name: 'Criar Usuários', description: 'Criar novos usuários' },
-      { name: 'usuarios.edit', display_name: 'Editar Usuários', description: 'Editar dados de usuários' },
-      { name: 'usuarios.delete', display_name: 'Deletar Usuários', description: 'Deletar usuários do sistema' },
-      { name: 'usuarios.manage', display_name: 'Gerenciar Usuários', description: 'Acesso completo a usuários' },
-      { name: 'usuarios.manage_permissions', display_name: 'Gerenciar Permissões', description: 'Atribuir roles e permissões' },
-    ]
-  },
+export const PERMISSIONS: PermissionDef[] = [
+  // Dashboard
+  { name: 'dashboard.view', display_name: 'Ver Dashboard', description: 'Acessar o dashboard principal', category: 'Dashboard' },
 
-  // ==============================================================================
-  // ORGANIZAÇÕES
-  // ==============================================================================
-  organizacoes: {
-    category: 'Gestão',
-    permissions: [
-      { name: 'organizacoes.view', display_name: 'Ver Organizações', description: 'Listar e visualizar organizações' },
-      { name: 'organizacoes.create', display_name: 'Criar Organizações', description: 'Criar novas organizações' },
-      { name: 'organizacoes.edit', display_name: 'Editar Organizações', description: 'Editar dados de organizações' },
-      { name: 'organizacoes.delete', display_name: 'Deletar Organizações', description: 'Deletar organizações' },
-      { name: 'organizacoes.manage', display_name: 'Gerenciar Organizações', description: 'Acesso completo a organizações' },
-    ]
-  },
+  // Plantas
+  { name: 'plantas.view', display_name: 'Ver Plantas', description: 'Listar e visualizar plantas', category: 'Plantas' },
+  { name: 'plantas.manage', display_name: 'Gerenciar Plantas', description: 'Criar, editar e deletar plantas', category: 'Plantas' },
+  { name: 'plantas.manage_operadores', display_name: 'Gerenciar Operadores da Planta', description: 'Vincular e desvincular operadores de plantas', category: 'Plantas' },
 
-  // ==============================================================================
-  // PLANTAS
-  // ==============================================================================
-  plantas: {
-    category: 'Gestão de Energia',
-    permissions: [
-      { name: 'plantas.view', display_name: 'Ver Plantas', description: 'Listar e visualizar plantas' },
-      { name: 'plantas.create', display_name: 'Criar Plantas', description: 'Criar novas plantas' },
-      { name: 'plantas.edit', display_name: 'Editar Plantas', description: 'Editar dados de plantas' },
-      { name: 'plantas.delete', display_name: 'Deletar Plantas', description: 'Deletar plantas' },
-      { name: 'plantas.manage', display_name: 'Gerenciar Plantas', description: 'Acesso completo a plantas' },
-      { name: 'plantas.view_own', display_name: 'Ver Minhas Plantas', description: 'Ver apenas suas próprias plantas' },
-    ]
-  },
+  // Unidades
+  { name: 'unidades.view', display_name: 'Ver Unidades', description: 'Listar e visualizar unidades', category: 'Unidades' },
+  { name: 'unidades.manage', display_name: 'Gerenciar Unidades', description: 'Criar, editar e deletar unidades', category: 'Unidades' },
 
-  // ==============================================================================
-  // UNIDADES CONSUMIDORAS
-  // ==============================================================================
-  unidades: {
-    category: 'Gestão de Energia',
-    permissions: [
-      { name: 'unidades.view', display_name: 'Ver Unidades', description: 'Listar e visualizar unidades consumidoras' },
-      { name: 'unidades.create', display_name: 'Criar Unidades', description: 'Criar novas unidades' },
-      { name: 'unidades.edit', display_name: 'Editar Unidades', description: 'Editar dados de unidades' },
-      { name: 'unidades.delete', display_name: 'Deletar Unidades', description: 'Deletar unidades' },
-      { name: 'unidades.manage', display_name: 'Gerenciar Unidades', description: 'Acesso completo a unidades' },
-    ]
-  },
+  // Equipamentos
+  { name: 'equipamentos.view', display_name: 'Ver Equipamentos', description: 'Listar e visualizar equipamentos', category: 'Equipamentos' },
+  { name: 'equipamentos.manage', display_name: 'Gerenciar Equipamentos', description: 'Criar, editar e deletar equipamentos', category: 'Equipamentos' },
 
-  // ==============================================================================
-  // EQUIPAMENTOS
-  // ==============================================================================
-  equipamentos: {
-    category: 'Gestão de Energia',
-    permissions: [
-      { name: 'equipamentos.view', display_name: 'Ver Equipamentos', description: 'Listar e visualizar equipamentos' },
-      { name: 'equipamentos.create', display_name: 'Criar Equipamentos', description: 'Criar novos equipamentos' },
-      { name: 'equipamentos.edit', display_name: 'Editar Equipamentos', description: 'Editar dados de equipamentos' },
-      { name: 'equipamentos.delete', display_name: 'Deletar Equipamentos', description: 'Deletar equipamentos' },
-      { name: 'equipamentos.manage', display_name: 'Gerenciar Equipamentos', description: 'Acesso completo a equipamentos' },
-    ]
-  },
+  // Anomalias
+  { name: 'anomalias.view', display_name: 'Ver Anomalias', description: 'Listar e visualizar anomalias', category: 'Anomalias' },
+  { name: 'anomalias.manage', display_name: 'Gerenciar Anomalias', description: 'Criar, editar e deletar anomalias', category: 'Anomalias' },
 
-  // ==============================================================================
-  // MONITORAMENTO
-  // ==============================================================================
-  monitoramento: {
-    category: 'Monitoramento',
-    permissions: [
-      { name: 'monitoramento.view', display_name: 'Ver Monitoramento', description: 'Visualizar dados de monitoramento' },
-      { name: 'monitoramento.view_consumo', display_name: 'Ver Consumo', description: 'Visualizar dados de consumo de energia' },
-      { name: 'monitoramento.view_geracao', display_name: 'Ver Geração', description: 'Visualizar dados de geração de energia' },
-      { name: 'monitoramento.view_analytics', display_name: 'Ver Analytics', description: 'Visualizar analytics avançados' },
-      { name: 'monitoramento.export', display_name: 'Exportar Dados', description: 'Exportar dados de monitoramento' },
-    ]
-  },
+  // Usuarios
+  { name: 'usuarios.view', display_name: 'Ver Usuarios', description: 'Listar e visualizar usuarios', category: 'Usuarios' },
+  { name: 'usuarios.manage', display_name: 'Gerenciar Usuarios', description: 'Editar e deletar usuarios (respeitando hierarquia)', category: 'Usuarios' },
+  { name: 'usuarios.create_operador', display_name: 'Criar Operador', description: 'Cadastrar novo usuario com role operador', category: 'Usuarios' },
+  { name: 'usuarios.create_proprietario', display_name: 'Criar Proprietario', description: 'Cadastrar novo usuario com role proprietario', category: 'Usuarios' },
+  { name: 'usuarios.create_analista', display_name: 'Criar Analista', description: 'Cadastrar novo usuario com role analista', category: 'Usuarios' },
+  { name: 'usuarios.create_admin', display_name: 'Criar Admin', description: 'Cadastrar novo usuario com role admin', category: 'Usuarios' },
 
-  // ==============================================================================
-  // SCADA & SUPERVISÓRIO
-  // ==============================================================================
-  scada: {
-    category: 'Supervisório',
-    permissions: [
-      { name: 'scada.view', display_name: 'Ver SCADA', description: 'Visualizar sistema SCADA' },
-      { name: 'scada.control', display_name: 'Controlar SCADA', description: 'Controlar equipamentos via SCADA' },
-      { name: 'scada.view_logs', display_name: 'Ver Logs', description: 'Visualizar logs de eventos' },
-      { name: 'scada.view_alarms', display_name: 'Ver Alarmes', description: 'Visualizar alarmes do sistema' },
-      { name: 'scada.acknowledge_alarms', display_name: 'Reconhecer Alarmes', description: 'Reconhecer e tratar alarmes' },
-    ]
-  },
+  // Programacao OS
+  { name: 'programacao_os.view', display_name: 'Ver Programacao OS', description: 'Listar e visualizar programacoes de OS', category: 'Ordens de Servico' },
+  { name: 'programacao_os.manage', display_name: 'Gerenciar Programacao OS', description: 'Criar e editar programacoes de OS', category: 'Ordens de Servico' },
+  { name: 'programacao_os.aprovar', display_name: 'Aprovar Programacao OS', description: 'Aprovar programacoes de OS pendentes', category: 'Ordens de Servico' },
+  { name: 'programacao_os.cancelar', display_name: 'Cancelar Programacao OS', description: 'Cancelar programacoes de OS', category: 'Ordens de Servico' },
 
-  supervisorio: {
-    category: 'Supervisório',
-    permissions: [
-      { name: 'supervisorio.view', display_name: 'Ver Supervisório', description: 'Visualizar sistema supervisório' },
-      { name: 'supervisorio.view_sinoptico', display_name: 'Ver Sinóptico', description: 'Visualizar sinóptico dos ativos' },
-      { name: 'supervisorio.view_logs', display_name: 'Ver Logs de Eventos', description: 'Visualizar histórico de eventos' },
-      { name: 'supervisorio.manage', display_name: 'Gerenciar Supervisório', description: 'Configurar sistema supervisório' },
-    ]
-  },
+  // Execucao OS
+  { name: 'execucao_os.view', display_name: 'Ver Execucao OS', description: 'Listar e visualizar execucoes de OS', category: 'Ordens de Servico' },
+  { name: 'execucao_os.manage', display_name: 'Gerenciar Execucao OS', description: 'Criar e editar execucoes de OS', category: 'Ordens de Servico' },
+  { name: 'execucao_os.aprovar', display_name: 'Aprovar Execucao OS', description: 'Aprovar execucoes de OS', category: 'Ordens de Servico' },
+  { name: 'execucao_os.cancelar', display_name: 'Cancelar Execucao OS', description: 'Cancelar execucoes de OS', category: 'Ordens de Servico' },
 
-  // ==============================================================================
-  // COMERCIAL - PROSPECÇÃO
-  // ==============================================================================
-  prospeccao: {
-    category: 'Comercial',
-    permissions: [
-      { name: 'prospeccao.view', display_name: 'Ver Prospecções', description: 'Listar e visualizar prospecções' },
-      { name: 'prospeccao.create', display_name: 'Criar Prospecções', description: 'Criar novas prospecções' },
-      { name: 'prospeccao.edit', display_name: 'Editar Prospecções', description: 'Editar dados de prospecções' },
-      { name: 'prospeccao.delete', display_name: 'Deletar Prospecções', description: 'Deletar prospecções' },
-      { name: 'prospeccao.manage', display_name: 'Gerenciar Prospecções', description: 'Acesso completo a prospecções' },
-      { name: 'prospeccao.view_own', display_name: 'Ver Minhas Prospecções', description: 'Ver apenas suas próprias prospecções' },
-    ]
-  },
+  // Outras paginas AupusService (agrupadas)
+  { name: 'manutencao.manage', display_name: 'Gerenciar Manutencao', description: 'Tarefas, instrucoes, planos de manutencao, solicitacoes de servico', category: 'Manutencao' },
+  { name: 'recursos.manage', display_name: 'Gerenciar Recursos', description: 'Ferramentas, fornecedores, veiculos e reservas', category: 'Recursos' },
+  { name: 'agenda.manage', display_name: 'Gerenciar Agenda', description: 'Feriados e dias uteis', category: 'Agenda' },
 
-  // ==============================================================================
-  // COMERCIAL - OPORTUNIDADES
-  // ==============================================================================
-  oportunidades: {
-    category: 'Comercial',
-    permissions: [
-      { name: 'oportunidades.view', display_name: 'Ver Oportunidades', description: 'Listar e visualizar oportunidades' },
-      { name: 'oportunidades.create', display_name: 'Criar Oportunidades', description: 'Criar novas oportunidades' },
-      { name: 'oportunidades.edit', display_name: 'Editar Oportunidades', description: 'Editar dados de oportunidades' },
-      { name: 'oportunidades.delete', display_name: 'Deletar Oportunidades', description: 'Deletar oportunidades' },
-      { name: 'oportunidades.manage', display_name: 'Gerenciar Oportunidades', description: 'Acesso completo a oportunidades' },
-    ]
-  },
+  // Administracao
+  { name: 'admin.impersonate', display_name: 'Personificar Usuario', description: 'Fazer login como outro usuario', category: 'Administracao' },
+];
 
-  // ==============================================================================
-  // FINANCEIRO
-  // ==============================================================================
-  financeiro: {
-    category: 'Financeiro',
-    permissions: [
-      { name: 'financeiro.view', display_name: 'Ver Financeiro', description: 'Visualizar dados financeiros básicos' },
-      { name: 'financeiro.view_reports', display_name: 'Ver Relatórios', description: 'Visualizar relatórios financeiros' },
-      { name: 'financeiro.view_admin', display_name: 'Ver Admin Financeiro', description: 'Acesso administrativo ao financeiro' },
-      { name: 'financeiro.manage', display_name: 'Gerenciar Financeiro', description: 'Gerenciar módulo financeiro' },
-      { name: 'financeiro.export', display_name: 'Exportar Dados', description: 'Exportar dados financeiros' },
-    ]
-  },
-
-  // ==============================================================================
-  // CLUBE AUPUS
-  // ==============================================================================
-  clube: {
-    category: 'Clube',
-    permissions: [
-      { name: 'clube.view', display_name: 'Ver Clube', description: 'Acessar área do clube' },
-      { name: 'clube.view_associado', display_name: 'Área do Associado', description: 'Acessar área do associado' },
-      { name: 'clube.view_proprietario', display_name: 'Área do Proprietário', description: 'Acessar área do proprietário' },
-      { name: 'clube.manage', display_name: 'Gerenciar Clube', description: 'Gerenciar clube Aupus' },
-    ]
-  },
-
-  // ==============================================================================
-  // CONCESSIONÁRIAS
-  // ==============================================================================
-  concessionarias: {
-    category: 'Sistema',
-    permissions: [
-      { name: 'concessionarias.view', display_name: 'Ver Concessionárias', description: 'Listar e visualizar concessionárias' },
-      { name: 'concessionarias.create', display_name: 'Criar Concessionárias', description: 'Criar novas concessionárias' },
-      { name: 'concessionarias.edit', display_name: 'Editar Concessionárias', description: 'Editar dados de concessionárias' },
-      { name: 'concessionarias.delete', display_name: 'Deletar Concessionárias', description: 'Deletar concessionárias' },
-      { name: 'concessionarias.manage', display_name: 'Gerenciar Concessionárias', description: 'Acesso completo a concessionárias' },
-    ]
-  },
-
-  // ==============================================================================
-  // CONFIGURAÇÕES
-  // ==============================================================================
-  configuracoes: {
-    category: 'Sistema',
-    permissions: [
-      { name: 'configuracoes.view', display_name: 'Ver Configurações', description: 'Visualizar configurações do sistema' },
-      { name: 'configuracoes.edit', display_name: 'Editar Configurações', description: 'Editar configurações do sistema' },
-      { name: 'configuracoes.manage', display_name: 'Gerenciar Configurações', description: 'Acesso completo a configurações' },
-    ]
-  },
-
-  // ==============================================================================
-  // DOCUMENTOS
-  // ==============================================================================
-  documentos: {
-    category: 'Sistema',
-    permissions: [
-      { name: 'documentos.view', display_name: 'Ver Documentos', description: 'Visualizar documentos' },
-      { name: 'documentos.upload', display_name: 'Upload Documentos', description: 'Fazer upload de documentos' },
-      { name: 'documentos.download', display_name: 'Download Documentos', description: 'Baixar documentos' },
-      { name: 'documentos.delete', display_name: 'Deletar Documentos', description: 'Deletar documentos' },
-      { name: 'documentos.manage', display_name: 'Gerenciar Documentos', description: 'Acesso completo a documentos' },
-    ]
-  },
-
-  // ==============================================================================
-  // RELATÓRIOS
-  // ==============================================================================
-  relatorios: {
-    category: 'Sistema',
-    permissions: [
-      { name: 'relatorios.view', display_name: 'Ver Relatórios', description: 'Visualizar relatórios' },
-      { name: 'relatorios.export', display_name: 'Exportar Relatórios', description: 'Exportar relatórios' },
-      { name: 'relatorios.create', display_name: 'Criar Relatórios', description: 'Criar relatórios personalizados' },
-    ]
-  },
-
-  // ==============================================================================
-  // SUPER ADMIN
-  // ==============================================================================
-  admin: {
-    category: 'Administração',
-    permissions: [
-      { name: 'admin.super', display_name: 'Super Admin', description: 'Acesso total ao sistema' },
-      { name: 'admin.impersonate', display_name: 'Personificar Usuário', description: 'Fazer login como outro usuário' },
-      { name: 'admin.view_logs', display_name: 'Ver Logs do Sistema', description: 'Visualizar logs do sistema' },
-      { name: 'admin.manage_permissions', display_name: 'Gerenciar Permissões', description: 'Gerenciar roles e permissões' },
-    ]
-  },
+/**
+ * Mapeamento role -> permissoes.
+ * Cada role herda as permissoes do role anterior na hierarquia, mas aqui listamos de forma explicita
+ * para ficar claro o que cada role recebe no seed.
+ */
+export const ROLE_PERMISSIONS: Record<string, string[]> = {
+  operador: [
+    'dashboard.view',
+    'plantas.view',
+    'unidades.view',
+    'equipamentos.view',
+    'anomalias.view',
+    'anomalias.manage', // restrito por planta em runtime
+  ],
+  proprietario: [
+    'dashboard.view',
+    'plantas.view',
+    'plantas.manage_operadores',
+    'unidades.view',
+    'equipamentos.view',
+    'anomalias.view',
+    'anomalias.manage',
+    'usuarios.view',
+    'usuarios.create_operador',
+  ],
+  analista: [
+    'dashboard.view',
+    'plantas.view', 'plantas.manage', 'plantas.manage_operadores',
+    'unidades.view', 'unidades.manage',
+    'equipamentos.view', 'equipamentos.manage',
+    'anomalias.view', 'anomalias.manage',
+    'usuarios.view',
+    'usuarios.create_operador', 'usuarios.create_proprietario',
+    'programacao_os.view', 'programacao_os.manage', 'programacao_os.cancelar',
+    'execucao_os.view', 'execucao_os.manage', 'execucao_os.cancelar',
+    'manutencao.manage',
+    'recursos.manage',
+    'agenda.manage',
+  ],
+  gerente: [
+    'dashboard.view',
+    'plantas.view', 'plantas.manage', 'plantas.manage_operadores',
+    'unidades.view', 'unidades.manage',
+    'equipamentos.view', 'equipamentos.manage',
+    'anomalias.view', 'anomalias.manage',
+    'usuarios.view',
+    'usuarios.create_operador', 'usuarios.create_proprietario', 'usuarios.create_analista',
+    'programacao_os.view', 'programacao_os.manage', 'programacao_os.aprovar', 'programacao_os.cancelar',
+    'execucao_os.view', 'execucao_os.manage', 'execucao_os.aprovar', 'execucao_os.cancelar',
+    'manutencao.manage',
+    'recursos.manage',
+    'agenda.manage',
+  ],
+  admin: [
+    'dashboard.view',
+    'plantas.view', 'plantas.manage', 'plantas.manage_operadores',
+    'unidades.view', 'unidades.manage',
+    'equipamentos.view', 'equipamentos.manage',
+    'anomalias.view', 'anomalias.manage',
+    'usuarios.view', 'usuarios.manage',
+    'usuarios.create_operador', 'usuarios.create_proprietario', 'usuarios.create_analista',
+    'programacao_os.view', 'programacao_os.manage', 'programacao_os.aprovar', 'programacao_os.cancelar',
+    'execucao_os.view', 'execucao_os.manage', 'execucao_os.aprovar', 'execucao_os.cancelar',
+    'manutencao.manage',
+    'recursos.manage',
+    'agenda.manage',
+    'admin.impersonate',
+  ],
+  super_admin: [
+    'dashboard.view',
+    'plantas.view', 'plantas.manage', 'plantas.manage_operadores',
+    'unidades.view', 'unidades.manage',
+    'equipamentos.view', 'equipamentos.manage',
+    'anomalias.view', 'anomalias.manage',
+    'usuarios.view', 'usuarios.manage',
+    'usuarios.create_operador', 'usuarios.create_proprietario', 'usuarios.create_analista', 'usuarios.create_admin',
+    'programacao_os.view', 'programacao_os.manage', 'programacao_os.aprovar', 'programacao_os.cancelar',
+    'execucao_os.view', 'execucao_os.manage', 'execucao_os.aprovar', 'execucao_os.cancelar',
+    'manutencao.manage',
+    'recursos.manage',
+    'agenda.manage',
+    'admin.impersonate',
+  ],
 };
 
-/**
- * Gera array plano de todas as permissões
- */
-export function getAllPermissions() {
-  const permissions: Array<{
-    name: string;
-    display_name: string;
-    description: string;
-    category: string;
-  }> = [];
+export const ROLES = Object.keys(ROLE_PERMISSIONS);
 
-  Object.entries(PERMISSIONS_STRUCTURE).forEach(([key, config]) => {
-    config.permissions.forEach(permission => {
-      permissions.push({
-        ...permission,
-        category: config.category
-      });
-    });
-  });
-
-  return permissions;
+export function getAllPermissions(): PermissionDef[] {
+  return PERMISSIONS;
 }
 
-/**
- * Gera permissões agrupadas por categoria
- */
-export function getPermissionsByCategory() {
-  const grouped: Record<string, Array<{
-    name: string;
-    display_name: string;
-    description: string;
-  }>> = {};
-
-  Object.entries(PERMISSIONS_STRUCTURE).forEach(([key, config]) => {
-    if (!grouped[config.category]) {
-      grouped[config.category] = [];
-    }
-    grouped[config.category].push(...config.permissions);
-  });
-
-  return grouped;
+export function getPermissionsByCategory(): Record<string, PermissionDef[]> {
+  return PERMISSIONS.reduce<Record<string, PermissionDef[]>>((acc, p) => {
+    (acc[p.category] ??= []).push(p);
+    return acc;
+  }, {});
 }
 
-/**
- * Total de permissões definidas
- */
-export function getTotalPermissions() {
-  return getAllPermissions().length;
+export function getTotalPermissions(): number {
+  return PERMISSIONS.length;
 }

@@ -16,6 +16,7 @@ import {
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { ApiTags, ApiOperation, ApiResponse, ApiParam, ApiConsumes } from '@nestjs/swagger';
+import { Permissions } from '@aupus/api-shared';
 import { Response } from 'express';
 import * as path from 'path';
 import { InstrucoesService } from './instrucoes.service';
@@ -33,6 +34,9 @@ import {
 
 @ApiTags('Instrucoes')
 @Controller('instrucoes')
+@Permissions('manutencao.manage')
+// Quem pode editar anomalias tambem le/associa instrucoes via selector.
+// Endpoints GET e a associacao com anomalias aceitam 'anomalias.manage' tambem.
 export class InstrucoesController {
   constructor(
     private readonly instrucoesService: InstrucoesService,
@@ -53,6 +57,7 @@ export class InstrucoesController {
   }
 
   @Get()
+  @Permissions('manutencao.manage', 'anomalias.manage')
   @ApiOperation({ summary: 'Listar instruções com filtros e paginação' })
   @ApiResponse({ status: HttpStatus.OK, description: 'Lista de instruções encontrada' })
   async listar(@Query() queryDto: QueryInstrucoesDto) {
@@ -67,6 +72,7 @@ export class InstrucoesController {
   }
 
   @Get(':id')
+  @Permissions('manutencao.manage', 'anomalias.manage')
   @ApiOperation({ summary: 'Buscar instrução por ID com detalhes completos' })
   @ApiParam({ name: 'id', description: 'ID da instrução' })
   @ApiResponse({ status: HttpStatus.OK, description: 'Instrução encontrada', type: InstrucaoResponseDto })
@@ -146,6 +152,7 @@ export class InstrucoesController {
   // ==========================================
 
   @Post(':id/anomalias')
+  @Permissions('manutencao.manage', 'anomalias.manage')
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({ summary: 'Associar anomalia à instrução' })
   @ApiParam({ name: 'id', description: 'ID da instrução' })
@@ -159,6 +166,7 @@ export class InstrucoesController {
   }
 
   @Get(':id/anomalias')
+  @Permissions('manutencao.manage', 'anomalias.manage')
   @ApiOperation({ summary: 'Listar anomalias associadas à instrução' })
   @ApiParam({ name: 'id', description: 'ID da instrução' })
   @ApiResponse({ status: HttpStatus.OK, description: 'Anomalias encontradas' })
@@ -167,6 +175,7 @@ export class InstrucoesController {
   }
 
   @Delete(':id/anomalias/:anomaliaId')
+  @Permissions('manutencao.manage', 'anomalias.manage')
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({ summary: 'Remover associação com anomalia' })
   @ApiParam({ name: 'id', description: 'ID da instrução' })

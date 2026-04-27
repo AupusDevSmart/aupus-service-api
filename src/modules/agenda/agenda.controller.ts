@@ -19,6 +19,7 @@ import {
   ApiParam,
   ApiQuery
 } from '@nestjs/swagger';
+import { Permissions } from '@aupus/api-shared';
 import { AgendaService, DiaUtilResponse, ProximosDiasUteisResponse } from './agenda.service';
 import { FeriadosService, PaginatedResponse } from './feriados.service';
 import { ConfiguracoesDiasUteisService } from './configuracoes-dias-uteis.service';
@@ -38,6 +39,7 @@ import {
 
 @ApiTags('agenda')
 @Controller('agenda')
+@Permissions('agenda.manage')
 export class AgendaController {
   private readonly logger = new Logger(AgendaController.name);
 
