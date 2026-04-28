@@ -5,7 +5,7 @@
  * Uso: npx ts-node prisma/seeds/debug-dashboard-scope.ts <email>
  */
 
-import { PrismaClient } from '@prisma/client';
+import { PrismaClient } from '@aupus/api-shared';
 
 const prisma = new PrismaClient();
 

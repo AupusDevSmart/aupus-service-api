@@ -1,6 +1,6 @@
 // src/modules/planos-manutencao/dto/create-plano-manutencao.dto.ts
 import { IsString, IsOptional, IsEnum, IsDateString, IsNotEmpty, MaxLength, IsBoolean } from 'class-validator';
-import { StatusPlano } from '@prisma/client';
+import { StatusPlano } from '@aupus/api-shared';
 import { Type } from 'class-transformer';
 
 export class CreatePlanoManutencaoDto {

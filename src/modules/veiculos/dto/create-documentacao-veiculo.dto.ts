@@ -1,7 +1,7 @@
 import { IsEnum, IsString, IsNotEmpty, IsOptional, IsDate } from 'class-validator';
 import { Type } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { TipoDocumentacaoVeiculo } from '@prisma/client';
+import { TipoDocumentacaoVeiculo } from '@aupus/api-shared';
 
 export class CreateDocumentacaoVeiculoDto {
   @ApiProperty({

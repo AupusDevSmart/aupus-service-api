@@ -3,7 +3,7 @@ import { ProgramacaoOSService } from './programacao-os.service';
 import { PrismaService } from '@aupus/api-shared';
 import { AnomaliasService } from '../anomalias/anomalias.service';
 import { NotFoundException, BadRequestException, ConflictException } from '@nestjs/common';
-import { StatusProgramacaoOS, CondicaoOS, TipoOS, PrioridadeOS, OrigemOS } from '@prisma/client';
+import { StatusProgramacaoOS, CondicaoOS, TipoOS, PrioridadeOS, OrigemOS } from '@aupus/api-shared';
 import {
   CreateProgramacaoDto,
   UpdateProgramacaoDto,

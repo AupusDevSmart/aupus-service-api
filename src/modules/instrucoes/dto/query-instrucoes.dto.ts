@@ -5,7 +5,7 @@ import {
   StatusTarefa,
   CategoriaTarefa,
   TipoManutencao
-} from '@prisma/client';
+} from '@aupus/api-shared';
 
 export class QueryInstrucoesDto {
   @IsOptional()

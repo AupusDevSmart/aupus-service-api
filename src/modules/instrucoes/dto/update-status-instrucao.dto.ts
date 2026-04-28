@@ -1,6 +1,6 @@
 // src/modules/instrucoes/dto/update-status-instrucao.dto.ts
 import { IsEnum, IsOptional, IsString } from 'class-validator';
-import { StatusTarefa } from '@prisma/client';
+import { StatusTarefa } from '@aupus/api-shared';
 
 export class UpdateStatusInstrucaoDto {
   @IsEnum(StatusTarefa)

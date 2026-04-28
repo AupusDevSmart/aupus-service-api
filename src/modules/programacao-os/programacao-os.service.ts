@@ -1,5 +1,5 @@
 import { ConflictException, Injectable, Logger, NotFoundException } from '@nestjs/common';
-import { Prisma, StatusProgramacaoOS } from '@prisma/client';
+import { Prisma, StatusProgramacaoOS } from '@aupus/api-shared';
 import { PrismaService } from '@aupus/api-shared';
 import { AnomaliasService } from '../anomalias/anomalias.service';
 import {

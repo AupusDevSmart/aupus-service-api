@@ -1,6 +1,6 @@
 // src/modules/tarefas/dto/create-anexo-tarefa.dto.ts
 import { IsString, IsNotEmpty, IsOptional, IsEnum } from 'class-validator';
-import { TipoAnexo } from '@prisma/client';
+import { TipoAnexo } from '@aupus/api-shared';
 
 export class CreateAnexoTarefaDto {
   @IsString()

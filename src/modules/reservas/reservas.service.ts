@@ -1,7 +1,7 @@
 import { Injectable, NotFoundException, BadRequestException, ConflictException } from '@nestjs/common';
 import { PrismaService } from '@aupus/api-shared';
 import { VeiculosService } from '../veiculos/veiculos.service';
-import { StatusVeiculo, StatusReserva, Prisma } from '@prisma/client';
+import { StatusVeiculo, StatusReserva, Prisma } from '@aupus/api-shared';
 import {
   CreateReservaDto,
   UpdateReservaDto,

@@ -12,8 +12,8 @@
  * As roles NAO sao deletadas para preservar os ids referenciados em model_has_roles.
  */
 
-import { PrismaClient } from '@prisma/client';
-import { PERMISSIONS, ROLE_PERMISSIONS, ROLES } from '../permissions-structure';
+import { PrismaClient } from '@aupus/api-shared';
+import { PERMISSIONS, ROLE_PERMISSIONS, ROLES } from './permissions-structure';
 
 const prisma = new PrismaClient();
 

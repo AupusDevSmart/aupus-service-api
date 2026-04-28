@@ -1,4 +1,4 @@
-import { TipoAnexo } from '@prisma/client';
+import { TipoAnexo } from '@aupus/api-shared';
 
 export class AnexoInstrucaoDetalhesDto {
   id: string;

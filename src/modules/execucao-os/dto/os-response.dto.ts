@@ -1,5 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { StatusOS, TipoOS, PrioridadeOS, OrigemOS, CondicaoOS, TipoAnexoOS } from '@prisma/client';
+import { StatusOS, TipoOS, PrioridadeOS, OrigemOS, CondicaoOS, TipoAnexoOS } from '@aupus/api-shared';
 
 export class TarefaOSResponseDto {
   @ApiProperty({ description: 'ID do relacionamento' })

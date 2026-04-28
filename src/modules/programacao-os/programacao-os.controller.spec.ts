@@ -13,7 +13,7 @@ import {
   AdicionarTarefasDto,
   AtualizarTarefasDto,
 } from './dto/programacao-actions.dto';
-import { CondicaoOS, TipoOS, PrioridadeOS, OrigemOS, StatusProgramacaoOS } from '@prisma/client';
+import { CondicaoOS, TipoOS, PrioridadeOS, OrigemOS, StatusProgramacaoOS } from '@aupus/api-shared';
 
 describe('ProgramacaoOSController', () => {
   let controller: ProgramacaoOSController;

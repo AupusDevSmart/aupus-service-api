@@ -2,7 +2,7 @@
 import { IsOptional, IsEnum, IsString, IsInt, Min, Max, IsBoolean } from 'class-validator';
 import { Transform, Type } from 'class-transformer';
 import { ApiPropertyOptional } from '@nestjs/swagger';
-import { StatusPlano } from '@prisma/client';
+import { StatusPlano } from '@aupus/api-shared';
 
 export class QueryPlanosDto {
   @ApiPropertyOptional({ description: 'Busca em nome, descrição ou equipamento' })

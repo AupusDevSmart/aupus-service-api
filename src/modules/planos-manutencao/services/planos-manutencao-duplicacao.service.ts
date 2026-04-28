@@ -1,7 +1,7 @@
 // src/modules/planos-manutencao/services/planos-manutencao-duplicacao.service.ts
 import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
 import { PrismaService } from '@aupus/api-shared';
-import { StatusPlano } from '@prisma/client';
+import { StatusPlano } from '@aupus/api-shared';
 import {
   DuplicarPlanoDto,
   ClonarPlanoLoteDto,

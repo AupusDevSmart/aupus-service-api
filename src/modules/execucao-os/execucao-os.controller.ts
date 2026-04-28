@@ -49,7 +49,7 @@ import {
   ListarOSResponseDto,
   AnexoOSResponseDto,
 } from './dto';
-import { TipoAnexoOS } from '@prisma/client';
+import { TipoAnexoOS } from '@aupus/api-shared';
 import * as fs from 'fs';
 import * as path from 'path';
 

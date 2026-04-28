@@ -2,7 +2,7 @@
 import { Injectable, NotFoundException, ConflictException, BadRequestException, ForbiddenException, Logger } from '@nestjs/common';
 import { PrismaService, PermissionScopeService, PlantaScope } from '@aupus/api-shared';
 import { CreateAnomaliaDto, UpdateAnomaliaDto, AnomaliaFiltersDto, AnomaliaStatsDto } from './dto';
-import { Prisma } from '@prisma/client';
+import { Prisma } from '@aupus/api-shared';
 
 type UserCtx = { id: string; role?: string | null } | undefined;
 

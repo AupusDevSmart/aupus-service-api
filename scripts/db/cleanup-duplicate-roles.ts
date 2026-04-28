@@ -9,7 +9,7 @@
  * 2. Para roles que so existem como 'web' (ex: analista neste sistema), nao faz nada.
  */
 
-import { PrismaClient } from '@prisma/client';
+import { PrismaClient } from '@aupus/api-shared';
 
 const prisma = new PrismaClient();
 

@@ -20,7 +20,7 @@ import {
   OrdemServicoDetalhesResponseDto,
   ListarOSResponseDto,
 } from './dto';
-import { StatusOS, PrioridadeOS, Prisma } from '@prisma/client';
+import { StatusOS, PrioridadeOS, Prisma } from '@aupus/api-shared';
 
 @Injectable()
 export class ExecucaoOSService {

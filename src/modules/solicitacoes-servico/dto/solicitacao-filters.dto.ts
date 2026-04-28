@@ -1,7 +1,7 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { IsOptional, IsEnum, IsString, IsNumber, IsDateString, Min } from 'class-validator';
 import { Type } from 'class-transformer';
-import { StatusSolicitacaoServico, TipoSolicitacaoServico, PrioridadeSolicitacao, OrigemSolicitacao } from '@prisma/client';
+import { StatusSolicitacaoServico, TipoSolicitacaoServico, PrioridadeSolicitacao, OrigemSolicitacao } from '@aupus/api-shared';
 
 export class SolicitacaoFiltersDto {
   @ApiPropertyOptional({ description: 'Página atual', minimum: 1, default: 1 })

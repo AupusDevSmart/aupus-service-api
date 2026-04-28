@@ -21,7 +21,7 @@ import {
   FrequenciaTarefa, 
   CondicaoAtivo, 
   StatusTarefa 
-} from '@prisma/client';
+} from '@aupus/api-shared';
 import { CreateSubTarefaDto } from './create-sub-tarefa.dto';
 import { CreateRecursoTarefaDto } from './create-recurso-tarefa.dto';
 

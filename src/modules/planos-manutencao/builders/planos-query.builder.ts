@@ -1,5 +1,5 @@
 // src/modules/planos-manutencao/builders/planos-query.builder.ts
-import { Prisma } from '@prisma/client';
+import { Prisma } from '@aupus/api-shared';
 import { QueryPlanosDto } from '../dto';
 
 export class PlanosQueryBuilder {

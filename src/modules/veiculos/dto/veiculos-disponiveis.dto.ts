@@ -1,7 +1,7 @@
 import { IsString, IsNotEmpty, IsOptional, IsInt, IsArray, Min } from 'class-validator';
 import { Type } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { TipoVeiculo } from '@prisma/client';
+import { TipoVeiculo } from '@aupus/api-shared';
 
 export class VeiculosDisponiveisDto {
   @ApiProperty({

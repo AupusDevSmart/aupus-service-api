@@ -9,7 +9,7 @@ import {
   InativarVeiculoDto,
   VeiculosDisponiveisDto
 } from './dto';
-import { StatusVeiculo, Prisma } from '@prisma/client';
+import { StatusVeiculo, Prisma } from '@aupus/api-shared';
 
 export interface PaginatedResponse<T> {
   data: T[];

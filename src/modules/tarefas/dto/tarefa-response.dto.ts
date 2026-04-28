@@ -7,7 +7,7 @@ import {
   CondicaoAtivo,
   TipoRecurso,
   TipoAnexo
-} from '@prisma/client';
+} from '@aupus/api-shared';
 
 export class UsuarioResumoDto {
   id: string;

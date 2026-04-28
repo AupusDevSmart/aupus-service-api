@@ -18,7 +18,7 @@ import {
   TipoManutencao,
   CondicaoAtivo,
   StatusTarefa
-} from '@prisma/client';
+} from '@aupus/api-shared';
 import { CreateSubInstrucaoDto } from './create-sub-instrucao.dto';
 import { CreateRecursoInstrucaoDto } from './create-recurso-instrucao.dto';
 

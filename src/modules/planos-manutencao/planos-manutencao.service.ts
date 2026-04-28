@@ -14,7 +14,7 @@ import {
   PlanoResumoDto,
   DashboardPlanosDto
 } from './dto';
-import { StatusPlano, Prisma } from '@prisma/client';
+import { StatusPlano, Prisma } from '@aupus/api-shared';
 
 @Injectable()
 export class PlanosManutencaoService {

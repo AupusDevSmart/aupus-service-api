@@ -3,7 +3,7 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '@aupus/api-shared';
 import { PlanoResumoDto, DashboardPlanosDto } from '../dto';
 import { contarPorStatus, contarPorTipo } from '../helpers/planos-manutencao.helpers';
-import { StatusPlano } from '@prisma/client';
+import { StatusPlano } from '@aupus/api-shared';
 
 @Injectable()
 export class PlanosManutencaoEstatisticasService {

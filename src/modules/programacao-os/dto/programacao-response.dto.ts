@@ -1,5 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { StatusProgramacaoOS, TipoOS, PrioridadeOS, OrigemOS, CondicaoOS } from '@prisma/client';
+import { StatusProgramacaoOS, TipoOS, PrioridadeOS, OrigemOS, CondicaoOS } from '@aupus/api-shared';
 
 export class UsuarioSimpleDto {
   @ApiProperty({ description: 'ID do usuário' })

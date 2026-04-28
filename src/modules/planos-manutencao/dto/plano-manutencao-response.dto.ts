@@ -1,5 +1,5 @@
 // src/modules/planos-manutencao/dto/plano-manutencao-response.dto.ts
-import { StatusPlano } from '@prisma/client';
+import { StatusPlano } from '@aupus/api-shared';
 
 export class UsuarioResumoDto {
   id: string;

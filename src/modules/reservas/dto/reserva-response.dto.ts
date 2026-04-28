@@ -1,5 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { StatusReserva, TipoSolicitante } from '@prisma/client';
+import { StatusReserva, TipoSolicitante } from '@aupus/api-shared';
 
 export class VeiculoReservaDto {
   @ApiProperty({

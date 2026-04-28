@@ -10,7 +10,7 @@ import {
   DashboardInstrucoesDto,
   AdicionarAoPlanoDto
 } from './dto';
-import { StatusTarefa, Prisma } from '@prisma/client';
+import { StatusTarefa, Prisma } from '@aupus/api-shared';
 
 @Injectable()
 export class InstrucoesService {

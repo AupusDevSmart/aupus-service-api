@@ -1,7 +1,7 @@
 import { IsOptional, IsEnum, IsDateString, IsString, IsNumber, Min, Length } from 'class-validator';
 import { Type } from 'class-transformer';
 import { ApiPropertyOptional } from '@nestjs/swagger';
-import { StatusProgramacaoOS, TipoOS, PrioridadeOS, OrigemOS } from '@prisma/client';
+import { StatusProgramacaoOS, TipoOS, PrioridadeOS, OrigemOS } from '@aupus/api-shared';
 
 export class ProgramacaoFiltersDto {
   @ApiPropertyOptional({ description: 'Página', example: 1 })

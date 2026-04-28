@@ -1,6 +1,6 @@
 // src/modules/instrucoes/dto/create-recurso-instrucao.dto.ts
 import { IsString, IsNotEmpty, IsEnum, IsOptional, IsBoolean } from 'class-validator';
-import { TipoRecurso } from '@prisma/client';
+import { TipoRecurso } from '@aupus/api-shared';
 import { Transform } from 'class-transformer';
 
 export class CreateRecursoInstrucaoDto {

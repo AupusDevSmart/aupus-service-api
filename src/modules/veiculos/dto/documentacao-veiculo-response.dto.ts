@@ -1,5 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { TipoDocumentacaoVeiculo } from '@prisma/client';
+import { TipoDocumentacaoVeiculo } from '@aupus/api-shared';
 
 export class DocumentacaoVeiculoResponseDto {
   @ApiProperty({

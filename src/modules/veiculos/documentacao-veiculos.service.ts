@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException, BadRequestException, ConflictException } from '@nestjs/common';
 import { PrismaService } from '@aupus/api-shared';
-import { TipoDocumentacaoVeiculo } from '@prisma/client';
+import { TipoDocumentacaoVeiculo } from '@aupus/api-shared';
 import * as path from 'path';
 import * as fs from 'fs';
 

@@ -1,6 +1,6 @@
 // src/modules/planos-manutencao/dto/update-status.dto.ts
 import { IsEnum, IsOptional, IsString } from 'class-validator';
-import { StatusPlano } from '@prisma/client';
+import { StatusPlano } from '@aupus/api-shared';
 
 export class UpdateStatusPlanoDto {
   @IsEnum(StatusPlano)

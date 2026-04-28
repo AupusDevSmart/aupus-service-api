@@ -1,7 +1,7 @@
 import { IsEnum, IsOptional, IsString, IsDate } from 'class-validator';
 import { Type } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { StatusVeiculo } from '@prisma/client';
+import { StatusVeiculo } from '@aupus/api-shared';
 
 export class AlterarStatusVeiculoDto {
   @ApiProperty({

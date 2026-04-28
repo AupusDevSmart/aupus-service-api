@@ -1,7 +1,7 @@
 import { IsOptional, IsEnum, IsUUID, IsDateString, IsString, IsNumber, IsBoolean, Min, Length } from 'class-validator';
 import { Type } from 'class-transformer';
 import { ApiPropertyOptional } from '@nestjs/swagger';
-import { StatusOS, TipoOS, PrioridadeOS } from '@prisma/client';
+import { StatusOS, TipoOS, PrioridadeOS } from '@aupus/api-shared';
 
 export class OSFiltersDto {
   @ApiPropertyOptional({ description: 'Página', example: 1 })

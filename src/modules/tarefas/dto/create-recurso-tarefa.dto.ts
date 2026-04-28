@@ -1,6 +1,6 @@
 // src/modules/tarefas/dto/create-recurso-tarefa.dto.ts
 import { IsString, IsNotEmpty, IsEnum, IsOptional, IsBoolean, IsDecimal } from 'class-validator';
-import { TipoRecurso } from '@prisma/client';
+import { TipoRecurso } from '@aupus/api-shared';
 import { Type, Transform } from 'class-transformer';
 
 export class CreateRecursoTarefaDto {

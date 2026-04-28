@@ -4,7 +4,7 @@ import {
   TipoSolicitacaoServico,
   PrioridadeSolicitacao,
   OrigemSolicitacao
-} from '@prisma/client';
+} from '@aupus/api-shared';
 
 export class SolicitacaoResponseDto {
   @ApiProperty()

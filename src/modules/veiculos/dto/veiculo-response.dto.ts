@@ -1,4 +1,4 @@
-import { StatusVeiculo, TipoVeiculo, TipoCombustivel } from '@prisma/client';
+import { StatusVeiculo, TipoVeiculo, TipoCombustivel } from '@aupus/api-shared';
 
 export class DocumentacaoResumoDto {
   id: string;

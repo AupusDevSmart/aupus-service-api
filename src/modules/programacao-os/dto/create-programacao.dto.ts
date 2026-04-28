@@ -14,7 +14,7 @@ import {
 } from 'class-validator';
 import { Type } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { CondicaoOS, TipoOS, PrioridadeOS, OrigemOS } from '@prisma/client';
+import { CondicaoOS, TipoOS, PrioridadeOS, OrigemOS } from '@aupus/api-shared';
 
 export class MaterialProgramacaoDto {
   @ApiProperty({ description: 'Descrição do material', example: 'Óleo lubrificante SAE 20W-50' })

@@ -1,7 +1,7 @@
 // src/modules/instrucoes/dto/adicionar-ao-plano.dto.ts
 import { IsString, IsNotEmpty, IsEnum, IsOptional, IsInt, Min } from 'class-validator';
 import { Type } from 'class-transformer';
-import { FrequenciaTarefa } from '@prisma/client';
+import { FrequenciaTarefa } from '@aupus/api-shared';
 
 export class AdicionarAoPlanoDto {
   @IsString()

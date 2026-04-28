@@ -7,7 +7,7 @@ import {
   ConfiguracaoDiasUteisResponseDto,
   AssociarPlantasDto
 } from './dto';
-import { Prisma } from '@prisma/client';
+import { Prisma } from '@aupus/api-shared';
 
 export interface PaginatedResponse<T> {
   data: T[];

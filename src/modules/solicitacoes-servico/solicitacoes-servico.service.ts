@@ -15,10 +15,10 @@ import {
   SolicitacaoStatsDto,
   AdicionarComentarioDto,
 } from './dto';
-import { Prisma } from '@prisma/client';
+import { Prisma } from '@aupus/api-shared';
 
 // Import the enum from Prisma
-import { StatusSolicitacaoServico } from '@prisma/client';
+import { StatusSolicitacaoServico } from '@aupus/api-shared';
 
 @Injectable()
 export class SolicitacoesServicoService {

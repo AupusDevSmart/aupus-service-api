@@ -1,6 +1,6 @@
 import { IsOptional, IsEnum, IsInt, Min, Max, IsBoolean } from 'class-validator';
 import { Transform, Type } from 'class-transformer';
-import { StatusPlano } from '@prisma/client';
+import { StatusPlano } from '@aupus/api-shared';
 
 export class QueryPlanosPorPlantaDto {
   @IsOptional()

@@ -1,6 +1,6 @@
 // src/modules/planos-manutencao/helpers/planos-manutencao.helpers.ts
 import { BadRequestException } from '@nestjs/common';
-import { StatusPlano } from '@prisma/client';
+import { StatusPlano } from '@aupus/api-shared';
 
 /**
  * Converte string de data para objeto Date
