@@ -1,10 +1,10 @@
 // src/modules/tarefas/tarefas.service.ts
-import { Injectable, NotFoundException, BadRequestException, ConflictException } from '@nestjs/common';
-import { PrismaService } from '@aupus/api-shared';
-import { 
-  CreateTarefaDto, 
-  UpdateTarefaDto, 
-  QueryTarefasDto, 
+import { Injectable, NotFoundException, BadRequestException, ConflictException, ForbiddenException } from '@nestjs/common';
+import { PrismaService, PermissionScopeService, ScopedUser } from '@aupus/api-shared';
+import {
+  CreateTarefaDto,
+  UpdateTarefaDto,
+  QueryTarefasDto,
   ReordenarTarefaDto,
   UpdateStatusTarefaDto,
   TarefaResponseDto,
@@ -14,7 +14,23 @@ import { StatusTarefa, Prisma } from '@aupus/api-shared';
 
 @Injectable()
 export class TarefasService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly scopeService: PermissionScopeService,
+  ) {}
+
+  /** Retorna fragmento `where` para tarefas restringindo ao escopo de plantas. */
+  private async scopeFragment(user?: ScopedUser): Promise<Prisma.tarefasWhereInput | undefined> {
+    const scope = await this.scopeService.getScope(user);
+    if (!this.scopeService.isScoped(scope)) return undefined;
+    if (scope.length === 0) return { id: '__NEVER__' };
+    return {
+      OR: [
+        { planta_id: { in: scope } },
+        { equipamento: { unidade: { planta_id: { in: scope } } } },
+      ],
+    };
+  }
 
   async criar(createDto: CreateTarefaDto): Promise<TarefaResponseDto> {
     let plano = null;
@@ -113,7 +129,7 @@ export class TarefasService {
     return this.buscarPorId(tarefa.id);
   }
 
-  async listar(queryDto: QueryTarefasDto): Promise<{
+  async listar(queryDto: QueryTarefasDto, user?: ScopedUser): Promise<{
     data: TarefaResponseDto[];
     total: number;
     page: number;
@@ -127,9 +143,11 @@ export class TarefasService {
     console.log('🔍 [TAREFAS] Filtro status_atrasada recebido:', status_atrasada, 'tipo:', typeof status_atrasada);
 
     // Construir filtros
+    const scopeFragment = await this.scopeFragment(user);
     const where: Prisma.tarefasWhereInput = {
       deleted_at: null,
-      ...this.construirFiltros(filters, search)
+      ...this.construirFiltros(filters, search),
+      ...(scopeFragment && { AND: [scopeFragment] }),
     };
 
     // Construir ordenação
@@ -192,7 +210,8 @@ export class TarefasService {
     };
   }
 
-  async buscarPorId(id: string): Promise<TarefaResponseDto> {
+  async buscarPorId(id: string, user?: ScopedUser): Promise<TarefaResponseDto> {
+    if (user) await this.scopeService.assertEntityInScope('tarefa', id, user);
     const inicio = Date.now();
 
     // ✅ OTIMIZADO: Buscar tarefa e relacionamentos em paralelo
@@ -274,13 +293,15 @@ export class TarefasService {
     return this.mapearParaResponse(tarefaCompleta);
   }
 
-  async listarPorPlano(planoId: string, queryDto?: Partial<QueryTarefasDto>): Promise<TarefaResponseDto[]> {
+  async listarPorPlano(planoId: string, queryDto?: Partial<QueryTarefasDto>, user?: ScopedUser): Promise<TarefaResponseDto[]> {
     // Verificar se plano existe
     await this.verificarPlanoExiste(planoId);
 
+    const scopeFragment = await this.scopeFragment(user);
     const where: Prisma.tarefasWhereInput = {
       plano_manutencao_id: planoId,
       deleted_at: null,
+      ...(scopeFragment && { AND: [scopeFragment] }),
       ...(queryDto && this.construirFiltros(queryDto))
     };
 
@@ -293,11 +314,14 @@ export class TarefasService {
     return tarefas.map(tarefa => this.mapearParaResponse(tarefa));
   }
 
-  async listarPorEquipamento(equipamentoId: string, queryDto?: Partial<QueryTarefasDto>): Promise<TarefaResponseDto[]> {
+  async listarPorEquipamento(equipamentoId: string, queryDto?: Partial<QueryTarefasDto>, user?: ScopedUser): Promise<TarefaResponseDto[]> {
+    if (user) await this.scopeService.assertEntityInScope('equipamento', equipamentoId, user);
+    const scopeFragment = await this.scopeFragment(user);
     const where: Prisma.tarefasWhereInput = {
       equipamento_id: equipamentoId,
       deleted_at: null,
-      ...(queryDto && this.construirFiltros(queryDto))
+      ...(queryDto && this.construirFiltros(queryDto)),
+      ...(scopeFragment && { AND: [scopeFragment] }),
     };
 
     const tarefas = await this.prisma.tarefas.findMany({
@@ -309,7 +333,7 @@ export class TarefasService {
     return tarefas.map(tarefa => this.mapearParaResponse(tarefa));
   }
 
-  async listarSemPlano(queryDto?: Partial<QueryTarefasDto>): Promise<{
+  async listarSemPlano(queryDto?: Partial<QueryTarefasDto>, user?: ScopedUser): Promise<{
     data: TarefaResponseDto[];
     total: number;
     page: number;
@@ -320,10 +344,12 @@ export class TarefasService {
     const limit = queryDto?.limit || 10;
     const skip = (page - 1) * limit;
 
+    const scopeFragment = await this.scopeFragment(user);
     const where: Prisma.tarefasWhereInput = {
       plano_manutencao_id: null,
       deleted_at: null,
-      ...(queryDto && this.construirFiltros(queryDto, queryDto.search))
+      ...(queryDto && this.construirFiltros(queryDto, queryDto.search)),
+      ...(scopeFragment && { AND: [scopeFragment] }),
     };
 
     const [tarefas, total] = await Promise.all([
@@ -346,7 +372,8 @@ export class TarefasService {
     };
   }
 
-  async atualizar(id: string, updateDto: UpdateTarefaDto): Promise<TarefaResponseDto> {
+  async atualizar(id: string, updateDto: UpdateTarefaDto, user?: ScopedUser): Promise<TarefaResponseDto> {
+    if (user) await this.scopeService.assertEntityInScope('tarefa', id, user);
     const tarefaExistente = await this.verificarTarefaExiste(id);
 
     // Se mudou TAG, verificar unicidade
@@ -438,7 +465,8 @@ export class TarefasService {
     return this.buscarPorId(tarefa.id);
   }
 
-  async atualizarStatus(id: string, updateStatusDto: UpdateStatusTarefaDto): Promise<TarefaResponseDto> {
+  async atualizarStatus(id: string, updateStatusDto: UpdateStatusTarefaDto, user?: ScopedUser): Promise<TarefaResponseDto> {
+    if (user) await this.scopeService.assertEntityInScope('tarefa', id, user);
     await this.verificarTarefaExiste(id);
 
     const tarefa = await this.prisma.tarefas.update({
@@ -454,7 +482,8 @@ export class TarefasService {
     return this.buscarPorId(tarefa.id);
   }
 
-  async reordenar(id: string, reordenarDto: ReordenarTarefaDto): Promise<TarefaResponseDto> {
+  async reordenar(id: string, reordenarDto: ReordenarTarefaDto, user?: ScopedUser): Promise<TarefaResponseDto> {
+    if (user) await this.scopeService.assertEntityInScope('tarefa', id, user);
     const tarefa = await this.verificarTarefaExiste(id);
 
     // Verificar se nova ordem está disponível
@@ -471,7 +500,8 @@ export class TarefasService {
     return this.buscarPorId(tarefaAtualizada.id);
   }
 
-  async remover(id: string): Promise<void> {
+  async remover(id: string, user?: ScopedUser): Promise<void> {
+    if (user) await this.scopeService.assertEntityInScope('tarefa', id, user);
     await this.verificarTarefaExiste(id);
 
     // Soft delete

@@ -14,7 +14,7 @@ import {
   Request
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiQuery } from '@nestjs/swagger';
-import { Permissions } from '@aupus/api-shared';
+import { Permissions, CurrentUser } from '@aupus/api-shared';
 import { VeiculosService } from './veiculos.service';
 import {
   CreateVeiculoDto,
@@ -48,9 +48,10 @@ export class VeiculosController {
     description: 'Conflito - placa, chassi ou código patrimonial já existe'
   })
   async criarVeiculo(
-    @Body() createDto: CreateVeiculoDto
+    @Body() createDto: CreateVeiculoDto,
+    @CurrentUser() user?: any,
   ): Promise<VeiculoResponseDto> {
-    return this.veiculosService.criar(createDto);
+    return this.veiculosService.criar(createDto, user);
   }
 
   @Get()
@@ -74,8 +75,8 @@ export class VeiculosController {
   @ApiQuery({ name: 'apenasDisponiveis', required: false, type: Boolean, description: 'Apenas veículos disponíveis para reserva' })
   @ApiQuery({ name: 'orderBy', required: false, enum: ['nome', 'placa', 'marca', 'modelo', 'anoFabricacao', 'quilometragem', 'criadoEm'] })
   @ApiQuery({ name: 'orderDirection', required: false, enum: ['asc', 'desc'] })
-  async listarVeiculos(@Query() queryDto: QueryVeiculosDto) {
-    return this.veiculosService.buscarTodos(queryDto);
+  async listarVeiculos(@Query() queryDto: QueryVeiculosDto, @CurrentUser() user?: any) {
+    return this.veiculosService.buscarTodos(queryDto, user);
   }
 
   @Get('disponiveis')
@@ -88,8 +89,8 @@ export class VeiculosController {
     status: 400,
     description: 'Parâmetros inválidos'
   })
-  async buscarVeiculosDisponiveis(@Query() queryDto: VeiculosDisponiveisDto) {
-    return this.veiculosService.buscarDisponiveis(queryDto);
+  async buscarVeiculosDisponiveis(@Query() queryDto: VeiculosDisponiveisDto, @CurrentUser() user?: any) {
+    return this.veiculosService.buscarDisponiveis(queryDto, user);
   }
 
   @Get(':id')
@@ -103,8 +104,8 @@ export class VeiculosController {
     status: 404,
     description: 'Veículo não encontrado'
   })
-  async buscarVeiculoPorId(@Param('id') id: string): Promise<VeiculoResponseDto> {
-    return this.veiculosService.buscarPorId(id);
+  async buscarVeiculoPorId(@Param('id') id: string, @CurrentUser() user?: any): Promise<VeiculoResponseDto> {
+    return this.veiculosService.buscarPorId(id, user);
   }
 
   @Put(':id')
@@ -128,9 +129,10 @@ export class VeiculosController {
   })
   async atualizarVeiculo(
     @Param('id') id: string,
-    @Body() updateDto: UpdateVeiculoDto
+    @Body() updateDto: UpdateVeiculoDto,
+    @CurrentUser() user?: any,
   ): Promise<VeiculoResponseDto> {
-    return this.veiculosService.atualizar(id, updateDto);
+    return this.veiculosService.atualizar(id, updateDto, user);
   }
 
   @Patch(':id/status')
@@ -154,11 +156,15 @@ export class VeiculosController {
   })
   async alterarStatus(
     @Param('id') id: string,
-    @Body() alterarStatusDto: AlterarStatusVeiculoDto
+    @Body() alterarStatusDto: AlterarStatusVeiculoDto,
+    @CurrentUser() user?: any,
   ): Promise<VeiculoResponseDto> {
     return this.veiculosService.alterarStatus(
       id,
-      alterarStatusDto
+      alterarStatusDto,
+      undefined,
+      undefined,
+      user,
     );
   }
 
@@ -179,11 +185,15 @@ export class VeiculosController {
   })
   async inativarVeiculo(
     @Param('id') id: string,
-    @Body() inativarDto: InativarVeiculoDto
+    @Body() inativarDto: InativarVeiculoDto,
+    @CurrentUser() user?: any,
   ): Promise<void> {
     return this.veiculosService.inativar(
       id,
-      inativarDto
+      inativarDto,
+      undefined,
+      undefined,
+      user,
     );
   }
 }

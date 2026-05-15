@@ -14,7 +14,7 @@ import {
   ParseUUIDPipe
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiParam, ApiQuery } from '@nestjs/swagger';
-import { Permissions } from '@aupus/api-shared';
+import { Permissions, CurrentUser } from '@aupus/api-shared';
 import { PlanosManutencaoService } from './planos-manutencao.service';
 import {
   CreatePlanoManutencaoDto,
@@ -55,9 +55,10 @@ export class PlanosManutencaoController {
     description: 'Equipamento não encontrado' 
   })
   async criar(
-    @Body() createDto: CreatePlanoManutencaoDto
+    @Body() createDto: CreatePlanoManutencaoDto,
+    @CurrentUser() user?: any,
   ): Promise<PlanoManutencaoResponseDto> {
-    return this.planosManutencaoService.criar(createDto);
+    return this.planosManutencaoService.criar(createDto, user);
   }
 
   @Get()
@@ -79,8 +80,8 @@ export class PlanosManutencaoController {
       }
     }
   })
-  async listar(@Query() queryDto: QueryPlanosDto) {
-    return this.planosManutencaoService.listar(queryDto);
+  async listar(@Query() queryDto: QueryPlanosDto, @CurrentUser() user?: any) {
+    return this.planosManutencaoService.listar(queryDto, user);
   }
 
   @Get('dashboard')
@@ -144,9 +145,10 @@ export class PlanosManutencaoController {
   })
   async buscarPorPlanta(
     @Param('plantaId') plantaId: string,
-    @Query() queryDto: QueryPlanosPorPlantaDto
+    @Query() queryDto: QueryPlanosPorPlantaDto,
+    @CurrentUser() user?: any,
   ) {
-    return this.planosManutencaoService.buscarPorPlanta(plantaId, queryDto);
+    return this.planosManutencaoService.buscarPorPlanta(plantaId, queryDto, user);
   }
 
   @Get('por-unidade/:unidadeId')
@@ -199,9 +201,10 @@ export class PlanosManutencaoController {
   })
   async buscarPorUnidade(
     @Param('unidadeId') unidadeId: string,
-    @Query() queryDto: QueryPlanosPorPlantaDto
+    @Query() queryDto: QueryPlanosPorPlantaDto,
+    @CurrentUser() user?: any,
   ) {
-    return this.planosManutencaoService.buscarPorUnidade(unidadeId, queryDto);
+    return this.planosManutencaoService.buscarPorUnidade(unidadeId, queryDto, user);
   }
 
   @Get('por-equipamento/:equipamentoId')
@@ -217,9 +220,10 @@ export class PlanosManutencaoController {
     description: 'Equipamento não possui plano de manutenção' 
   })
   async buscarPorEquipamento(
-    @Param('equipamentoId') equipamentoId: string
+    @Param('equipamentoId') equipamentoId: string,
+    @CurrentUser() user?: any,
   ): Promise<PlanoManutencaoResponseDto> {
-    return this.planosManutencaoService.buscarPorEquipamento(equipamentoId);
+    return this.planosManutencaoService.buscarPorEquipamento(equipamentoId, user);
   }
 
   @Get(':id')
@@ -242,10 +246,11 @@ export class PlanosManutencaoController {
   })
   async buscarPorId(
     @Param('id') id: string,
-    @Query('incluirTarefas') incluirTarefas?: string
+    @CurrentUser() user?: any,
+    @Query('incluirTarefas') incluirTarefas?: string,
   ): Promise<PlanoManutencaoResponseDto> {
     const incluir = incluirTarefas === 'true';
-    return this.planosManutencaoService.buscarPorId(id, incluir);
+    return this.planosManutencaoService.buscarPorId(id, incluir, user);
   }
 
   @Get(':id/resumo')
@@ -284,9 +289,10 @@ export class PlanosManutencaoController {
   })
   async atualizar(
     @Param('id') id: string,
-    @Body() updateDto: UpdatePlanoManutencaoDto
+    @Body() updateDto: UpdatePlanoManutencaoDto,
+    @CurrentUser() user?: any,
   ): Promise<PlanoManutencaoResponseDto> {
-    return this.planosManutencaoService.atualizar(id, updateDto);
+    return this.planosManutencaoService.atualizar(id, updateDto, user);
   }
 
   @Put(':id/status')
@@ -303,9 +309,10 @@ export class PlanosManutencaoController {
   })
   async atualizarStatus(
     @Param('id') id: string,
-    @Body() updateStatusDto: UpdateStatusPlanoDto
+    @Body() updateStatusDto: UpdateStatusPlanoDto,
+    @CurrentUser() user?: any,
   ): Promise<PlanoManutencaoResponseDto> {
-    return this.planosManutencaoService.atualizarStatus(id, updateStatusDto);
+    return this.planosManutencaoService.atualizarStatus(id, updateStatusDto, user);
   }
 
   @Post(':id/duplicar')
@@ -327,9 +334,10 @@ export class PlanosManutencaoController {
   })
   async duplicar(
     @Param('id') id: string,
-    @Body() duplicarDto: DuplicarPlanoDto
+    @Body() duplicarDto: DuplicarPlanoDto,
+    @CurrentUser() user?: any,
   ): Promise<PlanoManutencaoResponseDto> {
-    return this.planosManutencaoService.duplicar(id, duplicarDto);
+    return this.planosManutencaoService.duplicar(id, duplicarDto, user);
   }
 
   @Post(':id/clonar-lote')
@@ -398,8 +406,9 @@ export class PlanosManutencaoController {
     description: 'Plano não encontrado' 
   })
   async remover(
-    @Param('id') id: string
+    @Param('id') id: string,
+    @CurrentUser() user?: any,
   ): Promise<void> {
-    return this.planosManutencaoService.remover(id);
+    return this.planosManutencaoService.remover(id, user);
   }
 }

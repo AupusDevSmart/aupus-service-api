@@ -83,8 +83,8 @@ export class ExecucaoOSController {
   @ApiQuery({ name: 'data_inicio', required: false, description: 'Data início (YYYY-MM-DD)' })
   @ApiQuery({ name: 'data_fim', required: false, description: 'Data fim (YYYY-MM-DD)' })
   @ApiQuery({ name: 'atrasadas', required: false, description: 'Filtrar apenas OS atrasadas' })
-  async listar(@Query() filters: OSFiltersDto): Promise<ListarOSResponseDto> {
-    return this.execucaoOSService.listar(filters);
+  async listar(@Query() filters: OSFiltersDto, @CurrentUser() user?: any): Promise<ListarOSResponseDto> {
+    return this.execucaoOSService.listar(filters, user);
   }
 
   @Get(':id')
@@ -102,8 +102,8 @@ export class ExecucaoOSController {
     status: HttpStatus.NOT_FOUND,
     description: 'OS não encontrada',
   })
-  async buscarPorId(@Param('id') id: string): Promise<OrdemServicoDetalhesResponseDto> {
-    return this.execucaoOSService.buscarPorId(id.trim());
+  async buscarPorId(@Param('id') id: string, @CurrentUser() user?: any): Promise<OrdemServicoDetalhesResponseDto> {
+    return this.execucaoOSService.buscarPorId(id.trim(), user);
   }
 
   @Patch(':id/iniciar')
@@ -119,7 +119,7 @@ export class ExecucaoOSController {
     @Body() dto: IniciarExecucaoDto,
     @CurrentUser() user?: any,
   ): Promise<{ message: string }> {
-    await this.execucaoOSService.iniciar(id.trim(), dto, user?.id);
+    await this.execucaoOSService.iniciar(id.trim(), dto, user?.id, user);
     return { message: 'Execução iniciada com sucesso' };
   }
 
@@ -142,7 +142,7 @@ export class ExecucaoOSController {
     @Body() dto: PausarExecucaoDto,
     @CurrentUser() user?: any,
   ): Promise<{ message: string }> {
-    await this.execucaoOSService.pausar(id.trim(), dto, user?.id);
+    await this.execucaoOSService.pausar(id.trim(), dto, user?.id, user);
     return { message: 'Execução pausada' };
   }
 
@@ -165,7 +165,7 @@ export class ExecucaoOSController {
     @Body() dto: RetomarExecucaoDto,
     @CurrentUser() user?: any,
   ): Promise<{ message: string }> {
-    await this.execucaoOSService.retomar(id.trim(), dto, user?.id);
+    await this.execucaoOSService.retomar(id.trim(), dto, user?.id, user);
     return { message: 'Execução retomada' };
   }
 
@@ -397,7 +397,7 @@ export class ExecucaoOSController {
   }
 
   @Patch(':id/executar')
-  @Permissions('execucao_os.manage')
+  @Permissions('execucao_os.manage', 'execucao_os.executar')
   @ApiOperation({
     summary: 'Marcar OS como executada',
     description: 'EM_EXECUCAO/PAUSADA → EXECUTADA, registra resultados da execução',
@@ -410,7 +410,7 @@ export class ExecucaoOSController {
     @Body() dto: ExecutarOSDto,
     @CurrentUser() user?: any,
   ): Promise<{ message: string }> {
-    await this.execucaoOSService.executar(id.trim(), dto, user?.id);
+    await this.execucaoOSService.executar(id.trim(), dto, user?.id, user);
     return { message: 'OS marcada como executada' };
   }
 
@@ -428,7 +428,7 @@ export class ExecucaoOSController {
     @Body() dto: AuditarOSDto,
     @CurrentUser() user?: any,
   ): Promise<{ message: string }> {
-    await this.execucaoOSService.auditar(id.trim(), dto, user?.id);
+    await this.execucaoOSService.auditar(id.trim(), dto, user?.id, user);
     return { message: 'OS auditada com sucesso' };
   }
 
@@ -446,7 +446,7 @@ export class ExecucaoOSController {
     @Body() dto: ReabrirOSDto,
     @CurrentUser() user?: any,
   ): Promise<{ message: string }> {
-    await this.execucaoOSService.reabrir(id.trim(), dto, user?.id);
+    await this.execucaoOSService.reabrir(id.trim(), dto, user?.id, user);
     return { message: 'OS reaberta para execução' };
   }
 
@@ -464,7 +464,7 @@ export class ExecucaoOSController {
     @Body() dto: FinalizarOSDto,
     @CurrentUser() user?: any,
   ): Promise<{ message: string }> {
-    await this.execucaoOSService.finalizar(id.trim(), dto, user?.id);
+    await this.execucaoOSService.finalizar(id.trim(), dto, user?.id, user);
     return { message: 'OS finalizada com sucesso' };
   }
 
@@ -482,7 +482,7 @@ export class ExecucaoOSController {
     @Body() dto: CancelarOSDto,
     @CurrentUser() user?: any,
   ): Promise<{ message: string }> {
-    await this.execucaoOSService.cancelar(id.trim(), dto, user?.id);
+    await this.execucaoOSService.cancelar(id.trim(), dto, user?.id, user);
     return { message: 'OS cancelada' };
   }
 

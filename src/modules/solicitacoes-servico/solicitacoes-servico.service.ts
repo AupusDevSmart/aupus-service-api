@@ -3,9 +3,10 @@ import {
   NotFoundException,
   BadRequestException,
   ConflictException,
+  ForbiddenException,
   Logger,
 } from '@nestjs/common';
-import { PrismaService } from '@aupus/api-shared';
+import { PrismaService, PermissionScopeService, ScopedUser } from '@aupus/api-shared';
 import {
   CreateSolicitacaoDto,
   UpdateSolicitacaoDto,
@@ -24,7 +25,10 @@ import { StatusSolicitacaoServico } from '@aupus/api-shared';
 export class SolicitacoesServicoService {
   private readonly logger = new Logger(SolicitacoesServicoService.name);
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly scopeService: PermissionScopeService,
+  ) {}
 
   /**
    * Mapear solicitação do Prisma para DTO
@@ -98,6 +102,7 @@ export class SolicitacoesServicoService {
   async create(
     createDto: CreateSolicitacaoDto,
     usuarioId?: string,
+    user?: ScopedUser,
   ): Promise<SolicitacaoResponseDto> {
     return await this.prisma.$transaction(async (prisma) => {
       // Gerar número único
@@ -149,6 +154,9 @@ export class SolicitacoesServicoService {
       if (!plantaExiste) {
         throw new NotFoundException(`Planta com ID ${planta_id} não encontrada ou foi deletada`);
       }
+
+      // Scope RBAC: a planta da solicitacao deve estar no escopo do usuario
+      if (user) await this.scopeService.assertPlantaInScope(planta_id, user);
 
       // Extrair campos que não são colunas da tabela antes de criar
       const { instrucoes_ids, tarefas_ids, ...createData } = createDto as any;
@@ -219,6 +227,7 @@ export class SolicitacoesServicoService {
    */
   async findAll(
     filters: SolicitacaoFiltersDto,
+    user?: ScopedUser,
   ): Promise<ListarSolicitacoesResponseDto> {
     const {
       page = 1,
@@ -271,6 +280,16 @@ export class SolicitacoesServicoService {
       where.data_solicitacao = {};
       if (data_inicio) where.data_solicitacao.gte = new Date(data_inicio);
       if (data_fim) where.data_solicitacao.lte = new Date(data_fim);
+    }
+
+    // Scope RBAC: filtrar por planta do escopo
+    const scope = await this.scopeService.getScope(user);
+    if (this.scopeService.isScoped(scope)) {
+      if (scope.length === 0) {
+        where.AND = [{ id: '__NEVER__' }];
+      } else {
+        where.AND = [{ planta_id: { in: scope } }];
+      }
     }
 
     // Contar total
@@ -365,7 +384,8 @@ export class SolicitacoesServicoService {
   /**
    * Buscar solicitação por ID
    */
-  async findOne(id: string): Promise<SolicitacaoResponseDto> {
+  async findOne(id: string, user?: ScopedUser): Promise<SolicitacaoResponseDto> {
+    if (user) await this.scopeService.assertEntityInScope('solicitacao_servico', id, user);
     const solicitacao = await this.prisma.solicitacoes_servico.findUnique({
       where: { id },
       include: {
@@ -479,8 +499,9 @@ export class SolicitacoesServicoService {
     id: string,
     updateDto: UpdateSolicitacaoDto,
     usuarioId?: string,
+    user?: ScopedUser,
   ): Promise<SolicitacaoResponseDto> {
-    const solicitacao = await this.findOne(id);
+    const solicitacao = await this.findOne(id, user);
 
     // Verificar se pode ser editada
     if (solicitacao.status !== 'REGISTRADA') {

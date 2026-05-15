@@ -4,7 +4,7 @@ import { PrismaService, PermissionScopeService, PlantaScope } from '@aupus/api-s
 import { CreateAnomaliaDto, UpdateAnomaliaDto, AnomaliaFiltersDto, AnomaliaStatsDto } from './dto';
 import { Prisma } from '@aupus/api-shared';
 
-type UserCtx = { id: string; role?: string | null } | undefined;
+type UserCtx = { id: string; role?: string | null; permissions?: string[] } | undefined;
 
 @Injectable()
 export class AnomaliasService {
@@ -248,6 +248,9 @@ export class AnomaliasService {
     const anomalia = await this.findOne(id, user);
     const userId = user?.id;
 
+    // Ownership: quem so tem manage_own (sem manage) so edita o que reportou
+    this.assertManageOrOwnership(user, anomalia.usuario_id);
+
     if (anomalia.status !== 'REGISTRADA') {
       throw new ConflictException('Apenas anomalias registradas podem ser editadas');
     }
@@ -295,6 +298,9 @@ export class AnomaliasService {
   async remove(id: string, user?: UserCtx) {
     const anomalia = await this.findOne(id, user);
     const userId = user?.id;
+
+    // Ownership: quem so tem manage_own (sem manage) so remove o que reportou
+    this.assertManageOrOwnership(user, anomalia.usuario_id);
 
     if (anomalia.status !== 'REGISTRADA') {
       throw new ConflictException('Apenas anomalias registradas podem ser excluídas');
@@ -376,6 +382,21 @@ export class AnomaliasService {
     });
 
     this.logger.log(`Anomalia ${id} voltou para registrada`);
+  }
+
+  /**
+   * Quando o usuario nao tem `anomalias.manage`, exige que ele seja o autor da anomalia
+   * (anomalias.manage_own). Sem permissions na sessao -> deixa passar (caller ja confiou no guard).
+   */
+  private assertManageOrOwnership(user: UserCtx, ownerId: string | null | undefined): void {
+    const perms = user?.permissions;
+    if (!perms) return;
+    if (perms.includes('anomalias.manage')) return;
+    if (!perms.includes('anomalias.manage_own')) return; // guard ja teria barrado
+    const uid = user?.id?.trim();
+    if (!uid || ownerId?.trim() !== uid) {
+      throw new ForbiddenException('Voce so pode editar anomalias que reportou');
+    }
   }
 
   /**

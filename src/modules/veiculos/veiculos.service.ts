@@ -1,5 +1,5 @@
-import { Injectable, NotFoundException, BadRequestException, ConflictException } from '@nestjs/common';
-import { PrismaService } from '@aupus/api-shared';
+import { Injectable, NotFoundException, BadRequestException, ConflictException, ForbiddenException } from '@nestjs/common';
+import { PrismaService, PermissionScopeService, ScopedUser } from '@aupus/api-shared';
 import {
   CreateVeiculoDto,
   UpdateVeiculoDto,
@@ -23,9 +23,27 @@ export interface PaginatedResponse<T> {
 
 @Injectable()
 export class VeiculosService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly scopeService: PermissionScopeService,
+  ) {}
 
-  async criar(createDto: CreateVeiculoDto): Promise<VeiculoResponseDto> {
+  /** Aplica scope no `where` de veiculos. Veiculos com planta_id NULL sao "globais" e nao aparecem para users escopados. */
+  private async applyScope(where: Prisma.veiculoWhereInput, user?: ScopedUser): Promise<void> {
+    const scope = await this.scopeService.getScope(user);
+    if (!this.scopeService.isScoped(scope)) return;
+    if (scope.length === 0) {
+      (where as any).id = '__NEVER__';
+      return;
+    }
+    (where as any).planta_id = { in: scope };
+  }
+
+  async criar(createDto: CreateVeiculoDto, user?: ScopedUser): Promise<VeiculoResponseDto> {
+    // Scope RBAC: planta_id deve estar no escopo (ou usuario sem scope)
+    if (user && createDto.plantaId) {
+      await this.scopeService.assertPlantaInScope(createDto.plantaId, user);
+    }
     // Verificar se placa já existe
     const placaExistente = await this.prisma.veiculo.findUnique({
       where: { placa: createDto.placa }
@@ -103,7 +121,7 @@ export class VeiculosService {
     return this.mapearParaResponse(veiculo);
   }
 
-  async buscarTodos(queryDto: QueryVeiculosDto): Promise<PaginatedResponse<VeiculoResponseDto>> {
+  async buscarTodos(queryDto: QueryVeiculosDto, user?: ScopedUser): Promise<PaginatedResponse<VeiculoResponseDto>> {
     const { page, limit, search, status, tipo, tipoCombustivel, plantaId, responsavel, ativo, marca, anoFabricacao, capacidadeMinima, apenasDisponiveis, orderBy, orderDirection } = queryDto;
 
     const skip = (page - 1) * limit;
@@ -138,6 +156,9 @@ export class VeiculosService {
       })
     };
 
+    // Scope RBAC
+    await this.applyScope(where, user);
+
     // Ordenação
     const orderByClause = this.buildOrderBy(orderBy, orderDirection);
 
@@ -171,7 +192,7 @@ export class VeiculosService {
     };
   }
 
-  async buscarPorId(id: string): Promise<VeiculoResponseDto> {
+  async buscarPorId(id: string, user?: ScopedUser): Promise<VeiculoResponseDto> {
     const veiculo = await this.prisma.veiculo.findUnique({
       where: { id },
       include: {
@@ -208,10 +229,13 @@ export class VeiculosService {
       throw new NotFoundException(`Veículo com ID ${id} não encontrado`);
     }
 
+    // Scope RBAC: veiculos com planta_id NULL ou fora do escopo -> 403 para users escopados
+    await this.scopeService.assertPlantaInScope(veiculo.planta_id, user);
+
     return this.mapearParaResponse(veiculo);
   }
 
-  async atualizar(id: string, updateDto: UpdateVeiculoDto): Promise<VeiculoResponseDto> {
+  async atualizar(id: string, updateDto: UpdateVeiculoDto, user?: ScopedUser): Promise<VeiculoResponseDto> {
     const veiculoExistente = await this.prisma.veiculo.findUnique({
       where: { id },
       include: {
@@ -223,6 +247,12 @@ export class VeiculosService {
 
     if (!veiculoExistente) {
       throw new NotFoundException(`Veículo com ID ${id} não encontrado`);
+    }
+
+    // Scope RBAC
+    await this.scopeService.assertPlantaInScope(veiculoExistente.planta_id, user);
+    if (user && updateDto.plantaId !== undefined && updateDto.plantaId !== veiculoExistente.planta_id) {
+      await this.scopeService.assertPlantaInScope(updateDto.plantaId, user);
     }
 
     // Verificar se tem reservas ativas antes de alterar campos críticos
@@ -291,7 +321,7 @@ export class VeiculosService {
     return this.mapearParaResponse(veiculo);
   }
 
-  async inativar(id: string, inativarDto: InativarVeiculoDto, inativadoPor?: string, inativadoPorId?: string): Promise<void> {
+  async inativar(id: string, inativarDto: InativarVeiculoDto, inativadoPor?: string, inativadoPorId?: string, user?: ScopedUser): Promise<void> {
     const veiculo = await this.prisma.veiculo.findUnique({
       where: { id },
       include: {
@@ -304,6 +334,8 @@ export class VeiculosService {
     if (!veiculo) {
       throw new NotFoundException(`Veículo com ID ${id} não encontrado`);
     }
+
+    await this.scopeService.assertPlantaInScope(veiculo.planta_id, user);
 
     if (veiculo.reservas.length > 0) {
       throw new ConflictException('Não é possível inativar veículo com reservas ativas');
@@ -337,7 +369,7 @@ export class VeiculosService {
     });
   }
 
-  async alterarStatus(id: string, alterarStatusDto: AlterarStatusVeiculoDto, alteradoPor?: string, alteradoPorId?: string): Promise<VeiculoResponseDto> {
+  async alterarStatus(id: string, alterarStatusDto: AlterarStatusVeiculoDto, alteradoPor?: string, alteradoPorId?: string, user?: ScopedUser): Promise<VeiculoResponseDto> {
     const veiculo = await this.prisma.veiculo.findUnique({
       where: { id },
       include: {
@@ -350,6 +382,8 @@ export class VeiculosService {
     if (!veiculo) {
       throw new NotFoundException(`Veículo com ID ${id} não encontrado`);
     }
+
+    await this.scopeService.assertPlantaInScope(veiculo.planta_id, user);
 
     // Validar transições de status
     this.validarTransicaoStatus(veiculo.status, alterarStatusDto.novoStatus);
@@ -380,7 +414,7 @@ export class VeiculosService {
     return this.mapearParaResponse(veiculoAtualizado);
   }
 
-  async buscarDisponiveis(queryDto: VeiculosDisponiveisDto): Promise<any> {
+  async buscarDisponiveis(queryDto: VeiculosDisponiveisDto, user?: ScopedUser): Promise<any> {
     const { dataInicio, dataFim, horaInicio, horaFim, capacidadeMinima, tiposVeiculo, excluirReservaId } = queryDto;
 
     // Validar período

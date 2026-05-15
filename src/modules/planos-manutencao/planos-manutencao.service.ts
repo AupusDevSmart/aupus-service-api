@@ -1,6 +1,6 @@
 // src/modules/planos-manutencao/planos-manutencao.service.ts
-import { Injectable, NotFoundException, BadRequestException, ConflictException } from '@nestjs/common';
-import { PrismaService } from '@aupus/api-shared';
+import { Injectable, NotFoundException, BadRequestException, ConflictException, ForbiddenException } from '@nestjs/common';
+import { PrismaService, PermissionScopeService, ScopedUser } from '@aupus/api-shared';
 import {
   CreatePlanoManutencaoDto,
   UpdatePlanoManutencaoDto,
@@ -18,11 +18,23 @@ import { StatusPlano, Prisma } from '@aupus/api-shared';
 
 @Injectable()
 export class PlanosManutencaoService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly scopeService: PermissionScopeService,
+  ) {}
 
-  async criar(createDto: CreatePlanoManutencaoDto): Promise<PlanoManutencaoResponseDto> {
-    // Verificar se equipamento existe
+  /** Fragmento `where` para planos restringindo ao escopo via equipamento.unidade.planta_id. */
+  private async scopeFragment(user?: ScopedUser): Promise<Prisma.planos_manutencaoWhereInput | undefined> {
+    const scope = await this.scopeService.getScope(user);
+    if (!this.scopeService.isScoped(scope)) return undefined;
+    if (scope.length === 0) return { id: '__NEVER__' };
+    return { equipamento: { unidade: { planta_id: { in: scope } } } };
+  }
+
+  async criar(createDto: CreatePlanoManutencaoDto, user?: ScopedUser): Promise<PlanoManutencaoResponseDto> {
+    // Verificar se equipamento existe e esta no escopo
     await this.verificarEquipamentoExiste(createDto.equipamento_id);
+    if (user) await this.scopeService.assertEntityInScope('equipamento', createDto.equipamento_id, user);
     
     // Verificar se equipamento já tem plano (constraint unique)
     const planoExistente = await this.prisma.planos_manutencao.findFirst({
@@ -55,7 +67,7 @@ export class PlanosManutencaoService {
     return this.mapearParaResponse(plano);
   }
 
-  async listar(queryDto: QueryPlanosDto): Promise<{
+  async listar(queryDto: QueryPlanosDto, user?: ScopedUser): Promise<{
     data: PlanoManutencaoResponseDto[];
     total: number;
     page: number;
@@ -66,9 +78,11 @@ export class PlanosManutencaoService {
     const skip = (page - 1) * limit;
 
     // Construir filtros
+    const scopeFragment = await this.scopeFragment(user);
     const where: Prisma.planos_manutencaoWhereInput = {
       deleted_at: null,
-      ...this.construirFiltros(filters, search)
+      ...this.construirFiltros(filters, search),
+      ...(scopeFragment && { AND: [scopeFragment] }),
     };
 
     // Construir ordenação
@@ -110,7 +124,7 @@ export class PlanosManutencaoService {
     };
   }
 
-  async buscarPorId(id: string, incluirTarefas = false): Promise<PlanoManutencaoResponseDto> {
+  async buscarPorId(id: string, incluirTarefas = false, user?: ScopedUser): Promise<PlanoManutencaoResponseDto> {
     const includeOptions: any = {
       ...this.includeRelacionamentos(),
       ...(incluirTarefas && {
@@ -142,11 +156,15 @@ export class PlanosManutencaoService {
       throw new NotFoundException('Plano de manutenção não encontrado');
     }
 
+    // Scope RBAC: 403 se planta do equipamento nao esta no escopo
+    if (user) await this.scopeService.assertEntityInScope('equipamento', (plano as any).equipamento_id, user);
+
     return this.mapearParaResponse(plano);
   }
 
-  async buscarPorEquipamento(equipamentoId: string): Promise<PlanoManutencaoResponseDto> {
+  async buscarPorEquipamento(equipamentoId: string, user?: ScopedUser): Promise<PlanoManutencaoResponseDto> {
     await this.verificarEquipamentoExiste(equipamentoId);
+    if (user) await this.scopeService.assertEntityInScope('equipamento', equipamentoId, user);
 
     const plano = await this.prisma.planos_manutencao.findFirst({
       where: {
@@ -163,15 +181,16 @@ export class PlanosManutencaoService {
     return this.mapearParaResponse(plano);
   }
 
-  async buscarPorPlanta(plantaId: string, queryDto: QueryPlanosPorPlantaDto): Promise<{
+  async buscarPorPlanta(plantaId: string, queryDto: QueryPlanosPorPlantaDto, user?: ScopedUser): Promise<{
     data: PlanoManutencaoResponseDto[];
     total: number;
     page: number;
     limit: number;
     totalPages: number;
   }> {
-    // Verificar se planta existe
+    // Verificar se planta existe e esta no escopo
     await this.verificarPlantaExiste(plantaId);
+    if (user) await this.scopeService.assertPlantaInScope(plantaId, user);
 
     const { page, limit, status, incluir_tarefas } = queryDto;
     const skip = (page - 1) * limit;
@@ -262,15 +281,16 @@ export class PlanosManutencaoService {
     };
   }
 
-  async buscarPorUnidade(unidadeId: string, queryDto: QueryPlanosPorPlantaDto): Promise<{
+  async buscarPorUnidade(unidadeId: string, queryDto: QueryPlanosPorPlantaDto, user?: ScopedUser): Promise<{
     data: PlanoManutencaoResponseDto[];
     total: number;
     page: number;
     limit: number;
     totalPages: number;
   }> {
-    // Verificar se unidade existe
+    // Verificar se unidade existe e esta no escopo
     await this.verificarUnidadeExiste(unidadeId);
+    if (user) await this.scopeService.assertEntityInScope('unidade', unidadeId, user);
 
     const { page, limit, status, incluir_tarefas } = queryDto;
     const skip = (page - 1) * limit;
@@ -361,7 +381,14 @@ export class PlanosManutencaoService {
     };
   }
 
-  async atualizar(id: string, updateDto: UpdatePlanoManutencaoDto): Promise<PlanoManutencaoResponseDto> {
+  async atualizar(id: string, updateDto: UpdatePlanoManutencaoDto, user?: ScopedUser): Promise<PlanoManutencaoResponseDto> {
+    if (user) {
+      const existing = await this.prisma.planos_manutencao.findFirst({
+        where: { id, deleted_at: null },
+        select: { equipamento_id: true },
+      });
+      if (existing) await this.scopeService.assertEntityInScope('equipamento', existing.equipamento_id, user);
+    }
     await this.verificarPlanoExiste(id);
 
     // Se mudou equipamento, verificar se novo equipamento já tem plano
@@ -409,7 +436,14 @@ export class PlanosManutencaoService {
     return this.mapearParaResponse(plano);
   }
 
-  async atualizarStatus(id: string, updateStatusDto: UpdateStatusPlanoDto): Promise<PlanoManutencaoResponseDto> {
+  async atualizarStatus(id: string, updateStatusDto: UpdateStatusPlanoDto, user?: ScopedUser): Promise<PlanoManutencaoResponseDto> {
+    if (user) {
+      const existing = await this.prisma.planos_manutencao.findFirst({
+        where: { id, deleted_at: null },
+        select: { equipamento_id: true },
+      });
+      if (existing) await this.scopeService.assertEntityInScope('equipamento', existing.equipamento_id, user);
+    }
     await this.verificarPlanoExiste(id);
 
     const plano = await this.prisma.planos_manutencao.update({
@@ -426,7 +460,14 @@ export class PlanosManutencaoService {
     return this.mapearParaResponse(plano);
   }
 
-  async remover(id: string): Promise<void> {
+  async remover(id: string, user?: ScopedUser): Promise<void> {
+    if (user) {
+      const existing = await this.prisma.planos_manutencao.findFirst({
+        where: { id, deleted_at: null },
+        select: { equipamento_id: true },
+      });
+      if (existing) await this.scopeService.assertEntityInScope('equipamento', existing.equipamento_id, user);
+    }
     await this.verificarPlanoExiste(id);
 
     // Soft delete - também marca tarefas como removidas
@@ -445,7 +486,17 @@ export class PlanosManutencaoService {
     });
   }
 
-  async duplicar(id: string, duplicarDto: DuplicarPlanoDto): Promise<PlanoManutencaoResponseDto> {
+  async duplicar(id: string, duplicarDto: DuplicarPlanoDto, user?: ScopedUser): Promise<PlanoManutencaoResponseDto> {
+    if (user) {
+      const existing = await this.prisma.planos_manutencao.findFirst({
+        where: { id, deleted_at: null },
+        select: { equipamento_id: true },
+      });
+      if (existing) await this.scopeService.assertEntityInScope('equipamento', existing.equipamento_id, user);
+      if (duplicarDto.equipamento_destino_id) {
+        await this.scopeService.assertEntityInScope('equipamento', duplicarDto.equipamento_destino_id, user);
+      }
+    }
     // Verificar se plano original existe
     const planoOriginal = await this.prisma.planos_manutencao.findFirst({
       where: {

@@ -1,6 +1,6 @@
-import { ConflictException, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { ConflictException, ForbiddenException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { Prisma, StatusProgramacaoOS } from '@aupus/api-shared';
-import { PrismaService } from '@aupus/api-shared';
+import { PrismaService, PermissionScopeService, ScopedUser } from '@aupus/api-shared';
 import { AnomaliasService } from '../anomalias/anomalias.service';
 import {
   AdicionarTarefasDto,
@@ -25,9 +25,23 @@ export class ProgramacaoOSService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly anomaliasService: AnomaliasService,
+    private readonly scopeService: PermissionScopeService,
   ) { }
 
-  async listar(filters: ProgramacaoFiltersDto): Promise<ListarProgramacoesResponseDto> {
+  /** Fragmento `where` restringindo ao escopo de plantas do usuario. */
+  private async scopeFragment(user?: ScopedUser): Promise<Prisma.programacoes_osWhereInput | undefined> {
+    const scope = await this.scopeService.getScope(user);
+    if (!this.scopeService.isScoped(scope)) return undefined;
+    if (scope.length === 0) return { id: '__NEVER__' };
+    return {
+      OR: [
+        { planta_id: { in: scope } },
+        { equipamento: { unidade: { planta_id: { in: scope } } } },
+      ],
+    };
+  }
+
+  async listar(filters: ProgramacaoFiltersDto, user?: ScopedUser): Promise<ListarProgramacoesResponseDto> {
 
     const {
       page = 1,
@@ -96,6 +110,12 @@ export class ProgramacaoOSService {
       }
     }
 
+    // Scope RBAC
+    const scopeFragment = await this.scopeFragment(user);
+    if (scopeFragment) {
+      where.AND = [scopeFragment];
+    }
+
     // Contar total
     const total = await this.prisma.programacoes_os.count({ where });
 
@@ -152,7 +172,8 @@ export class ProgramacaoOSService {
     };
   }
 
-  async buscarPorId(id: string): Promise<ProgramacaoDetalhesResponseDto> {
+  async buscarPorId(id: string, user?: ScopedUser): Promise<ProgramacaoDetalhesResponseDto> {
+    if (user) await this.scopeService.assertEntityInScope('programacao_os', id, user);
     const programacao = await this.prisma.programacoes_os.findFirst({
       where: {
         id,
@@ -218,9 +239,10 @@ export class ProgramacaoOSService {
     return this.mapearParaDetalhes(programacao, reserva);
   }
 
-  async buscarPorUnidade(unidadeId: string, filters?: Partial<ProgramacaoFiltersDto>): Promise<ListarProgramacoesResponseDto> {
-    // Verificar se unidade existe
+  async buscarPorUnidade(unidadeId: string, filters?: Partial<ProgramacaoFiltersDto>, user?: ScopedUser): Promise<ListarProgramacoesResponseDto> {
+    // Verificar se unidade existe e esta no escopo
     await this.verificarUnidadeExiste(unidadeId);
+    if (user) await this.scopeService.assertEntityInScope('unidade', unidadeId, user);
 
     // Construir filtros com unidade_id
     const filtersComUnidade: ProgramacaoFiltersDto = {
@@ -230,10 +252,14 @@ export class ProgramacaoOSService {
       limit: filters?.limit || 10,
     };
 
-    return this.listar(filtersComUnidade);
+    return this.listar(filtersComUnidade, user);
   }
 
-  async criar(createDto: CreateProgramacaoDto, usuarioId?: string): Promise<ProgramacaoResponseDto> {
+  async criar(createDto: CreateProgramacaoDto, usuarioId?: string, user?: ScopedUser): Promise<ProgramacaoResponseDto> {
+    // Scope RBAC: planta_id deve estar no escopo
+    if (user && createDto.planta_id) {
+      await this.scopeService.assertPlantaInScope(createDto.planta_id, user);
+    }
     // Limpar IDs (remover espaços em branco)
     if (createDto.veiculo_id) {
       createDto.veiculo_id = createDto.veiculo_id.trim();
@@ -380,7 +406,8 @@ export class ProgramacaoOSService {
     });
   }
 
-  async atualizar(id: string, updateDto: UpdateProgramacaoDto, usuarioId?: string): Promise<ProgramacaoResponseDto> {
+  async atualizar(id: string, updateDto: UpdateProgramacaoDto, usuarioId?: string, user?: ScopedUser): Promise<ProgramacaoResponseDto> {
+    if (user) await this.scopeService.assertEntityInScope('programacao_os', id, user);
     const programacao = await this.buscarPorId(id);
 
     // Verificar se pode ser editada
@@ -530,7 +557,8 @@ export class ProgramacaoOSService {
     });
   }
 
-  async aprovar(id: string, dto: AprovarProgramacaoDto, usuarioId?: string): Promise<void> {
+  async aprovar(id: string, dto: AprovarProgramacaoDto, usuarioId?: string, user?: ScopedUser): Promise<void> {
+    if (user) await this.scopeService.assertEntityInScope('programacao_os', id, user);
     const programacao = await this.buscarPorId(id);
 
     if (programacao.status !== StatusProgramacaoOS.PENDENTE) {
@@ -708,7 +736,8 @@ export class ProgramacaoOSService {
     }
   }
 
-  async cancelar(id: string, dto: CancelarProgramacaoDto, usuarioId?: string): Promise<void> {
+  async cancelar(id: string, dto: CancelarProgramacaoDto, usuarioId?: string, user?: ScopedUser): Promise<void> {
+    if (user) await this.scopeService.assertEntityInScope('programacao_os', id, user);
     const programacao = await this.buscarPorId(id);
 
     if (programacao.status === StatusProgramacaoOS.CANCELADA || programacao.status === StatusProgramacaoOS.FINALIZADA) {

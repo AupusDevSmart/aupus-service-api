@@ -40,7 +40,7 @@ export class AnomaliasController {
   ) {}
 
   @Post()
-  @Permissions('anomalias.manage')
+  @Permissions('anomalias.manage', 'anomalias.report')
   @ApiOperation({ summary: 'Criar nova anomalia' })
   @ApiResponse({
     status: HttpStatus.CREATED,
@@ -113,7 +113,7 @@ export class AnomaliasController {
   }
 
   @Patch(':id')
-  @Permissions('anomalias.manage')
+  @Permissions('anomalias.manage', 'anomalias.manage_own')
   @ApiOperation({ summary: 'Atualizar anomalia' })
   @ApiResponse({ 
     status: HttpStatus.OK, 
@@ -129,7 +129,7 @@ export class AnomaliasController {
   }
 
   @Delete(':id')
-  @Permissions('anomalias.manage')
+  @Permissions('anomalias.manage', 'anomalias.manage_own')
   @ApiOperation({ summary: 'Remover anomalia (soft delete)' })
   @ApiResponse({ 
     status: HttpStatus.OK, 

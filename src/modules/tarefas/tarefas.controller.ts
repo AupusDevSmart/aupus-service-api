@@ -19,7 +19,7 @@ import {
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { ApiTags, ApiOperation, ApiResponse, ApiParam, ApiQuery, ApiConsumes } from '@nestjs/swagger';
-import { Permissions } from '@aupus/api-shared';
+import { Permissions, CurrentUser } from '@aupus/api-shared';
 import { Response } from 'express';
 import * as path from 'path';
 import { TarefasService } from './tarefas.service';
@@ -102,8 +102,8 @@ export class TarefasController {
       }
     }
   })
-  async listar(@Query() queryDto: QueryTarefasDto) {
-    return this.tarefasService.listar(queryDto);
+  async listar(@Query() queryDto: QueryTarefasDto, @CurrentUser() user: any) {
+    return this.tarefasService.listar(queryDto, user);
   }
 
   @Get('dashboard')
@@ -136,8 +136,8 @@ export class TarefasController {
       }
     }
   })
-  async listarSemPlano(@Query() queryDto?: Partial<QueryTarefasDto>) {
-    return this.tarefasService.listarSemPlano(queryDto);
+  async listarSemPlano(@CurrentUser() user: any, @Query() queryDto?: Partial<QueryTarefasDto>) {
+    return this.tarefasService.listarSemPlano(queryDto, user);
   }
 
   @Get('plano/:planoId')
@@ -154,9 +154,10 @@ export class TarefasController {
   })
   async listarPorPlano(
     @Param('planoId') planoId: string,
+    @CurrentUser() user: any,
     @Query() queryDto?: Partial<QueryTarefasDto>
   ): Promise<TarefaResponseDto[]> {
-    return this.tarefasService.listarPorPlano(planoId, queryDto);
+    return this.tarefasService.listarPorPlano(planoId, queryDto, user);
   }
 
   @Get('equipamento/:equipamentoId')
@@ -169,9 +170,10 @@ export class TarefasController {
   })
   async listarPorEquipamento(
     @Param('equipamentoId') equipamentoId: string,
+    @CurrentUser() user: any,
     @Query() queryDto?: Partial<QueryTarefasDto>
   ): Promise<TarefaResponseDto[]> {
-    return this.tarefasService.listarPorEquipamento(equipamentoId, queryDto);
+    return this.tarefasService.listarPorEquipamento(equipamentoId, queryDto, user);
   }
 
   @Get(':id')
@@ -187,9 +189,10 @@ export class TarefasController {
     description: 'Tarefa não encontrada' 
   })
   async buscarPorId(
-    @Param('id') id: string
+    @Param('id') id: string,
+    @CurrentUser() user: any
   ): Promise<TarefaResponseDto> {
-    return this.tarefasService.buscarPorId(id);
+    return this.tarefasService.buscarPorId(id, user);
   }
 
   @Put(':id')
@@ -210,28 +213,31 @@ export class TarefasController {
   })
   async atualizar(
     @Param('id') id: string,
-    @Body() updateDto: UpdateTarefaDto
+    @Body() updateDto: UpdateTarefaDto,
+    @CurrentUser() user: any
   ): Promise<TarefaResponseDto> {
-    return this.tarefasService.atualizar(id, updateDto);
+    return this.tarefasService.atualizar(id, updateDto, user);
   }
 
   @Put(':id/status')
+  @Permissions('manutencao.manage', 'tarefas.update_status')
   @ApiOperation({ summary: 'Atualizar apenas status da tarefa' })
   @ApiParam({ name: 'id', description: 'ID da tarefa' })
-  @ApiResponse({ 
-    status: HttpStatus.OK, 
+  @ApiResponse({
+    status: HttpStatus.OK,
     description: 'Status atualizado com sucesso',
-    type: TarefaResponseDto 
+    type: TarefaResponseDto
   })
-  @ApiResponse({ 
-    status: HttpStatus.NOT_FOUND, 
-    description: 'Tarefa não encontrada' 
+  @ApiResponse({
+    status: HttpStatus.NOT_FOUND,
+    description: 'Tarefa não encontrada'
   })
   async atualizarStatus(
     @Param('id') id: string,
-    @Body() updateStatusDto: UpdateStatusTarefaDto
+    @Body() updateStatusDto: UpdateStatusTarefaDto,
+    @CurrentUser() user: any
   ): Promise<TarefaResponseDto> {
-    return this.tarefasService.atualizarStatus(id, updateStatusDto);
+    return this.tarefasService.atualizarStatus(id, updateStatusDto, user);
   }
 
   @Put(':id/reordenar')
@@ -252,9 +258,10 @@ export class TarefasController {
   })
   async reordenar(
     @Param('id') id: string,
-    @Body() reordenarDto: ReordenarTarefaDto
+    @Body() reordenarDto: ReordenarTarefaDto,
+    @CurrentUser() user: any
   ): Promise<TarefaResponseDto> {
-    return this.tarefasService.reordenar(id, reordenarDto);
+    return this.tarefasService.reordenar(id, reordenarDto, user);
   }
 
   @Delete(':id')
@@ -270,9 +277,10 @@ export class TarefasController {
     description: 'Tarefa não encontrada' 
   })
   async remover(
-    @Param('id') id: string
+    @Param('id') id: string,
+    @CurrentUser() user: any
   ): Promise<void> {
-    return this.tarefasService.remover(id);
+    return this.tarefasService.remover(id, user);
   }
 
   // Rotas de Anexos

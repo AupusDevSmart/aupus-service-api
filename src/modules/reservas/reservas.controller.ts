@@ -14,7 +14,7 @@ import {
   Request
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiQuery } from '@nestjs/swagger';
-import { Permissions } from '@aupus/api-shared';
+import { Permissions, CurrentUser } from '@aupus/api-shared';
 import { ReservasService } from './reservas.service';
 import { ReservasSchedulerService } from './reservas-scheduler.service';
 import {
@@ -54,9 +54,10 @@ export class ReservasController {
     description: 'Conflito de horário com outra reserva'
   })
   async criarReserva(
-    @Body() createDto: CreateReservaDto
+    @Body() createDto: CreateReservaDto,
+    @CurrentUser() user?: any,
   ): Promise<ReservaResponseDto> {
-    return this.reservasService.criar(createDto);
+    return this.reservasService.criar(createDto, user);
   }
 
   @Get()
@@ -76,8 +77,8 @@ export class ReservasController {
   @ApiQuery({ name: 'dataFim', required: false, type: String, description: 'Data de fim máxima (YYYY-MM-DD)' })
   @ApiQuery({ name: 'orderBy', required: false, enum: ['responsavel', 'dataInicio', 'dataFim', 'status', 'finalidade', 'criadoEm'] })
   @ApiQuery({ name: 'orderDirection', required: false, enum: ['asc', 'desc'] })
-  async listarReservas(@Query() queryDto: QueryReservasDto) {
-    return this.reservasService.buscarTodos(queryDto);
+  async listarReservas(@Query() queryDto: QueryReservasDto, @CurrentUser() user?: any) {
+    return this.reservasService.buscarTodos(queryDto, user);
   }
 
   @Get(':id')
@@ -91,8 +92,8 @@ export class ReservasController {
     status: 404,
     description: 'Reserva não encontrada'
   })
-  async buscarReservaPorId(@Param('id') id: string): Promise<ReservaResponseDto> {
-    return this.reservasService.buscarPorId(id);
+  async buscarReservaPorId(@Param('id') id: string, @CurrentUser() user?: any): Promise<ReservaResponseDto> {
+    return this.reservasService.buscarPorId(id, user);
   }
 
   @Put(':id')
@@ -116,9 +117,10 @@ export class ReservasController {
   })
   async atualizarReserva(
     @Param('id') id: string,
-    @Body() updateDto: UpdateReservaDto
+    @Body() updateDto: UpdateReservaDto,
+    @CurrentUser() user?: any,
   ): Promise<ReservaResponseDto> {
-    return this.reservasService.atualizar(id, updateDto);
+    return this.reservasService.atualizar(id, updateDto, user);
   }
 
   @Patch(':id/cancelar')
@@ -138,11 +140,15 @@ export class ReservasController {
   })
   async cancelarReserva(
     @Param('id') id: string,
-    @Body() cancelarDto: CancelarReservaDto
+    @Body() cancelarDto: CancelarReservaDto,
+    @CurrentUser() user?: any,
   ): Promise<void> {
     return this.reservasService.cancelar(
       id,
-      cancelarDto.motivo
+      cancelarDto.motivo,
+      undefined,
+      undefined,
+      user,
     );
   }
 
@@ -161,8 +167,8 @@ export class ReservasController {
     status: 400,
     description: 'Não é possível finalizar reserva não ativa'
   })
-  async finalizarReserva(@Param('id') id: string): Promise<void> {
-    return this.reservasService.finalizar(id);
+  async finalizarReserva(@Param('id') id: string, @CurrentUser() user?: any): Promise<void> {
+    return this.reservasService.finalizar(id, user);
   }
 
   @Post('verificar-vencidas')
@@ -187,8 +193,9 @@ export class ReservasController {
   @ApiQuery({ name: 'incluirFinalizadas', required: false, type: Boolean, description: 'Incluir reservas finalizadas' })
   async listarReservasVeiculo(
     @Param('veiculoId') veiculoId: string,
-    @Query('incluirFinalizadas') incluirFinalizadas?: boolean
+    @CurrentUser() user?: any,
+    @Query('incluirFinalizadas') incluirFinalizadas?: boolean,
   ): Promise<ReservaResponseDto[]> {
-    return this.reservasService.buscarReservasVeiculo(veiculoId, incluirFinalizadas);
+    return this.reservasService.buscarReservasVeiculo(veiculoId, incluirFinalizadas, user);
   }
 }

@@ -51,6 +51,7 @@ export class SolicitacoesServicoController {
   ) {}
 
   @Post()
+  @Permissions('manutencao.manage', 'solicitacoes.create')
   @ApiOperation({ summary: 'Criar nova solicitação de serviço' })
   @ApiResponse({
     status: HttpStatus.CREATED,
@@ -62,7 +63,7 @@ export class SolicitacoesServicoController {
     @Request() req?: any,
   ): Promise<SolicitacaoResponseDto> {
     const usuarioId = req?.user?.id;
-    return this.solicitacoesService.create(createDto, usuarioId);
+    return this.solicitacoesService.create(createDto, usuarioId, req?.user);
   }
 
   @Get()
@@ -74,8 +75,9 @@ export class SolicitacoesServicoController {
   })
   async findAll(
     @Query() filters: SolicitacaoFiltersDto,
+    @Request() req?: any,
   ): Promise<ListarSolicitacoesResponseDto> {
-    return this.solicitacoesService.findAll(filters);
+    return this.solicitacoesService.findAll(filters, req?.user);
   }
 
   @Get('debug-unidade')
@@ -109,9 +111,9 @@ export class SolicitacoesServicoController {
     status: HttpStatus.NOT_FOUND,
     description: 'Solicitação não encontrada',
   })
-  async findOne(@Param('id') id: string): Promise<SolicitacaoResponseDto> {
+  async findOne(@Param('id') id: string, @Request() req?: any): Promise<SolicitacaoResponseDto> {
     console.log(`[CONTROLLER] GET /solicitacoes-servico/${id} chamado`);
-    const result = await this.solicitacoesService.findOne(id);
+    const result = await this.solicitacoesService.findOne(id, req?.user);
     console.log('[CONTROLLER] Resposta enviada:', {
       numero: result.numero,
       unidade_id: result.unidade_id,
@@ -142,7 +144,7 @@ export class SolicitacoesServicoController {
     @Request() req?: any,
   ): Promise<SolicitacaoResponseDto> {
     const usuarioId = req?.user?.id;
-    return this.solicitacoesService.update(id, updateDto, usuarioId);
+    return this.solicitacoesService.update(id, updateDto, usuarioId, req?.user);
   }
 
   @Delete(':id')

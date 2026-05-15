@@ -1,5 +1,5 @@
-import { Injectable, NotFoundException, BadRequestException, ConflictException } from '@nestjs/common';
-import { PrismaService } from '@aupus/api-shared';
+import { Injectable, NotFoundException, BadRequestException, ConflictException, ForbiddenException } from '@nestjs/common';
+import { PrismaService, PermissionScopeService, ScopedUser } from '@aupus/api-shared';
 import { VeiculosService } from '../veiculos/veiculos.service';
 import { StatusVeiculo, StatusReserva, Prisma } from '@aupus/api-shared';
 import {
@@ -24,12 +24,13 @@ export interface PaginatedResponse<T> {
 export class ReservasService {
   constructor(
     private readonly prisma: PrismaService,
-    private readonly veiculosService: VeiculosService
+    private readonly veiculosService: VeiculosService,
+    private readonly scopeService: PermissionScopeService,
   ) {}
 
-  async criar(createDto: CreateReservaDto): Promise<ReservaResponseDto> {
-    // Verificar se o veículo existe e está disponível
-    const veiculo = await this.veiculosService.buscarPorId(createDto.veiculoId);
+  async criar(createDto: CreateReservaDto, user?: ScopedUser): Promise<ReservaResponseDto> {
+    // Verificar se o veículo existe e está disponível (com scope, ja valida planta_id)
+    const veiculo = await this.veiculosService.buscarPorId(createDto.veiculoId, user);
 
     if (!veiculo.ativo) {
       throw new BadRequestException('Veículo não está ativo');
@@ -79,7 +80,7 @@ export class ReservasService {
     return this.mapearParaResponse(reserva);
   }
 
-  async buscarTodos(queryDto: QueryReservasDto): Promise<PaginatedResponse<ReservaResponseDto>> {
+  async buscarTodos(queryDto: QueryReservasDto, user?: ScopedUser): Promise<PaginatedResponse<ReservaResponseDto>> {
     const {
       page = 1,
       limit = 20,
@@ -113,6 +114,14 @@ export class ReservasService {
       ...(dataInicio && { data_inicio: { gte: new Date(dataInicio) } }),
       ...(dataFim && { data_fim: { lte: new Date(dataFim) } })
     };
+
+    // Scope RBAC: filtrar reservas via planta_id do veiculo
+    const scope = await this.scopeService.getScope(user);
+    if (this.scopeService.isScoped(scope)) {
+      where.AND = scope.length === 0
+        ? [{ id: '__NEVER__' }]
+        : [{ veiculo: { planta_id: { in: scope } } }];
+    }
 
     // Ordenação
     const orderByClause = this.buildOrderBy(orderBy, orderDirection);
@@ -150,7 +159,7 @@ export class ReservasService {
     };
   }
 
-  async buscarPorId(id: string): Promise<ReservaResponseDto> {
+  async buscarPorId(id: string, user?: ScopedUser): Promise<ReservaResponseDto> {
     const reserva = await this.prisma.reserva_veiculo.findUnique({
       where: { id },
       include: {
@@ -160,7 +169,8 @@ export class ReservasService {
             nome: true,
             placa: true,
             tipo: true,
-            capacidade_passageiros: true
+            capacidade_passageiros: true,
+            planta_id: true
           }
         }
       }
@@ -170,11 +180,14 @@ export class ReservasService {
       throw new NotFoundException(`Reserva com ID ${id} não encontrada`);
     }
 
+    // Scope RBAC: 403 se a planta do veiculo nao esta no escopo
+    await this.scopeService.assertPlantaInScope((reserva as any).veiculo?.planta_id ?? null, user);
+
     return this.mapearParaResponse(reserva);
   }
 
-  async atualizar(id: string, updateDto: UpdateReservaDto): Promise<ReservaResponseDto> {
-    const reservaExistente = await this.buscarPorId(id);
+  async atualizar(id: string, updateDto: UpdateReservaDto, user?: ScopedUser): Promise<ReservaResponseDto> {
+    const reservaExistente = await this.buscarPorId(id, user);
 
     if (reservaExistente.status !== StatusReserva.ativa) {
       throw new BadRequestException('Só é possível editar reservas ativas');
@@ -182,7 +195,7 @@ export class ReservasService {
 
     // Se está alterando o veículo, verificar se está disponível
     if (updateDto.veiculoId && updateDto.veiculoId !== reservaExistente.veiculoId) {
-      const veiculo = await this.veiculosService.buscarPorId(updateDto.veiculoId);
+      const veiculo = await this.veiculosService.buscarPorId(updateDto.veiculoId, user);
 
       if (!veiculo.ativo || veiculo.status !== StatusVeiculo.disponivel) {
         throw new BadRequestException('Veículo não está disponível para reserva');
@@ -241,7 +254,8 @@ export class ReservasService {
     return this.mapearParaResponse(reserva);
   }
 
-  async cancelar(id: string, motivo: string, canceladoPor?: string, canceladoPorId?: string): Promise<void> {
+  async cancelar(id: string, motivo: string, canceladoPor?: string, canceladoPorId?: string, user?: ScopedUser): Promise<void> {
+    await this.buscarPorId(id, user);
     const reserva = await this.buscarPorId(id);
 
     if (reserva.status !== StatusReserva.ativa) {
@@ -260,7 +274,8 @@ export class ReservasService {
     });
   }
 
-  async finalizar(id: string): Promise<void> {
+  async finalizar(id: string, user?: ScopedUser): Promise<void> {
+    await this.buscarPorId(id, user);
     const reserva = await this.buscarPorId(id);
 
     if (reserva.status !== StatusReserva.ativa) {
@@ -273,7 +288,9 @@ export class ReservasService {
     });
   }
 
-  async buscarReservasVeiculo(veiculoId: string, incluirFinalizadas = false): Promise<ReservaResponseDto[]> {
+  async buscarReservasVeiculo(veiculoId: string, incluirFinalizadas = false, user?: ScopedUser): Promise<ReservaResponseDto[]> {
+    // Garantir scope via veiculo (assertEntity vai 403/404)
+    if (user) await this.veiculosService.buscarPorId(veiculoId, user);
     const where: Prisma.reserva_veiculoWhereInput = {
       veiculo_id: veiculoId,
       ...(incluirFinalizadas ? {} : { status: { not: StatusReserva.finalizada } })

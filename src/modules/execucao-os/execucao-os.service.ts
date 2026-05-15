@@ -1,5 +1,5 @@
-import { Injectable, NotFoundException, BadRequestException, ConflictException, Logger } from '@nestjs/common';
-import { PrismaService } from '@aupus/api-shared';
+import { Injectable, NotFoundException, BadRequestException, ConflictException, ForbiddenException, Logger } from '@nestjs/common';
+import { PrismaService, PermissionScopeService, ScopedUser } from '@aupus/api-shared';
 import { AnomaliasService } from '../anomalias/anomalias.service';
 import {
   OSFiltersDto,
@@ -29,9 +29,10 @@ export class ExecucaoOSService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly anomaliasService: AnomaliasService,
+    private readonly scopeService: PermissionScopeService,
   ) {}
 
-  async listar(filters: OSFiltersDto): Promise<ListarOSResponseDto> {
+  async listar(filters: OSFiltersDto, user?: ScopedUser): Promise<ListarOSResponseDto> {
     const {
       page = 1,
       limit = 10,
@@ -99,6 +100,14 @@ export class ExecucaoOSService {
         { data_hora_programada: { lt: hoje } },
         { status: { notIn: [StatusOS.FINALIZADA, StatusOS.CANCELADA] } },
       ];
+    }
+
+    // Scope RBAC
+    const scope = await this.scopeService.getScope(user);
+    if (this.scopeService.isScoped(scope)) {
+      const scopeFragment: Prisma.ordens_servicoWhereInput =
+        scope.length === 0 ? { id: '__NEVER__' } : { planta_id: { in: scope } };
+      where.AND = where.AND ? [...(where.AND as any[]), scopeFragment] : [scopeFragment];
     }
 
     // Contar total
@@ -231,7 +240,8 @@ export class ExecucaoOSService {
     };
   }
 
-  async buscarPorId(id: string): Promise<OrdemServicoDetalhesResponseDto> {
+  async buscarPorId(id: string, user?: ScopedUser): Promise<OrdemServicoDetalhesResponseDto> {
+    if (user) await this.scopeService.assertEntityInScope('ordem_servico', id, user);
     const os = await this.prisma.ordens_servico.findFirst({
       where: {
         id,
@@ -379,7 +389,8 @@ export class ExecucaoOSService {
     return this.mapearParaDetalhes(os);
   }
 
-  async iniciar(id: string, dto: IniciarExecucaoDto, usuarioId?: string): Promise<void> {
+  async iniciar(id: string, dto: IniciarExecucaoDto, usuarioId?: string, user?: ScopedUser): Promise<void> {
+    if (user) await this.scopeService.assertEntityInScope('ordem_servico', id, user);
     const os = await this.buscarPorId(id);
 
     if (os.status !== StatusOS.PENDENTE) {
@@ -642,7 +653,8 @@ export class ExecucaoOSService {
     return `OS-${ano}-${String(proximoNumero).padStart(5, '0')}`;
   }
 
-  async pausar(id: string, dto: PausarExecucaoDto, usuarioId?: string): Promise<void> {
+  async pausar(id: string, dto: PausarExecucaoDto, usuarioId?: string, user?: ScopedUser): Promise<void> {
+    if (user) await this.scopeService.assertEntityInScope('ordem_servico', id, user);
     const os = await this.buscarPorId(id);
 
     if (os.status !== StatusOS.EM_EXECUCAO) {
@@ -670,7 +682,8 @@ export class ExecucaoOSService {
     });
   }
 
-  async retomar(id: string, dto: RetomarExecucaoDto, usuarioId?: string): Promise<void> {
+  async retomar(id: string, dto: RetomarExecucaoDto, usuarioId?: string, user?: ScopedUser): Promise<void> {
+    if (user) await this.scopeService.assertEntityInScope('ordem_servico', id, user);
     const os = await this.buscarPorId(id);
 
     if (os.status !== StatusOS.PAUSADA) {
@@ -870,7 +883,8 @@ export class ExecucaoOSService {
     });
   }
 
-  async executar(id: string, dto: ExecutarOSDto, usuarioId?: string): Promise<void> {
+  async executar(id: string, dto: ExecutarOSDto, usuarioId?: string, user?: ScopedUser): Promise<void> {
+    if (user) await this.scopeService.assertEntityInScope('ordem_servico', id, user);
     const os = await this.buscarPorId(id);
 
     if (os.status !== StatusOS.EM_EXECUCAO && os.status !== StatusOS.PAUSADA) {
@@ -968,7 +982,8 @@ export class ExecucaoOSService {
     });
   }
 
-  async auditar(id: string, dto: AuditarOSDto, usuarioId?: string): Promise<void> {
+  async auditar(id: string, dto: AuditarOSDto, usuarioId?: string, user?: ScopedUser): Promise<void> {
+    if (user) await this.scopeService.assertEntityInScope('ordem_servico', id, user);
     const os = await this.buscarPorId(id);
 
     if (os.status !== StatusOS.EXECUTADA) {
@@ -1009,7 +1024,8 @@ export class ExecucaoOSService {
     });
   }
 
-  async reabrir(id: string, dto: ReabrirOSDto, usuarioId?: string): Promise<void> {
+  async reabrir(id: string, dto: ReabrirOSDto, usuarioId?: string, user?: ScopedUser): Promise<void> {
+    if (user) await this.scopeService.assertEntityInScope('ordem_servico', id, user);
     const os = await this.buscarPorId(id);
 
     if (os.status !== StatusOS.AUDITADA) {
@@ -1038,7 +1054,8 @@ export class ExecucaoOSService {
     });
   }
 
-  async finalizar(id: string, dto: FinalizarOSDto, usuarioId?: string): Promise<void> {
+  async finalizar(id: string, dto: FinalizarOSDto, usuarioId?: string, user?: ScopedUser): Promise<void> {
+    if (user) await this.scopeService.assertEntityInScope('ordem_servico', id, user);
     const os = await this.buscarPorId(id);
 
     if (os.status !== StatusOS.AUDITADA) {
@@ -1145,7 +1162,8 @@ export class ExecucaoOSService {
     });
   }
 
-  async cancelar(id: string, dto: CancelarOSDto, usuarioId?: string): Promise<void> {
+  async cancelar(id: string, dto: CancelarOSDto, usuarioId?: string, user?: ScopedUser): Promise<void> {
+    if (user) await this.scopeService.assertEntityInScope('ordem_servico', id, user);
     const os = await this.buscarPorId(id);
 
     if (os.status === StatusOS.FINALIZADA || os.status === StatusOS.CANCELADA) {

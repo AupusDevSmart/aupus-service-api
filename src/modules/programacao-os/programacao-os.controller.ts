@@ -64,8 +64,8 @@ export class ProgramacaoOSController {
   @ApiQuery({ name: 'data_inicio', required: false, description: 'Data início (YYYY-MM-DD)' })
   @ApiQuery({ name: 'data_fim', required: false, description: 'Data fim (YYYY-MM-DD)' })
   @ApiQuery({ name: 'criado_por_id', required: false, description: 'Filtrar por criador' })
-  async listar(@Query() filters: ProgramacaoFiltersDto): Promise<ListarProgramacoesResponseDto> {
-    return this.programacaoOSService.listar(filters);
+  async listar(@Query() filters: ProgramacaoFiltersDto, @CurrentUser() user?: any): Promise<ListarProgramacoesResponseDto> {
+    return this.programacaoOSService.listar(filters, user);
   }
 
   @Post()
@@ -85,7 +85,7 @@ export class ProgramacaoOSController {
   })
   
   async criar(@Body() createDto: CreateProgramacaoDto, @CurrentUser() user?: any): Promise<ProgramacaoResponseDto> {
-    return this.programacaoOSService.criar(createDto, user?.id);
+    return this.programacaoOSService.criar(createDto, user?.id, user);
   }
 
   @Get('por-unidade/:unidadeId')
@@ -110,9 +110,10 @@ export class ProgramacaoOSController {
   })
   async buscarPorUnidade(
     @Param('unidadeId') unidadeId: string,
-    @Query() filters?: Partial<ProgramacaoFiltersDto>
+    @CurrentUser() user?: any,
+    @Query() filters?: Partial<ProgramacaoFiltersDto>,
   ): Promise<ListarProgramacoesResponseDto> {
-    return this.programacaoOSService.buscarPorUnidade(unidadeId, filters);
+    return this.programacaoOSService.buscarPorUnidade(unidadeId, filters, user);
   }
 
   @Get(':id')
@@ -130,8 +131,8 @@ export class ProgramacaoOSController {
     status: HttpStatus.NOT_FOUND,
     description: 'Programação não encontrada',
   })
-  async buscarPorId(@Param('id', ParseULIDPipe) id: string): Promise<ProgramacaoDetalhesResponseDto> {
-    return this.programacaoOSService.buscarPorId(id);
+  async buscarPorId(@Param('id', ParseULIDPipe) id: string, @CurrentUser() user?: any): Promise<ProgramacaoDetalhesResponseDto> {
+    return this.programacaoOSService.buscarPorId(id, user);
   }
 
 
@@ -161,7 +162,7 @@ export class ProgramacaoOSController {
     @Body() updateDto: UpdateProgramacaoDto,
     @CurrentUser() user?: any,
   ): Promise<ProgramacaoResponseDto> {
-    return this.programacaoOSService.atualizar(id, updateDto, user?.id);
+    return this.programacaoOSService.atualizar(id, updateDto, user?.id, user);
   }
 
   @Patch(':id/aprovar')
@@ -178,7 +179,7 @@ export class ProgramacaoOSController {
     @Body() dto: AprovarProgramacaoDto,
     @CurrentUser() user?: any,
   ): Promise<{ message: string }> {
-    await this.programacaoOSService.aprovar(id, dto, user?.id);
+    await this.programacaoOSService.aprovar(id, dto, user?.id, user);
     return { message: 'Programação aprovada e OS gerada com sucesso' };
   }
 
@@ -198,7 +199,7 @@ export class ProgramacaoOSController {
     @Body() dto: CancelarProgramacaoDto,
     @CurrentUser() user?: any,
   ): Promise<{ message: string }> {
-    await this.programacaoOSService.cancelar(id, dto, user?.id);
+    await this.programacaoOSService.cancelar(id, dto, user?.id, user);
     return { message: 'Programação cancelada' };
   }
 
