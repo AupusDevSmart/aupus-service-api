@@ -38,6 +38,7 @@ export const PERMISSIONS: PermissionDef[] = [
   // Equipamentos
   { name: 'equipamentos.view', display_name: 'Ver Equipamentos', description: 'Listar e visualizar equipamentos', category: 'Equipamentos' },
   { name: 'equipamentos.manage', display_name: 'Gerenciar Equipamentos', description: 'Criar, editar e deletar equipamentos', category: 'Equipamentos' },
+  { name: 'equipamentos.iot_catalog', display_name: 'Acessar Catalogo IoT', description: 'Acessar o cadastro de Catalogo IoT (tipos e modelos de dispositivos) - restrito a admin e super_admin', category: 'Equipamentos' },
 
   // Anomalias
   { name: 'anomalias.view', display_name: 'Ver Anomalias', description: 'Listar e visualizar anomalias', category: 'Anomalias' },
@@ -73,6 +74,9 @@ export const PERMISSIONS: PermissionDef[] = [
   { name: 'solicitacoes.create', display_name: 'Abrir Solicitacao de Servico', description: 'Criar (POST) solicitacao de servico em planta dentro do escopo (operador reporta)', category: 'Manutencao' },
   { name: 'recursos.manage', display_name: 'Gerenciar Recursos', description: 'Ferramentas, fornecedores, veiculos e reservas', category: 'Recursos' },
   { name: 'agenda.manage', display_name: 'Gerenciar Agenda', description: 'Feriados e dias uteis', category: 'Agenda' },
+
+  // Supervisorio
+  { name: 'supervisorio.iot_view', display_name: 'Ver Diagrama IoT', description: 'Visualizar a aba/diagrama IoT no sinoptico do ativo (restrito a admin e super_admin)', category: 'Supervisorio' },
 
   // Administracao
   { name: 'admin.impersonate', display_name: 'Personificar Usuario', description: 'Fazer login como outro usuario', category: 'Administracao' },
@@ -164,6 +168,8 @@ export const ROLE_PERMISSIONS: Record<string, string[]> = {
     'solicitacoes.create',
     'tarefas.update_status',
     'admin.impersonate',
+    'supervisorio.iot_view',
+    'equipamentos.iot_catalog',
   ],
   super_admin: [
     'dashboard.view',
@@ -181,6 +187,8 @@ export const ROLE_PERMISSIONS: Record<string, string[]> = {
     'solicitacoes.create',
     'tarefas.update_status',
     'admin.impersonate',
+    'supervisorio.iot_view',
+    'equipamentos.iot_catalog',
   ],
 };
 
