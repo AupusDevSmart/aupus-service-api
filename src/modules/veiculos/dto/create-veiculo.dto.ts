@@ -36,13 +36,13 @@ export class CreateVeiculoDto {
   codigoPatrimonial?: string;
 
   @ApiProperty({
-    description: 'Placa do veículo no formato ABC-1234',
-    example: 'ABC-1234'
+    description: 'Placa do veículo no formato antigo (ABC-1234) ou Mercosul (ABC1D23)',
+    example: 'ABC1D23'
   })
   @IsString({ message: 'Placa deve ser uma string' })
   @IsNotEmpty({ message: 'Placa é obrigatória' })
-  @Matches(/^[A-Z]{3}-[0-9]{4}$/, {
-    message: 'Placa deve estar no formato ABC-1234'
+  @Matches(/^([A-Z]{3}-[0-9]{4}|[A-Z]{3}[0-9][A-Z][0-9]{2})$/, {
+    message: 'Placa deve estar no formato ABC-1234 ou ABC1D23 (Mercosul)'
   })
   placa: string;
 
