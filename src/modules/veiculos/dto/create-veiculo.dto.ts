@@ -182,14 +182,14 @@ export class CreateVeiculoDto {
   @IsOptional()
   dataAquisicao?: Date;
 
-  @ApiProperty({
+  @ApiPropertyOptional({
     description: 'Responsável pelo veículo',
     example: 'João Silva'
   })
   @IsString({ message: 'Responsável deve ser uma string' })
-  @IsNotEmpty({ message: 'Responsável é obrigatório' })
+  @IsOptional()
   @Length(1, 100, { message: 'Responsável deve ter até 100 caracteres' })
-  responsavel: string;
+  responsavel?: string;
 
   @ApiPropertyOptional({
     description: 'ID do usuário responsável',
@@ -255,4 +255,23 @@ export class CreateVeiculoDto {
   @Type(() => Date)
   @IsOptional()
   ultimaRevisao?: Date;
+
+  @ApiPropertyOptional({
+    description: 'Seguradora do veículo',
+    example: 'Porto Seguro'
+  })
+  @IsString({ message: 'Seguradora deve ser uma string' })
+  @IsOptional()
+  @Length(1, 100, { message: 'Seguradora deve ter até 100 caracteres' })
+  seguradora?: string;
+
+  @ApiPropertyOptional({
+    description: 'Data de vencimento do seguro',
+    example: '2025-12-31',
+    type: Date
+  })
+  @IsDate({ message: 'Data de vencimento do seguro deve ser uma data válida' })
+  @Type(() => Date)
+  @IsOptional()
+  vencimentoSeguro?: Date;
 }

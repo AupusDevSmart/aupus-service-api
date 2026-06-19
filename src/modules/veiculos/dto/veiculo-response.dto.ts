@@ -44,8 +44,10 @@ export class VeiculoResponseDto {
   quilometragem: number;
   proximaRevisao?: Date;
   ultimaRevisao?: Date;
-  responsavel: string;
+  responsavel?: string;
   responsavelId?: string;
+  seguradora?: string;
+  vencimentoSeguro?: Date;
   observacoes?: string;
   foto?: string;
   ativo: boolean;
