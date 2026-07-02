@@ -1,5 +1,4 @@
 // src/modules/planos-manutencao/dto/plano-manutencao-response.dto.ts
-import { StatusPlano } from '@aupus/api-shared';
 
 export class UsuarioResumoDto {
   id: string;
@@ -43,11 +42,6 @@ export class PlanoManutencaoResponseDto {
   nome: string;
   descricao?: string;
   versao: string;
-  status: StatusPlano;
-  ativo: boolean;
-  data_vigencia_inicio?: Date;
-  data_vigencia_fim?: Date;
-  observacoes?: string;
   criado_por?: string;
   atualizado_por?: string;
   created_at: Date;

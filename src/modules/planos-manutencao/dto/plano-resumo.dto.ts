@@ -1,11 +1,9 @@
 // src/modules/planos-manutencao/dto/plano-resumo.dto.ts
-import { StatusPlano } from '@aupus/api-shared';
 
 export class PlanoResumoDto {
   id: string;
   nome: string;
   versao: string;
-  status: StatusPlano;
   equipamento_nome: string;
   equipamento_tipo?: string;
   planta_nome?: string;

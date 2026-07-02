@@ -1,5 +1,5 @@
 // src/modules/planos-manutencao/planos-manutencao.service.ts
-import { Injectable, NotFoundException, BadRequestException, ConflictException, ForbiddenException } from '@nestjs/common';
+import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
 import { PrismaService, PermissionScopeService, ScopedUser } from '@aupus/api-shared';
 import {
   CreatePlanoManutencaoDto,
@@ -9,12 +9,11 @@ import {
   DuplicarPlanoDto,
   ClonarPlanoLoteDto,
   ClonarPlanoLoteResponseDto,
-  UpdateStatusPlanoDto,
   PlanoManutencaoResponseDto,
   PlanoResumoDto,
   DashboardPlanosDto
 } from './dto';
-import { StatusPlano, Prisma } from '@aupus/api-shared';
+import { Prisma } from '@aupus/api-shared';
 
 @Injectable()
 export class PlanosManutencaoService {
@@ -48,15 +47,9 @@ export class PlanosManutencaoService {
       throw new ConflictException('Este equipamento já possui um plano de manutenção');
     }
 
-    // Converter datas string para Date objects
     const dados = {
       ...createDto,
       versao: createDto.versao || '1.0',
-      status: createDto.status || StatusPlano.ATIVO,
-      ativo: createDto.ativo !== undefined ? createDto.ativo : true,
-      // Converter datas se existirem
-      data_vigencia_inicio: createDto.data_vigencia_inicio ? this.converterStringParaDate(createDto.data_vigencia_inicio) : null,
-      data_vigencia_fim: createDto.data_vigencia_fim ? this.converterStringParaDate(createDto.data_vigencia_fim) : null
     };
 
     const plano = await this.prisma.planos_manutencao.create({
@@ -192,13 +185,12 @@ export class PlanosManutencaoService {
     await this.verificarPlantaExiste(plantaId);
     if (user) await this.scopeService.assertPlantaInScope(plantaId, user);
 
-    const { page, limit, status, incluir_tarefas } = queryDto;
+    const { page, limit, incluir_tarefas } = queryDto;
     const skip = (page - 1) * limit;
 
     // Construir filtros - JOIN entre planos_manutencao e equipamentos através de unidade
     const where: Prisma.planos_manutencaoWhereInput = {
       deleted_at: null,
-      status: status,
       equipamento: {
         deleted_at: null,
         unidade: {
@@ -292,13 +284,12 @@ export class PlanosManutencaoService {
     await this.verificarUnidadeExiste(unidadeId);
     if (user) await this.scopeService.assertEntityInScope('unidade', unidadeId, user);
 
-    const { page, limit, status, incluir_tarefas } = queryDto;
+    const { page, limit, incluir_tarefas } = queryDto;
     const skip = (page - 1) * limit;
 
     // Construir filtros - JOIN entre planos_manutencao e equipamentos através de unidade_id
     const where: Prisma.planos_manutencaoWhereInput = {
       deleted_at: null,
-      status: status,
       equipamento: {
         deleted_at: null,
         unidade_id: unidadeId
@@ -408,52 +399,14 @@ export class PlanosManutencaoService {
       }
     }
 
-    // Preparar dados com conversão de datas
     const dadosAtualizacao: any = {
       ...updateDto,
       updated_at: new Date()
     };
 
-    // Converter datas se existirem no DTO
-    if (updateDto.data_vigencia_inicio !== undefined) {
-      dadosAtualizacao.data_vigencia_inicio = updateDto.data_vigencia_inicio 
-        ? this.converterStringParaDate(updateDto.data_vigencia_inicio)
-        : null;
-    }
-
-    if (updateDto.data_vigencia_fim !== undefined) {
-      dadosAtualizacao.data_vigencia_fim = updateDto.data_vigencia_fim 
-        ? this.converterStringParaDate(updateDto.data_vigencia_fim)
-        : null;
-    }
-
     const plano = await this.prisma.planos_manutencao.update({
       where: { id },
       data: dadosAtualizacao,
-      include: this.includeRelacionamentos()
-    });
-
-    return this.mapearParaResponse(plano);
-  }
-
-  async atualizarStatus(id: string, updateStatusDto: UpdateStatusPlanoDto, user?: ScopedUser): Promise<PlanoManutencaoResponseDto> {
-    if (user) {
-      const existing = await this.prisma.planos_manutencao.findFirst({
-        where: { id, deleted_at: null },
-        select: { equipamento_id: true },
-      });
-      if (existing) await this.scopeService.assertEntityInScope('equipamento', existing.equipamento_id, user);
-    }
-    await this.verificarPlanoExiste(id);
-
-    const plano = await this.prisma.planos_manutencao.update({
-      where: { id },
-      data: {
-        status: updateStatusDto.status,
-        ativo: updateStatusDto.status === StatusPlano.ATIVO,
-        atualizado_por: updateStatusDto.atualizado_por,
-        updated_at: new Date()
-      },
       include: this.includeRelacionamentos()
     });
 
@@ -555,11 +508,6 @@ export class PlanosManutencaoService {
           nome: novoNome,
           descricao: planoOriginal.descricao,
           versao: '1.0', // Reset versão
-          status: StatusPlano.ATIVO,
-          ativo: true,
-          data_vigencia_inicio: planoOriginal.data_vigencia_inicio,
-          data_vigencia_fim: planoOriginal.data_vigencia_fim,
-          observacoes: planoOriginal.observacoes,
           // Apenas incluir criado_por se for fornecido
           ...(duplicarDto.criado_por && { criado_por: duplicarDto.criado_por })
         }
@@ -804,7 +752,6 @@ export class PlanosManutencaoService {
       id: plano.id,
       nome: plano.nome,
       versao: plano.versao,
-      status: plano.status,
       equipamento_nome: plano.equipamento?.nome,
       equipamento_tipo: plano.equipamento?.tipo_equipamento,
       planta_nome: plano.equipamento?.unidade?.planta?.nome,
@@ -823,12 +770,10 @@ export class PlanosManutencaoService {
   }
 
   async obterDashboard(): Promise<DashboardPlanosDto> {
-    const [statsPlanos, statsTarefas, distribuicao] = await Promise.all([
-      // Stats dos planos
-      this.prisma.planos_manutencao.groupBy({
-        by: ['status'],
-        where: { deleted_at: null },
-        _count: true
+    const [totalPlanos, statsTarefas, distribuicao] = await Promise.all([
+      // Total de planos
+      this.prisma.planos_manutencao.count({
+        where: { deleted_at: null }
       }),
 
       // Stats das tarefas
@@ -841,7 +786,7 @@ export class PlanosManutencaoService {
       // Distribuição por tipo
       this.prisma.tarefas.groupBy({
         by: ['tipo_manutencao'],
-        where: { 
+        where: {
           deleted_at: null,
           ativo: true
         },
@@ -849,7 +794,6 @@ export class PlanosManutencaoService {
       })
     ]);
 
-    const totalPlanos = statsPlanos.reduce((acc, stat) => acc + stat._count, 0);
     const equipamentosComPlano = await this.prisma.planos_manutencao.groupBy({
       by: ['equipamento_id'],
       where: { deleted_at: null }
@@ -867,10 +811,6 @@ export class PlanosManutencaoService {
 
     return {
       total_planos: totalPlanos,
-      planos_ativos: this.contarPorStatus(statsPlanos, StatusPlano.ATIVO),
-      planos_inativos: this.contarPorStatus(statsPlanos, StatusPlano.INATIVO),
-      planos_em_revisao: this.contarPorStatus(statsPlanos, StatusPlano.EM_REVISAO),
-      planos_arquivados: this.contarPorStatus(statsPlanos, StatusPlano.ARQUIVADO),
       equipamentos_com_plano: equipamentosComPlano,
       total_tarefas_todos_planos: statsTarefas._count,
       media_tarefas_por_plano: totalPlanos > 0 ? Math.round(statsTarefas._count / totalPlanos) : 0,
@@ -886,27 +826,6 @@ export class PlanosManutencaoService {
   }
 
   // Métodos privados auxiliares
-
-  /**
-   * Converte string de data para objeto Date
-   * Aceita formatos: "2025-09-13" ou "2025-09-13T10:30:00.000Z"
-   */
-  private converterStringParaDate(dataString: string | Date): Date {
-    if (dataString instanceof Date) {
-      return dataString;
-    }
-
-    if (typeof dataString === 'string') {
-      // Se é apenas uma data (YYYY-MM-DD), adicionar hora para evitar problemas de timezone
-      if (dataString.match(/^\d{4}-\d{2}-\d{2}$/)) {
-        return new Date(dataString + 'T00:00:00.000Z');
-      }
-      // Se já é um datetime ISO, usar diretamente
-      return new Date(dataString);
-    }
-
-    throw new BadRequestException('Formato de data inválido');
-  }
 
   private async verificarEquipamentoExiste(equipamentoId: string): Promise<void> {
     const equipamento = await this.prisma.equipamentos.findFirst({
@@ -1007,14 +926,6 @@ export class PlanosManutencaoService {
       where.equipamento_id = filters.equipamento_id;
     }
 
-    if (filters.status) {
-      where.status = filters.status;
-    }
-
-    if (filters.ativo !== undefined) {
-      where.ativo = filters.ativo;
-    }
-
     // Handle planta_id and unidade_id filters - usando equipamento_id diretamente
     // ao invés de relação (para evitar problemas com relações opcionais)
     if (filters.planta_id || filters.unidade_id) {
@@ -1044,9 +955,6 @@ export class PlanosManutencaoService {
         // Não podemos ordenar por relação opcional, usar equipamento_id
         orderBy.equipamento_id = sortOrder;
         break;
-      case 'status':
-        orderBy.status = sortOrder;
-        break;
       case 'updated_at':
         orderBy.updated_at = sortOrder;
         break;
@@ -1064,11 +972,6 @@ export class PlanosManutencaoService {
       nome: plano.nome,
       descricao: plano.descricao,
       versao: plano.versao,
-      status: plano.status,
-      ativo: plano.ativo,
-      data_vigencia_inicio: plano.data_vigencia_inicio,
-      data_vigencia_fim: plano.data_vigencia_fim,
-      observacoes: plano.observacoes,
       criado_por: plano.criado_por,
       atualizado_por: plano.atualizado_por,
       created_at: plano.created_at,
@@ -1136,10 +1039,6 @@ export class PlanosManutencaoService {
     }
 
     return novaTag;
-  }
-
-  private contarPorStatus(stats: any[], status: StatusPlano): number {
-    return stats.find(s => s.status === status)?._count || 0;
   }
 
   private contarPorTipo(distribuicao: any[], tipo: string): number {

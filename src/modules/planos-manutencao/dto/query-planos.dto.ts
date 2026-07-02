@@ -1,8 +1,7 @@
 // src/modules/planos-manutencao/dto/query-planos.dto.ts
-import { IsOptional, IsEnum, IsString, IsInt, Min, Max, IsBoolean } from 'class-validator';
-import { Transform, Type } from 'class-transformer';
+import { IsOptional, IsEnum, IsString, IsInt, Min, Max } from 'class-validator';
+import { Type } from 'class-transformer';
 import { ApiPropertyOptional } from '@nestjs/swagger';
-import { StatusPlano } from '@aupus/api-shared';
 
 export class QueryPlanosDto {
   @ApiPropertyOptional({ description: 'Busca em nome, descrição ou equipamento' })
@@ -24,17 +23,6 @@ export class QueryPlanosDto {
   @IsOptional()
   @IsString()
   unidade_id?: string;
-
-  @ApiPropertyOptional({ enum: StatusPlano, description: 'Status do plano' })
-  @IsOptional()
-  @IsEnum(StatusPlano)
-  status?: StatusPlano;
-
-  @ApiPropertyOptional({ description: 'Filtrar por planos ativos/inativos', type: Boolean })
-  @IsOptional()
-  @Transform(({ value }) => value === 'true')
-  @IsBoolean()
-  ativo?: boolean;
 
   @ApiPropertyOptional({ description: 'Número da página', default: 1, minimum: 1 })
   @IsOptional()

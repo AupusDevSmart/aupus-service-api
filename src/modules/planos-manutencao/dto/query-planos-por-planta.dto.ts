@@ -1,16 +1,11 @@
-import { IsOptional, IsEnum, IsInt, Min, Max, IsBoolean } from 'class-validator';
+import { IsOptional, IsInt, Min, Max, IsBoolean } from 'class-validator';
 import { Transform, Type } from 'class-transformer';
-import { StatusPlano } from '@aupus/api-shared';
 
 export class QueryPlanosPorPlantaDto {
   @IsOptional()
   @Transform(({ value }) => value === 'true')
   @IsBoolean()
   incluir_tarefas?: boolean = false;
-
-  @IsOptional()
-  @IsEnum(StatusPlano)
-  status?: StatusPlano = StatusPlano.ATIVO;
 
   @IsOptional()
   @Type(() => Number)

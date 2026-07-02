@@ -24,7 +24,6 @@ import {
   DuplicarPlanoDto,
   ClonarPlanoLoteDto,
   ClonarPlanoLoteResponseDto,
-  UpdateStatusPlanoDto,
   PlanoManutencaoResponseDto,
   PlanoResumoDto,
   DashboardPlanosDto
@@ -105,12 +104,6 @@ export class PlanosManutencaoController {
     description: 'Incluir tarefas dos planos na resposta'
   })
   @ApiQuery({
-    name: 'status',
-    required: false,
-    enum: ['ATIVO', 'INATIVO', 'EM_REVISAO', 'ARQUIVADO'],
-    description: 'Filtrar por status (default: ATIVO)'
-  })
-  @ApiQuery({
     name: 'page',
     required: false,
     type: 'number',
@@ -159,12 +152,6 @@ export class PlanosManutencaoController {
     required: false,
     type: 'boolean',
     description: 'Incluir tarefas dos planos na resposta'
-  })
-  @ApiQuery({
-    name: 'status',
-    required: false,
-    enum: ['ATIVO', 'INATIVO', 'EM_REVISAO', 'ARQUIVADO'],
-    description: 'Filtrar por status (default: ATIVO)'
   })
   @ApiQuery({
     name: 'page',
@@ -293,26 +280,6 @@ export class PlanosManutencaoController {
     @CurrentUser() user?: any,
   ): Promise<PlanoManutencaoResponseDto> {
     return this.planosManutencaoService.atualizar(id, updateDto, user);
-  }
-
-  @Put(':id/status')
-  @ApiOperation({ summary: 'Atualizar apenas status do plano' })
-  @ApiParam({ name: 'id', description: 'ID do plano' })
-  @ApiResponse({ 
-    status: HttpStatus.OK, 
-    description: 'Status atualizado com sucesso',
-    type: PlanoManutencaoResponseDto 
-  })
-  @ApiResponse({ 
-    status: HttpStatus.NOT_FOUND, 
-    description: 'Plano não encontrado' 
-  })
-  async atualizarStatus(
-    @Param('id') id: string,
-    @Body() updateStatusDto: UpdateStatusPlanoDto,
-    @CurrentUser() user?: any,
-  ): Promise<PlanoManutencaoResponseDto> {
-    return this.planosManutencaoService.atualizarStatus(id, updateStatusDto, user);
   }
 
   @Post(':id/duplicar')

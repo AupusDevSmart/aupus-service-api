@@ -1,7 +1,5 @@
 // src/modules/planos-manutencao/dto/create-plano-manutencao.dto.ts
-import { IsString, IsOptional, IsEnum, IsDateString, IsNotEmpty, MaxLength, IsBoolean } from 'class-validator';
-import { StatusPlano } from '@aupus/api-shared';
-import { Type } from 'class-transformer';
+import { IsString, IsOptional, IsNotEmpty, MaxLength } from 'class-validator';
 
 export class CreatePlanoManutencaoDto {
   @IsString()
@@ -21,26 +19,6 @@ export class CreatePlanoManutencaoDto {
   @IsOptional()
   @MaxLength(20)
   versao?: string;
-
-  @IsEnum(StatusPlano)
-  @IsOptional()
-  status?: StatusPlano;
-
-  @IsBoolean()
-  @IsOptional()
-  ativo?: boolean;
-
-  @IsDateString()
-  @IsOptional()
-  data_vigencia_inicio?: string;
-
-  @IsDateString()
-  @IsOptional()
-  data_vigencia_fim?: string;
-
-  @IsString()
-  @IsOptional()
-  observacoes?: string;
 
   @IsString()
   @IsOptional()

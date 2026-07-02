@@ -2,10 +2,6 @@
 
 export class DashboardPlanosDto {
   total_planos: number;
-  planos_ativos: number;
-  planos_inativos: number;
-  planos_em_revisao: number;
-  planos_arquivados: number;
   equipamentos_com_plano: number;
   
   // Estatísticas gerais
