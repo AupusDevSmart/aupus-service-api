@@ -82,6 +82,11 @@ describe('ExecucaoOSService', () => {
       update: jest.fn(),
       count: jest.fn().mockResolvedValue(0),
     },
+    // Usado pelo registro de execucao na finalizacao e pelo avanco da ancora
+    // no cancelamento
+    tarefas: {
+      update: jest.fn(),
+    },
     materiais_os: {
       findMany: jest.fn(),
       updateMany: jest.fn(),
@@ -675,6 +680,65 @@ describe('ExecucaoOSService', () => {
     });
   });
 
+  describe('registro de execucao na finalizacao', () => {
+    const prepararFinalizacao = () => {
+      const mockTransaction = jest.fn(async (callback) => callback(mockPrismaService));
+      mockPrismaService.$transaction.mockImplementation(mockTransaction);
+      mockPrismaService.ordens_servico.findFirst.mockResolvedValue({
+        ...mockOSData,
+        status: StatusOS.AUDITADA,
+      });
+      (mockPrismaService as any).usuarios = {
+        findUnique: jest.fn().mockResolvedValue({ nome: 'Admin' }),
+      };
+      (mockPrismaService as any).programacoes_os = {
+        update: jest.fn().mockResolvedValue({ solicitacao_servico_id: null }),
+      };
+      mockPrismaService.ordens_servico.update.mockResolvedValue({});
+      mockPrismaService.historico_os.create.mockResolvedValue({});
+      mockPrismaService.tarefas.update.mockResolvedValue({});
+    };
+
+    it('registra apenas as tarefas CONCLUIDA, com a data da conclusao', async () => {
+      prepararFinalizacao();
+
+      const dataConclusao = new Date('2026-07-20T14:30:00Z');
+      mockPrismaService.tarefas_os.findMany.mockResolvedValue([
+        { tarefa_id: 'tarefa_feita ', data_conclusao: dataConclusao },
+      ]);
+      mockPrismaService.tarefas_os.count.mockResolvedValue(3);
+
+      await service.finalizar('clrx1234567890123456789012', { observacoes: 'ok' } as any, 'user123');
+
+      // A consulta tem que filtrar por CONCLUIDA: OS pode fechar com tarefa
+      // pendente ou cancelada, e marcar todas como executadas faria a
+      // periodicidade contar a partir de algo que nunca aconteceu
+      const where = mockPrismaService.tarefas_os.findMany.mock.calls[0][0].where;
+      expect(where.status).toBe('CONCLUIDA');
+
+      // A data e a da conclusao da tarefa, nao a da finalizacao da OS: OS
+      // fechada com atraso deslocaria todo o calendario seguinte
+      expect(mockPrismaService.tarefas.update).toHaveBeenCalledWith({
+        where: { id: 'tarefa_feita' },
+        data: {
+          data_ultima_execucao: dataConclusao,
+          numero_execucoes: { increment: 1 },
+        },
+      });
+      expect(mockPrismaService.tarefas.update).toHaveBeenCalledTimes(1);
+    });
+
+    it('nao registra execucao nenhuma quando nada foi concluido', async () => {
+      prepararFinalizacao();
+      mockPrismaService.tarefas_os.findMany.mockResolvedValue([]);
+      mockPrismaService.tarefas_os.count.mockResolvedValue(2);
+
+      await service.finalizar('clrx1234567890123456789012', { observacoes: 'ok' } as any, 'user123');
+
+      expect(mockPrismaService.tarefas.update).not.toHaveBeenCalled();
+    });
+  });
+
   describe('cancelar', () => {
     const cancelarDto: CancelarOSDto = {
       motivo_cancelamento: 'Equipamento com defeito grave',
@@ -717,6 +781,49 @@ describe('ExecucaoOSService', () => {
 
       await expect(service.cancelar('clrx1234567890123456789012', cancelarDto, 'user123'))
         .rejects.toThrow(ConflictException);
+    });
+
+    it('avanca a ancora das tarefas para o ciclo cancelado, pulando um ciclo', async () => {
+      const mockTransaction = jest.fn(async (callback) => callback(mockPrismaService));
+      mockPrismaService.$transaction.mockImplementation(mockTransaction);
+      mockPrismaService.ordens_servico.findFirst.mockResolvedValue({
+        ...mockOSData,
+        status: StatusOS.EM_EXECUCAO,
+      });
+      mockPrismaService.ordens_servico.update.mockResolvedValue({});
+      mockPrismaService.historico_os.create.mockResolvedValue({});
+
+      const cicloCancelado = new Date('2026-09-01T00:00:00Z');
+      mockPrismaService.tarefas_os.findMany.mockResolvedValue([
+        { tarefa_id: 'tarefa_1  ', ciclo_referencia: cicloCancelado },
+      ]);
+      mockPrismaService.tarefas.update.mockResolvedValue({});
+
+      await service.cancelar('clrx1234567890123456789012', cancelarDto, 'user123');
+
+      // Cancelar a OS inteira e decisao de planejamento: aquele ciclo nao
+      // acontece. Sem isso o cron recriaria a mesma programacao na madrugada
+      // seguinte, e o usuario cancelaria de novo, em loop.
+      expect(mockPrismaService.tarefas.update).toHaveBeenCalledWith({
+        where: { id: 'tarefa_1' },
+        data: { data_ancora: cicloCancelado },
+      });
+    });
+
+    it('nao mexe na ancora quando o vinculo nao tem ciclo (OS manual)', async () => {
+      const mockTransaction = jest.fn(async (callback) => callback(mockPrismaService));
+      mockPrismaService.$transaction.mockImplementation(mockTransaction);
+      mockPrismaService.ordens_servico.findFirst.mockResolvedValue({
+        ...mockOSData,
+        status: StatusOS.EM_EXECUCAO,
+      });
+      mockPrismaService.ordens_servico.update.mockResolvedValue({});
+      mockPrismaService.historico_os.create.mockResolvedValue({});
+      mockPrismaService.tarefas_os.findMany.mockResolvedValue([]);
+
+      await service.cancelar('clrx1234567890123456789012', cancelarDto, 'user123');
+
+      expect(mockPrismaService.tarefas.update).not.toHaveBeenCalled();
     });
   });
 
@@ -905,6 +1012,88 @@ describe('ExecucaoOSService', () => {
         await service.iniciar('clrx1234567890123456789012', iniciarDto, 'user123');
 
         expect(mockPrismaService.checklist_atividades_os.createMany).not.toHaveBeenCalled();
+      });
+
+      it('semeia o checklist com as sub-instrucoes reais antes dos itens genericos', async () => {
+        const mockTransaction = jest.fn(async (callback) => callback(mockPrismaService));
+        mockPrismaService.$transaction.mockImplementation(mockTransaction);
+        mockPrismaService.ordens_servico.findFirst.mockResolvedValue({
+          ...mockOSData,
+          status: StatusOS.PENDENTE,
+        });
+        mockPrismaService.checklist_atividades_os.count.mockResolvedValue(0);
+        mockPrismaService.checklist_atividades_os.createMany.mockResolvedValue({ count: 7 });
+        mockPrismaService.ordens_servico.update.mockResolvedValue({});
+        mockPrismaService.registros_tempo_os.create.mockResolvedValue({});
+        mockPrismaService.historico_os.create.mockResolvedValue({});
+
+        mockPrismaService.tarefas_os.findMany.mockResolvedValue([
+          {
+            nome_snapshot: 'Relação de transformação',
+            instrucao_nome: 'Ensaio TTR',
+            tarefa: {
+              nome: 'Relação de transformação',
+              instrucao: {
+                nome: 'Ensaio TTR',
+                sub_instrucoes: [
+                  { descricao: 'Desconectar os cabos', obrigatoria: true, tempo_estimado: 10 },
+                  { descricao: 'Realizar o ensaio', obrigatoria: true, tempo_estimado: 20 },
+                ],
+              },
+            },
+          },
+        ]);
+
+        await service.iniciar('clrx1234567890123456789012', {
+          equipe_presente: ['João Silva'],
+          responsavel_execucao: 'João Silva',
+        } as IniciarExecucaoDto, 'user123');
+
+        const dados = mockPrismaService.checklist_atividades_os.createMany.mock.calls[0][0].data;
+
+        // As etapas reais vem primeiro, prefixadas pela tarefa: a OS junta
+        // varias tarefas e sem o prefixo nao da pra saber de quem e a etapa
+        expect(dados[0]).toEqual(
+          expect.objectContaining({
+            atividade: 'Relação de transformação: Desconectar os cabos',
+            ordem: 1,
+            obrigatoria: true,
+            tempo_estimado: 10,
+          }),
+        );
+        expect(dados[1].atividade).toBe('Relação de transformação: Realizar o ensaio');
+
+        // Os genericos de seguranca fecham a lista, sem sobrescrever a ordem
+        expect(dados[2].atividade).toBe('Verificar equipamentos de segurança');
+        expect(dados[2].ordem).toBe(3);
+        expect(dados.map((d: any) => d.ordem)).toEqual([1, 2, 3, 4, 5, 6, 7]);
+      });
+
+      it('ignora tarefa cuja instrucao nao tem sub-instrucoes', async () => {
+        const mockTransaction = jest.fn(async (callback) => callback(mockPrismaService));
+        mockPrismaService.$transaction.mockImplementation(mockTransaction);
+        mockPrismaService.ordens_servico.findFirst.mockResolvedValue({
+          ...mockOSData,
+          status: StatusOS.PENDENTE,
+        });
+        mockPrismaService.checklist_atividades_os.count.mockResolvedValue(0);
+        mockPrismaService.checklist_atividades_os.createMany.mockResolvedValue({ count: 5 });
+        mockPrismaService.ordens_servico.update.mockResolvedValue({});
+        mockPrismaService.registros_tempo_os.create.mockResolvedValue({});
+        mockPrismaService.historico_os.create.mockResolvedValue({});
+
+        mockPrismaService.tarefas_os.findMany.mockResolvedValue([
+          { nome_snapshot: 'Sem instrucao', tarefa: { nome: 'Sem instrucao', instrucao: null } },
+        ]);
+
+        await service.iniciar('clrx1234567890123456789012', {
+          equipe_presente: ['João Silva'],
+          responsavel_execucao: 'João Silva',
+        } as IniciarExecucaoDto, 'user123');
+
+        const dados = mockPrismaService.checklist_atividades_os.createMany.mock.calls[0][0].data;
+        expect(dados).toHaveLength(5);
+        expect(dados[0].atividade).toBe('Verificar equipamentos de segurança');
       });
     });
 

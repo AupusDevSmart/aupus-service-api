@@ -325,6 +325,99 @@ describe('ProgramacaoOSService', () => {
     });
   });
 
+  describe('congelamento do conteudo pedido', () => {
+    it('grava o snapshot da tarefa e da instrucao no vinculo da programacao', async () => {
+      const mockTransaction = jest.fn(async (callback) => callback(mockPrismaService));
+      mockPrismaService.$transaction.mockImplementation(mockTransaction);
+      mockPrismaService.programacoes_os.create.mockResolvedValue(mockProgramacaoData);
+      mockPrismaService.programacoes_os.count.mockResolvedValue(0);
+      mockPrismaService.tarefas_programacao_os.findMany.mockResolvedValue([]);
+      mockPrismaService.tarefas_programacao_os.createMany.mockResolvedValue({ count: 1 });
+      mockPrismaService.historico_programacao_os.create.mockResolvedValue({});
+
+      mockPrismaService.tarefas.findMany.mockResolvedValue([
+        {
+          id: 'tarefa_1',
+          nome: 'Relação de transformação',
+          criticidade: 4,
+          frequencia: 'ANUAL',
+          deleted_at: null,
+          instrucao: {
+            tag: 'INST-052',
+            nome: 'Ensaio TTR',
+            descricao: 'Medição de relação de transformação em TP',
+          },
+        },
+      ]);
+
+      await service.criar(
+        {
+          descricao: 'Programação',
+          local: 'Planta A',
+          ativo: 'Motor',
+          condicoes: 'PARADO',
+          tipo: 'PREVENTIVA',
+          prioridade: 'MEDIA',
+          origem: 'PLANO_MANUTENCAO',
+          tempo_estimado: 1,
+          duracao_estimada: 1,
+          tarefas_ids: ['tarefa_1'],
+        } as any,
+        'user123',
+      );
+
+      const dados = mockPrismaService.tarefas_programacao_os.createMany.mock.calls[0][0].data;
+
+      // Sem o congelamento, editar a tarefa (ou apagar a copia do plano ao
+      // trocar de equipamento) reescreveria o historico do que foi pedido
+      expect(dados[0]).toEqual(
+        expect.objectContaining({
+          tarefa_id: 'tarefa_1',
+          nome_snapshot: 'Relação de transformação',
+          criticidade_snapshot: 4,
+          frequencia_snapshot: 'ANUAL',
+          instrucao_tag: 'INST-052',
+          instrucao_nome: 'Ensaio TTR',
+          instrucao_descricao: 'Medição de relação de transformação em TP',
+        }),
+      );
+    });
+
+    it('nao quebra quando a tarefa nao tem instrucao vinculada', async () => {
+      const mockTransaction = jest.fn(async (callback) => callback(mockPrismaService));
+      mockPrismaService.$transaction.mockImplementation(mockTransaction);
+      mockPrismaService.programacoes_os.create.mockResolvedValue(mockProgramacaoData);
+      mockPrismaService.programacoes_os.count.mockResolvedValue(0);
+      mockPrismaService.tarefas_programacao_os.findMany.mockResolvedValue([]);
+      mockPrismaService.tarefas_programacao_os.createMany.mockResolvedValue({ count: 1 });
+      mockPrismaService.historico_programacao_os.create.mockResolvedValue({});
+
+      mockPrismaService.tarefas.findMany.mockResolvedValue([
+        { id: 'tarefa_1', nome: 'Avulsa', criticidade: 2, frequencia: null, deleted_at: null, instrucao: null },
+      ]);
+
+      await service.criar(
+        {
+          descricao: 'Programação',
+          local: 'Planta A',
+          ativo: 'Motor',
+          condicoes: 'PARADO',
+          tipo: 'PREVENTIVA',
+          prioridade: 'MEDIA',
+          origem: 'PLANO_MANUTENCAO',
+          tempo_estimado: 1,
+          duracao_estimada: 1,
+          tarefas_ids: ['tarefa_1'],
+        } as any,
+        'user123',
+      );
+
+      const dados = mockPrismaService.tarefas_programacao_os.createMany.mock.calls[0][0].data;
+      expect(dados[0].nome_snapshot).toBe('Avulsa');
+      expect(dados[0].instrucao_tag).toBeNull();
+    });
+  });
+
   describe('criar', () => {
     const createDto: CreateProgramacaoDto = {
       descricao: 'Manutenção preventiva',
