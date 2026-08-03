@@ -9,6 +9,11 @@ export class QueryPlanosDto {
   @IsString()
   search?: string;
 
+  @ApiPropertyOptional({ description: 'ID da categoria de equipamento (filtra templates)' })
+  @IsOptional()
+  @IsString()
+  categoria_id?: string;
+
   @ApiPropertyOptional({ description: 'ID do equipamento' })
   @IsOptional()
   @IsString()

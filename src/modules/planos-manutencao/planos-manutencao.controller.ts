@@ -22,6 +22,9 @@ import {
   QueryPlanosDto,
   QueryPlanosPorPlantaDto,
   DuplicarPlanoDto,
+  VincularPlanoDto,
+  VincularPlanoResponseDto,
+  PreviaDesvinculoDto,
   ClonarPlanoLoteDto,
   ClonarPlanoLoteResponseDto,
   PlanoManutencaoResponseDto,
@@ -211,6 +214,69 @@ export class PlanosManutencaoController {
     @CurrentUser() user?: any,
   ): Promise<PlanoManutencaoResponseDto> {
     return this.planosManutencaoService.buscarPorEquipamento(equipamentoId, user);
+  }
+
+  // ==========================================
+  // Vinculo equipamento <-> plano
+  // ==========================================
+
+  @Get('equipamento/:equipamentoId/templates')
+  @ApiOperation({
+    summary: 'Listar planos template aplicaveis ao equipamento (mesma categoria do modelo)'
+  })
+  @ApiParam({ name: 'equipamentoId', description: 'ID do equipamento' })
+  @ApiResponse({ status: HttpStatus.OK, type: [PlanoManutencaoResponseDto] })
+  async listarTemplatesDoEquipamento(
+    @Param('equipamentoId') equipamentoId: string,
+    @CurrentUser() user?: any,
+  ): Promise<PlanoManutencaoResponseDto[]> {
+    return this.planosManutencaoService.listarTemplatesDoEquipamento(equipamentoId, user);
+  }
+
+  @Get('equipamento/:equipamentoId/previa-desvinculo')
+  @ApiOperation({
+    summary: 'O que se perde ao trocar ou desvincular o plano do equipamento'
+  })
+  @ApiParam({ name: 'equipamentoId', description: 'ID do equipamento' })
+  @ApiResponse({ status: HttpStatus.OK, type: PreviaDesvinculoDto })
+  async previaDesvinculo(
+    @Param('equipamentoId') equipamentoId: string,
+    @CurrentUser() user?: any,
+  ): Promise<PreviaDesvinculoDto> {
+    return this.planosManutencaoService.previaDesvinculo(equipamentoId, user);
+  }
+
+  @Post('vincular')
+  @HttpCode(HttpStatus.CREATED)
+  @ApiOperation({
+    summary: 'Vincular um plano template a um equipamento, copiando plano e tarefas'
+  })
+  @ApiResponse({ status: HttpStatus.CREATED, type: VincularPlanoResponseDto })
+  @ApiResponse({
+    status: HttpStatus.BAD_REQUEST,
+    description: 'Equipamento nao e UC, esta sem modelo, ou o plano e de outra categoria'
+  })
+  @ApiResponse({ status: HttpStatus.NOT_FOUND, description: 'Equipamento ou plano nao encontrado' })
+  async vincularEquipamento(
+    @Body() dto: VincularPlanoDto,
+    @CurrentUser() user?: any,
+  ): Promise<VincularPlanoResponseDto> {
+    return this.planosManutencaoService.vincularEquipamento(
+      { ...dto, criado_por: dto.criado_por || user?.id },
+      user,
+    );
+  }
+
+  @Delete('equipamento/:equipamentoId/vinculo')
+  @ApiOperation({ summary: 'Desvincular o plano do equipamento, removendo a copia' })
+  @ApiParam({ name: 'equipamentoId', description: 'ID do equipamento' })
+  @ApiResponse({ status: HttpStatus.OK, type: PreviaDesvinculoDto })
+  @ApiResponse({ status: HttpStatus.NOT_FOUND, description: 'Equipamento sem plano vinculado' })
+  async desvincularEquipamento(
+    @Param('equipamentoId') equipamentoId: string,
+    @CurrentUser() user?: any,
+  ): Promise<PreviaDesvinculoDto> {
+    return this.planosManutencaoService.desvincularEquipamento(equipamentoId, user);
   }
 
   @Get(':id')

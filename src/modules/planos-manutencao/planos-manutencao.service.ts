@@ -1,5 +1,5 @@
 // src/modules/planos-manutencao/planos-manutencao.service.ts
-import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
+import { Injectable, NotFoundException, ConflictException, BadRequestException } from '@nestjs/common';
 import { PrismaService, PermissionScopeService, ScopedUser } from '@aupus/api-shared';
 import {
   CreatePlanoManutencaoDto,
@@ -7,6 +7,9 @@ import {
   QueryPlanosDto,
   QueryPlanosPorPlantaDto,
   DuplicarPlanoDto,
+  VincularPlanoDto,
+  VincularPlanoResponseDto,
+  PreviaDesvinculoDto,
   ClonarPlanoLoteDto,
   ClonarPlanoLoteResponseDto,
   PlanoManutencaoResponseDto,
@@ -30,25 +33,21 @@ export class PlanosManutencaoService {
     return { equipamento: { unidade: { planta_id: { in: scope } } } };
   }
 
-  async criar(createDto: CreatePlanoManutencaoDto, user?: ScopedUser): Promise<PlanoManutencaoResponseDto> {
-    // Verificar se equipamento existe e esta no escopo
-    await this.verificarEquipamentoExiste(createDto.equipamento_id);
-    if (user) await this.scopeService.assertEntityInScope('equipamento', createDto.equipamento_id, user);
-    
-    // Verificar se equipamento já tem plano (constraint unique)
-    const planoExistente = await this.prisma.planos_manutencao.findFirst({
-      where: {
-        equipamento_id: createDto.equipamento_id,
-        deleted_at: null
-      }
-    });
+  /**
+   * Template nao tem equipamento, logo nao tem planta, logo nao tem escopo:
+   * pertence a uma categoria e vale para toda a base. O escopo por planta e
+   * verificado no vinculo, onde o equipamento existe.
+   */
+  private readonly SOMENTE_TEMPLATES: Prisma.planos_manutencaoWhereInput = {
+    plano_origem_id: null,
+  };
 
-    if (planoExistente) {
-      throw new ConflictException('Este equipamento já possui um plano de manutenção');
-    }
+  async criar(createDto: CreatePlanoManutencaoDto, user?: ScopedUser): Promise<PlanoManutencaoResponseDto> {
+    await this.verificarCategoriaExiste(createDto.categoria_id);
 
     const dados = {
       ...createDto,
+      categoria_id: createDto.categoria_id.trim(),
       versao: createDto.versao || '1.0',
     };
 
@@ -70,12 +69,12 @@ export class PlanosManutencaoService {
     const { page, limit, search, sort_by, sort_order, ...filters } = queryDto;
     const skip = (page - 1) * limit;
 
-    // Construir filtros
-    const scopeFragment = await this.scopeFragment(user);
+    // Somente templates: as copias por equipamento nascem do vinculo e
+    // apareceriam duplicadas aqui, uma por equipamento vinculado.
     const where: Prisma.planos_manutencaoWhereInput = {
       deleted_at: null,
+      ...this.SOMENTE_TEMPLATES,
       ...this.construirFiltros(filters, search),
-      ...(scopeFragment && { AND: [scopeFragment] }),
     };
 
     // Construir ordenação
@@ -86,6 +85,7 @@ export class PlanosManutencaoService {
         where,
         include: {
           equipamento: true,
+          categoria: { select: { id: true, nome: true } },
           usuario_criador: {
             select: {
               id: true,
@@ -96,6 +96,10 @@ export class PlanosManutencaoService {
           _count: {
             select: {
               tarefas: {
+                where: { deleted_at: null }
+              },
+              // Quantos equipamentos usam este template hoje
+              copias: {
                 where: { deleted_at: null }
               }
             }
@@ -373,30 +377,16 @@ export class PlanosManutencaoService {
   }
 
   async atualizar(id: string, updateDto: UpdatePlanoManutencaoDto, user?: ScopedUser): Promise<PlanoManutencaoResponseDto> {
-    if (user) {
-      const existing = await this.prisma.planos_manutencao.findFirst({
-        where: { id, deleted_at: null },
-        select: { equipamento_id: true },
-      });
-      if (existing) await this.scopeService.assertEntityInScope('equipamento', existing.equipamento_id, user);
+    const existente = await this.verificarPlanoExiste(id);
+
+    // Copia (tem origem) segue amarrada a um equipamento e mantem o escopo por
+    // planta. Template e global por categoria e nao tem escopo.
+    if (user && (existente as any).equipamento_id) {
+      await this.scopeService.assertEntityInScope('equipamento', (existente as any).equipamento_id, user);
     }
-    await this.verificarPlanoExiste(id);
 
-    // Se mudou equipamento, verificar se novo equipamento já tem plano
-    if (updateDto.equipamento_id) {
-      await this.verificarEquipamentoExiste(updateDto.equipamento_id);
-      
-      const planoExistente = await this.prisma.planos_manutencao.findFirst({
-        where: {
-          equipamento_id: updateDto.equipamento_id,
-          id: { not: id },
-          deleted_at: null
-        }
-      });
-
-      if (planoExistente) {
-        throw new ConflictException('O equipamento selecionado já possui um plano de manutenção');
-      }
+    if (updateDto.categoria_id) {
+      await this.verificarCategoriaExiste(updateDto.categoria_id);
     }
 
     const dadosAtualizacao: any = {
@@ -825,6 +815,239 @@ export class PlanosManutencaoService {
     };
   }
 
+  // ==========================================
+  // Vinculo equipamento <-> plano (copia do template)
+  // ==========================================
+
+  /**
+   * Lista os templates aplicaveis a um equipamento: os da categoria do modelo
+   * dele. Equipamento sem modelo nao tem categoria e portanto nao tem template.
+   */
+  async listarTemplatesDoEquipamento(equipamentoId: string, user?: ScopedUser): Promise<PlanoManutencaoResponseDto[]> {
+    const id = equipamentoId.trim();
+    if (user) await this.scopeService.assertEntityInScope('equipamento', id, user);
+
+    const categoriaId = await this.categoriaDoEquipamento(id);
+    if (!categoriaId) return [];
+
+    const planos = await this.prisma.planos_manutencao.findMany({
+      where: { deleted_at: null, ...this.SOMENTE_TEMPLATES, categoria_id: categoriaId },
+      include: {
+        categoria: { select: { id: true, nome: true } },
+        _count: { select: { tarefas: { where: { deleted_at: null } } } }
+      },
+      orderBy: { nome: 'asc' }
+    });
+
+    return planos.map(plano => this.mapearParaResponse(plano));
+  }
+
+  /** O que se perde ao trocar ou desvincular o plano do equipamento. */
+  async previaDesvinculo(equipamentoId: string, user?: ScopedUser): Promise<PreviaDesvinculoDto> {
+    const id = equipamentoId.trim();
+    if (user) await this.scopeService.assertEntityInScope('equipamento', id, user);
+
+    const copia = await this.prisma.planos_manutencao.findFirst({
+      where: { equipamento_id: id, deleted_at: null },
+      include: { tarefas: { where: { deleted_at: null }, select: { origem_status: true } } }
+    });
+
+    if (!copia) {
+      return { possui_plano: false, total_tarefas: 0, tarefas_proprias: 0, tarefas_customizadas: 0 };
+    }
+
+    return {
+      possui_plano: true,
+      total_tarefas: copia.tarefas.length,
+      tarefas_proprias: copia.tarefas.filter(t => t.origem_status === 'PROPRIA').length,
+      tarefas_customizadas: copia.tarefas.filter(t => t.origem_status === 'CUSTOMIZADA').length
+    };
+  }
+
+  async vincularEquipamento(dto: VincularPlanoDto, user?: ScopedUser): Promise<VincularPlanoResponseDto> {
+    const equipamentoId = dto.equipamento_id.trim();
+    const planoId = dto.plano_id.trim();
+
+    if (user) await this.scopeService.assertEntityInScope('equipamento', equipamentoId, user);
+
+    const equipamento = await this.prisma.equipamentos.findFirst({
+      where: { id: equipamentoId, deleted_at: null },
+      select: {
+        id: true,
+        nome: true,
+        classificacao: true,
+        unidade: { select: { planta_id: true } }
+      }
+    });
+
+    if (!equipamento) {
+      throw new NotFoundException('Equipamento não encontrado');
+    }
+
+    if (equipamento.classificacao !== 'UC') {
+      throw new BadRequestException(
+        'Somente equipamentos UC recebem plano de manutenção. Componentes UAR são cobertos pelo plano do equipamento pai.'
+      );
+    }
+
+    const template = await this.prisma.planos_manutencao.findFirst({
+      where: { id: planoId, deleted_at: null },
+      include: {
+        tarefas: {
+          where: { deleted_at: null },
+          orderBy: { ordem: 'asc' }
+        }
+      }
+    });
+
+    if (!template) {
+      throw new NotFoundException('Plano de manutenção não encontrado');
+    }
+
+    if (template.plano_origem_id) {
+      throw new BadRequestException('Só é possível vincular um plano template, não uma cópia de outro equipamento');
+    }
+
+    const categoriaEquipamento = await this.categoriaDoEquipamento(equipamentoId);
+    if (!categoriaEquipamento) {
+      throw new BadRequestException(
+        'Equipamento sem modelo definido: não há categoria para casar com o plano'
+      );
+    }
+
+    if (categoriaEquipamento !== template.categoria_id?.trim()) {
+      throw new BadRequestException('O plano pertence a outra categoria de equipamento');
+    }
+
+    const previa = await this.previaDesvinculo(equipamentoId);
+
+    const resultado = await this.prisma.$transaction(async (tx) => {
+      // Substituicao: remove a copia anterior inteira, como decidido — nao
+      // acumular plano orfao no banco.
+      // Soft delete por enquanto: `tarefas_os.tarefa_id` ainda nao tem snapshot
+      // (chega na Fase 5), e o hard delete anularia o vinculo, apagando o
+      // registro do que foi pedido em OS ja executadas.
+      if (previa.possui_plano) {
+        const agora = new Date();
+        const copiaAnterior = await tx.planos_manutencao.findFirst({
+          where: { equipamento_id: equipamentoId, deleted_at: null },
+          select: { id: true }
+        });
+
+        if (copiaAnterior) {
+          await tx.tarefas.updateMany({
+            where: { plano_manutencao_id: copiaAnterior.id, deleted_at: null },
+            data: { deleted_at: agora }
+          });
+          await tx.planos_manutencao.update({
+            where: { id: copiaAnterior.id },
+            data: { deleted_at: agora, equipamento_id: null }
+          });
+        }
+      }
+
+      const copia = await tx.planos_manutencao.create({
+        data: {
+          nome: template.nome,
+          descricao: template.descricao,
+          versao: template.versao,
+          equipamento_id: equipamentoId,
+          plano_origem_id: template.id,
+          ...(dto.criado_por && { criado_por: dto.criado_por })
+        }
+      });
+
+      let copiadas = 0;
+      for (const tarefaTemplate of template.tarefas) {
+        const tag = await this.gerarNovaTag(equipamentoId, 'TRF');
+
+        await tx.tarefas.create({
+          data: {
+            plano_manutencao_id: copia.id,
+            equipamento_id: equipamentoId,
+            planta_id: equipamento.unidade?.planta_id ?? null,
+            tarefa_origem_id: tarefaTemplate.id,
+            origem_status: 'HERDADA',
+            data_ancora: new Date(),
+            tag,
+            nome: tarefaTemplate.nome,
+            descricao: tarefaTemplate.descricao,
+            categoria: tarefaTemplate.categoria,
+            tipo_manutencao: tarefaTemplate.tipo_manutencao,
+            frequencia: tarefaTemplate.frequencia,
+            frequencia_personalizada: tarefaTemplate.frequencia_personalizada,
+            condicao_ativo: tarefaTemplate.condicao_ativo,
+            criticidade: tarefaTemplate.criticidade,
+            duracao_estimada: tarefaTemplate.duracao_estimada,
+            tempo_estimado: tarefaTemplate.tempo_estimado,
+            ordem: tarefaTemplate.ordem,
+            instrucao_id: tarefaTemplate.instrucao_id,
+            ...(dto.criado_por && { criado_por: dto.criado_por })
+          }
+        });
+        copiadas++;
+      }
+
+      return { planoId: copia.id, copiadas };
+    }, { maxWait: 15000, timeout: 15000 });
+
+    return {
+      plano_id: resultado.planoId,
+      tarefas_copiadas: resultado.copiadas,
+      substituiu_vinculo_anterior: previa.possui_plano,
+      tarefas_proprias_descartadas: previa.tarefas_proprias,
+      tarefas_customizadas_descartadas: previa.tarefas_customizadas
+    };
+  }
+
+  async desvincularEquipamento(equipamentoId: string, user?: ScopedUser): Promise<PreviaDesvinculoDto> {
+    const id = equipamentoId.trim();
+    if (user) await this.scopeService.assertEntityInScope('equipamento', id, user);
+
+    const previa = await this.previaDesvinculo(id);
+    if (!previa.possui_plano) {
+      throw new NotFoundException('Este equipamento não possui plano de manutenção vinculado');
+    }
+
+    const copia = await this.prisma.planos_manutencao.findFirst({
+      where: { equipamento_id: id, deleted_at: null },
+      select: { id: true }
+    });
+
+    await this.prisma.$transaction(async (tx) => {
+      const agora = new Date();
+      await tx.tarefas.updateMany({
+        where: { plano_manutencao_id: copia!.id, deleted_at: null },
+        data: { deleted_at: agora }
+      });
+      // equipamento_id volta a null para liberar a constraint unique
+      await tx.planos_manutencao.update({
+        where: { id: copia!.id },
+        data: { deleted_at: agora, equipamento_id: null }
+      });
+    });
+
+    return previa;
+  }
+
+  /** Categoria do modelo (tipo_equipamento) do equipamento, ou null. */
+  private async categoriaDoEquipamento(equipamentoId: string): Promise<string | null> {
+    const equipamento = await this.prisma.equipamentos.findFirst({
+      where: { id: equipamentoId.trim(), deleted_at: null },
+      select: { tipo_equipamento_id: true }
+    });
+
+    const tipoId = equipamento?.tipo_equipamento_id?.trim();
+    if (!tipoId) return null;
+
+    const modelo = await this.prisma.tipos_equipamentos.findUnique({
+      where: { id: tipoId },
+      select: { categoria_id: true }
+    });
+
+    return modelo?.categoria_id?.trim() ?? null;
+  }
+
   // Métodos privados auxiliares
 
   private async verificarEquipamentoExiste(equipamentoId: string): Promise<void> {
@@ -866,7 +1089,7 @@ export class PlanosManutencaoService {
     }
   }
 
-  private async verificarPlanoExiste(id: string): Promise<void> {
+  private async verificarPlanoExiste(id: string) {
     const plano = await this.prisma.planos_manutencao.findFirst({
       where: {
         id,
@@ -877,10 +1100,28 @@ export class PlanosManutencaoService {
     if (!plano) {
       throw new NotFoundException('Plano de manutenção não encontrado');
     }
+
+    return plano;
+  }
+
+  private async verificarCategoriaExiste(categoriaId: string): Promise<void> {
+    const categoria = await this.prisma.categorias_equipamentos.findFirst({
+      where: { id: categoriaId.trim() }
+    });
+
+    if (!categoria) {
+      throw new NotFoundException('Categoria de equipamento não encontrada');
+    }
   }
 
   private includeRelacionamentos() {
     return {
+      categoria: {
+        select: {
+          id: true,
+          nome: true
+        }
+      },
       equipamento: {
         select: {
           id: true,
@@ -921,6 +1162,10 @@ export class PlanosManutencaoService {
 
   private construirFiltros(filters: Partial<QueryPlanosDto>, search?: string): Prisma.planos_manutencaoWhereInput {
     const where: Prisma.planos_manutencaoWhereInput = {};
+
+    if (filters.categoria_id) {
+      where.categoria_id = filters.categoria_id.trim();
+    }
 
     if (filters.equipamento_id) {
       where.equipamento_id = filters.equipamento_id;
@@ -968,6 +1213,11 @@ export class PlanosManutencaoService {
   private mapearParaResponse(plano: any): PlanoManutencaoResponseDto {
     return {
       id: plano.id,
+      categoria_id: plano.categoria_id?.trim() || plano.categoria_id,
+      plano_origem_id: plano.plano_origem_id?.trim() || plano.plano_origem_id,
+      categoria: plano.categoria,
+      is_template: !plano.plano_origem_id,
+      total_equipamentos_vinculados: plano._count?.copias ?? 0,
       equipamento_id: plano.equipamento_id,
       nome: plano.nome,
       descricao: plano.descricao,
