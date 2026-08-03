@@ -151,7 +151,7 @@ describe('ExecucaoOSController', () => {
 
       const result = await controller.listar(filters);
 
-      expect(execucaoService.listar).toHaveBeenCalledWith(filters);
+      expect(execucaoService.listar).toHaveBeenCalledWith(filters, undefined);
       expect(result).toEqual(mockListResponse);
     });
 
@@ -164,7 +164,7 @@ describe('ExecucaoOSController', () => {
 
       const result = await controller.listar(filters);
 
-      expect(execucaoService.listar).toHaveBeenCalledWith(filters);
+      expect(execucaoService.listar).toHaveBeenCalledWith(filters, undefined);
       expect(result).toEqual(mockListResponse);
     });
   });
@@ -176,7 +176,7 @@ describe('ExecucaoOSController', () => {
 
       const result = await controller.buscarPorId(id);
 
-      expect(execucaoService.buscarPorId).toHaveBeenCalledWith(id);
+      expect(execucaoService.buscarPorId).toHaveBeenCalledWith(id, undefined);
       expect(result).toEqual(mockOSDetalhes);
     });
   });
@@ -194,7 +194,7 @@ describe('ExecucaoOSController', () => {
 
       const result = await controller.iniciar(id, dto);
 
-      expect(execucaoService.iniciar).toHaveBeenCalledWith(id, dto, undefined);
+      expect(execucaoService.iniciar).toHaveBeenCalledWith(id, dto, undefined, undefined);
       expect(result).toEqual({ message: 'Execução iniciada com sucesso' });
     });
   });
@@ -211,7 +211,7 @@ describe('ExecucaoOSController', () => {
 
       const result = await controller.pausar(id, dto);
 
-      expect(execucaoService.pausar).toHaveBeenCalledWith(id, dto, undefined);
+      expect(execucaoService.pausar).toHaveBeenCalledWith(id, dto, undefined, undefined);
       expect(result).toEqual({ message: 'Execução pausada' });
     });
   });
@@ -227,7 +227,7 @@ describe('ExecucaoOSController', () => {
 
       const result = await controller.retomar(id, dto);
 
-      expect(execucaoService.retomar).toHaveBeenCalledWith(id, dto, undefined);
+      expect(execucaoService.retomar).toHaveBeenCalledWith(id, dto, undefined, undefined);
       expect(result).toEqual({ message: 'Execução retomada' });
     });
   });
@@ -483,7 +483,7 @@ describe('ExecucaoOSController', () => {
 
       const result = await controller.finalizar(id, dto);
 
-      expect(execucaoService.finalizar).toHaveBeenCalledWith(id, dto, undefined);
+      expect(execucaoService.finalizar).toHaveBeenCalledWith(id, dto, undefined, undefined);
       expect(result).toEqual({ message: 'OS finalizada com sucesso' });
     });
   });
@@ -500,7 +500,7 @@ describe('ExecucaoOSController', () => {
 
       const result = await controller.cancelar(id, dto);
 
-      expect(execucaoService.cancelar).toHaveBeenCalledWith(id, dto, undefined);
+      expect(execucaoService.cancelar).toHaveBeenCalledWith(id, dto, undefined, undefined);
       expect(result).toEqual({ message: 'OS cancelada' });
     });
   });

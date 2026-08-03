@@ -1,6 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { ExecucaoOSService } from './execucao-os.service';
-import { PrismaService } from '@aupus/api-shared';
+import { PrismaService, PermissionScopeService } from '@aupus/api-shared';
 import { AnomaliasService } from '../anomalias/anomalias.service';
 import { NotFoundException, BadRequestException, ConflictException } from '@nestjs/common';
 import { StatusOS, CondicaoOS, TipoOS, PrioridadeOS, OrigemOS } from '@aupus/api-shared';
@@ -78,7 +78,9 @@ describe('ExecucaoOSService', () => {
     },
     tarefas_os: {
       findFirst: jest.fn(),
+      findMany: jest.fn().mockResolvedValue([]),
       update: jest.fn(),
+      count: jest.fn().mockResolvedValue(0),
     },
     materiais_os: {
       findMany: jest.fn(),
@@ -123,6 +125,17 @@ describe('ExecucaoOSService', () => {
           useValue: {
             marcarComoFinalizada: jest.fn(),
             voltarParaRegistrada: jest.fn(),
+          },
+        },
+        {
+          // Sem escopo: os testes chamam os metodos sem `user`, entao as
+          // assercoes de escopo nao devem interferir.
+          provide: PermissionScopeService,
+          useValue: {
+            assertEntityInScope: jest.fn().mockResolvedValue(undefined),
+            assertPlantaInScope: jest.fn().mockResolvedValue(undefined),
+            getScope: jest.fn().mockResolvedValue(null),
+            isScoped: jest.fn().mockReturnValue(false),
           },
         },
       ],

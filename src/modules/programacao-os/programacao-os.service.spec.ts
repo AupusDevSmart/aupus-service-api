@@ -1,6 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { ProgramacaoOSService } from './programacao-os.service';
-import { PrismaService } from '@aupus/api-shared';
+import { PrismaService, PermissionScopeService } from '@aupus/api-shared';
 import { AnomaliasService } from '../anomalias/anomalias.service';
 import { NotFoundException, BadRequestException, ConflictException } from '@nestjs/common';
 import { StatusProgramacaoOS, CondicaoOS, TipoOS, PrioridadeOS, OrigemOS } from '@aupus/api-shared';
@@ -42,6 +42,7 @@ describe('ProgramacaoOSService', () => {
     materiais: [],
     ferramentas: [],
     tecnicos: [],
+    itens_orcamento: [],
     historico: [],
     ordem_servico: null,
   };
@@ -191,6 +192,17 @@ describe('ProgramacaoOSService', () => {
             marcarComoFinalizada: jest.fn(),
             marcarComoProgramada: jest.fn(),
             voltarParaRegistrada: jest.fn(),
+          },
+        },
+        {
+          // Sem escopo: os testes chamam os metodos sem `user`, entao as
+          // assercoes de escopo nao devem interferir.
+          provide: PermissionScopeService,
+          useValue: {
+            assertEntityInScope: jest.fn().mockResolvedValue(undefined),
+            assertPlantaInScope: jest.fn().mockResolvedValue(undefined),
+            getScope: jest.fn().mockResolvedValue(null),
+            isScoped: jest.fn().mockReturnValue(false),
           },
         },
       ],
@@ -540,6 +552,7 @@ describe('ProgramacaoOSService', () => {
         materiais: [],
         ferramentas: [],
         tecnicos: [],
+        itens_orcamento: [],
         historico: [],
       });
 

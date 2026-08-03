@@ -112,7 +112,7 @@ describe('ProgramacaoOSController', () => {
 
       const result = await controller.listar(filters);
 
-      expect(service.listar).toHaveBeenCalledWith(filters);
+      expect(service.listar).toHaveBeenCalledWith(filters, undefined);
       expect(result).toEqual(mockListResponse);
     });
 
@@ -122,7 +122,7 @@ describe('ProgramacaoOSController', () => {
 
       const result = await controller.listar(filters);
 
-      expect(service.listar).toHaveBeenCalledWith(filters);
+      expect(service.listar).toHaveBeenCalledWith(filters, undefined);
       expect(result).toEqual(mockListResponse);
     });
   });
@@ -134,7 +134,7 @@ describe('ProgramacaoOSController', () => {
 
       const result = await controller.buscarPorId(id);
 
-      expect(service.buscarPorId).toHaveBeenCalledWith(id);
+      expect(service.buscarPorId).toHaveBeenCalledWith(id, undefined);
       expect(result).toEqual(mockProgramacaoDetalhes);
     });
   });
@@ -157,7 +157,7 @@ describe('ProgramacaoOSController', () => {
 
       const result = await controller.criar(createDto);
 
-      expect(service.criar).toHaveBeenCalledWith(createDto, undefined);
+      expect(service.criar).toHaveBeenCalledWith(createDto, undefined, undefined);
       expect(result).toEqual(mockProgramacaoResponse);
     });
 
@@ -200,7 +200,7 @@ describe('ProgramacaoOSController', () => {
 
       const result = await controller.criar(createDto);
 
-      expect(service.criar).toHaveBeenCalledWith(createDto, undefined);
+      expect(service.criar).toHaveBeenCalledWith(createDto, undefined, undefined);
       expect(result).toEqual(mockProgramacaoResponse);
     });
   });
@@ -220,7 +220,7 @@ describe('ProgramacaoOSController', () => {
 
       const result = await controller.atualizar(id, updateDto);
 
-      expect(service.atualizar).toHaveBeenCalledWith(id, updateDto, undefined);
+      expect(service.atualizar).toHaveBeenCalledWith(id, updateDto, undefined, undefined);
       expect(result.descricao).toBe(updateDto.descricao);
       expect(result.tempo_estimado).toBe(updateDto.tempo_estimado);
     });
@@ -238,7 +238,7 @@ describe('ProgramacaoOSController', () => {
 
       const result = await controller.aprovar(id, dto);
 
-      expect(service.aprovar).toHaveBeenCalledWith(id, dto, undefined);
+      expect(service.aprovar).toHaveBeenCalledWith(id, dto, undefined, undefined);
       expect(result).toEqual({ message: 'Programação aprovada e OS gerada com sucesso' });
     });
   });
@@ -254,7 +254,7 @@ describe('ProgramacaoOSController', () => {
 
       const result = await controller.cancelar(id, dto);
 
-      expect(service.cancelar).toHaveBeenCalledWith(id, dto, undefined);
+      expect(service.cancelar).toHaveBeenCalledWith(id, dto, undefined, undefined);
       expect(result).toEqual({ message: 'Programação cancelada' });
     });
   });

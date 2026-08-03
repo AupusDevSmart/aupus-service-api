@@ -45,7 +45,7 @@
       "^src/(.*)$": "<rootDir>/$1"
     },
     "transformIgnorePatterns": [
-      "node_modules/(?!(nanoid)/)"
+      "node_modules/(?!.*(nanoid|uuid)/)"
     ]
   },
   "devDependencies": {
