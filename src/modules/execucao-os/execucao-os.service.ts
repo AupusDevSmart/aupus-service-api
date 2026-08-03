@@ -1135,30 +1135,43 @@ export class ExecucaoOSService {
         }
       }
 
-      // Atualizar data_ultima_execucao e numero_execucoes das tarefas vinculadas
-      try {
-        const tarefasVinculadas = await prisma.tarefas_os.findMany({
-          where: { os_id: id, tarefa_id: { not: null } },
-          select: { tarefa_id: true },
+      // Registrar execução APENAS das tarefas efetivamente concluídas.
+      // Uma OS pode ser finalizada com tarefas PENDENTE ou CANCELADA — marcar
+      // todas como executadas faria a periodicidade contar a partir de algo que
+      // nunca aconteceu, e a tarefa sumiria do agendamento por um ciclo inteiro.
+      // A data é a da conclusão daquela tarefa, não a da finalização da OS:
+      // OS fechada com atraso deslocaria todo o calendário seguinte.
+      // Fica dentro da transação de propósito — se falhar, a finalização inteira
+      // volta atrás em vez de deixar o agendamento silenciosamente parado.
+      const tarefasConcluidas = await prisma.tarefas_os.findMany({
+        where: {
+          os_id: id,
+          tarefa_id: { not: null },
+          status: 'CONCLUIDA',
+        },
+        select: { tarefa_id: true, data_conclusao: true },
+      });
+
+      for (const vinculo of tarefasConcluidas) {
+        const tarefaId = vinculo.tarefa_id?.trim();
+        if (!tarefaId) continue;
+
+        await prisma.tarefas.update({
+          where: { id: tarefaId },
+          data: {
+            data_ultima_execucao: vinculo.data_conclusao ?? new Date(),
+            numero_execucoes: { increment: 1 },
+          },
         });
-
-        const tarefaIds = tarefasVinculadas
-          .map((t) => t.tarefa_id?.trim())
-          .filter((id): id is string => !!id);
-
-        if (tarefaIds.length > 0) {
-          await prisma.tarefas.updateMany({
-            where: { id: { in: tarefaIds } },
-            data: {
-              data_ultima_execucao: new Date(),
-              numero_execucoes: { increment: 1 },
-            },
-          });
-          this.logger.log(`Atualizadas ${tarefaIds.length} tarefas com data_ultima_execucao`);
-        }
-      } catch (error) {
-        this.logger.warn(`Erro ao atualizar execução das tarefas: ${error.message}`);
       }
+
+      const totalVinculos = await prisma.tarefas_os.count({
+        where: { os_id: id, tarefa_id: { not: null } },
+      });
+
+      this.logger.log(
+        `OS ${id} finalizada: ${tarefasConcluidas.length} de ${totalVinculos} tarefas concluídas tiveram a execução registrada`,
+      );
     });
   }
 
