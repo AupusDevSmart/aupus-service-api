@@ -587,7 +587,7 @@ export class ExecucaoOSService {
         });
       }
 
-      // Copiar tarefas
+      // Copiar tarefas, carregando adiante o conteudo congelado na programacao
       if (programacao.tarefas_programacao.length > 0) {
         await prisma.tarefas_os.createMany({
           data: programacao.tarefas_programacao.map(tp => ({
@@ -596,6 +596,13 @@ export class ExecucaoOSService {
             ordem: tp.ordem,
             status: 'PENDENTE',
             observacoes: tp.observacoes,
+            nome_snapshot: tp.nome_snapshot ?? null,
+            criticidade_snapshot: tp.criticidade_snapshot ?? null,
+            frequencia_snapshot: tp.frequencia_snapshot ?? null,
+            instrucao_tag: tp.instrucao_tag ?? null,
+            instrucao_nome: tp.instrucao_nome ?? null,
+            instrucao_descricao: tp.instrucao_descricao ?? null,
+            ciclo_referencia: tp.ciclo_referencia ?? null,
           })),
         });
       }
@@ -1225,6 +1232,31 @@ export class ExecucaoOSService {
         StatusOS.CANCELADA,
       );
 
+      // Cancelar a OS inteira e decisao de planejamento: aquele ciclo nao vai
+      // acontecer. A ancora da tarefa avanca para o ciclo cancelado, entao a
+      // proxima geracao cai no ciclo seguinte em vez de recriar a mesma
+      // programacao na madrugada seguinte.
+      const vinculosComCiclo = await prisma.tarefas_os.findMany({
+        where: { os_id: id, tarefa_id: { not: null }, ciclo_referencia: { not: null } },
+        select: { tarefa_id: true, ciclo_referencia: true },
+      });
+
+      for (const vinculo of vinculosComCiclo) {
+        const tarefaId = vinculo.tarefa_id?.trim();
+        if (!tarefaId || !vinculo.ciclo_referencia) continue;
+
+        await prisma.tarefas.update({
+          where: { id: tarefaId },
+          data: { data_ancora: vinculo.ciclo_referencia },
+        });
+      }
+
+      if (vinculosComCiclo.length > 0) {
+        this.logger.log(
+          `OS ${id} cancelada: ${vinculosComCiclo.length} tarefas tiveram o ciclo pulado`,
+        );
+      }
+
       // Retornar anomalia vinculada para REGISTRADA
       if (os.anomalia_id) {
         try {
@@ -1259,28 +1291,93 @@ export class ExecucaoOSService {
 
   // Métodos auxiliares privados
 
+  /**
+   * Semeia o checklist da OS.
+   *
+   * Antes eram apenas seis itens genericos, sem nenhuma relacao com o que foi
+   * pedido: a OS nao sabia dizer o que era para ter sido feito. Agora as
+   * sub-instrucoes reais de cada tarefa vem primeiro, e os itens genericos de
+   * seguranca ficam no fim, como fecho.
+   *
+   * O texto e copiado (a tabela guarda `atividade` como texto, nao FK), entao o
+   * checklist fica congelado junto com o resto do conteudo da OS.
+   */
   private async gerarChecklistPadrao(prisma: any, osId: string): Promise<void> {
     const checklistExistente = await prisma.checklist_atividades_os.count({
       where: { os_id: osId },
     });
 
-    if (checklistExistente === 0) {
-      const atividadesPadrao = [
-        { atividade: 'Verificar equipamentos de segurança', ordem: 1, obrigatoria: true },
-        { atividade: 'Conferir materiais e ferramentas', ordem: 2, obrigatoria: true },
-        { atividade: 'Executar tarefas conforme planejado', ordem: 3, obrigatoria: true },
-        { atividade: 'Testar funcionamento após execução', ordem: 4, obrigatoria: true },
-        { atividade: 'Limpar área de trabalho', ordem: 5, obrigatoria: false },
-        { atividade: 'Documentar resultados', ordem: 6, obrigatoria: true },
-      ];
+    if (checklistExistente > 0) return;
 
-      const dados = atividadesPadrao.map(ativ => ({
-        os_id: osId,
-        ...ativ,
-      }));
+    const dados: Array<{
+      os_id: string;
+      atividade: string;
+      ordem: number;
+      obrigatoria: boolean;
+      tempo_estimado?: number | null;
+    }> = [];
 
-      await prisma.checklist_atividades_os.createMany({ data: dados });
+    const tarefasDaOS = await prisma.tarefas_os.findMany({
+      where: { os_id: osId, tarefa_id: { not: null } },
+      orderBy: { ordem: 'asc' },
+      select: {
+        nome_snapshot: true,
+        instrucao_nome: true,
+        tarefa: {
+          select: {
+            nome: true,
+            instrucao: {
+              select: {
+                nome: true,
+                sub_instrucoes: {
+                  orderBy: { ordem: 'asc' },
+                  select: { descricao: true, obrigatoria: true, tempo_estimado: true },
+                },
+              },
+            },
+          },
+        },
+      },
+    });
+
+    let ordem = 1;
+    for (const vinculo of tarefasDaOS) {
+      const subInstrucoes = vinculo.tarefa?.instrucao?.sub_instrucoes ?? [];
+      if (subInstrucoes.length === 0) continue;
+
+      // Prefixo identifica a que tarefa cada etapa pertence quando a OS junta
+      // varias tarefas — que e o caso comum.
+      const rotulo =
+        vinculo.nome_snapshot ||
+        vinculo.tarefa?.nome ||
+        vinculo.instrucao_nome ||
+        vinculo.tarefa?.instrucao?.nome ||
+        'Tarefa';
+
+      for (const sub of subInstrucoes) {
+        dados.push({
+          os_id: osId,
+          atividade: `${rotulo}: ${sub.descricao}`.slice(0, 500),
+          ordem: ordem++,
+          obrigatoria: sub.obrigatoria ?? false,
+          tempo_estimado: sub.tempo_estimado ?? null,
+        });
+      }
     }
+
+    const atividadesGerais = [
+      { atividade: 'Verificar equipamentos de segurança', obrigatoria: true },
+      { atividade: 'Conferir materiais e ferramentas', obrigatoria: true },
+      { atividade: 'Testar funcionamento após execução', obrigatoria: true },
+      { atividade: 'Limpar área de trabalho', obrigatoria: false },
+      { atividade: 'Documentar resultados', obrigatoria: true },
+    ];
+
+    for (const item of atividadesGerais) {
+      dados.push({ os_id: osId, ordem: ordem++, ...item });
+    }
+
+    await prisma.checklist_atividades_os.createMany({ data: dados });
   }
 
   private calcularTempoExecucao(

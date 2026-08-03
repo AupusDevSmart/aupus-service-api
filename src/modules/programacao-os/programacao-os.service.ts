@@ -1210,11 +1210,17 @@ export class ProgramacaoOSService {
   }
 
   private async adicionarTarefas(prisma: any, programacaoId: string, tarefasIds: string[]): Promise<void> {
-    // Verificar se as tarefas existem
+    // Verificar se as tarefas existem. A instrucao vem junto porque o conteudo
+    // do que esta sendo pedido e congelado aqui — ver montarSnapshotTarefa.
     const tarefas = await prisma.tarefas.findMany({
       where: {
         id: { in: tarefasIds },
         deleted_at: null,
+      },
+      include: {
+        instrucao: {
+          select: { tag: true, nome: true, descricao: true },
+        },
       },
     });
 
@@ -1234,14 +1240,38 @@ export class ProgramacaoOSService {
       throw new ConflictException('Uma ou mais tarefas já estão associadas à programação');
     }
 
-    // Adicionar tarefas
+    // Adicionar tarefas ja congelando o conteudo pedido
+    const porId = new Map(tarefas.map((t: any) => [t.id?.trim(), t]));
+
     const dados = tarefasIds.map((tarefaId, index) => ({
       programacao_id: programacaoId,
       tarefa_id: tarefaId,
       ordem: index + 1,
+      ...this.montarSnapshotTarefa(porId.get(tarefaId?.trim())),
     }));
 
     await prisma.tarefas_programacao_os.createMany({ data: dados });
+  }
+
+  /**
+   * Congela o que esta sendo pedido no momento da programacao.
+   *
+   * Sem isso, a OS le nome/instrucao por join na tarefa viva: editar a tarefa
+   * (ou apagar a copia do plano ao trocar de equipamento) reescreveria o
+   * historico do que foi pedido. O objetivo da OS e justamente comparar o que
+   * foi pedido com o que foi entregue.
+   */
+  private montarSnapshotTarefa(tarefa: any) {
+    if (!tarefa) return {};
+
+    return {
+      nome_snapshot: tarefa.nome ?? null,
+      criticidade_snapshot: tarefa.criticidade ?? null,
+      frequencia_snapshot: tarefa.frequencia ?? null,
+      instrucao_tag: tarefa.instrucao?.tag ?? null,
+      instrucao_nome: tarefa.instrucao?.nome ?? null,
+      instrucao_descricao: tarefa.instrucao?.descricao ?? null,
+    };
   }
 
   private async criarMateriais(prisma: any, programacaoId: string, materiais: any[]): Promise<void> {
@@ -1384,10 +1414,19 @@ export class ProgramacaoOSService {
 
     // Copiar tarefas para a OS
     if (programacao.tarefas_programacao.length > 0) {
+      // O snapshot ja foi congelado na programacao; a OS carrega o mesmo
+      // conteudo adiante em vez de reler a tarefa viva.
       const tarefasOS = programacao.tarefas_programacao.map(tp => ({
         os_id: os.id,
         tarefa_id: tp.tarefa_id,
         ordem: tp.ordem,
+        nome_snapshot: tp.nome_snapshot ?? null,
+        criticidade_snapshot: tp.criticidade_snapshot ?? null,
+        frequencia_snapshot: tp.frequencia_snapshot ?? null,
+        instrucao_tag: tp.instrucao_tag ?? null,
+        instrucao_nome: tp.instrucao_nome ?? null,
+        instrucao_descricao: tp.instrucao_descricao ?? null,
+        ciclo_referencia: tp.ciclo_referencia ?? null,
       }));
       await prisma.tarefas_os.createMany({ data: tarefasOS });
     }

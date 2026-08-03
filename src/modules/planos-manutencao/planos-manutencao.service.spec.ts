@@ -25,6 +25,7 @@ describe('PlanosManutencaoService', () => {
       create: jest.fn(),
       update: jest.fn(),
       updateMany: jest.fn(),
+      delete: jest.fn(),
       count: jest.fn(),
     },
     tarefas: {
@@ -32,6 +33,7 @@ describe('PlanosManutencaoService', () => {
       findMany: jest.fn(),
       create: jest.fn(),
       updateMany: jest.fn(),
+      deleteMany: jest.fn(),
       count: jest.fn(),
     },
     equipamentos: { findFirst: jest.fn(), findUnique: jest.fn() },
@@ -248,12 +250,14 @@ describe('PlanosManutencaoService', () => {
       expect(result.tarefas_proprias_descartadas).toBe(2);
       expect(result.tarefas_customizadas_descartadas).toBe(1);
 
-      // A copia anterior sai de cena e libera o unique de equipamento_id
-      expect(mockPrismaService.planos_manutencao.update).toHaveBeenCalledWith(
-        expect.objectContaining({
-          data: expect.objectContaining({ equipamento_id: null }),
-        }),
-      );
+      // A copia anterior sai de vez, liberando o unique de equipamento_id.
+      // Seguro porque a OS ja congela o conteudo pedido.
+      expect(mockPrismaService.tarefas.deleteMany).toHaveBeenCalledWith({
+        where: { plano_manutencao_id: 'copia_anterior_00000000' },
+      });
+      expect(mockPrismaService.planos_manutencao.delete).toHaveBeenCalledWith({
+        where: { id: 'copia_anterior_00000000' },
+      });
     });
   });
 
@@ -276,7 +280,8 @@ describe('PlanosManutencaoService', () => {
 
       expect(result.possui_plano).toBe(true);
       expect(result.tarefas_proprias).toBe(1);
-      expect(mockPrismaService.tarefas.updateMany).toHaveBeenCalled();
+      expect(mockPrismaService.tarefas.deleteMany).toHaveBeenCalled();
+      expect(mockPrismaService.planos_manutencao.delete).toHaveBeenCalled();
     });
   });
 

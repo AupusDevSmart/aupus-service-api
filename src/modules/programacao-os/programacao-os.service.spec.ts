@@ -412,10 +412,14 @@ describe('ProgramacaoOSService', () => {
 
       const result = await service.criar(createDtoCompleto, 'user123');
 
+      // A instrucao vem junto porque o conteudo pedido e congelado no vinculo
       expect(mockPrismaService.tarefas.findMany).toHaveBeenCalledWith({
         where: {
           id: { in: ['clrx1234567890123456789012'] },
           deleted_at: null,
+        },
+        include: {
+          instrucao: { select: { tag: true, nome: true, descricao: true } },
         },
       });
 
@@ -646,10 +650,11 @@ describe('ProgramacaoOSService', () => {
       await service.aprovar('clrx1234567890123456789012', aprovarDto, 'user123');
 
       // Verificar cópia de tarefas
+      // A OS carrega adiante o snapshot congelado na programacao
       expect(mockPrismaService.tarefas_os.createMany).toHaveBeenCalledWith({
         data: [
-          { os_id: osId, tarefa_id: 'tarefa1', ordem: 1 },
-          { os_id: osId, tarefa_id: 'tarefa2', ordem: 2 },
+          expect.objectContaining({ os_id: osId, tarefa_id: 'tarefa1', ordem: 1 }),
+          expect.objectContaining({ os_id: osId, tarefa_id: 'tarefa2', ordem: 2 }),
         ],
       });
 

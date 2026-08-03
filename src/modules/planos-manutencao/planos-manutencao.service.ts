@@ -922,27 +922,18 @@ export class PlanosManutencaoService {
     const previa = await this.previaDesvinculo(equipamentoId);
 
     const resultado = await this.prisma.$transaction(async (tx) => {
-      // Substituicao: remove a copia anterior inteira, como decidido — nao
-      // acumular plano orfao no banco.
-      // Soft delete por enquanto: `tarefas_os.tarefa_id` ainda nao tem snapshot
-      // (chega na Fase 5), e o hard delete anularia o vinculo, apagando o
-      // registro do que foi pedido em OS ja executadas.
+      // Substituicao: remove a copia anterior inteira — nao acumular plano
+      // orfao no banco. Seguro porque a OS congela nome, criticidade,
+      // periodicidade e instrucao no momento da geracao: perder a tarefa nao
+      // apaga mais o registro do que foi pedido.
       if (previa.possui_plano) {
-        const agora = new Date();
         const copiaAnterior = await tx.planos_manutencao.findFirst({
           where: { equipamento_id: equipamentoId, deleted_at: null },
           select: { id: true }
         });
 
         if (copiaAnterior) {
-          await tx.tarefas.updateMany({
-            where: { plano_manutencao_id: copiaAnterior.id, deleted_at: null },
-            data: { deleted_at: agora }
-          });
-          await tx.planos_manutencao.update({
-            where: { id: copiaAnterior.id },
-            data: { deleted_at: agora, equipamento_id: null }
-          });
+          await this.removerCopia(tx, copiaAnterior.id);
         }
       }
 
@@ -1015,19 +1006,26 @@ export class PlanosManutencaoService {
     });
 
     await this.prisma.$transaction(async (tx) => {
-      const agora = new Date();
-      await tx.tarefas.updateMany({
-        where: { plano_manutencao_id: copia!.id, deleted_at: null },
-        data: { deleted_at: agora }
-      });
-      // equipamento_id volta a null para liberar a constraint unique
-      await tx.planos_manutencao.update({
-        where: { id: copia!.id },
-        data: { deleted_at: agora, equipamento_id: null }
-      });
+      await this.removerCopia(tx, copia!.id);
     });
 
     return previa;
+  }
+
+  /**
+   * Apaga de vez a copia de um equipamento e suas tarefas.
+   *
+   * Hard delete e seguro porque a OS congela o conteudo pedido (nome,
+   * criticidade, periodicidade e instrucao) no momento em que e gerada:
+   * `tarefas_os.tarefa_id` fica so como rastro, e perder a tarefa nao apaga
+   * mais o registro do que foi pedido. Antes do congelamento isso destruiria
+   * historico em silencio.
+   */
+  private async removerCopia(tx: any, planoId: string): Promise<void> {
+    // Os vinculos com OS/programacao ficam com tarefa_id nulo (a FK e opcional),
+    // preservando o snapshot ja gravado neles.
+    await tx.tarefas.deleteMany({ where: { plano_manutencao_id: planoId } });
+    await tx.planos_manutencao.delete({ where: { id: planoId } });
   }
 
   /** Categoria do modelo (tipo_equipamento) do equipamento, ou null. */

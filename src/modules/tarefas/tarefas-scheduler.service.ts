@@ -37,6 +37,7 @@ interface TarefaElegivel {
   frequencia: string | null;
   frequencia_personalizada: number | null;
   data_ultima_execucao: Date | null;
+  data_ancora: Date | null;
   created_at: Date;
   tempo_estimado: number;
   duracao_estimada: any;
@@ -96,19 +97,24 @@ export class TarefasSchedulerService {
     const hoje = new Date();
     const limiteHorizonte = new Date(hoje.getTime() + HORIZONTE_DIAS * 24 * 60 * 60 * 1000);
 
+    // Ultima execucao efetiva vem do historico de OS, nao do campo cache
+    const ultimasExecucoes = await this.buscarUltimasExecucoes(tarefas.map((t) => t.id.trim()));
+
     const tarefasDentroHorizonte = tarefas
       .map((t) => ({
         ...t,
-        proxima_execucao: this.calcularProximaExecucao(t),
+        proxima_execucao: this.calcularProximaExecucao(t, ultimasExecucoes.get(t.id.trim())),
       }))
       .filter((t) => t.proxima_execucao && t.proxima_execucao <= limiteHorizonte);
 
     this.logger.log(`${tarefasDentroHorizonte.length} tarefas vencem nos próximos ${HORIZONTE_DIAS} dias`);
 
-    // 3. Filtrar tarefas que já têm programação ativa
-    const tarefasSemProgramacao = await this.filtrarSemProgramacaoAtiva(tarefasDentroHorizonte);
+    // 3. Descartar as que ja tem item aberto para o ciclo atual
+    const tarefasSemProgramacao = await this.filtrarCiclosJaGerados(tarefasDentroHorizonte);
     const tarefasIgnoradas = tarefasDentroHorizonte.length - tarefasSemProgramacao.length;
-    this.logger.log(`${tarefasSemProgramacao.length} tarefas sem programação ativa (${tarefasIgnoradas} já possuem)`);
+    this.logger.log(
+      `${tarefasSemProgramacao.length} tarefas com ciclo em aberto para gerar (${tarefasIgnoradas} ja possuem item no ciclo)`,
+    );
 
     if (tarefasSemProgramacao.length === 0) {
       return { programacoesCriadas: 0, tarefasProcessadas: 0, tarefasIgnoradas, detalhes: [] };
@@ -159,23 +165,26 @@ export class TarefasSchedulerService {
   private async buscarTarefasElegiveis(): Promise<TarefaElegivel[]> {
     const tarefas = await this.prisma.tarefas.findMany({
       where: {
-        status: 'ATIVA',
         deleted_at: null,
+        ativo: true,
         frequencia: { not: null },
-        // Plano ativo (ou tarefa sem plano - independente)
+        // Tarefa de template nao gera OS: ela nao tem equipamento e serve
+        // apenas de molde para as copias.
+        equipamento_id: { not: null },
+        // Removida localmente: o usuario tirou a tarefa daquele equipamento.
+        origem_status: { not: 'REMOVIDA' },
+        // So copias vinculadas a equipamento. Tarefa avulsa (sem plano) segue
+        // valendo — e o caso da tarefa criada direto no equipamento.
         OR: [
-          {
-            plano_manutencao: {
-              status: 'ATIVO',
-              ativo: true,
-            },
-          },
-          {
-            plano_manutencao_id: null,
-          },
+          { plano_manutencao: { plano_origem_id: { not: null }, ativo: true } },
+          { plano_manutencao_id: null },
         ],
       },
       include: {
+        // A duracao vem da instrucao: a tarefa nao guarda mais esse dado.
+        instrucao: {
+          select: { tempo_estimado: true, duracao_estimada: true },
+        },
         equipamento: {
           select: {
             id: true,
@@ -197,70 +206,147 @@ export class TarefasSchedulerService {
   }
 
   /**
-   * Calcula a data da próxima execução com base na frequência
+   * Ultima execucao EFETIVA por tarefa, lida do historico de OS.
+   *
+   * O campo `tarefas.data_ultima_execucao` e cache: ele e escrito na
+   * finalizacao da OS e pode ficar defasado se algo falhar no caminho. A fonte
+   * da verdade e `tarefas_os.data_conclusao` das tarefas que foram realmente
+   * concluidas em OS finalizadas — tarefa pendente ou cancelada dentro de uma
+   * OS finalizada nao conta como executada.
+   *
+   * Uma query agregada para todas as tarefas, sem N+1.
    */
-  private calcularProximaExecucao(tarefa: TarefaElegivel): Date | null {
-    const freq = tarefa.frequencia;
-    if (!freq) return null;
+  private async buscarUltimasExecucoes(tarefaIds: string[]): Promise<Map<string, Date>> {
+    if (tarefaIds.length === 0) return new Map();
 
-    let diasIntervalo: number;
+    const vinculos = await this.prisma.tarefas_os.findMany({
+      where: {
+        tarefa_id: { in: tarefaIds },
+        status: 'CONCLUIDA',
+        data_conclusao: { not: null },
+        ordem_servico: { status: 'FINALIZADA' },
+      },
+      select: { tarefa_id: true, data_conclusao: true },
+    });
 
-    if (freq === 'PERSONALIZADA') {
-      if (!tarefa.frequencia_personalizada) return null;
-      diasIntervalo = tarefa.frequencia_personalizada;
-    } else {
-      diasIntervalo = FREQUENCIA_DIAS[freq];
-      if (!diasIntervalo) return null;
+    const ultimas = new Map<string, Date>();
+    for (const vinculo of vinculos) {
+      const id = vinculo.tarefa_id?.trim();
+      if (!id || !vinculo.data_conclusao) continue;
+
+      const atual = ultimas.get(id);
+      if (!atual || vinculo.data_conclusao > atual) {
+        ultimas.set(id, vinculo.data_conclusao);
+      }
     }
 
-    // Base: última execução ou data de criação da tarefa
-    const baseDate = tarefa.data_ultima_execucao
-      ? new Date(tarefa.data_ultima_execucao)
-      : new Date(tarefa.created_at);
-
-    const proxima = new Date(baseDate.getTime() + diasIntervalo * 24 * 60 * 60 * 1000);
-    return proxima;
+    return ultimas;
   }
 
   /**
-   * Filtra tarefas que NÃO têm programação ativa (PENDENTE, APROVADA, EM_EXECUCAO)
+   * Calcula a data da próxima execução com base na frequência
    */
-  private async filtrarSemProgramacaoAtiva(tarefas: TarefaElegivel[]): Promise<TarefaElegivel[]> {
+  private intervaloEmDias(tarefa: TarefaElegivel): number | null {
+    const freq = tarefa.frequencia;
+    if (!freq) return null;
+
+    if (freq === 'PERSONALIZADA') {
+      return tarefa.frequencia_personalizada || null;
+    }
+
+    return FREQUENCIA_DIAS[freq] || null;
+  }
+
+  /**
+   * Proxima execucao = ultima execucao efetiva + intervalo.
+   *
+   * Quando nunca houve execucao, a base e `data_ancora` (definida no vinculo do
+   * plano ao equipamento). O fallback para `created_at` continua existindo para
+   * tarefas antigas sem ancora, mas e ruim de proposito visivel: uma tarefa
+   * anual criada hoje so apareceria daqui a um ano, que era o comportamento
+   * anterior para todas.
+   */
+  private calcularProximaExecucao(tarefa: TarefaElegivel, ultimaExecucao?: Date): Date | null {
+    const diasIntervalo = this.intervaloEmDias(tarefa);
+    if (!diasIntervalo) return null;
+
+    // A ancora tambem avanca quando uma OS e cancelada: cancelar a OS inteira
+    // e decisao de planejamento, aquele ciclo nao vai acontecer. Por isso a base
+    // e a mais recente entre execucao efetiva e ancora.
+    const candidatas = [ultimaExecucao, tarefa.data_ancora ? new Date(tarefa.data_ancora) : null]
+      .filter((d): d is Date => !!d)
+      .sort((a, b) => b.getTime() - a.getTime());
+
+    const base = candidatas[0] ?? new Date(tarefa.created_at);
+
+    return new Date(base.getTime() + diasIntervalo * 24 * 60 * 60 * 1000);
+  }
+
+  private chaveCiclo(tarefaId: string, ciclo?: Date | null): string {
+    return `${tarefaId}|${ciclo ? ciclo.getTime() : 'sem-ciclo'}`;
+  }
+
+  /**
+   * Descarta as tarefas cujo ciclo atual ja tem item ABERTO.
+   *
+   * A pergunta antiga era "essa tarefa tem alguma OS ativa?", o que dava dois
+   * problemas: OS cancelada liberava a tarefa na mesma hora e o cron recriava a
+   * programacao toda madrugada; e tarefa nao concluida numa OS finalizada
+   * sumia, porque quem a segurava era o campo de ultima execucao, escrito
+   * indevidamente para todas.
+   *
+   * Agora o bloqueio e por ciclo e so vale enquanto ha item aberto. OS
+   * finalizada ou cancelada nao bloqueia: quem move o ciclo adiante e a execucao
+   * efetiva (finalizada) ou a ancora (cancelada). Tarefa que nao foi concluida
+   * volta ao pool no MESMO ciclo, como atrasada — e assim que entra numa
+   * programacao nova, esta fica PENDENTE e segura as geracoes seguintes.
+   */
+  private async filtrarCiclosJaGerados(tarefas: TarefaElegivel[]): Promise<TarefaElegivel[]> {
     if (tarefas.length === 0) return [];
 
-    const tarefaIds = tarefas.map((t) => t.id);
+    const tarefaIds = tarefas.map((t) => t.id.trim());
 
-    // Buscar tarefas que JÁ estão vinculadas a programações ativas
-    const vinculosProgramacao = await this.prisma.tarefas_programacao_os.findMany({
-      where: {
-        tarefa_id: { in: tarefaIds },
-        programacao: {
-          is: {
-            status: { in: ['PENDENTE', 'APROVADA'] },
-            deletado_em: null,
+    const [vinculosProgramacao, vinculosOS] = await Promise.all([
+      this.prisma.tarefas_programacao_os.findMany({
+        where: {
+          tarefa_id: { in: tarefaIds },
+          programacao: {
+            is: {
+              status: { in: ['PENDENTE', 'APROVADA'] },
+              deletado_em: null,
+            },
           },
         },
-      },
-      select: { tarefa_id: true },
-    });
-
-    // Buscar tarefas que JÁ estão vinculadas a OS ativas (não finalizada/cancelada)
-    const vinculosOS = await this.prisma.tarefas_os.findMany({
-      where: {
-        tarefa_id: { in: tarefaIds },
-        ordem_servico: {
-          status: { in: ['PENDENTE', 'EM_EXECUCAO', 'PAUSADA', 'EXECUTADA', 'AUDITADA'] },
+        select: { tarefa_id: true, ciclo_referencia: true },
+      }),
+      this.prisma.tarefas_os.findMany({
+        where: {
+          tarefa_id: { in: tarefaIds },
+          ordem_servico: {
+            status: { in: ['PENDENTE', 'EM_EXECUCAO', 'PAUSADA', 'EXECUTADA', 'AUDITADA'] },
+          },
         },
-      },
-      select: { tarefa_id: true },
-    });
-
-    const idsComProgramacao = new Set([
-      ...vinculosProgramacao.map((v) => v.tarefa_id?.trim()),
-      ...vinculosOS.map((v) => v.tarefa_id?.trim()),
+        select: { tarefa_id: true, ciclo_referencia: true },
+      }),
     ]);
 
-    return tarefas.filter((t) => !idsComProgramacao.has(t.id.trim()));
+    const ciclosAbertos = new Set<string>();
+    for (const vinculo of [...vinculosProgramacao, ...vinculosOS]) {
+      const id = vinculo.tarefa_id?.trim();
+      if (!id) continue;
+      ciclosAbertos.add(this.chaveCiclo(id, vinculo.ciclo_referencia));
+    }
+
+    return tarefas.filter((tarefa) => {
+      const id = tarefa.id.trim();
+
+      // Vinculos anteriores a esta versao nao tem ciclo gravado. Nesses casos
+      // vale o comportamento antigo: bloqueia a tarefa inteira, em vez de
+      // arriscar gerar programacao duplicada.
+      if (ciclosAbertos.has(this.chaveCiclo(id, null))) return false;
+
+      return !ciclosAbertos.has(this.chaveCiclo(id, tarefa.proxima_execucao));
+    });
   }
 
   /**
@@ -367,6 +453,24 @@ export class TarefasSchedulerService {
       },
       undefined, // usuarioId - sistema
     );
+
+    // Marcar o ciclo de cada tarefa no vinculo recem-criado. E o que impede o
+    // cron de gerar a mesma coisa de novo amanha, e o que a OS carrega adiante.
+    if (resultado?.id) {
+      for (const tarefa of cluster) {
+        if (!tarefa.proxima_execucao) continue;
+        try {
+          await this.prisma.tarefas_programacao_os.updateMany({
+            where: { programacao_id: resultado.id, tarefa_id: tarefa.id },
+            data: { ciclo_referencia: tarefa.proxima_execucao },
+          });
+        } catch (error) {
+          this.logger.warn(
+            `Falha ao marcar ciclo de referencia da tarefa ${tarefa.id}: ${error.message}`,
+          );
+        }
+      }
+    }
 
     // Atualizar dados_origem com info extra da geração automática
     if (resultado?.id) {
