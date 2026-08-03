@@ -323,61 +323,34 @@ export class InstrucoesService {
     // Gerar TAG única para a tarefa
     const tagTarefa = await this.gerarTagTarefa(dto.plano_manutencao_id);
 
-    // Criar tarefa em transação copiando dados da instrução
-    const tarefa = await this.prisma.$transaction(async (tx) => {
-      const novaTarefa = await tx.tarefas.create({
-        data: {
-          plano_manutencao_id: dto.plano_manutencao_id,
-          instrucao_id: id,
-          equipamento_id: plano.equipamento_id,
-          planta_id: plano.equipamento?.unidade?.planta_id || null,
-          tag: tagTarefa,
-          nome: instrucao.nome,
-          descricao: instrucao.descricao,
-          categoria: instrucao.categoria,
-          tipo_manutencao: instrucao.tipo_manutencao,
-          frequencia: dto.frequencia,
-          frequencia_personalizada: dto.frequencia_personalizada || null,
-          condicao_ativo: instrucao.condicao_ativo,
-          criticidade: dto.criticidade ?? instrucao.criticidade,
-          duracao_estimada: instrucao.duracao_estimada,
-          tempo_estimado: instrucao.tempo_estimado,
-          ordem,
-          observacoes: instrucao.observacoes,
-          status: StatusTarefa.ATIVA,
-          ativo: true,
-          criado_por: dto.criado_por
-        }
-      });
-
-      // Copiar sub-instruções para sub-tarefas
-      if (subInstrucoes.length > 0) {
-        await tx.sub_tarefas.createMany({
-          data: subInstrucoes.map(sub => ({
-            tarefa_id: novaTarefa.id,
-            descricao: sub.descricao,
-            obrigatoria: sub.obrigatoria,
-            tempo_estimado: sub.tempo_estimado,
-            ordem: sub.ordem
-          }))
-        });
+    // A tarefa guarda o vinculo com a instrucao, a periodicidade e a
+    // criticidade. Sub-etapas e recursos NAO sao mais copiados: eles vivem na
+    // instrucao e sao lidos de la (inclusive pelo checklist da OS). Copiar
+    // criaria duas versoes da mesma coisa, que divergem no primeiro ajuste.
+    const tarefa = await this.prisma.tarefas.create({
+      data: {
+        plano_manutencao_id: dto.plano_manutencao_id,
+        instrucao_id: id,
+        equipamento_id: plano.equipamento_id,
+        planta_id: plano.equipamento?.unidade?.planta_id || null,
+        tag: tagTarefa,
+        nome: instrucao.nome,
+        frequencia: dto.frequencia,
+        frequencia_personalizada: dto.frequencia_personalizada || null,
+        criticidade: dto.criticidade ?? instrucao.criticidade,
+        ordem,
+        origem_status: 'PROPRIA',
+        data_ancora: plano.equipamento_id ? new Date() : null,
+        ativo: true,
+        criado_por: dto.criado_por,
+        // Colunas herdadas enquanto o drop nao acontece
+        descricao: instrucao.descricao,
+        categoria: instrucao.categoria,
+        tipo_manutencao: instrucao.tipo_manutencao,
+        condicao_ativo: instrucao.condicao_ativo,
+        duracao_estimada: instrucao.duracao_estimada,
+        tempo_estimado: instrucao.tempo_estimado
       }
-
-      // Copiar recursos
-      if (recursos.length > 0) {
-        await tx.recursos_tarefa.createMany({
-          data: recursos.map(rec => ({
-            tarefa_id: novaTarefa.id,
-            tipo: rec.tipo,
-            descricao: rec.descricao,
-            quantidade: rec.quantidade,
-            unidade: rec.unidade,
-            obrigatorio: rec.obrigatorio
-          }))
-        });
-      }
-
-      return novaTarefa;
     });
 
     return tarefa;

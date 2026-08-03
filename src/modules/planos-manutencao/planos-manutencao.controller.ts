@@ -279,6 +279,15 @@ export class PlanosManutencaoController {
     return this.planosManutencaoService.desvincularEquipamento(equipamentoId, user);
   }
 
+  @Get(':id/propagacao')
+  @ApiOperation({
+    summary: 'Andamento das propagacoes do template para as copias (10 mais recentes)'
+  })
+  @ApiParam({ name: 'id', description: 'ID do plano template' })
+  async consultarPropagacoes(@Param('id') id: string) {
+    return this.planosManutencaoService.consultarPropagacoes(id);
+  }
+
   @Get(':id')
   @ApiOperation({ summary: 'Buscar plano específico por ID' })
   @ApiParam({ name: 'id', description: 'ID do plano' })

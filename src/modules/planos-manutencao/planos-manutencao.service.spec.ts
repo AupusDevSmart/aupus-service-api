@@ -2,6 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { PrismaService, PermissionScopeService } from '@aupus/api-shared';
 import { PlanosManutencaoService } from './planos-manutencao.service';
+import { PropagacaoPlanosService } from './propagacao-planos.service';
 
 /**
  * Cobre o que o PR2 introduziu: plano como template de categoria e o vinculo
@@ -53,6 +54,13 @@ describe('PlanosManutencaoService', () => {
             assertEntityInScope: jest.fn().mockResolvedValue(undefined),
             getScope: jest.fn().mockResolvedValue(null),
             isScoped: jest.fn().mockReturnValue(false),
+          },
+        },
+        {
+          provide: PropagacaoPlanosService,
+          useValue: {
+            enfileirar: jest.fn().mockResolvedValue('propagacao_1'),
+            consultar: jest.fn().mockResolvedValue([]),
           },
         },
       ],

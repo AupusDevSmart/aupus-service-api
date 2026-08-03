@@ -17,13 +17,20 @@ import {
   DashboardPlanosDto
 } from './dto';
 import { Prisma } from '@aupus/api-shared';
+import { PropagacaoPlanosService } from './propagacao-planos.service';
 
 @Injectable()
 export class PlanosManutencaoService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly scopeService: PermissionScopeService,
+    private readonly propagacaoService: PropagacaoPlanosService,
   ) {}
+
+  /** Andamento das propagacoes de um template. */
+  async consultarPropagacoes(planoId: string) {
+    return this.propagacaoService.consultar(planoId);
+  }
 
   /** Fragmento `where` para planos restringindo ao escopo via equipamento.unidade.planta_id. */
   private async scopeFragment(user?: ScopedUser): Promise<Prisma.planos_manutencaoWhereInput | undefined> {
@@ -393,6 +400,12 @@ export class PlanosManutencaoService {
       ...updateDto,
       updated_at: new Date()
     };
+
+    // Editar um template propaga para as copias. Assincrono: o numero de
+    // equipamentos cresce sempre e nao pode segurar o request.
+    if (!(existente as any).plano_origem_id) {
+      await this.propagacaoService.enfileirar(id);
+    }
 
     const plano = await this.prisma.planos_manutencao.update({
       where: { id },

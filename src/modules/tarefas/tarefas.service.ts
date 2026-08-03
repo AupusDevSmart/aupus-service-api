@@ -37,14 +37,21 @@ export class TarefasService {
     let equipamento_id = null;
     let planta_id = null;
 
+    // O conteudo da tarefa vem da instrucao; a tarefa guarda so o vinculo,
+    // a periodicidade e a criticidade daquele plano.
+    const instrucao = await this.verificarInstrucaoExiste(createDto.instrucao_id);
+
     // Se tem plano, verificar se existe e está ativo
     if (createDto.plano_manutencao_id) {
       plano = await this.verificarPlanoExiste(createDto.plano_manutencao_id);
       equipamento_id = plano.equipamento_id;
-      planta_id = plano.equipamento.unidade?.planta_id;
+      planta_id = plano.equipamento?.unidade?.planta_id ?? null;
 
-      // Verificar se ordem já existe no plano
-      await this.verificarOrdemDisponivel(createDto.plano_manutencao_id, createDto.ordem);
+      if (createDto.ordem === undefined || createDto.ordem === null) {
+        createDto.ordem = await this.proximaOrdem(createDto.plano_manutencao_id);
+      } else {
+        await this.verificarOrdemDisponivel(createDto.plano_manutencao_id, createDto.ordem);
+      }
     } else {
       // Tarefa independente - ordem não é obrigatória
       createDto.ordem = null;
@@ -73,54 +80,22 @@ export class TarefasService {
           planta_id: planta_id,
           tag: createDto.tag,
           nome: createDto.nome,
-          descricao: createDto.descricao,
-          categoria: createDto.categoria,
-          tipo_manutencao: createDto.tipo_manutencao,
+          instrucao_id: instrucao.id,
           frequencia: createDto.frequencia,
           frequencia_personalizada: createDto.frequencia_personalizada,
-          condicao_ativo: createDto.condicao_ativo,
           criticidade: createDto.criticidade,
-          duracao_estimada: createDto.duracao_estimada,
-          tempo_estimado: createDto.tempo_estimado,
           ordem: createDto.ordem,
-          planejador: createDto.planejador,
-          responsavel: createDto.responsavel,
-          observacoes: createDto.observacoes,
-          status: createDto.status || StatusTarefa.ATIVA,
-          ativo: createDto.ativo !== undefined ? createDto.ativo : true,
-          data_ultima_execucao: createDto.data_ultima_execucao,
-          numero_execucoes: createDto.numero_execucoes || 0,
+          // Tarefa nasce sempre PROPRIA: no template ela e original, e na copia
+          // foi criada direto naquele equipamento. Propagacao nunca mexe nela.
+          origem_status: 'PROPRIA',
+          // A ancora so faz sentido na copia, que e quem gera OS
+          data_ancora: equipamento_id ? new Date() : null,
+          ativo: true,
           criado_por: createDto.criado_por,
-          instrucao_id: createDto.instrucao_id || null
+          // Colunas herdadas da instrucao enquanto o drop nao acontece
+          ...this.camposHerdadosDaInstrucao(instrucao)
         }
       });
-
-      // Criar sub-tarefas se fornecidas
-      if (createDto.sub_tarefas && createDto.sub_tarefas.length > 0) {
-        await tx.sub_tarefas.createMany({
-          data: createDto.sub_tarefas.map(subTarefa => ({
-            tarefa_id: novaTarefa.id,
-            descricao: subTarefa.descricao,
-            obrigatoria: subTarefa.obrigatoria || false,
-            tempo_estimado: subTarefa.tempo_estimado,
-            ordem: subTarefa.ordem
-          }))
-        });
-      }
-
-      // Criar recursos se fornecidos
-      if (createDto.recursos && createDto.recursos.length > 0) {
-        await tx.recursos_tarefa.createMany({
-          data: createDto.recursos.map(recurso => ({
-            tarefa_id: novaTarefa.id,
-            tipo: recurso.tipo,
-            descricao: recurso.descricao,
-            quantidade: recurso.quantidade,
-            unidade: recurso.unidade,
-            obrigatorio: recurso.obrigatorio || false
-          }))
-        });
-      }
 
       return novaTarefa;
     });
@@ -381,13 +356,26 @@ export class TarefasService {
       await this.verificarTagUnica(updateDto.tag, id);
     }
 
-    // Preparar dados para atualização - remover campos que não existem no schema
-    const { sub_tarefas, recursos, ...dadosAtualizacao } = updateDto;
+    const dadosAtualizacao: any = { ...updateDto };
+
+    // Trocar a instrucao troca o conteudo da tarefa: as colunas herdadas
+    // acompanham enquanto elas existirem.
+    if (updateDto.instrucao_id && updateDto.instrucao_id !== tarefaExistente.instrucao_id) {
+      const instrucao = await this.verificarInstrucaoExiste(updateDto.instrucao_id);
+      Object.assign(dadosAtualizacao, this.camposHerdadosDaInstrucao(instrucao));
+    }
 
     // Se mudou plano, verificar se existe e ajustar dados
     if (updateDto.plano_manutencao_id && updateDto.plano_manutencao_id !== tarefaExistente.plano_manutencao_id) {
       const novoPlano = await this.verificarPlanoExiste(updateDto.plano_manutencao_id);
       dadosAtualizacao.equipamento_id = novoPlano.equipamento_id;
+    }
+
+    // Editar uma tarefa HERDADA marca a divergencia: a partir daqui ela deixa
+    // de acompanhar o template. Sem isso, a proxima propagacao sobrescreveria
+    // silenciosamente o ajuste que o usuario acabou de fazer.
+    if (tarefaExistente.origem_status === 'HERDADA' && this.alteraDefinicao(updateDto, tarefaExistente)) {
+      dadosAtualizacao.origem_status = 'CUSTOMIZADA';
     }
 
     // Validar frequência personalizada se alterada e se frequência existe
@@ -404,65 +392,31 @@ export class TarefasService {
       await this.verificarOrdemDisponivel(planoId, updateDto.ordem, id);
     }
 
-    // Transação para atualizar tarefa com sub-estruturas
-    const tarefa = await this.prisma.$transaction(async (tx) => {
-      // Atualizar tarefa principal
-      const tarefaAtualizada = await tx.tarefas.update({
-        where: { id },
-        data: {
-          ...dadosAtualizacao,
-          updated_at: new Date()
-        }
-      });
-
-      // Se fornecidas sub-tarefas, substituir todas
-      if (updateDto.sub_tarefas) {
-        // Remover sub-tarefas existentes
-        await tx.sub_tarefas.deleteMany({
-          where: { tarefa_id: id }
-        });
-
-        // Criar novas sub-tarefas
-        if (updateDto.sub_tarefas.length > 0) {
-          await tx.sub_tarefas.createMany({
-            data: updateDto.sub_tarefas.map(subTarefa => ({
-              tarefa_id: id,
-              descricao: subTarefa.descricao,
-              obrigatoria: subTarefa.obrigatoria || false,
-              tempo_estimado: subTarefa.tempo_estimado,
-              ordem: subTarefa.ordem
-            }))
-          });
-        }
+    const tarefa = await this.prisma.tarefas.update({
+      where: { id },
+      data: {
+        ...dadosAtualizacao,
+        updated_at: new Date()
       }
-
-      // Se fornecidos recursos, substituir todos
-      if (updateDto.recursos) {
-        // Remover recursos existentes
-        await tx.recursos_tarefa.deleteMany({
-          where: { tarefa_id: id }
-        });
-
-        // Criar novos recursos
-        if (updateDto.recursos.length > 0) {
-          await tx.recursos_tarefa.createMany({
-            data: updateDto.recursos.map(recurso => ({
-              tarefa_id: id,
-              tipo: recurso.tipo,
-              descricao: recurso.descricao,
-              quantidade: recurso.quantidade,
-              unidade: recurso.unidade,
-              obrigatorio: recurso.obrigatorio || false
-            }))
-          });
-        }
-      }
-
-      return tarefaAtualizada;
     });
 
     // Retornar tarefa completa com relacionamentos
     return this.buscarPorId(tarefa.id);
+  }
+
+  /** Os quatro campos de definicao. Mudanca de ordem ou tag nao customiza. */
+  private alteraDefinicao(updateDto: UpdateTarefaDto, atual: any): boolean {
+    const campos: Array<keyof UpdateTarefaDto> = [
+      'nome',
+      'instrucao_id',
+      'frequencia',
+      'frequencia_personalizada',
+      'criticidade',
+    ];
+
+    return campos.some(
+      (campo) => updateDto[campo] !== undefined && updateDto[campo] !== atual[campo],
+    );
   }
 
   async atualizarStatus(id: string, updateStatusDto: UpdateStatusTarefaDto, user?: ScopedUser): Promise<TarefaResponseDto> {
@@ -502,12 +456,21 @@ export class TarefasService {
 
   async remover(id: string, user?: ScopedUser): Promise<void> {
     if (user) await this.scopeService.assertEntityInScope('tarefa', id, user);
-    await this.verificarTarefaExiste(id);
+    const tarefa = await this.verificarTarefaExiste(id);
 
-    // Soft delete
+    // Tarefa HERDADA removida na copia vira REMOVIDA, nao some.
+    //
+    // Se apagasse de vez, a proxima edicao do template a traria de volta — o
+    // usuario removeria, o template propagaria, e assim para sempre. O estado
+    // REMOVIDA e o que diz a propagacao "aqui nao".
+    const virarRemovida = tarefa.origem_status === 'HERDADA';
+
     await this.prisma.tarefas.update({
       where: { id },
-      data: { deleted_at: new Date() }
+      data: {
+        deleted_at: new Date(),
+        ...(virarRemovida && { origem_status: 'REMOVIDA' })
+      }
     });
   }
 
@@ -646,6 +609,44 @@ export class TarefasService {
   }
 
   // Métodos privados auxiliares
+
+  private async verificarInstrucaoExiste(instrucaoId: string) {
+    const instrucao = await this.prisma.instrucoes.findFirst({
+      where: { id: instrucaoId.trim(), deleted_at: null }
+    });
+
+    if (!instrucao) {
+      throw new NotFoundException('Instrução não encontrada');
+    }
+
+    return instrucao;
+  }
+
+  /**
+   * Colunas que a tarefa ainda carrega no banco mas que sao conteudo da
+   * instrucao. Preenchidas na criacao porque sao NOT NULL; o drop delas e a
+   * ultima etapa da migracao, quando ninguem mais as ler.
+   */
+  private camposHerdadosDaInstrucao(instrucao: any) {
+    return {
+      descricao: instrucao.descricao,
+      categoria: instrucao.categoria,
+      tipo_manutencao: instrucao.tipo_manutencao,
+      condicao_ativo: instrucao.condicao_ativo,
+      duracao_estimada: instrucao.duracao_estimada,
+      tempo_estimado: instrucao.tempo_estimado
+    };
+  }
+
+  private async proximaOrdem(planoId: string): Promise<number> {
+    const ultima = await this.prisma.tarefas.findFirst({
+      where: { plano_manutencao_id: planoId, deleted_at: null },
+      orderBy: { ordem: 'desc' },
+      select: { ordem: true }
+    });
+
+    return (ultima?.ordem ?? 0) + 1;
+  }
 
   private async verificarPlanoExiste(planoId: string) {
     const plano = await this.prisma.planos_manutencao.findFirst({
