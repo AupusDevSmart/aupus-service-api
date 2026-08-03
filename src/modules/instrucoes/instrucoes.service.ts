@@ -282,17 +282,35 @@ export class InstrucoesService {
       throw new NotFoundException('Plano de manutenção não encontrado');
     }
 
-    // Verificar se ordem já está em uso no plano
-    const ordemExistente = await this.prisma.tarefas.findFirst({
-      where: {
-        plano_manutencao_id: dto.plano_manutencao_id,
-        ordem: dto.ordem,
-        deleted_at: null
-      }
-    });
+    // Ordem: se informada, precisa estar livre. Se omitida (cadastro rápido pela
+    // tabela de planos), usa a próxima ordem livre do plano.
+    let ordem: number;
 
-    if (ordemExistente) {
-      throw new ConflictException(`A ordem ${dto.ordem} já está sendo utilizada por outra tarefa neste plano`);
+    if (dto.ordem !== undefined) {
+      const ordemExistente = await this.prisma.tarefas.findFirst({
+        where: {
+          plano_manutencao_id: dto.plano_manutencao_id,
+          ordem: dto.ordem,
+          deleted_at: null
+        }
+      });
+
+      if (ordemExistente) {
+        throw new ConflictException(`A ordem ${dto.ordem} já está sendo utilizada por outra tarefa neste plano`);
+      }
+
+      ordem = dto.ordem;
+    } else {
+      const ultimaTarefa = await this.prisma.tarefas.findFirst({
+        where: {
+          plano_manutencao_id: dto.plano_manutencao_id,
+          deleted_at: null
+        },
+        orderBy: { ordem: 'desc' },
+        select: { ordem: true }
+      });
+
+      ordem = (ultimaTarefa?.ordem ?? 0) + 1;
     }
 
     // Validar frequência personalizada
@@ -321,10 +339,10 @@ export class InstrucoesService {
           frequencia: dto.frequencia,
           frequencia_personalizada: dto.frequencia_personalizada || null,
           condicao_ativo: instrucao.condicao_ativo,
-          criticidade: instrucao.criticidade,
+          criticidade: dto.criticidade ?? instrucao.criticidade,
           duracao_estimada: instrucao.duracao_estimada,
           tempo_estimado: instrucao.tempo_estimado,
-          ordem: dto.ordem,
+          ordem,
           observacoes: instrucao.observacoes,
           status: StatusTarefa.ATIVA,
           ativo: true,
