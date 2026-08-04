@@ -227,7 +227,14 @@ export class TarefasService {
               tag: true,
               nome: true,
               categoria: true,
-              tipo_manutencao: true
+              tipo_manutencao: true,
+              descricao: true,
+              // As telas de OS leem as etapas daqui: a tarefa nao guarda mais
+              // sub-etapas proprias.
+              sub_instrucoes: {
+                orderBy: { ordem: 'asc' as const },
+                select: { id: true, descricao: true, obrigatoria: true, ordem: true, tempo_estimado: true }
+              }
             }
           }
         }
@@ -804,7 +811,14 @@ export class TarefasService {
           tag: true,
           nome: true,
           categoria: true,
-          tipo_manutencao: true
+          tipo_manutencao: true,
+          descricao: true,
+          // As telas de OS leem as etapas daqui: a tarefa nao guarda mais
+          // sub-etapas proprias.
+          sub_instrucoes: {
+            orderBy: { ordem: 'asc' as const },
+            select: { id: true, descricao: true, obrigatoria: true, ordem: true, tempo_estimado: true }
+          }
         }
       },
       _count: {
@@ -848,7 +862,14 @@ export class TarefasService {
           tag: true,
           nome: true,
           categoria: true,
-          tipo_manutencao: true
+          tipo_manutencao: true,
+          descricao: true,
+          // As telas de OS leem as etapas daqui: a tarefa nao guarda mais
+          // sub-etapas proprias.
+          sub_instrucoes: {
+            orderBy: { ordem: 'asc' as const },
+            select: { id: true, descricao: true, obrigatoria: true, ordem: true, tempo_estimado: true }
+          }
         }
       },
       usuario_criador: {
