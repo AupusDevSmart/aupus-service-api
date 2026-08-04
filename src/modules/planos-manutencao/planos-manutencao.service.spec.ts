@@ -12,6 +12,7 @@ import { PropagacaoPlanosService } from './propagacao-planos.service';
  */
 describe('PlanosManutencaoService', () => {
   let service: PlanosManutencaoService;
+  let module: TestingModule;
 
   const CATEGORIA_MOTOR = 'cat_motor_00000000000000';
   const CATEGORIA_TRAFO = 'cat_trafo_00000000000000';
@@ -44,7 +45,7 @@ describe('PlanosManutencaoService', () => {
   };
 
   beforeEach(async () => {
-    const module: TestingModule = await Test.createTestingModule({
+    module = await Test.createTestingModule({
       providers: [
         PlanosManutencaoService,
         { provide: PrismaService, useValue: mockPrismaService },
@@ -106,6 +107,48 @@ describe('PlanosManutencaoService', () => {
       await expect(
         service.criar({ categoria_id: 'nao_existe', nome: 'X' }),
       ).rejects.toThrow(NotFoundException);
+    });
+  });
+
+  describe('atualizar', () => {
+    it('enfileira a propagacao DEPOIS de gravar o template', async () => {
+      const ordemDasChamadas: string[] = [];
+
+      mockPrismaService.planos_manutencao.findFirst.mockResolvedValue({
+        id: TEMPLATE_ID,
+        plano_origem_id: null,
+        equipamento_id: null,
+      });
+      mockPrismaService.planos_manutencao.update.mockImplementation(async () => {
+        ordemDasChamadas.push('update');
+        return { id: TEMPLATE_ID, plano_origem_id: null };
+      });
+
+      const propagacao = module.get(PropagacaoPlanosService);
+      (propagacao.enfileirar as jest.Mock).mockImplementation(async () => {
+        ordemDasChamadas.push('enfileirar');
+        return 'propagacao_1';
+      });
+
+      await service.atualizar(TEMPLATE_ID, { nome: 'Novo nome' });
+
+      // O worker le o template do banco. Enfileirar antes do update abre
+      // janela para ele propagar o conteudo antigo.
+      expect(ordemDasChamadas).toEqual(['update', 'enfileirar']);
+    });
+
+    it('copia nao enfileira propagacao', async () => {
+      mockPrismaService.planos_manutencao.findFirst.mockResolvedValue({
+        id: 'copia_1',
+        plano_origem_id: TEMPLATE_ID,
+        equipamento_id: EQUIPAMENTO_UC,
+      });
+      mockPrismaService.planos_manutencao.update.mockResolvedValue({ id: 'copia_1' });
+
+      const propagacao = module.get(PropagacaoPlanosService);
+      await service.atualizar('copia_1', { nome: 'Ajuste local' });
+
+      expect(propagacao.enfileirar).not.toHaveBeenCalled();
     });
   });
 

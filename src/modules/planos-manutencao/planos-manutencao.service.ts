@@ -401,17 +401,17 @@ export class PlanosManutencaoService {
       updated_at: new Date()
     };
 
-    // Editar um template propaga para as copias. Assincrono: o numero de
-    // equipamentos cresce sempre e nao pode segurar o request.
-    if (!(existente as any).plano_origem_id) {
-      await this.propagacaoService.enfileirar(id);
-    }
-
     const plano = await this.prisma.planos_manutencao.update({
       where: { id },
       data: dadosAtualizacao,
       include: this.includeRelacionamentos()
     });
+
+    // Enfileirado DEPOIS do update: o worker le o template do banco, entao
+    // enfileirar antes abre janela para ele propagar o conteudo antigo.
+    if (!(existente as any).plano_origem_id) {
+      await this.propagacaoService.enfileirar(id);
+    }
 
     return this.mapearParaResponse(plano);
   }

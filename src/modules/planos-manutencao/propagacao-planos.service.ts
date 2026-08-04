@@ -43,11 +43,24 @@ export class PropagacaoPlanosService {
 
   constructor(private readonly prisma: PrismaService) {}
 
-  /** Enfileira. Chamado quando um template e salvo. */
+  /**
+   * Enfileira e ja dispara o processamento, sem esperar por ele.
+   *
+   * O cron sozinho faria a propagacao demorar ate um ciclo inteiro para
+   * comecar, e ficaria varrendo uma tabela vazia o tempo todo. Disparando
+   * aqui, o caso normal comeca na hora e o cron passa a ser so a rede de
+   * seguranca para o que ficou preso (processo reiniciado no meio, falha
+   * transitoria).
+   */
   async enfileirar(planoId: string): Promise<string> {
     const registro = await this.prisma.propagacoes_plano.create({
       data: { plano_id: planoId.trim() },
       select: { id: true },
+    });
+
+    // Sem await: quem salvou o template nao espera a propagacao terminar.
+    void this.processarFila().catch((error) => {
+      this.logger.warn(`Disparo imediato da propagacao falhou: ${error.message}`);
     });
 
     return registro.id;
@@ -61,7 +74,10 @@ export class PropagacaoPlanosService {
     });
   }
 
-  @Cron('*/2 * * * *')
+  // Rede de seguranca: o caminho normal e o disparo do enfileirar. Este cron
+  // so pega o que sobrou de um processo reiniciado no meio ou de uma falha
+  // transitoria, entao nao precisa ser frequente.
+  @Cron('*/10 * * * *')
   async processarFila(): Promise<void> {
     // Guarda simples contra sobreposicao: o cron nao espera a rodada anterior.
     if (this.processando) return;
