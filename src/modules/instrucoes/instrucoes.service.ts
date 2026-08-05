@@ -1,6 +1,7 @@
 // src/modules/instrucoes/instrucoes.service.ts
 import { Injectable, NotFoundException, ConflictException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '@aupus/api-shared';
+import { PropagacaoPlanosService } from '../planos-manutencao/propagacao-planos.service';
 import {
   CreateInstrucaoDto,
   UpdateInstrucaoDto,
@@ -14,7 +15,10 @@ import { StatusTarefa, Prisma } from '@aupus/api-shared';
 
 @Injectable()
 export class InstrucoesService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly propagacaoService: PropagacaoPlanosService,
+  ) {}
 
   async criar(createDto: CreateInstrucaoDto): Promise<InstrucaoResponseDto> {
     // Se não foi fornecida TAG, gerar automaticamente
@@ -352,6 +356,11 @@ export class InstrucoesService {
         tempo_estimado: instrucao.tempo_estimado
       }
     });
+
+    // Se o plano e template, a tarefa nova precisa chegar nas copias
+    if (!plano.plano_origem_id) {
+      await this.propagacaoService.enfileirar(plano.id);
+    }
 
     return tarefa;
   }
