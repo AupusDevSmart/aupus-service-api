@@ -11,13 +11,35 @@ import {
   DashboardTarefasDto
 } from './dto';
 import { StatusTarefa, Prisma } from '@aupus/api-shared';
+import { PropagacaoPlanosService } from '../planos-manutencao/propagacao-planos.service';
 
 @Injectable()
 export class TarefasService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly scopeService: PermissionScopeService,
+    private readonly propagacaoService: PropagacaoPlanosService,
   ) {}
+
+  /**
+   * Enfileira a propagacao quando a tarefa mexida pertence a um TEMPLATE.
+   *
+   * O gatilho anterior ficava so no save do plano, mas adicionar, editar ou
+   * remover tarefa nao toca no registro do plano — entao a alteracao mais
+   * comum de todas nao chegava nas copias.
+   */
+  private async propagarSePertenceATemplate(planoId?: string | null): Promise<void> {
+    if (!planoId) return;
+
+    const plano = await this.prisma.planos_manutencao.findFirst({
+      where: { id: planoId.trim(), deleted_at: null },
+      select: { id: true, plano_origem_id: true },
+    });
+
+    if (!plano || plano.plano_origem_id) return;
+
+    await this.propagacaoService.enfileirar(plano.id);
+  }
 
   /** Retorna fragmento `where` para tarefas restringindo ao escopo de plantas. */
   private async scopeFragment(user?: ScopedUser): Promise<Prisma.tarefasWhereInput | undefined> {
@@ -99,6 +121,8 @@ export class TarefasService {
 
       return novaTarefa;
     });
+
+    await this.propagarSePertenceATemplate(createDto.plano_manutencao_id);
 
     // Retornar tarefa completa com relacionamentos
     return this.buscarPorId(tarefa.id);
@@ -407,6 +431,10 @@ export class TarefasService {
       }
     });
 
+    await this.propagarSePertenceATemplate(
+      updateDto.plano_manutencao_id || tarefaExistente.plano_manutencao_id,
+    );
+
     // Retornar tarefa completa com relacionamentos
     return this.buscarPorId(tarefa.id);
   }
@@ -479,6 +507,8 @@ export class TarefasService {
         ...(virarRemovida && { origem_status: 'REMOVIDA' })
       }
     });
+
+    await this.propagarSePertenceATemplate(tarefa.plano_manutencao_id);
   }
 
   async obterDashboard(): Promise<DashboardTarefasDto> {

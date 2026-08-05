@@ -2,6 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { NotFoundException } from '@nestjs/common';
 import { PrismaService, PermissionScopeService } from '@aupus/api-shared';
 import { TarefasService } from './tarefas.service';
+import { PropagacaoPlanosService } from '../planos-manutencao/propagacao-planos.service';
 
 /**
  * Cobre a tarefa reduzida a quatro campos e as transicoes de heranca.
@@ -12,6 +13,7 @@ import { TarefasService } from './tarefas.service';
  */
 describe('TarefasService', () => {
   let service: TarefasService;
+  let module_ref: TestingModule;
 
   const instrucao = {
     id: 'inst_1',
@@ -41,10 +43,14 @@ describe('TarefasService', () => {
   };
 
   beforeEach(async () => {
-    const module: TestingModule = await Test.createTestingModule({
+    module_ref = await Test.createTestingModule({
       providers: [
         TarefasService,
         { provide: PrismaService, useValue: mockPrismaService },
+        {
+          provide: PropagacaoPlanosService,
+          useValue: { enfileirar: jest.fn().mockResolvedValue('prop_1') },
+        },
         {
           provide: PermissionScopeService,
           useValue: {
@@ -56,7 +62,7 @@ describe('TarefasService', () => {
       ],
     }).compile();
 
-    service = module.get<TarefasService>(TarefasService);
+    service = module_ref.get<TarefasService>(TarefasService);
     mockPrismaService.$transaction.mockImplementation(async (cb: any) => cb(mockPrismaService));
     mockPrismaService.instrucoes.findFirst.mockResolvedValue(instrucao);
     mockPrismaService.tarefas.count.mockResolvedValue(0);
@@ -128,6 +134,55 @@ describe('TarefasService', () => {
       const dados = mockPrismaService.tarefas.create.mock.calls[0][0].data;
       expect(dados.data_ancora).toBeNull();
       expect(dados.equipamento_id).toBeNull();
+    });
+  });
+
+  describe('propagacao a partir do template', () => {
+    const enfileirar = () =>
+      (module_ref.get(PropagacaoPlanosService).enfileirar as jest.Mock);
+
+    it('enfileira ao criar tarefa num template', async () => {
+      mockPrismaService.planos_manutencao.findFirst.mockResolvedValue({
+        id: 'template_1',
+        equipamento_id: null,
+        equipamento: null,
+        plano_origem_id: null,
+      });
+      mockPrismaService.tarefas.findFirst.mockResolvedValue(null);
+      mockPrismaService.tarefas.create.mockResolvedValue({ id: 'tarefa_1' });
+
+      await service.criar({
+        nome: 'Nova',
+        instrucao_id: 'inst_1',
+        frequencia: 'MENSAL' as any,
+        criticidade: 3,
+        plano_manutencao_id: 'template_1',
+      });
+
+      // Sem isso, adicionar tarefa no template nao chegava nas copias: o
+      // gatilho antigo ficava so no save do plano, que nao e tocado aqui.
+      expect(enfileirar()).toHaveBeenCalledWith('template_1');
+    });
+
+    it('nao enfileira quando a tarefa e de uma copia', async () => {
+      mockPrismaService.planos_manutencao.findFirst.mockResolvedValue({
+        id: 'copia_1',
+        equipamento_id: 'eq_1',
+        equipamento: { id: 'eq_1', unidade: { planta_id: 'planta_1' } },
+        plano_origem_id: 'template_1',
+      });
+      mockPrismaService.tarefas.findFirst.mockResolvedValue(null);
+      mockPrismaService.tarefas.create.mockResolvedValue({ id: 'tarefa_1' });
+
+      await service.criar({
+        nome: 'Nova',
+        instrucao_id: 'inst_1',
+        frequencia: 'MENSAL' as any,
+        criticidade: 3,
+        plano_manutencao_id: 'copia_1',
+      });
+
+      expect(enfileirar()).not.toHaveBeenCalled();
     });
   });
 

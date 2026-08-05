@@ -84,14 +84,23 @@ export class PropagacaoPlanosService {
     this.processando = true;
 
     try {
-      const pendentes = await this.prisma.propagacoes_plano.findMany({
-        where: { status: 'PENDENTE' },
-        orderBy: { created_at: 'asc' },
-        take: 5,
-      });
+      // Continua enquanto houver fila. Enfileiramentos que chegam durante o
+      // processamento sao ignorados pela guarda acima; sem este laco eles
+      // esperariam o proximo cron — ate 10 minutos para uma edicao que o
+      // usuario acabou de fazer. O teto evita laco infinito se algo
+      // reenfileirar sozinho.
+      for (let rodada = 0; rodada < 20; rodada++) {
+        const pendentes = await this.prisma.propagacoes_plano.findMany({
+          where: { status: 'PENDENTE' },
+          orderBy: { created_at: 'asc' },
+          take: 5,
+        });
 
-      for (const item of pendentes) {
-        await this.processarItem(item.id, item.plano_id);
+        if (pendentes.length === 0) break;
+
+        for (const item of pendentes) {
+          await this.processarItem(item.id, item.plano_id);
+        }
       }
     } catch (error) {
       this.logger.error(`Erro ao processar fila de propagacao: ${error.message}`, error.stack);
