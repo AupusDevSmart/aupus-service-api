@@ -3,7 +3,6 @@ import { Module, forwardRef } from '@nestjs/common';
 import { TarefasController } from './tarefas.controller';
 import { TarefasService } from './tarefas.service';
 import { TarefasSchedulerService } from './tarefas-scheduler.service';
-import { AnexosTarefasService } from './anexos-tarefas.service';
 import { PrismaModule } from '@aupus/api-shared';
 import { ProgramacaoOSModule } from '../programacao-os/programacao-os.module';
 import { PlanosManutencaoModule } from '../planos-manutencao/planos-manutencao.module';
@@ -16,7 +15,7 @@ import { PlanosManutencaoModule } from '../planos-manutencao/planos-manutencao.m
     forwardRef(() => PlanosManutencaoModule),
   ],
   controllers: [TarefasController],
-  providers: [TarefasService, TarefasSchedulerService, AnexosTarefasService],
+  providers: [TarefasService, TarefasSchedulerService],
   exports: [TarefasService],
 })
 export class TarefasModule {}

@@ -43,38 +43,6 @@ export class InstrucaoResumoDto {
   tipo_manutencao: TipoManutencao;
 }
 
-export class SubTarefaResponseDto {
-  id: string;
-  descricao: string;
-  obrigatoria: boolean;
-  tempo_estimado?: number;
-  ordem?: number;
-  created_at: Date;
-  updated_at: Date;
-}
-
-export class RecursoTarefaResponseDto {
-  id: string;
-  tipo: TipoRecurso;
-  descricao: string;
-  quantidade?: number;
-  unidade?: string;
-  obrigatorio: boolean;
-  created_at: Date;
-  updated_at: Date;
-}
-
-export class AnexoTarefaResponseDto {
-  id: string;
-  nome: string;
-  tipo: TipoAnexo;
-  url: string;
-  tamanho?: number;
-  content_type?: string;
-  created_at: Date;
-  updated_at: Date;
-}
-
 export class TarefaResponseDto {
   id: string;
   plano_manutencao_id: string;
@@ -112,14 +80,4 @@ export class TarefaResponseDto {
   usuario_criador?: UsuarioResumoDto;
   usuario_atualizador?: UsuarioResumoDto;
   instrucao?: InstrucaoResumoDto;
-
-  // Sub-estruturas
-  sub_tarefas?: SubTarefaResponseDto[];
-  recursos?: RecursoTarefaResponseDto[];
-  anexos?: AnexoTarefaResponseDto[];
-
-  // Contadores calculados
-  total_sub_tarefas?: number;
-  total_recursos?: number;
-  total_anexos?: number;
 }

@@ -6,12 +6,9 @@ import {
   UpdatePlanoManutencaoDto,
   QueryPlanosDto,
   QueryPlanosPorPlantaDto,
-  DuplicarPlanoDto,
   VincularPlanoDto,
   VincularPlanoResponseDto,
   PreviaDesvinculoDto,
-  ClonarPlanoLoteDto,
-  ClonarPlanoLoteResponseDto,
   PlanoManutencaoResponseDto,
   PlanoResumoDto,
   DashboardPlanosDto
@@ -134,15 +131,6 @@ export class PlanosManutencaoService {
       ...(incluirTarefas && {
         tarefas: {
           where: { deleted_at: null },
-          include: {
-            _count: {
-              select: {
-                sub_tarefas: true,
-                recursos: true,
-                anexos: true
-              }
-            }
-          },
           orderBy: { ordem: 'asc' }
         }
       })
@@ -251,15 +239,6 @@ export class PlanosManutencaoService {
     if (incluir_tarefas) {
       includeOptions.tarefas = {
         where: { deleted_at: null },
-        include: {
-          _count: {
-            select: {
-              sub_tarefas: true,
-              recursos: true,
-              anexos: true
-            }
-          }
-        },
         orderBy: { ordem: 'asc' }
       };
     }
@@ -350,15 +329,6 @@ export class PlanosManutencaoService {
     if (incluir_tarefas) {
       includeOptions.tarefas = {
         where: { deleted_at: null },
-        include: {
-          _count: {
-            select: {
-              sub_tarefas: true,
-              recursos: true,
-              anexos: true
-            }
-          }
-        },
         orderBy: { ordem: 'asc' }
       };
     }
@@ -442,264 +412,6 @@ export class PlanosManutencaoService {
     });
   }
 
-  async duplicar(id: string, duplicarDto: DuplicarPlanoDto, user?: ScopedUser): Promise<PlanoManutencaoResponseDto> {
-    if (user) {
-      const existing = await this.prisma.planos_manutencao.findFirst({
-        where: { id, deleted_at: null },
-        select: { equipamento_id: true },
-      });
-      if (existing) await this.scopeService.assertEntityInScope('equipamento', existing.equipamento_id, user);
-      if (duplicarDto.equipamento_destino_id) {
-        await this.scopeService.assertEntityInScope('equipamento', duplicarDto.equipamento_destino_id, user);
-      }
-    }
-    // Verificar se plano original existe
-    const planoOriginal = await this.prisma.planos_manutencao.findFirst({
-      where: {
-        id,
-        deleted_at: null
-      },
-      include: {
-        tarefas: {
-          where: { deleted_at: null },
-          include: {
-            sub_tarefas: true,
-            recursos: true,
-            anexos: true
-          }
-        },
-        equipamento: {
-          select: { nome: true }
-        }
-      }
-    });
-
-    if (!planoOriginal) {
-      throw new NotFoundException('Plano de manutenção original não encontrado');
-    }
-
-    // Verificar se equipamento destino existe
-    await this.verificarEquipamentoExiste(duplicarDto.equipamento_destino_id);
-
-    // Verificar se equipamento destino já tem plano
-    const planoDestino = await this.prisma.planos_manutencao.findFirst({
-      where: {
-        equipamento_id: duplicarDto.equipamento_destino_id,
-        deleted_at: null
-      }
-    });
-
-    if (planoDestino) {
-      throw new ConflictException('O equipamento destino já possui um plano de manutenção');
-    }
-
-    // Buscar equipamento destino para gerar nome
-    const equipamentoDestino = await this.prisma.equipamentos.findUnique({
-      where: { id: duplicarDto.equipamento_destino_id },
-      select: { nome: true }
-    });
-
-    const novoNome = duplicarDto.novo_nome ||
-      `${planoOriginal.nome} - ${equipamentoDestino?.nome || 'Cópia'}`;
-
-    // Duplicar plano com todas as tarefas
-    const planoDuplicado = await this.prisma.$transaction(async (tx) => {
-      // Criar novo plano - com conversão de datas
-      const novoPlano = await tx.planos_manutencao.create({
-        data: {
-          equipamento_id: duplicarDto.equipamento_destino_id,
-          nome: novoNome,
-          descricao: planoOriginal.descricao,
-          versao: '1.0', // Reset versão
-          // Apenas incluir criado_por se for fornecido
-          ...(duplicarDto.criado_por && { criado_por: duplicarDto.criado_por })
-        }
-      });
-
-      // Duplicar todas as tarefas
-      for (const tarefaOriginal of planoOriginal.tarefas) {
-        // Gerar nova TAG
-        const novaTag = await this.gerarNovaTag(
-          duplicarDto.equipamento_destino_id,
-          duplicarDto.novo_prefixo_tag || 'TRF'
-        );
-
-        // Criar nova tarefa
-        const novaTarefa = await tx.tarefas.create({
-          data: {
-            plano_manutencao_id: novoPlano.id,
-            equipamento_id: duplicarDto.equipamento_destino_id,
-            tag: novaTag,
-            nome: tarefaOriginal.nome,
-            descricao: tarefaOriginal.descricao,
-            categoria: tarefaOriginal.categoria,
-            tipo_manutencao: tarefaOriginal.tipo_manutencao,
-            frequencia: tarefaOriginal.frequencia,
-            frequencia_personalizada: tarefaOriginal.frequencia_personalizada,
-            condicao_ativo: tarefaOriginal.condicao_ativo,
-            criticidade: tarefaOriginal.criticidade,
-            duracao_estimada: tarefaOriginal.duracao_estimada,
-            tempo_estimado: tarefaOriginal.tempo_estimado,
-            ordem: tarefaOriginal.ordem,
-            planejador: tarefaOriginal.planejador,
-            responsavel: tarefaOriginal.responsavel,
-            observacoes: tarefaOriginal.observacoes,
-            status: tarefaOriginal.status,
-            ativo: tarefaOriginal.ativo,
-            // Apenas incluir criado_por se for fornecido
-            ...(duplicarDto.criado_por && { criado_por: duplicarDto.criado_por })
-          }
-        });
-
-        // Duplicar sub-tarefas
-        for (const subTarefa of tarefaOriginal.sub_tarefas) {
-          await tx.sub_tarefas.create({
-            data: {
-              tarefa_id: novaTarefa.id,
-              descricao: subTarefa.descricao,
-              obrigatoria: subTarefa.obrigatoria,
-              tempo_estimado: subTarefa.tempo_estimado,
-              ordem: subTarefa.ordem
-            }
-          });
-        }
-
-        // Duplicar recursos
-        for (const recurso of tarefaOriginal.recursos) {
-          await tx.recursos_tarefa.create({
-            data: {
-              tarefa_id: novaTarefa.id,
-              tipo: recurso.tipo,
-              descricao: recurso.descricao,
-              quantidade: recurso.quantidade,
-              unidade: recurso.unidade,
-              obrigatorio: recurso.obrigatorio
-            }
-          });
-        }
-
-        // Anexos não são duplicados (apenas referências)
-        // Se quiser duplicar, seria necessário copiar os arquivos físicos
-      }
-
-      return novoPlano;
-    });
-
-    // Retornar plano criado com relacionamentos
-    return this.buscarPorId(planoDuplicado.id, true);
-  }
-
-  /**
-   * Clona um plano de manutenção para múltiplos equipamentos
-   * Útil para replicar planos similares para vários equipamentos de uma vez
-   */
-  async clonarParaVariosEquipamentos(
-    planoOrigemId: string,
-    dto: ClonarPlanoLoteDto,
-  ): Promise<ClonarPlanoLoteResponseDto> {
-    // Verificar se plano origem existe
-    const planoOrigem = await this.prisma.planos_manutencao.findFirst({
-      where: {
-        id: planoOrigemId,
-        deleted_at: null
-      },
-      include: {
-        tarefas: {
-          where: { deleted_at: null },
-          select: { id: true }
-        }
-      }
-    });
-
-    if (!planoOrigem) {
-      throw new NotFoundException('Plano de manutenção original não encontrado');
-    }
-
-    const resultado: ClonarPlanoLoteResponseDto = {
-      planos_criados: 0,
-      planos_com_erro: 0,
-      detalhes: []
-    };
-
-    // Processar cada equipamento destino
-    for (const equipamentoId of dto.equipamentos_destino_ids) {
-      try {
-        // Buscar equipamento para pegar nome
-        const equipamento = await this.prisma.equipamentos.findFirst({
-          where: {
-            id: equipamentoId,
-            deleted_at: null
-          },
-          select: { nome: true }
-        });
-
-        if (!equipamento) {
-          resultado.planos_com_erro++;
-          resultado.detalhes.push({
-            equipamento_id: equipamentoId,
-            equipamento_nome: 'Desconhecido',
-            sucesso: false,
-            erro: 'Equipamento não encontrado'
-          });
-          continue;
-        }
-
-        // Verificar se equipamento já tem plano
-        const planoExistente = await this.prisma.planos_manutencao.findFirst({
-          where: {
-            equipamento_id: equipamentoId,
-            deleted_at: null
-          }
-        });
-
-        if (planoExistente) {
-          resultado.planos_com_erro++;
-          resultado.detalhes.push({
-            equipamento_id: equipamentoId,
-            equipamento_nome: equipamento.nome,
-            sucesso: false,
-            erro: 'Equipamento já possui um plano de manutenção'
-          });
-          continue;
-        }
-
-        // Gerar novo nome do plano
-        const novoNome = dto.manter_nome_original
-          ? planoOrigem.nome
-          : `${planoOrigem.nome} - ${equipamento.nome}`;
-
-        // Usar método de duplicação existente
-        const novoPlano = await this.duplicar(planoOrigemId, {
-          equipamento_destino_id: equipamentoId,
-          novo_nome: novoNome,
-          novo_prefixo_tag: dto.novo_prefixo_tag,
-          criado_por: dto.criado_por
-        });
-
-        resultado.planos_criados++;
-        resultado.detalhes.push({
-          equipamento_id: equipamentoId,
-          equipamento_nome: equipamento.nome,
-          sucesso: true,
-          plano_id: novoPlano.id,
-          plano_nome: novoPlano.nome,
-          total_tarefas: novoPlano.total_tarefas || 0
-        });
-
-      } catch (error) {
-        resultado.planos_com_erro++;
-        resultado.detalhes.push({
-          equipamento_id: equipamentoId,
-          equipamento_nome: 'Erro ao processar',
-          sucesso: false,
-          erro: error.message || 'Erro desconhecido'
-        });
-      }
-    }
-
-    return resultado;
-  }
-
   async obterResumo(id: string): Promise<PlanoResumoDto> {
     const plano = await this.prisma.planos_manutencao.findFirst({
       where: { 
@@ -723,13 +435,6 @@ export class PlanosManutencaoService {
         },
         tarefas: {
           where: { deleted_at: null },
-          include: {
-            _count: {
-              select: {
-                sub_tarefas: true
-              }
-            }
-          }
         }
       }
     });
@@ -1250,9 +955,6 @@ export class PlanosManutencaoService {
         ordem: tarefa.ordem,
         duracao_estimada: Number(tarefa.duracao_estimada),
         tempo_estimado: tarefa.tempo_estimado,
-        total_sub_tarefas: tarefa._count?.sub_tarefas || 0,
-        total_recursos: tarefa._count?.recursos || 0,
-        total_anexos: tarefa._count?.anexos || 0
       })),
       total_tarefas: plano._count?.tarefas || plano.tarefas?.length || 0,
       tarefas_ativas: plano.tarefas?.filter((t: any) => t.ativo)?.length || 0,

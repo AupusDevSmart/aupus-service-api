@@ -24,16 +24,12 @@ import { Response } from 'express';
 import * as path from 'path';
 import { TarefasService } from './tarefas.service';
 import { TarefasSchedulerService } from './tarefas-scheduler.service';
-import { AnexosTarefasService } from './anexos-tarefas.service';
 import {
   CreateTarefaDto,
   UpdateTarefaDto,
   QueryTarefasDto,
   ReordenarTarefaDto,
-  UpdateStatusTarefaDto,
-  TarefaResponseDto,
-  DashboardTarefasDto,
-  AnexoTarefaDetalhesDto
+  TarefaResponseDto
 } from './dto';
 
 @ApiTags('Tarefas')
@@ -42,8 +38,7 @@ import {
 export class TarefasController {
   constructor(
     private readonly tarefasService: TarefasService,
-    private readonly tarefasSchedulerService: TarefasSchedulerService,
-    private readonly anexosTarefasService: AnexosTarefasService
+    private readonly tarefasSchedulerService: TarefasSchedulerService
   ) {}
 
   // Geração automática de programações
@@ -104,40 +99,6 @@ export class TarefasController {
   })
   async listar(@Query() queryDto: QueryTarefasDto, @CurrentUser() user: any) {
     return this.tarefasService.listar(queryDto, user);
-  }
-
-  @Get('dashboard')
-  @ApiOperation({ summary: 'Obter estatísticas gerais das tarefas' })
-  @ApiResponse({
-    status: HttpStatus.OK,
-    description: 'Dashboard obtido com sucesso',
-    type: DashboardTarefasDto
-  })
-  async obterDashboard(): Promise<DashboardTarefasDto> {
-    return this.tarefasService.obterDashboard();
-  }
-
-  @Get('sem-plano')
-  @ApiOperation({ summary: 'Listar tarefas sem plano de manutenção (tarefas independentes)' })
-  @ApiResponse({
-    status: HttpStatus.OK,
-    description: 'Lista de tarefas independentes encontrada',
-    schema: {
-      type: 'object',
-      properties: {
-        data: {
-          type: 'array',
-          items: { $ref: '#/components/schemas/TarefaResponseDto' }
-        },
-        total: { type: 'number' },
-        page: { type: 'number' },
-        limit: { type: 'number' },
-        totalPages: { type: 'number' }
-      }
-    }
-  })
-  async listarSemPlano(@CurrentUser() user: any, @Query() queryDto?: Partial<QueryTarefasDto>) {
-    return this.tarefasService.listarSemPlano(queryDto, user);
   }
 
   @Get('plano/:planoId')
@@ -219,27 +180,6 @@ export class TarefasController {
     return this.tarefasService.atualizar(id, updateDto, user);
   }
 
-  @Put(':id/status')
-  @Permissions('manutencao.manage', 'tarefas.update_status')
-  @ApiOperation({ summary: 'Atualizar apenas status da tarefa' })
-  @ApiParam({ name: 'id', description: 'ID da tarefa' })
-  @ApiResponse({
-    status: HttpStatus.OK,
-    description: 'Status atualizado com sucesso',
-    type: TarefaResponseDto
-  })
-  @ApiResponse({
-    status: HttpStatus.NOT_FOUND,
-    description: 'Tarefa não encontrada'
-  })
-  async atualizarStatus(
-    @Param('id') id: string,
-    @Body() updateStatusDto: UpdateStatusTarefaDto,
-    @CurrentUser() user: any
-  ): Promise<TarefaResponseDto> {
-    return this.tarefasService.atualizarStatus(id, updateStatusDto, user);
-  }
-
   @Put(':id/reordenar')
   @ApiOperation({ summary: 'Alterar ordem da tarefa no plano' })
   @ApiParam({ name: 'id', description: 'ID da tarefa' })
@@ -285,101 +225,4 @@ export class TarefasController {
 
   // Rotas de Anexos
 
-  @Get(':tarefaId/anexos')
-  @ApiOperation({ summary: 'Listar anexos de uma tarefa' })
-  @ApiParam({ name: 'tarefaId', description: 'ID da tarefa' })
-  @ApiResponse({ 
-    status: HttpStatus.OK, 
-    description: 'Lista de anexos encontrada',
-    type: [AnexoTarefaDetalhesDto] 
-  })
-  @ApiResponse({ 
-    status: HttpStatus.NOT_FOUND, 
-    description: 'Tarefa não encontrada' 
-  })
-  async listarAnexos(
-    @Param('tarefaId') tarefaId: string
-  ): Promise<AnexoTarefaDetalhesDto[]> {
-    return this.anexosTarefasService.listarAnexosTarefa(tarefaId);
-  }
-
-  @Post(':tarefaId/anexos/upload')
-  @HttpCode(HttpStatus.CREATED)
-  @UseInterceptors(FileInterceptor('file'))
-  @ApiConsumes('multipart/form-data')
-  @ApiOperation({ summary: 'Upload de anexo para tarefa' })
-  @ApiParam({ name: 'tarefaId', description: 'ID da tarefa' })
-  @ApiResponse({ 
-    status: HttpStatus.CREATED, 
-    description: 'Anexo enviado com sucesso',
-    type: AnexoTarefaDetalhesDto 
-  })
-  @ApiResponse({ 
-    status: HttpStatus.BAD_REQUEST, 
-    description: 'Arquivo inválido ou muito grande' 
-  })
-  @ApiResponse({ 
-    status: HttpStatus.NOT_FOUND, 
-    description: 'Tarefa não encontrada' 
-  })
-  async uploadAnexo(
-    @Param('tarefaId') tarefaId: string,
-    @UploadedFile() file: any,
-    @Body('descricao') descricao?: string,
-    @Body('usuario_id') usuarioId?: string
-  ): Promise<AnexoTarefaDetalhesDto> {
-    return this.anexosTarefasService.uploadAnexo(tarefaId, file, descricao, usuarioId);
-  }
-
-  @Get(':tarefaId/anexos/:anexoId/download')
-  @ApiOperation({ summary: 'Download de anexo' })
-  @ApiParam({ name: 'tarefaId', description: 'ID da tarefa' })
-  @ApiParam({ name: 'anexoId', description: 'ID do anexo' })
-  @ApiResponse({ 
-    status: HttpStatus.OK, 
-    description: 'Arquivo encontrado' 
-  })
-  @ApiResponse({ 
-    status: HttpStatus.NOT_FOUND, 
-    description: 'Anexo ou arquivo não encontrado' 
-  })
-  async downloadAnexo(
-    @Param('tarefaId') tarefaId: string,
-    @Param('anexoId') anexoId: string,
-    @Res() res: Response
-  ): Promise<void> {
-    const anexo = await this.anexosTarefasService.buscarAnexo(anexoId);
-    const caminhoArquivo = await this.anexosTarefasService.obterCaminhoArquivo(anexoId);
-
-    // Configurar headers para download
-    res.setHeader('Content-Type', anexo.content_type || 'application/octet-stream');
-    res.setHeader('Content-Disposition', `attachment; filename="${anexo.nome}"`);
-    
-    if (anexo.tamanho) {
-      res.setHeader('Content-Length', anexo.tamanho);
-    }
-
-    // Enviar arquivo
-    res.sendFile(path.resolve(caminhoArquivo));
-  }
-
-  @Delete(':tarefaId/anexos/:anexoId')
-  @HttpCode(HttpStatus.NO_CONTENT)
-  @ApiOperation({ summary: 'Remover anexo da tarefa' })
-  @ApiParam({ name: 'tarefaId', description: 'ID da tarefa' })
-  @ApiParam({ name: 'anexoId', description: 'ID do anexo' })
-  @ApiResponse({ 
-    status: HttpStatus.NO_CONTENT, 
-    description: 'Anexo removido com sucesso' 
-  })
-  @ApiResponse({ 
-    status: HttpStatus.NOT_FOUND, 
-    description: 'Anexo não encontrado' 
-  })
-  async removerAnexo(
-    @Param('tarefaId') tarefaId: string,
-    @Param('anexoId') anexoId: string
-  ): Promise<void> {
-    return this.anexosTarefasService.removerAnexo(anexoId);
-  }
 }

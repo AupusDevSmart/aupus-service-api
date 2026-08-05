@@ -28,7 +28,6 @@ import {
   UpdateStatusInstrucaoDto,
   InstrucaoResponseDto,
   DashboardInstrucoesDto,
-  AdicionarAoPlanoDto,
   AnexoInstrucaoDetalhesDto
 } from './dto';
 
@@ -114,24 +113,6 @@ export class InstrucoesController {
   @ApiResponse({ status: HttpStatus.NOT_FOUND, description: 'Instrução não encontrada' })
   async remover(@Param('id') id: string): Promise<void> {
     return this.instrucoesService.remover(id);
-  }
-
-  // ==========================================
-  // Adicionar ao Plano (gera tarefa)
-  // ==========================================
-
-  @Post(':id/adicionar-ao-plano')
-  @HttpCode(HttpStatus.CREATED)
-  @ApiOperation({ summary: 'Criar tarefa a partir da instrução e adicionar ao plano de manutenção' })
-  @ApiParam({ name: 'id', description: 'ID da instrução' })
-  @ApiResponse({ status: HttpStatus.CREATED, description: 'Tarefa criada a partir da instrução' })
-  @ApiResponse({ status: HttpStatus.NOT_FOUND, description: 'Instrução ou plano não encontrado' })
-  @ApiResponse({ status: HttpStatus.CONFLICT, description: 'Ordem já em uso no plano' })
-  async adicionarAoPlano(
-    @Param('id') id: string,
-    @Body() dto: AdicionarAoPlanoDto
-  ) {
-    return this.instrucoesService.adicionarAoPlano(id, dto);
   }
 
   // ==========================================

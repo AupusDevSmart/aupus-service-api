@@ -9,7 +9,6 @@ import {
   UpdateStatusInstrucaoDto,
   InstrucaoResponseDto,
   DashboardInstrucoesDto,
-  AdicionarAoPlanoDto
 } from './dto';
 import { StatusTarefa, Prisma } from '@aupus/api-shared';
 
@@ -249,120 +248,6 @@ export class InstrucoesService {
       where: { id },
       data: { deleted_at: new Date() }
     });
-  }
-
-  // ==========================================
-  // Adicionar instrução ao plano como tarefa
-  // ==========================================
-
-  async adicionarAoPlano(id: string, dto: AdicionarAoPlanoDto): Promise<any> {
-    const instrucao = await this.verificarInstrucaoExiste(id);
-
-    // Buscar sub-instruções e recursos para copiar
-    const [subInstrucoes, recursos] = await Promise.all([
-      this.prisma.sub_instrucoes.findMany({
-        where: { instrucao_id: id },
-        orderBy: { ordem: 'asc' }
-      }),
-      this.prisma.recursos_instrucao.findMany({
-        where: { instrucao_id: id }
-      })
-    ]);
-
-    // Verificar se o plano existe e obter equipamento_id
-    const plano = await this.prisma.planos_manutencao.findFirst({
-      where: { id: dto.plano_manutencao_id, deleted_at: null },
-      include: {
-        equipamento: {
-          select: {
-            id: true,
-            unidade: { select: { planta_id: true } }
-          }
-        }
-      }
-    });
-
-    if (!plano) {
-      throw new NotFoundException('Plano de manutenção não encontrado');
-    }
-
-    // Ordem: se informada, precisa estar livre. Se omitida (cadastro rápido pela
-    // tabela de planos), usa a próxima ordem livre do plano.
-    let ordem: number;
-
-    if (dto.ordem !== undefined) {
-      const ordemExistente = await this.prisma.tarefas.findFirst({
-        where: {
-          plano_manutencao_id: dto.plano_manutencao_id,
-          ordem: dto.ordem,
-          deleted_at: null
-        }
-      });
-
-      if (ordemExistente) {
-        throw new ConflictException(`A ordem ${dto.ordem} já está sendo utilizada por outra tarefa neste plano`);
-      }
-
-      ordem = dto.ordem;
-    } else {
-      const ultimaTarefa = await this.prisma.tarefas.findFirst({
-        where: {
-          plano_manutencao_id: dto.plano_manutencao_id,
-          deleted_at: null
-        },
-        orderBy: { ordem: 'desc' },
-        select: { ordem: true }
-      });
-
-      ordem = (ultimaTarefa?.ordem ?? 0) + 1;
-    }
-
-    // Validar frequência personalizada
-    if (dto.frequencia === 'PERSONALIZADA') {
-      if (!dto.frequencia_personalizada || dto.frequencia_personalizada < 1) {
-        throw new BadRequestException('Frequência personalizada deve ser informada e maior que zero quando a frequência é PERSONALIZADA');
-      }
-    }
-
-    // Gerar TAG única para a tarefa
-    const tagTarefa = await this.gerarTagTarefa(dto.plano_manutencao_id);
-
-    // A tarefa guarda o vinculo com a instrucao, a periodicidade e a
-    // criticidade. Sub-etapas e recursos NAO sao mais copiados: eles vivem na
-    // instrucao e sao lidos de la (inclusive pelo checklist da OS). Copiar
-    // criaria duas versoes da mesma coisa, que divergem no primeiro ajuste.
-    const tarefa = await this.prisma.tarefas.create({
-      data: {
-        plano_manutencao_id: dto.plano_manutencao_id,
-        instrucao_id: id,
-        equipamento_id: plano.equipamento_id,
-        planta_id: plano.equipamento?.unidade?.planta_id || null,
-        tag: tagTarefa,
-        nome: instrucao.nome,
-        frequencia: dto.frequencia,
-        frequencia_personalizada: dto.frequencia_personalizada || null,
-        criticidade: dto.criticidade ?? instrucao.criticidade,
-        ordem,
-        origem_status: 'PROPRIA',
-        data_ancora: plano.equipamento_id ? new Date() : null,
-        ativo: true,
-        criado_por: dto.criado_por,
-        // Colunas herdadas enquanto o drop nao acontece
-        descricao: instrucao.descricao,
-        categoria: instrucao.categoria,
-        tipo_manutencao: instrucao.tipo_manutencao,
-        condicao_ativo: instrucao.condicao_ativo,
-        duracao_estimada: instrucao.duracao_estimada,
-        tempo_estimado: instrucao.tempo_estimado
-      }
-    });
-
-    // Se o plano e template, a tarefa nova precisa chegar nas copias
-    if (!plano.plano_origem_id) {
-      await this.propagacaoService.enfileirar(plano.id);
-    }
-
-    return tarefa;
   }
 
   // ==========================================

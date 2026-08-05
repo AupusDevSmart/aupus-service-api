@@ -6,9 +6,7 @@ import {
   UpdateTarefaDto,
   QueryTarefasDto,
   ReordenarTarefaDto,
-  UpdateStatusTarefaDto,
   TarefaResponseDto,
-  DashboardTarefasDto
 } from './dto';
 import { StatusTarefa, Prisma } from '@aupus/api-shared';
 import { PropagacaoPlanosService } from '../planos-manutencao/propagacao-planos.service';
@@ -213,71 +211,53 @@ export class TarefasService {
     if (user) await this.scopeService.assertEntityInScope('tarefa', id, user);
     const inicio = Date.now();
 
-    // ✅ OTIMIZADO: Buscar tarefa e relacionamentos em paralelo
-    const [tarefa, sub_tarefas, recursos, anexos] = await Promise.all([
-      // Query principal - apenas campos necessários
-      this.prisma.tarefas.findFirst({
-        where: {
-          id,
-          deleted_at: null
+    const tarefa = await this.prisma.tarefas.findFirst({
+      where: {
+        id,
+        deleted_at: null
+      },
+      include: {
+        plano_manutencao: {
+          select: {
+            id: true,
+            nome: true,
+            versao: true,
+            status: true
+          }
         },
-        include: {
-          plano_manutencao: {
-            select: {
-              id: true,
-              nome: true,
-              versao: true,
-              status: true
-            }
-          },
-          planta: {
-            select: {
-              id: true,
-              nome: true,
-              localizacao: true
-            }
-          },
-          equipamento: {
-            select: {
-              id: true,
-              nome: true,
-              tipo_equipamento: true,
-              classificacao: true
-            }
-          },
-          instrucao: {
-            select: {
-              id: true,
-              tag: true,
-              nome: true,
-              categoria: true,
-              tipo_manutencao: true,
-              descricao: true,
-              // As telas de OS leem as etapas daqui: a tarefa nao guarda mais
-              // sub-etapas proprias.
-              sub_instrucoes: {
-                orderBy: { ordem: 'asc' as const },
-                select: { id: true, descricao: true, obrigatoria: true, ordem: true, tempo_estimado: true }
-              }
+        planta: {
+          select: {
+            id: true,
+            nome: true,
+            localizacao: true
+          }
+        },
+        equipamento: {
+          select: {
+            id: true,
+            nome: true,
+            tipo_equipamento: true,
+            classificacao: true
+          }
+        },
+        instrucao: {
+          select: {
+            id: true,
+            tag: true,
+            nome: true,
+            categoria: true,
+            tipo_manutencao: true,
+            descricao: true,
+            // As telas de OS leem as etapas daqui: a tarefa nao guarda mais
+            // sub-etapas proprias.
+            sub_instrucoes: {
+              orderBy: { ordem: 'asc' as const },
+              select: { id: true, descricao: true, obrigatoria: true, ordem: true, tempo_estimado: true }
             }
           }
         }
-      }),
-      // Buscar sub_tarefas em paralelo
-      this.prisma.sub_tarefas.findMany({
-        where: { tarefa_id: id },
-        orderBy: { ordem: 'asc' }
-      }),
-      // Buscar recursos em paralelo
-      this.prisma.recursos_tarefa.findMany({
-        where: { tarefa_id: id }
-      }),
-      // Buscar anexos em paralelo
-      this.prisma.anexos_tarefa.findMany({
-        where: { tarefa_id: id },
-        orderBy: { created_at: 'desc' }
-      })
-    ]);
+      }
+    });
 
     const tempoQuery = Date.now() - inicio;
     console.log(`⏱️ [BACKEND] buscarPorId levou ${tempoQuery}ms`);
@@ -286,17 +266,11 @@ export class TarefasService {
       throw new NotFoundException('Tarefa não encontrada');
     }
 
-    // Adicionar relacionamentos à tarefa
-    const tarefaCompleta = {
+    return this.mapearParaResponse({
       ...tarefa,
-      sub_tarefas,
-      recursos,
-      anexos,
       usuario_criador: null,
       usuario_atualizador: null
-    };
-
-    return this.mapearParaResponse(tarefaCompleta);
+    });
   }
 
   async listarPorPlano(planoId: string, queryDto?: Partial<QueryTarefasDto>, user?: ScopedUser): Promise<TarefaResponseDto[]> {
@@ -337,45 +311,6 @@ export class TarefasService {
     });
 
     return tarefas.map(tarefa => this.mapearParaResponse(tarefa));
-  }
-
-  async listarSemPlano(queryDto?: Partial<QueryTarefasDto>, user?: ScopedUser): Promise<{
-    data: TarefaResponseDto[];
-    total: number;
-    page: number;
-    limit: number;
-    totalPages: number;
-  }> {
-    const page = queryDto?.page || 1;
-    const limit = queryDto?.limit || 10;
-    const skip = (page - 1) * limit;
-
-    const scopeFragment = await this.scopeFragment(user);
-    const where: Prisma.tarefasWhereInput = {
-      plano_manutencao_id: null,
-      deleted_at: null,
-      ...(queryDto && this.construirFiltros(queryDto, queryDto.search)),
-      ...(scopeFragment && { AND: [scopeFragment] }),
-    };
-
-    const [tarefas, total] = await Promise.all([
-      this.prisma.tarefas.findMany({
-        where,
-        include: this.includeRelacionamentosLista(),
-        orderBy: { created_at: 'desc' },
-        skip,
-        take: limit
-      }),
-      this.prisma.tarefas.count({ where })
-    ]);
-
-    return {
-      data: tarefas.map(tarefa => this.mapearParaResponse(tarefa)),
-      total,
-      page,
-      limit,
-      totalPages: Math.ceil(total / limit)
-    };
   }
 
   async atualizar(id: string, updateDto: UpdateTarefaDto, user?: ScopedUser): Promise<TarefaResponseDto> {
@@ -454,23 +389,6 @@ export class TarefasService {
     );
   }
 
-  async atualizarStatus(id: string, updateStatusDto: UpdateStatusTarefaDto, user?: ScopedUser): Promise<TarefaResponseDto> {
-    if (user) await this.scopeService.assertEntityInScope('tarefa', id, user);
-    await this.verificarTarefaExiste(id);
-
-    const tarefa = await this.prisma.tarefas.update({
-      where: { id },
-      data: {
-        status: updateStatusDto.status,
-        ativo: updateStatusDto.status === StatusTarefa.ATIVA,
-        atualizado_por: updateStatusDto.atualizado_por,
-        updated_at: new Date()
-      }
-    });
-
-    return this.buscarPorId(tarefa.id);
-  }
-
   async reordenar(id: string, reordenarDto: ReordenarTarefaDto, user?: ScopedUser): Promise<TarefaResponseDto> {
     if (user) await this.scopeService.assertEntityInScope('tarefa', id, user);
     const tarefa = await this.verificarTarefaExiste(id);
@@ -510,142 +428,6 @@ export class TarefasService {
 
     await this.propagarSePertenceATemplate(tarefa.plano_manutencao_id);
   }
-
-  async obterDashboard(): Promise<DashboardTarefasDto> {
-    const [statusStats, criticidadeStats, tipoStats, categoriaStats, gerais, tarefasAtivas] = await Promise.all([
-      // Stats por status
-      this.prisma.tarefas.groupBy({
-        by: ['status'],
-        where: { deleted_at: null },
-        _count: true
-      }),
-
-      // Stats por criticidade
-      this.prisma.tarefas.groupBy({
-        by: ['criticidade'],
-        where: { deleted_at: null, ativo: true },
-        _count: true
-      }),
-
-      // Stats por tipo
-      this.prisma.tarefas.groupBy({
-        by: ['tipo_manutencao'],
-        where: { deleted_at: null, ativo: true },
-        _count: true
-      }),
-
-      // Stats por categoria
-      this.prisma.tarefas.groupBy({
-        by: ['categoria'],
-        where: { deleted_at: null, ativo: true },
-        _count: true
-      }),
-
-      // Stats gerais
-      this.prisma.tarefas.aggregate({
-        where: { deleted_at: null, ativo: true },
-        _count: true,
-        _sum: { tempo_estimado: true },
-        _avg: {
-          tempo_estimado: true,
-          criticidade: true
-        }
-      }),
-
-      // Buscar todas as tarefas ativas para calcular atrasadas
-      this.prisma.tarefas.findMany({
-        where: { deleted_at: null, ativo: true },
-        select: {
-          data_ultima_execucao: true,
-          frequencia: true,
-          frequencia_personalizada: true
-        }
-      })
-    ]);
-
-    const [totalSubTarefas, totalRecursos] = await Promise.all([
-      this.prisma.sub_tarefas.count({
-        where: {
-          tarefa: {
-            deleted_at: null,
-            ativo: true
-          }
-        }
-      }),
-      this.prisma.recursos_tarefa.count({
-        where: {
-          tarefa: {
-            deleted_at: null,
-            ativo: true
-          }
-        }
-      })
-    ]);
-
-    const totalTarefas = statusStats.reduce((acc, stat) => acc + stat._count, 0);
-
-    // Calcular tarefas atrasadas
-    const dataAtual = new Date();
-    const tarefasAtrasadas = tarefasAtivas.filter(tarefa => {
-      if (!tarefa.data_ultima_execucao) {
-        return false; // Se nunca foi executada, não está atrasada
-      }
-
-      const proximaExecucao = this.calcularProximaExecucao(
-        tarefa.data_ultima_execucao,
-        tarefa.frequencia,
-        tarefa.frequencia_personalizada
-      );
-
-      return proximaExecucao < dataAtual;
-    }).length;
-
-    return {
-      total_tarefas: totalTarefas,
-      tarefas_ativas: this.contarPorStatus(statusStats, StatusTarefa.ATIVA),
-      tarefas_inativas: this.contarPorStatus(statusStats, StatusTarefa.INATIVA),
-      tarefas_atrasadas: tarefasAtrasadas,
-      tarefas_em_revisao: this.contarPorStatus(statusStats, StatusTarefa.EM_REVISAO),
-      tarefas_arquivadas: this.contarPorStatus(statusStats, StatusTarefa.ARQUIVADA),
-
-      // Por criticidade
-      criticidade_muito_alta: this.contarPorCriticidade(criticidadeStats, 5),
-      criticidade_alta: this.contarPorCriticidade(criticidadeStats, 4),
-      criticidade_media: this.contarPorCriticidade(criticidadeStats, 3),
-      criticidade_baixa: this.contarPorCriticidade(criticidadeStats, 2),
-      criticidade_muito_baixa: this.contarPorCriticidade(criticidadeStats, 1),
-
-      // Por tipo
-      distribuicao_tipos: {
-        preventiva: this.contarPorTipo(tipoStats, 'PREVENTIVA'),
-        preditiva: this.contarPorTipo(tipoStats, 'PREDITIVA'),
-        corretiva: this.contarPorTipo(tipoStats, 'CORRETIVA'),
-        inspecao: this.contarPorTipo(tipoStats, 'INSPECAO'),
-        visita_tecnica: this.contarPorTipo(tipoStats, 'VISITA_TECNICA')
-      },
-
-      // Por categoria
-      distribuicao_categorias: {
-        mecanica: this.contarPorCategoria(categoriaStats, 'MECANICA'),
-        eletrica: this.contarPorCategoria(categoriaStats, 'ELETRICA'),
-        instrumentacao: this.contarPorCategoria(categoriaStats, 'INSTRUMENTACAO'),
-        lubrificacao: this.contarPorCategoria(categoriaStats, 'LUBRIFICACAO'),
-        limpeza: this.contarPorCategoria(categoriaStats, 'LIMPEZA'),
-        inspecao: this.contarPorCategoria(categoriaStats, 'INSPECAO'),
-        calibracao: this.contarPorCategoria(categoriaStats, 'CALIBRACAO'),
-        outros: this.contarPorCategoria(categoriaStats, 'OUTROS')
-      },
-
-      // Estatísticas gerais
-      tempo_total_estimado: gerais._sum.tempo_estimado || 0,
-      media_tempo_por_tarefa: Math.round(gerais._avg.tempo_estimado || 0),
-      media_criticidade: Math.round((gerais._avg.criticidade || 0) * 10) / 10,
-      total_sub_tarefas: totalSubTarefas,
-      total_recursos: totalRecursos
-    };
-  }
-
-  // Métodos privados auxiliares
 
   private async verificarInstrucaoExiste(instrucaoId: string) {
     const instrucao = await this.prisma.instrucoes.findFirst({
@@ -850,13 +632,6 @@ export class TarefasService {
             select: { id: true, descricao: true, obrigatoria: true, ordem: true, tempo_estimado: true }
           }
         }
-      },
-      _count: {
-        select: {
-          sub_tarefas: true,
-          recursos: true,
-          anexos: true
-        }
       }
     };
   }
@@ -915,13 +690,6 @@ export class TarefasService {
           nome: true,
           email: true
         }
-      },
-      sub_tarefas: {
-        orderBy: { ordem: 'asc' as const }
-      },
-      recursos: true,
-      anexos: {
-        orderBy: { created_at: 'desc' as const }
       }
     };
   }
@@ -1056,13 +824,7 @@ export class TarefasService {
       equipamento: tarefa.equipamento,
       instrucao: tarefa.instrucao,
       usuario_criador: tarefa.usuario_criador,
-      usuario_atualizador: tarefa.usuario_atualizador,
-      sub_tarefas: tarefa.sub_tarefas,
-      recursos: tarefa.recursos,
-      anexos: tarefa.anexos,
-      total_sub_tarefas: tarefa._count?.sub_tarefas ?? tarefa.sub_tarefas?.length ?? 0,
-      total_recursos: tarefa._count?.recursos ?? tarefa.recursos?.length ?? 0,
-      total_anexos: tarefa._count?.anexos ?? tarefa.anexos?.length ?? 0
+      usuario_atualizador: tarefa.usuario_atualizador
     };
   }
 
