@@ -23,15 +23,8 @@ export class TarefaResumoDto {
   id: string;
   tag: string;
   nome: string;
-  categoria: string;
-  tipo_manutencao: string;
-  status: string;
   ordem: number;
-  duracao_estimada: number;
-  tempo_estimado: number;
-  total_sub_tarefas?: number;
-  total_recursos?: number;
-  total_anexos?: number;
+  criticidade?: number;
   instrucao_id?: string;
   instrucao_nome?: string;
 }

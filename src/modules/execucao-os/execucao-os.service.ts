@@ -328,8 +328,6 @@ export class ExecucaoOSService {
               select: {
                 id: true,
                 nome: true,
-                categoria: true,
-                tipo_manutencao: true,
               },
             },
           },

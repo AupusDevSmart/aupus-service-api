@@ -928,8 +928,8 @@ describe('ProgramacaoOSService', () => {
       expect(service.criar).toHaveBeenCalledWith(
         expect.objectContaining({
           descricao: createTarefasDto.descricao,
-          tempo_estimado: 3.5, // 2.0 + 1.5
-          duracao_estimada: 5.0, // 3.0 + 2.0
+          // tempo_estimado e duracao_estimada deixaram de ser somados das
+          // tarefas: as colunas cairam no PR6 e o conteudo vive na instrucao.
           tarefas_ids: createTarefasDto.tarefas_ids,
           dados_origem: expect.objectContaining({
             tarefas_count: 2,

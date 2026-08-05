@@ -407,11 +407,7 @@ export class SolicitacoesServicoService {
                 id: true,
                 tag: true,
                 nome: true,
-                descricao: true,
-                categoria: true,
-                criticidade: true,
-                tempo_estimado: true,
-                tipo_manutencao: true
+                criticidade: true
               }
             }
           },
@@ -424,11 +420,7 @@ export class SolicitacoesServicoService {
                 id: true,
                 tag: true,
                 nome: true,
-                descricao: true,
-                categoria: true,
-                criticidade: true,
-                tempo_estimado: true,
-                tipo_manutencao: true
+                criticidade: true
               }
             }
           },

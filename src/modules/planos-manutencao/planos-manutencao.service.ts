@@ -446,15 +446,6 @@ export class PlanosManutencaoService {
     // Calcular estatísticas
     const totalTarefas = plano.tarefas.length;
     const tarefasAtivas = plano.tarefas.filter(t => t.ativo).length;
-    const tarefasEmRevisao = plano.tarefas.filter(t => !t.ativo).length;
-
-    const tarefasPreventivas = plano.tarefas.filter(t => t.tipo_manutencao === 'PREVENTIVA').length;
-    const tarefasPreditivas = plano.tarefas.filter(t => t.tipo_manutencao === 'PREDITIVA').length;
-    const tarefasCorretivas = plano.tarefas.filter(t => t.tipo_manutencao === 'CORRETIVA').length;
-
-    const tempoTotalEstimado = plano.tarefas.reduce((total, tarefa) => 
-      total + (tarefa.tempo_estimado || 0), 0
-    );
 
     const resumo: PlanoResumoDto = {
       id: plano.id,
@@ -465,11 +456,6 @@ export class PlanosManutencaoService {
       planta_nome: plano.equipamento?.unidade?.planta?.nome,
       total_tarefas: totalTarefas,
       tarefas_ativas: tarefasAtivas,
-      tarefas_em_revisao: tarefasEmRevisao,
-      tempo_total_estimado: tempoTotalEstimado,
-      tarefas_preventivas: tarefasPreventivas,
-      tarefas_preditivas: tarefasPreditivas,
-      tarefas_corretivas: tarefasCorretivas,
       created_at: plano.created_at,
       updated_at: plano.updated_at
     };
@@ -478,7 +464,7 @@ export class PlanosManutencaoService {
   }
 
   async obterDashboard(): Promise<DashboardPlanosDto> {
-    const [totalPlanos, statsTarefas, distribuicao] = await Promise.all([
+    const [totalPlanos, statsTarefas] = await Promise.all([
       // Total de planos
       this.prisma.planos_manutencao.count({
         where: { deleted_at: null }
@@ -487,17 +473,6 @@ export class PlanosManutencaoService {
       // Stats das tarefas
       this.prisma.tarefas.aggregate({
         where: { deleted_at: null },
-        _count: true,
-        _avg: { tempo_estimado: true }
-      }),
-
-      // Distribuição por tipo
-      this.prisma.tarefas.groupBy({
-        by: ['tipo_manutencao'],
-        where: {
-          deleted_at: null,
-          ativo: true
-        },
         _count: true
       })
     ]);
@@ -507,29 +482,11 @@ export class PlanosManutencaoService {
       where: { deleted_at: null }
     }).then(result => result.length);
 
-    const mediaTempoTotal = await this.prisma.$queryRaw<[{avg: number}]>`
-      SELECT AVG(tempo_total) as avg
-      FROM (
-        SELECT SUM(t.tempo_estimado) as tempo_total
-        FROM tarefas t
-        WHERE t.deleted_at IS NULL AND t.ativo = true
-        GROUP BY t.plano_manutencao_id
-      ) subquery
-    `;
-
     return {
       total_planos: totalPlanos,
       equipamentos_com_plano: equipamentosComPlano,
       total_tarefas_todos_planos: statsTarefas._count,
-      media_tarefas_por_plano: totalPlanos > 0 ? Math.round(statsTarefas._count / totalPlanos) : 0,
-      tempo_total_estimado_geral: Math.round(mediaTempoTotal[0]?.avg || 0),
-      distribuicao_tipos: {
-        preventiva: this.contarPorTipo(distribuicao, 'PREVENTIVA'),
-        preditiva: this.contarPorTipo(distribuicao, 'PREDITIVA'),
-        corretiva: this.contarPorTipo(distribuicao, 'CORRETIVA'),
-        inspecao: this.contarPorTipo(distribuicao, 'INSPECAO'),
-        visita_tecnica: this.contarPorTipo(distribuicao, 'VISITA_TECNICA')
-      }
+      media_tarefas_por_plano: totalPlanos > 0 ? Math.round(statsTarefas._count / totalPlanos) : 0
     };
   }
 
@@ -680,15 +637,9 @@ export class PlanosManutencaoService {
             data_ancora: new Date(),
             tag,
             nome: tarefaTemplate.nome,
-            descricao: tarefaTemplate.descricao,
-            categoria: tarefaTemplate.categoria,
-            tipo_manutencao: tarefaTemplate.tipo_manutencao,
             frequencia: tarefaTemplate.frequencia,
             frequencia_personalizada: tarefaTemplate.frequencia_personalizada,
-            condicao_ativo: tarefaTemplate.condicao_ativo,
             criticidade: tarefaTemplate.criticidade,
-            duracao_estimada: tarefaTemplate.duracao_estimada,
-            tempo_estimado: tarefaTemplate.tempo_estimado,
             ordem: tarefaTemplate.ordem,
             instrucao_id: tarefaTemplate.instrucao_id,
             ...(dto.criado_por && { criado_por: dto.criado_por })
@@ -949,16 +900,12 @@ export class PlanosManutencaoService {
         id: tarefa.id,
         tag: tarefa.tag,
         nome: tarefa.nome,
-        categoria: tarefa.categoria,
-        tipo_manutencao: tarefa.tipo_manutencao,
-        status: tarefa.status,
         ordem: tarefa.ordem,
-        duracao_estimada: Number(tarefa.duracao_estimada),
-        tempo_estimado: tarefa.tempo_estimado,
+        criticidade: tarefa.criticidade,
+        instrucao_id: tarefa.instrucao_id,
       })),
       total_tarefas: plano._count?.tarefas || plano.tarefas?.length || 0,
       tarefas_ativas: plano.tarefas?.filter((t: any) => t.ativo)?.length || 0,
-      tempo_total_estimado: plano.tarefas?.reduce((acc: number, t: any) => acc + t.tempo_estimado, 0) || 0,
       criticidade_media: plano.tarefas?.length > 0 ? 
         Math.round(plano.tarefas.reduce((acc: number, t: any) => acc + t.criticidade, 0) / plano.tarefas.length * 10) / 10 : 
         undefined,

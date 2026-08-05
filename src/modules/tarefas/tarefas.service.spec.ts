@@ -72,7 +72,7 @@ describe('TarefasService', () => {
   afterEach(() => jest.clearAllMocks());
 
   describe('criar', () => {
-    it('herda o conteudo da instrucao e nasce PROPRIA', async () => {
+    it('nasce PROPRIA e nao copia conteudo da instrucao', async () => {
       mockPrismaService.planos_manutencao.findFirst.mockResolvedValue({
         id: 'plano_1',
         equipamento_id: 'eq_1',
@@ -94,9 +94,10 @@ describe('TarefasService', () => {
       expect(dados.origem_status).toBe('PROPRIA');
       expect(dados.instrucao_id).toBe('inst_1');
       expect(dados.criticidade).toBe(4);
-      // Conteudo vem da instrucao, nao do payload
-      expect(dados.descricao).toBe(instrucao.descricao);
-      expect(dados.tempo_estimado).toBe(120);
+      // O conteudo NAO e mais copiado: as colunas cairam no PR6 e a tela le
+      // tudo pela instrucao. Gravar aqui quebraria o create.
+      expect(dados.descricao).toBeUndefined();
+      expect(dados.tempo_estimado).toBeUndefined();
       // Copia gera OS, entao precisa de ancora
       expect(dados.data_ancora).toBeInstanceOf(Date);
     });

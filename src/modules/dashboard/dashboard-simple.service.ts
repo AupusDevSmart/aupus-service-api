@@ -113,7 +113,7 @@ export class DashboardSimpleService {
           where: { deletado_em: null, status: 'CANCELADA', ...osF },
         }),
         this.prisma.tarefas.count({
-          where: { deleted_at: null, status: 'ATIVA', ...tarefaF },
+          where: { deleted_at: null, ativo: true, ...tarefaF },
         }),
         this.prisma.equipamentos.findMany({
           where: { deleted_at: null, ...eqF },

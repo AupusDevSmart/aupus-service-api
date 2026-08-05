@@ -243,13 +243,6 @@ export class PropagacaoPlanosService {
             criticidade: tarefaTemplate.criticidade,
             ordem: tarefaTemplate.ordem,
             ativo: true,
-            // Colunas herdadas enquanto o drop nao acontece
-            descricao: tarefaTemplate.descricao,
-            categoria: tarefaTemplate.categoria,
-            tipo_manutencao: tarefaTemplate.tipo_manutencao,
-            condicao_ativo: tarefaTemplate.condicao_ativo,
-            duracao_estimada: tarefaTemplate.duracao_estimada,
-            tempo_estimado: tarefaTemplate.tempo_estimado,
           },
         });
         parcial.tarefas_criadas++;
@@ -274,17 +267,6 @@ export class PropagacaoPlanosService {
         where: { id: naCopia.id },
         data: {
           ...dados,
-          // Conteudo herdado acompanha a instrucao nova, se ela mudou
-          ...(dados.instrucao_id
-            ? {
-                descricao: tarefaTemplate.descricao,
-                categoria: tarefaTemplate.categoria,
-                tipo_manutencao: tarefaTemplate.tipo_manutencao,
-                condicao_ativo: tarefaTemplate.condicao_ativo,
-                duracao_estimada: tarefaTemplate.duracao_estimada,
-                tempo_estimado: tarefaTemplate.tempo_estimado,
-              }
-            : {}),
           updated_at: new Date(),
         },
       });

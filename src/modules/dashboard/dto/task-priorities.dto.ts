@@ -10,9 +10,6 @@ class TarefaPrioridadeDto {
   @ApiProperty({ description: 'Criticidade (1-5)', example: 5 })
   criticidade: number;
 
-  @ApiProperty({ description: 'Status da tarefa', example: 'ATIVA' })
-  status: string;
-
   @ApiProperty({ description: 'Nome do equipamento', example: 'Inversor Solar 01' })
   equipamento_nome: string;
 

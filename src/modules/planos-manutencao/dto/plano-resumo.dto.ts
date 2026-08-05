@@ -11,17 +11,10 @@ export class PlanoResumoDto {
   // Contadores
   total_tarefas: number;
   tarefas_ativas: number;
-  tarefas_em_revisao: number;
-  
+
   // Estatísticas
   criticidade_media?: number;
-  tempo_total_estimado: number;
-  
-  // Por tipo
-  tarefas_preventivas: number;
-  tarefas_preditivas: number;
-  tarefas_corretivas: number;
-  
+
   created_at: Date;
   updated_at: Date;
 }

@@ -111,9 +111,7 @@ export class TarefasService {
           // A ancora so faz sentido na copia, que e quem gera OS
           data_ancora: equipamento_id ? new Date() : null,
           ativo: true,
-          criado_por: createDto.criado_por,
-          // Colunas herdadas da instrucao enquanto o drop nao acontece
-          ...this.camposHerdadosDaInstrucao(instrucao)
+          criado_por: createDto.criado_por
         }
       });
 
@@ -221,8 +219,7 @@ export class TarefasService {
           select: {
             id: true,
             nome: true,
-            versao: true,
-            status: true
+            versao: true
           }
         },
         planta: {
@@ -324,11 +321,8 @@ export class TarefasService {
 
     const dadosAtualizacao: any = { ...updateDto };
 
-    // Trocar a instrucao troca o conteudo da tarefa: as colunas herdadas
-    // acompanham enquanto elas existirem.
     if (updateDto.instrucao_id && updateDto.instrucao_id !== tarefaExistente.instrucao_id) {
-      const instrucao = await this.verificarInstrucaoExiste(updateDto.instrucao_id);
-      Object.assign(dadosAtualizacao, this.camposHerdadosDaInstrucao(instrucao));
+      await this.verificarInstrucaoExiste(updateDto.instrucao_id);
     }
 
     // Se mudou plano, verificar se existe e ajustar dados
@@ -446,17 +440,6 @@ export class TarefasService {
    * instrucao. Preenchidas na criacao porque sao NOT NULL; o drop delas e a
    * ultima etapa da migracao, quando ninguem mais as ler.
    */
-  private camposHerdadosDaInstrucao(instrucao: any) {
-    return {
-      descricao: instrucao.descricao,
-      categoria: instrucao.categoria,
-      tipo_manutencao: instrucao.tipo_manutencao,
-      condicao_ativo: instrucao.condicao_ativo,
-      duracao_estimada: instrucao.duracao_estimada,
-      tempo_estimado: instrucao.tempo_estimado
-    };
-  }
-
   private async proximaOrdem(planoId: string): Promise<number> {
     const ultima = await this.prisma.tarefas.findFirst({
       where: { plano_manutencao_id: planoId, deleted_at: null },
@@ -720,21 +703,10 @@ export class TarefasService {
       where.instrucao_id = filters.instrucao_id;
     }
 
-    if (filters.status) {
-      where.status = filters.status;
-    }
-
     if (filters.ativo !== undefined) {
       where.ativo = filters.ativo;
     }
 
-    if (filters.categoria) {
-      where.categoria = filters.categoria;
-    }
-
-    if (filters.tipo_manutencao) {
-      where.tipo_manutencao = filters.tipo_manutencao;
-    }
 
     if (filters.frequencia) {
       where.frequencia = filters.frequencia;
@@ -747,10 +719,7 @@ export class TarefasService {
     if (search) {
       where.OR = [
         { tag: { contains: search, mode: 'insensitive' } },
-        { nome: { contains: search, mode: 'insensitive' } },
-        { descricao: { contains: search, mode: 'insensitive' } },
-        { responsavel: { contains: search, mode: 'insensitive' } },
-        { planejador: { contains: search, mode: 'insensitive' } }
+        { nome: { contains: search, mode: 'insensitive' } }
       ];
     }
 
@@ -767,17 +736,11 @@ export class TarefasService {
       case 'nome':
         orderBy.nome = sortOrder;
         break;
-      case 'categoria':
-        orderBy.categoria = sortOrder;
-        break;
       case 'criticidade':
         orderBy.criticidade = sortOrder;
         break;
       case 'ordem':
         orderBy.ordem = sortOrder;
-        break;
-      case 'tempo_estimado':
-        orderBy.tempo_estimado = sortOrder;
         break;
       case 'updated_at':
         orderBy.updated_at = sortOrder;

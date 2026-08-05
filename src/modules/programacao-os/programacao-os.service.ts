@@ -129,10 +129,6 @@ export class ProgramacaoOSService {
               select: {
                 id: true,
                 nome: true,
-                categoria: true,
-                tipo_manutencao: true,
-                tempo_estimado: true,
-                duracao_estimada: true,
               },
             },
           },
@@ -186,10 +182,6 @@ export class ProgramacaoOSService {
               select: {
                 id: true,
                 nome: true,
-                categoria: true,
-                tipo_manutencao: true,
-                tempo_estimado: true,
-                duracao_estimada: true,
               },
             },
           },
@@ -335,10 +327,6 @@ export class ProgramacaoOSService {
                 select: {
                   id: true,
                   nome: true,
-                  categoria: true,
-                  tipo_manutencao: true,
-                  tempo_estimado: true,
-                  duracao_estimada: true,
                 },
               },
             },
@@ -454,10 +442,6 @@ export class ProgramacaoOSService {
                 select: {
                   id: true,
                   nome: true,
-                  categoria: true,
-                  tipo_manutencao: true,
-                  tempo_estimado: true,
-                  duracao_estimada: true,
                 },
               },
             },
@@ -975,9 +959,6 @@ export class ProgramacaoOSService {
       throw new NotFoundException('Uma ou mais tarefas não foram encontradas');
     }
 
-    // Calcular tempo total
-    const tempoTotal = tarefas.reduce((acc, tarefa) => acc + Number(tarefa.tempo_estimado), 0);
-    const duracaoTotal = tarefas.reduce((acc, tarefa) => acc + Number(tarefa.duracao_estimada), 0);
 
     // Determinar planta e equipamento principal
     const plantas = [...new Set(tarefas.map(t => t.equipamento?.unidade?.planta?.id).filter(Boolean))];
@@ -992,12 +973,10 @@ export class ProgramacaoOSService {
         ? tarefas[0].equipamento?.nome || 'Equipamento não definido'
         : 'Múltiplos equipamentos',
       condicoes: 'FUNCIONANDO',
-      tipo: tarefas[0].tipo_manutencao as any || 'PREVENTIVA',
+      tipo: 'PREVENTIVA',
       prioridade: dto.prioridade as any || 'MEDIA',
       origem: 'TAREFA',
       equipamento_id: equipamentos.length === 1 ? equipamentos[0] : null,
-      tempo_estimado: tempoTotal,
-      duracao_estimada: duracaoTotal,
       data_hora_programada: dto.data_hora_programada
         ? dto.data_hora_programada
         : null,

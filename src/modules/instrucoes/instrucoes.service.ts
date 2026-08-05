@@ -264,7 +264,7 @@ export class InstrucoesService {
       },
       include: {
         plano_manutencao: {
-          select: { id: true, nome: true, versao: true, status: true }
+          select: { id: true, nome: true, versao: true }
         },
         equipamento: {
           select: { id: true, nome: true, tipo_equipamento: true, classificacao: true }

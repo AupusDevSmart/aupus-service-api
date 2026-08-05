@@ -198,7 +198,6 @@ export class DashboardService {
         id: t.id,
         nome: t.nome,
         criticidade: t.criticidade,
-        status: t.status,
         equipamento_nome: t.equipamento?.nome || 'Sem equipamento',
         criado_em: t.created_at,
       })),
