@@ -781,7 +781,7 @@ export class PlanosManutencaoService {
     }
   }
 
-  private includeRelacionamentos() {
+  private includeRelacionamentos(): Prisma.planos_manutencaoInclude {
     return {
       categoria: {
         select: {

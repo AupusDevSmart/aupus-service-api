@@ -580,7 +580,7 @@ export class InstrucoesService {
     return tag;
   }
 
-  private includeRelacionamentosLista() {
+  private includeRelacionamentosLista(): Prisma.instrucoesInclude {
     return {
       _count: {
         select: {

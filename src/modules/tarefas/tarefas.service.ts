@@ -575,14 +575,13 @@ export class TarefasService {
     return tag;
   }
 
-  private includeRelacionamentosLista() {
+  private includeRelacionamentosLista(): Prisma.tarefasInclude {
     return {
       plano_manutencao: {
         select: {
           id: true,
           nome: true,
-          versao: true,
-          status: true
+          versao: true
         }
       },
       planta: {
@@ -619,14 +618,13 @@ export class TarefasService {
     };
   }
 
-  private includeRelacionamentosCompletos() {
+  private includeRelacionamentosCompletos(): Prisma.tarefasInclude {
     return {
       plano_manutencao: {
         select: {
           id: true,
           nome: true,
-          versao: true,
-          status: true
+          versao: true
         }
       },
       planta: {

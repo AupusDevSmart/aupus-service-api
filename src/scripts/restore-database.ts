@@ -105,9 +105,6 @@ async function restoreDatabase(backupPath: string) {
     // Manutenção
     'planos_manutencao',
     'tarefas',
-    'sub_tarefas',
-    'recursos_tarefa',
-    'anexos_tarefa',
 
     // Agenda
     'feriados',
