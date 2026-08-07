@@ -917,11 +917,12 @@ export class ExecucaoOSService {
           recomendacoes: dto.recomendacoes,
           proxima_manutencao: dto.proxima_manutencao,
           atividades_realizadas: dto.atividades_realizadas,
-          checklist_concluido: dto.checklist_concluido,
+          // Derivado do proprio checklist, nao pedido ao usuario: o painel de
+          // executar nunca coletou esse campo, entao a coluna vivia nula.
+          checklist_concluido: await this.calcularChecklistConcluido(prisma, id),
           procedimentos_seguidos: dto.procedimentos_seguidos,
           equipamentos_seguranca: dto.equipamentos_seguranca,
           incidentes_seguranca: dto.incidentes_seguranca,
-          medidas_seguranca_adicionais: dto.medidas_seguranca_adicionais,
           custos_adicionais: dto.custos_adicionais,
         },
       });
@@ -1387,6 +1388,21 @@ export class ExecucaoOSService {
     }
 
     return Math.round((dataHoraFim.getTime() - dataHoraInicio.getTime()) / (1000 * 60)); // em minutos
+  }
+
+  /**
+   * Percentual de itens concluidos do checklist da OS, arredondado.
+   * Sem itens devolve null — 0% diria que nada foi feito, quando na verdade
+   * nao havia o que fazer.
+   */
+  private async calcularChecklistConcluido(prisma: any, osId: string): Promise<number | null> {
+    const [total, concluidas] = await Promise.all([
+      prisma.checklist_atividades_os.count({ where: { os_id: osId } }),
+      prisma.checklist_atividades_os.count({ where: { os_id: osId, concluida: true } }),
+    ]);
+
+    if (total === 0) return null;
+    return Math.round((concluidas / total) * 100);
   }
 
   private async calcularCustoReal(osId: string, dto: ExecutarOSDto): Promise<number> {

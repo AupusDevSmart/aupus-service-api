@@ -351,13 +351,6 @@ export class ExecutarOSDto {
   @IsString()
   atividades_realizadas?: string;
 
-  @ApiPropertyOptional({ description: 'Percentual de conclusão do checklist (0-100)' })
-  @IsOptional()
-  @IsNumber()
-  @Min(0)
-  @Max(100)
-  checklist_concluido?: number;
-
   @ApiPropertyOptional({ description: 'Procedimentos seguidos durante a execução' })
   @IsOptional()
   @IsString()
@@ -372,11 +365,6 @@ export class ExecutarOSDto {
   @IsOptional()
   @IsString()
   incidentes_seguranca?: string;
-
-  @ApiPropertyOptional({ description: 'Medidas de segurança adicionais adotadas' })
-  @IsOptional()
-  @IsString()
-  medidas_seguranca_adicionais?: string;
 
   @ApiPropertyOptional({ description: 'Custos adicionais não planejados' })
   @IsOptional()
