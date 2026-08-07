@@ -36,6 +36,9 @@ logs/
 .env.development.local
 .env.test.local
 .env.production.local
+# Backups de .env feitos na VPS antes de mexer em credencial. Sem isto o
+# deploy.sh aborta: ele exige working tree limpa e o padrao escapava.
+.env.bak-*
 .env.production
 .env.prod
 
