@@ -592,6 +592,7 @@ export class ExecucaoOSService {
             os_id: osId,
             tarefa_id: tp.tarefa_id,
             ordem: tp.ordem,
+            equipamento_id: tp.equipamento_id ?? null,
             status: 'PENDENTE',
             observacoes: tp.observacoes,
             nome_snapshot: tp.nome_snapshot ?? null,

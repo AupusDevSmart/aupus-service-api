@@ -1244,6 +1244,10 @@ export class ProgramacaoOSService {
     if (!tarefa) return {};
 
     return {
+      // O equipamento entra no congelamento junto do resto. tarefa_id nao e
+      // caminho estavel ate ele: trocar o plano do equipamento apaga as copias
+      // das tarefas, o FK vira NULL e a OS historica fica orfa.
+      equipamento_id: tarefa.equipamento_id?.trim() ?? null,
       nome_snapshot: tarefa.nome ?? null,
       criticidade_snapshot: tarefa.criticidade ?? null,
       frequencia_snapshot: tarefa.frequencia ?? null,
@@ -1399,6 +1403,7 @@ export class ProgramacaoOSService {
         os_id: os.id,
         tarefa_id: tp.tarefa_id,
         ordem: tp.ordem,
+        equipamento_id: tp.equipamento_id ?? null,
         nome_snapshot: tp.nome_snapshot ?? null,
         criticidade_snapshot: tp.criticidade_snapshot ?? null,
         frequencia_snapshot: tp.frequencia_snapshot ?? null,
