@@ -528,56 +528,51 @@ export class InstrucoesService {
     }
   }
 
+  /**
+   * Próxima TAG a partir do MAIOR número já usado.
+   *
+   * Antes derivava da instrução "mais recente" por `created_at desc`. Esse
+   * campo tem precisão de SEGUNDO: criando várias instruções no mesmo segundo,
+   * a mais recente é arbitrária, o número repetia, a verificação de duplicata
+   * batia e a tag caía no fallback `INST-<timestamp>` — que foi como
+   * apareceram tags do tipo INST-1786559548512.
+   *
+   * O maior número não depende de ordenação e não empata.
+   */
   private async gerarTagUnica(): Promise<string> {
-    const ultimaInstrucao = await this.prisma.instrucoes.findFirst({
-      orderBy: { created_at: 'desc' },
-      select: { tag: true }
-    });
-
-    let proximoNumero = 1;
-
-    if (ultimaInstrucao?.tag) {
-      const match = ultimaInstrucao.tag.match(/INST-(\d+)/);
-      if (match) {
-        proximoNumero = parseInt(match[1]) + 1;
-      }
-    }
-
-    const tag = `INST-${proximoNumero.toString().padStart(3, '0')}`;
-
-    // Verificar se já existe (precaução)
-    const tagExiste = await this.prisma.instrucoes.findFirst({ where: { tag } });
-    if (tagExiste) {
-      return `INST-${Date.now()}`;
-    }
-
-    return tag;
+    return this.proximaTagSequencial('INST', await this.tagsExistentes('instrucoes'));
   }
 
-  private async gerarTagTarefa(planoId: string): Promise<string> {
-    const ultimaTarefa = await this.prisma.tarefas.findFirst({
-      where: { plano_manutencao_id: planoId },
-      orderBy: { created_at: 'desc' },
-      select: { tag: true }
-    });
+  /** Números absurdos vêm de tags-timestamp do bug antigo e não devem virar base. */
+  private static readonly MAIOR_SEQUENCIAL = 100000;
 
-    let proximoNumero = 1;
+  private async tagsExistentes(modelo: 'instrucoes' | 'tarefas'): Promise<string[]> {
+    const linhas = await (this.prisma[modelo] as any).findMany({ select: { tag: true } });
+    return linhas.map((l: any) => l.tag).filter(Boolean);
+  }
 
-    if (ultimaTarefa?.tag) {
-      const match = ultimaTarefa.tag.match(/TRF-(\d+)/);
-      if (match) {
-        proximoNumero = parseInt(match[1]) + 1;
-      }
-    }
+  private proximaTagSequencial(prefixo: string, tags: string[]): string {
+    const padrao = new RegExp(`^${prefixo}-(\\d+)$`);
 
-    const tag = `TRF-${proximoNumero.toString().padStart(3, '0')}`;
+    const maior = tags.reduce((max, tag) => {
+      const encontrado = tag.match(padrao);
+      if (!encontrado) return max;
+      const numero = parseInt(encontrado[1], 10);
+      if (!Number.isFinite(numero) || numero > InstrucoesService.MAIOR_SEQUENCIAL) return max;
+      return numero > max ? numero : max;
+    }, 0);
 
-    const tagExiste = await this.prisma.tarefas.findFirst({ where: { tag } });
-    if (tagExiste) {
-      return `TRF-${Date.now()}`;
-    }
+    return `${prefixo}-${(maior + 1).toString().padStart(3, '0')}`;
+  }
 
-    return tag;
+  /**
+   * `tarefas.tag` é único no banco inteiro, então o maior número tem que ser
+   * procurado em todas as tarefas — não só nas do plano. Mesmo motivo do
+   * gerador de instrução: `created_at` de segundo empatava e derrubava no
+   * fallback com timestamp.
+   */
+  private async gerarTagTarefa(_planoId: string): Promise<string> {
+    return this.proximaTagSequencial('TRF', await this.tagsExistentes('tarefas'));
   }
 
   private includeRelacionamentosLista(): Prisma.instrucoesInclude {

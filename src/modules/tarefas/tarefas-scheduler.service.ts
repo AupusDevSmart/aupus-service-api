@@ -3,18 +3,8 @@ import { Injectable, Logger } from '@nestjs/common';
 import { Cron } from '@nestjs/schedule';
 import { PrismaService } from '@aupus/api-shared';
 import { ProgramacaoOSService } from '../programacao-os/programacao-os.service';
+import { calcularProximaExecucao } from './periodicidade';
 
-/** Mapa frequência → dias */
-const FREQUENCIA_DIAS: Record<string, number> = {
-  DIARIA: 1,
-  SEMANAL: 7,
-  QUINZENAL: 15,
-  MENSAL: 30,
-  BIMESTRAL: 60,
-  TRIMESTRAL: 90,
-  SEMESTRAL: 180,
-  ANUAL: 365,
-};
 
 /** Mapa criticidade equipamento (A/B/C) → prioridade OS */
 const CRITICIDADE_PRIORIDADE: Record<string, string> = {
@@ -246,16 +236,7 @@ export class TarefasSchedulerService {
   /**
    * Calcula a data da próxima execução com base na frequência
    */
-  private intervaloEmDias(tarefa: TarefaElegivel): number | null {
-    const freq = tarefa.frequencia;
-    if (!freq) return null;
 
-    if (freq === 'PERSONALIZADA') {
-      return tarefa.frequencia_personalizada || null;
-    }
-
-    return FREQUENCIA_DIAS[freq] || null;
-  }
 
   /**
    * Proxima execucao = ultima execucao efetiva + intervalo.
@@ -267,19 +248,7 @@ export class TarefasSchedulerService {
    * anterior para todas.
    */
   private calcularProximaExecucao(tarefa: TarefaElegivel, ultimaExecucao?: Date): Date | null {
-    const diasIntervalo = this.intervaloEmDias(tarefa);
-    if (!diasIntervalo) return null;
-
-    // A ancora tambem avanca quando uma OS e cancelada: cancelar a OS inteira
-    // e decisao de planejamento, aquele ciclo nao vai acontecer. Por isso a base
-    // e a mais recente entre execucao efetiva e ancora.
-    const candidatas = [ultimaExecucao, tarefa.data_ancora ? new Date(tarefa.data_ancora) : null]
-      .filter((d): d is Date => !!d)
-      .sort((a, b) => b.getTime() - a.getTime());
-
-    const base = candidatas[0] ?? new Date(tarefa.created_at);
-
-    return new Date(base.getTime() + diasIntervalo * 24 * 60 * 60 * 1000);
+    return calcularProximaExecucao(tarefa, ultimaExecucao);
   }
 
   private chaveCiclo(tarefaId: string, ciclo?: Date | null): string {

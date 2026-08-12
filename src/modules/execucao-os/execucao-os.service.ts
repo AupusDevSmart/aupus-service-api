@@ -22,6 +22,21 @@ import {
 } from './dto';
 import { StatusOS, PrioridadeOS, Prisma } from '@aupus/api-shared';
 
+/**
+ * Nome da tarefa dentro de uma OS, sem depender da tarefa viva.
+ *
+ * `tarefas_os.tarefa` é relação OPCIONAL e volta null em dois casos que
+ * acontecem de verdade: a cópia do plano foi apagada (trocar o plano do
+ * equipamento apaga as cópias) ou o id da tarefa tem 25 chars e não casa com o
+ * `Char(26)` do FK, que é blank-padded no Postgres. Sem guarda, concluir ou
+ * cancelar uma tarefa dentro da OS estourava 500.
+ *
+ * O snapshot vem primeiro de propósito: é o que foi pedido na época, e é para
+ * isso que o congelamento existe.
+ */
+const nomeDaTarefa = (vinculo: any): string =>
+  vinculo?.nome_snapshot || vinculo?.instrucao_nome || vinculo?.tarefa?.nome || 'tarefa sem nome';
+
 @Injectable()
 export class ExecucaoOSService {
   private readonly logger = new Logger(ExecucaoOSService.name);
@@ -834,7 +849,7 @@ export class ExecucaoOSService {
             tecnico_nome: dto.concluida_por || 'Sistema',
             data_hora_inicio: new Date(),
             tempo_total: dto.tempo_execucao,
-            atividade: `Execução da tarefa: ${tarefa.tarefa.nome}`,
+            atividade: `Execução da tarefa: ${nomeDaTarefa(tarefa)}`,
             observacoes: dto.observacoes,
           },
         });
@@ -847,7 +862,7 @@ export class ExecucaoOSService {
         'CONCLUSAO_TAREFA',
         dto.concluida_por || 'Sistema',
         usuarioId,
-        `Tarefa concluída: ${tarefa.tarefa.nome}. ${dto.problemas_encontrados ? `Problemas: ${dto.problemas_encontrados}` : ''}`,
+        `Tarefa concluída: ${nomeDaTarefa(tarefa)}. ${dto.problemas_encontrados ? `Problemas: ${dto.problemas_encontrados}` : ''}`,
       );
     });
   }
@@ -884,7 +899,7 @@ export class ExecucaoOSService {
         'CANCELAMENTO_TAREFA',
         'Sistema',
         usuarioId,
-        `Tarefa cancelada: ${tarefa.tarefa.nome}. Motivo: ${dto.motivo_cancelamento}`,
+        `Tarefa cancelada: ${nomeDaTarefa(tarefa)}. Motivo: ${dto.motivo_cancelamento}`,
       );
     });
   }

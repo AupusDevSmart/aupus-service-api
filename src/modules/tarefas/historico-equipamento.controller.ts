@@ -21,7 +21,14 @@ export class HistoricoEquipamentoController {
     summary: 'Ordens de serviço e programações que tocaram este equipamento',
   })
   @ApiResponse({ status: 200, description: 'Histórico do equipamento' })
-  listar(@Param('id') id: string) {
-    return this.historicoService.listar(id);
+  async listar(@Param('id') id: string) {
+    // As duas visoes numa chamada so: a situacao de cada tarefa (o que falta) e
+    // as ordens que passaram pelo equipamento (o que ja foi feito).
+    const [tarefas, ordens] = await Promise.all([
+      this.historicoService.situacaoDasTarefas(id),
+      this.historicoService.listar(id),
+    ]);
+
+    return { tarefas, ordens };
   }
 }

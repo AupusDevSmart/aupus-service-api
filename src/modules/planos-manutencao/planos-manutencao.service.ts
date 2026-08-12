@@ -640,9 +640,14 @@ export class PlanosManutencaoService {
         }
       });
 
+      // A numeracao sai de uma vez, dentro da transacao: gerar tag a cada volta
+      // lendo o banco por fora nao enxergaria as criadas aqui, e todas sairiam
+      // com o mesmo numero.
+      let proximoNumeroTag = await this.proximoNumeroDeTag(tx, 'TRF');
+
       let copiadas = 0;
       for (const tarefaTemplate of template.tarefas) {
-        const tag = await this.gerarNovaTag(equipamentoId, 'TRF');
+        const tag = `TRF-${(proximoNumeroTag++).toString().padStart(3, '0')}`;
 
         await tx.tarefas.create({
           data: {
@@ -950,22 +955,35 @@ export class PlanosManutencaoService {
       return `${prefixo}-${Date.now()}`;
     }
 
-    // Contar tarefas existentes e gerar próximo número
-    const totalTarefas = plano.tarefas.length;
-    const proximoNumero = totalTarefas + 1;
+    const numero = await this.proximoNumeroDeTag(this.prisma, prefixo);
+    return `${prefixo}-${numero.toString().padStart(3, '0')}`;
+  }
 
-    // Gerar TAG no formato: PREFIXO-001, PREFIXO-002, etc.
-    const numeroFormatado = proximoNumero.toString().padStart(3, '0');
-    const novaTag = `${prefixo}-${numeroFormatado}`;
+  /**
+   * Próximo número livre de TAG, olhando TODAS as tarefas.
+   *
+   * `tarefas.tag` é único no banco inteiro, mas isto contava só as tarefas
+   * daquele plano e usava `total + 1`: o segundo equipamento com a mesma
+   * quantidade de tarefas gerava exatamente os mesmos números e batia na
+   * constraint. A verificação de duplicata também olhava só o próprio plano,
+   * então nunca pegava a colisão — caía no fallback com timestamp, que é de
+   * onde vinham TAGs como TRF-1786559551441.
+   */
+  private async proximoNumeroDeTag(cliente: any, prefixo: string): Promise<number> {
+    const linhas = await cliente.tarefas.findMany({ select: { tag: true } });
 
-    // Verificar se TAG já existe (improvável, mas garantir unicidade)
-    const tagExiste = plano.tarefas.some(t => t.tag === novaTag);
-    if (tagExiste) {
-      // Se existir, usar timestamp como fallback
-      return `${prefixo}-${Date.now()}`;
-    }
+    // Números absurdos são resquício das TAGs-timestamp e não servem de base.
+    const LIMITE = 100000;
 
-    return novaTag;
+    const maior = linhas.reduce((max: number, { tag }: { tag: string | null }) => {
+      if (typeof tag !== 'string' || !tag.startsWith(`${prefixo}-`)) return max;
+      const resto = tag.slice(prefixo.length + 1);
+      if (!/^\d+$/.test(resto)) return max;
+      const numero = parseInt(resto, 10);
+      return numero <= LIMITE && numero > max ? numero : max;
+    }, 0);
+
+    return maior + 1;
   }
 
   private contarPorTipo(distribuicao: any[], tipo: string): number {
