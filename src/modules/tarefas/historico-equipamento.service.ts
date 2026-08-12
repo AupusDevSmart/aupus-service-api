@@ -94,20 +94,38 @@ export class HistoricoEquipamentoService {
 
     if (tarefas.length === 0) return [];
 
+    /**
+     * As execuções vêm pelo `equipamento_id` congelado, e não por `tarefa_id`.
+     *
+     * Dois motivos, os dois reais neste banco: `tarefa_id` é `Char(26)` e o id
+     * da tarefa tem 25 chars, então o `in` não casa; e o vínculo fica com
+     * `tarefa_id` NULL quando a cópia do plano é apagada — mas a execução
+     * aconteceu e precisa continuar contando.
+     */
     const execucoes = await this.prisma.tarefas_os.findMany({
       where: {
-        tarefa_id: { in: tarefas.map((t) => t.id) },
+        equipamento_id: id,
         status: 'CONCLUIDA',
         data_conclusao: { not: null },
         ordem_servico: { status: 'FINALIZADA', deletado_em: null },
       },
-      select: { tarefa_id: true, data_conclusao: true },
+      select: { tarefa_id: true, nome_snapshot: true, data_conclusao: true },
     });
+
+    const porId = new Map(tarefas.map((t) => [t.id.trim(), t.id.trim()]));
+    // Nome congelado → tarefa viva. É como se atribui a execução de um vínculo
+    // órfão, que perdeu o `tarefa_id` mas guardou o que foi pedido.
+    const porNome = new Map(tarefas.map((t) => [t.nome, t.id.trim()]));
 
     const porTarefa = new Map<string, Date[]>();
     for (const e of execucoes) {
-      const chave = e.tarefa_id?.trim();
-      if (!chave || !e.data_conclusao) continue;
+      if (!e.data_conclusao) continue;
+
+      const chave =
+        porId.get(e.tarefa_id?.trim() ?? '') ??
+        (e.nome_snapshot ? porNome.get(e.nome_snapshot) : undefined);
+      if (!chave) continue;
+
       if (!porTarefa.has(chave)) porTarefa.set(chave, []);
       porTarefa.get(chave)!.push(e.data_conclusao);
     }

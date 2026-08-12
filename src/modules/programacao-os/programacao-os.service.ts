@@ -1,6 +1,7 @@
 import { ConflictException, ForbiddenException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { Prisma, StatusProgramacaoOS } from '@aupus/api-shared';
 import { PrismaService, PermissionScopeService, ScopedUser } from '@aupus/api-shared';
+import { variantesDeIds } from '../tarefas/ids';
 import { AnomaliasService } from '../anomalias/anomalias.service';
 import {
   AdicionarTarefasDto,
@@ -1211,7 +1212,9 @@ export class ProgramacaoOSService {
     const existentes = await prisma.tarefas_programacao_os.findMany({
       where: {
         programacao_id: programacaoId,
-        tarefa_id: { in: tarefasIds },
+        // Char(26) blank-padded contra id de 25 chars: sem as duas formas a
+        // verificacao de duplicata nao acha nada e a tarefa entra duas vezes.
+        tarefa_id: { in: variantesDeIds(tarefasIds) },
       },
     });
 

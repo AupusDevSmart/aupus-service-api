@@ -4,6 +4,7 @@ import { Cron } from '@nestjs/schedule';
 import { PrismaService } from '@aupus/api-shared';
 import { ProgramacaoOSService } from '../programacao-os/programacao-os.service';
 import { calcularProximaExecucao } from './periodicidade';
+import { variantesDeIds } from './ids';
 
 
 /** Mapa criticidade equipamento (A/B/C) → prioridade OS */
@@ -211,7 +212,10 @@ export class TarefasSchedulerService {
 
     const vinculos = await this.prisma.tarefas_os.findMany({
       where: {
-        tarefa_id: { in: tarefaIds },
+        // As duas formas do id: Char(26) e blank-padded, o id da tarefa tem 25.
+        // Sem isto o cron nao enxergava execucao nenhuma e tratava toda tarefa
+        // antiga como se nunca tivesse rodado.
+        tarefa_id: { in: variantesDeIds(tarefaIds) },
         status: 'CONCLUIDA',
         data_conclusao: { not: null },
         ordem_servico: { status: 'FINALIZADA' },
@@ -278,7 +282,7 @@ export class TarefasSchedulerService {
     const [vinculosProgramacao, vinculosOS] = await Promise.all([
       this.prisma.tarefas_programacao_os.findMany({
         where: {
-          tarefa_id: { in: tarefaIds },
+          tarefa_id: { in: variantesDeIds(tarefaIds) },
           programacao: {
             is: {
               status: { in: ['PENDENTE', 'APROVADA'] },
@@ -290,7 +294,7 @@ export class TarefasSchedulerService {
       }),
       this.prisma.tarefas_os.findMany({
         where: {
-          tarefa_id: { in: tarefaIds },
+          tarefa_id: { in: variantesDeIds(tarefaIds) },
           ordem_servico: {
             status: { in: ['PENDENTE', 'EM_EXECUCAO', 'PAUSADA', 'EXECUTADA', 'AUDITADA'] },
           },
