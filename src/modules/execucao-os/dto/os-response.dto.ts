@@ -23,6 +23,25 @@ export class TarefaOSResponseDto {
   @ApiPropertyOptional({ description: 'Quem concluiu' })
   concluida_por?: string;
 
+  /** O que foi pedido, congelado na geracao da OS. Independe da tarefa viva. */
+  @ApiPropertyOptional()
+  nome_snapshot?: string;
+
+  @ApiPropertyOptional()
+  criticidade_snapshot?: number;
+
+  @ApiPropertyOptional()
+  frequencia_snapshot?: string;
+
+  @ApiPropertyOptional()
+  instrucao_tag?: string;
+
+  @ApiPropertyOptional()
+  instrucao_nome?: string;
+
+  @ApiPropertyOptional()
+  instrucao_descricao?: string;
+
   @ApiPropertyOptional({ description: 'Observações da tarefa' })
   observacoes?: string;
 

@@ -1594,7 +1594,12 @@ export class ExecucaoOSService {
       incidentes_seguranca: os.incidentes_seguranca,
       medidas_seguranca_adicionais: os.medidas_seguranca_adicionais,
       custos_adicionais: os.custos_adicionais ? Number(os.custos_adicionais) : null,
-      tarefas_os: os.tarefas_os?.filter((to: any) => to.tarefa).map((to: any) => ({
+      // Sem `filter(to => to.tarefa)`: descartar o vínculo por causa da tarefa
+      // viva esvaziava a OS inteira nos dois casos que o congelamento existe
+      // para cobrir — cópia do plano apagada, e id de 25 chars que não casa com
+      // o Char(26) do FK. A OS ficava sem checklist e o card de origem sem
+      // nada a dizer.
+      tarefas_os: os.tarefas_os?.map((to: any) => ({
         id: to.id,
         os_id: to.os_id,
         tarefa_id: to.tarefa_id,
@@ -1605,12 +1610,21 @@ export class ExecucaoOSService {
         observacoes: to.observacoes,
         created_at: to.created_at,
         updated_at: to.updated_at,
-        tarefa: {
-          id: to.tarefa.id,
-          nome: to.tarefa.nome,
-          categoria: to.tarefa.categoria,
-          tipo_manutencao: to.tarefa.tipo_manutencao,
-        },
+        // O que foi PEDIDO, congelado na geração da OS. É a fonte da tela.
+        nome_snapshot: to.nome_snapshot,
+        criticidade_snapshot: to.criticidade_snapshot,
+        frequencia_snapshot: to.frequencia_snapshot,
+        instrucao_tag: to.instrucao_tag,
+        instrucao_nome: to.instrucao_nome,
+        instrucao_descricao: to.instrucao_descricao,
+        tarefa: to.tarefa
+          ? {
+              id: to.tarefa.id,
+              nome: to.tarefa.nome,
+              categoria: to.tarefa.categoria,
+              tipo_manutencao: to.tarefa.tipo_manutencao,
+            }
+          : null,
       })) || [],
       materiais: os.materiais?.map((m: any) => ({
         id: m.id,
