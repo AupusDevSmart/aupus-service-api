@@ -42,6 +42,16 @@ export class TarefaOSResponseDto {
   @ApiPropertyOptional()
   instrucao_descricao?: string;
 
+  /** Abre o sheet da instrucao; nao esta no congelamento. */
+  @ApiPropertyOptional()
+  instrucao_id?: string;
+
+  @ApiPropertyOptional()
+  plano_id?: string;
+
+  @ApiPropertyOptional()
+  plano_nome?: string;
+
   @ApiPropertyOptional({ description: 'Observações da tarefa' })
   observacoes?: string;
 

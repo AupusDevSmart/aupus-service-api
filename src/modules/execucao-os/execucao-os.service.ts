@@ -343,15 +343,18 @@ export class ExecucaoOSService {
               select: {
                 id: true,
                 nome: true,
+                // O id da instrucao nao esta no congelamento, e e ele que abre
+                // o sheet com etapas, recursos e anexos.
+                instrucao_id: true,
+                plano_manutencao: { select: { id: true, nome: true } },
               },
             },
           },
-          // ✅ CORREÇÃO: Filtrar tarefas com tarefa_id válido
-          where: {
-            tarefa_id: {
-              not: null,
-            },
-          },
+          // Sem `where: { tarefa_id: { not: null } }`. O vinculo fica orfao
+          // quando a copia do plano e apagada, mas o que foi PEDIDO continua
+          // congelado nele — filtrar aqui esvaziava a OS inteira, sumindo com
+          // o checklist e com o card de origem.
+          orderBy: [{ ordem: 'asc' }, { id: 'asc' }],
         },
         materiais: true,
         ferramentas: true,
@@ -1617,6 +1620,12 @@ export class ExecucaoOSService {
         instrucao_tag: to.instrucao_tag,
         instrucao_nome: to.instrucao_nome,
         instrucao_descricao: to.instrucao_descricao,
+        // Ponte para a instrução e para o plano: o congelamento guarda o nome
+        // e a descrição do que foi pedido, mas não os ids — e é o id que abre
+        // o sheet da instrução com etapas, recursos e anexos.
+        instrucao_id: to.tarefa?.instrucao_id ?? null,
+        plano_id: to.tarefa?.plano_manutencao?.id ?? null,
+        plano_nome: to.tarefa?.plano_manutencao?.nome ?? null,
         tarefa: to.tarefa
           ? {
               id: to.tarefa.id,
