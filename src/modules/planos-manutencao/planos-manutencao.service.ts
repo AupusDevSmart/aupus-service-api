@@ -498,6 +498,32 @@ export class PlanosManutencaoService {
    * Lista os templates aplicaveis a um equipamento: os da categoria do modelo
    * dele. Equipamento sem modelo nao tem categoria e portanto nao tem template.
    */
+  /**
+   * Os templates de uma categoria, direto.
+   *
+   * No cadastro de equipamento ainda nao ha id para consultar por equipamento,
+   * mas a categoria ja foi escolhida no formulario — e e ela que decide quais
+   * planos servem.
+   */
+  async listarTemplatesDaCategoria(categoriaId: string): Promise<PlanoManutencaoResponseDto[]> {
+    const id = categoriaId?.trim();
+    if (!id) return [];
+    return this.buscarTemplatesPorCategoria(id);
+  }
+
+  private async buscarTemplatesPorCategoria(categoriaId: string): Promise<PlanoManutencaoResponseDto[]> {
+    const planos = await this.prisma.planos_manutencao.findMany({
+      where: { deleted_at: null, ...this.SOMENTE_TEMPLATES, categoria_id: categoriaId },
+      include: {
+        categoria: { select: { id: true, nome: true } },
+        _count: { select: { tarefas: { where: { deleted_at: null } } } }
+      },
+      orderBy: [{ nome: 'asc' }, { id: 'asc' }]
+    });
+
+    return planos.map(plano => this.mapearParaResponse(plano));
+  }
+
   async listarTemplatesDoEquipamento(equipamentoId: string, user?: ScopedUser): Promise<PlanoManutencaoResponseDto[]> {
     const id = equipamentoId.trim();
     if (user) await this.scopeService.assertEntityInScope('equipamento', id, user);
@@ -505,16 +531,7 @@ export class PlanosManutencaoService {
     const categoriaId = await this.categoriaDoEquipamento(id);
     if (!categoriaId) return [];
 
-    const planos = await this.prisma.planos_manutencao.findMany({
-      where: { deleted_at: null, ...this.SOMENTE_TEMPLATES, categoria_id: categoriaId },
-      include: {
-        categoria: { select: { id: true, nome: true } },
-        _count: { select: { tarefas: { where: { deleted_at: null } } } }
-      },
-      orderBy: { nome: 'asc' }
-    });
-
-    return planos.map(plano => this.mapearParaResponse(plano));
+    return this.buscarTemplatesPorCategoria(categoriaId);
   }
 
   /** O que se perde ao trocar ou desvincular o plano do equipamento. */

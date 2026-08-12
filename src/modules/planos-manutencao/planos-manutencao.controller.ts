@@ -230,6 +230,20 @@ export class PlanosManutencaoController {
     return this.planosManutencaoService.listarTemplatesDoEquipamento(equipamentoId, user);
   }
 
+  @Get('categoria/:categoriaId/templates')
+  @ApiOperation({
+    summary: 'Listar planos template de uma categoria',
+    description:
+      'Usado no cadastro de equipamento, quando ainda nao ha id para consultar por equipamento.',
+  })
+  @ApiParam({ name: 'categoriaId', description: 'ID da categoria de equipamento' })
+  @ApiResponse({ status: HttpStatus.OK, type: [PlanoManutencaoResponseDto] })
+  async listarTemplatesDaCategoria(
+    @Param('categoriaId') categoriaId: string,
+  ): Promise<PlanoManutencaoResponseDto[]> {
+    return this.planosManutencaoService.listarTemplatesDaCategoria(categoriaId);
+  }
+
   @Get('equipamento/:equipamentoId/previa-desvinculo')
   @ApiOperation({
     summary: 'O que se perde ao trocar ou desvincular o plano do equipamento'
