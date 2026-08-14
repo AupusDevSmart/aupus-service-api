@@ -14,12 +14,16 @@ import { Type, Transform } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional, PartialType } from '@nestjs/swagger';
 
 /**
- * As mesmas cinco de sempre. No banco o enum se chama TipoRecurso e continua
- * assim: renomear enum em Postgres e migracao com risco, e a tela ja diz
- * "Categoria", que e o nome que interessa a quem usa.
+ * No banco o enum se chama TipoRecurso e continua assim: o nome do TIPO nao
+ * muda, so o rotulo na tela ("Categoria"), que e o que interessa a quem usa.
+ *
+ * O valor PECA foi renomeado para INSTRUMENTO no proprio enum do Postgres
+ * (ALTER TYPE ... RENAME VALUE), e nao criando um valor novo e migrando dados:
+ * o banco troca o rotulo em todas as colunas do tipo de uma vez, sem reescrever
+ * linha. Nenhuma linha usava PECA quando isso foi feito.
  */
 export enum CategoriaRecurso {
-  PECA = 'PECA',
+  INSTRUMENTO = 'INSTRUMENTO',
   MATERIAL = 'MATERIAL',
   FERRAMENTA = 'FERRAMENTA',
   TECNICO = 'TECNICO',
