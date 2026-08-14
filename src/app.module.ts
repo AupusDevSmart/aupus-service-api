@@ -24,6 +24,7 @@ import { UploadsModule } from './modules/uploads/uploads.module';
 import { DashboardModule } from './modules/dashboard/dashboard.module';
 import { SolicitacoesServicoModule } from './modules/solicitacoes-servico/solicitacoes-servico.module';
 import { InstrucoesModule } from './modules/instrucoes/instrucoes.module';
+import { RecursosModule } from './modules/recursos/recursos.module';
 
 // Modulos compartilhados (de @aupus/api-shared)
 import {
@@ -80,6 +81,7 @@ import {
     ExecucaoOSModule,
     SolicitacoesServicoModule,
     InstrucoesModule,
+    RecursosModule,
     DashboardModule,
     UploadsModule,
   ],

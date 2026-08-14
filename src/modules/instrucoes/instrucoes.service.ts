@@ -9,6 +9,7 @@ import {
   UpdateStatusInstrucaoDto,
   InstrucaoResponseDto,
   DashboardInstrucoesDto,
+  CreateRecursoInstrucaoDto,
 } from './dto';
 import { StatusTarefa, Prisma } from '@aupus/api-shared';
 
@@ -62,15 +63,9 @@ export class InstrucoesService {
 
       // Criar recursos se fornecidos
       if (createDto.recursos && createDto.recursos.length > 0) {
+        const linhas = await this.montarLinhasDeRecurso(createDto.recursos);
         await tx.recursos_instrucao.createMany({
-          data: createDto.recursos.map(recurso => ({
-            instrucao_id: novaInstrucao.id,
-            tipo: recurso.tipo,
-            descricao: recurso.descricao,
-            quantidade: recurso.quantidade,
-            unidade: recurso.unidade,
-            obrigatorio: recurso.obrigatorio || false
-          }))
+          data: linhas.map(linha => ({ instrucao_id: novaInstrucao.id, ...linha }))
         });
       }
 
@@ -78,6 +73,67 @@ export class InstrucoesService {
     });
 
     return this.buscarPorId(instrucao.id);
+  }
+
+  /**
+   * Resolve as linhas de recurso de uma instrução.
+   *
+   * Com `recurso_id`, categoria, nome e unidade vêm do catálogo e são copiados
+   * para as colunas antigas — que continuam existindo e sendo lidas por quem
+   * ainda não migrou. Sem ele, valem os campos digitados.
+   *
+   * Uma consulta só para todos os ids: resolver um a um dentro do laço faria N
+   * idas ao banco dentro da transação de gravação.
+   */
+  private async montarLinhasDeRecurso(recursos: CreateRecursoInstrucaoDto[]) {
+    const ids = [
+      ...new Set(
+        recursos.map(r => r.recurso_id?.trim()).filter((id): id is string => !!id),
+      ),
+    ];
+
+    const catalogo = ids.length
+      ? await this.prisma.recursos.findMany({
+          where: { id: { in: ids }, deleted_at: null },
+        })
+      : [];
+
+    const porId = new Map(catalogo.map(r => [r.id.trim(), r]));
+
+    return recursos.map((recurso, indice) => {
+      const recursoId = recurso.recurso_id?.trim();
+
+      if (recursoId) {
+        const doCatalogo = porId.get(recursoId);
+        if (!doCatalogo) {
+          throw new BadRequestException(
+            `O recurso da linha ${indice + 1} não existe mais no catálogo.`,
+          );
+        }
+
+        return {
+          recurso_id: doCatalogo.id,
+          tipo: doCatalogo.categoria,
+          descricao: doCatalogo.nome,
+          unidade: doCatalogo.unidade,
+          quantidade: recurso.quantidade,
+          obrigatorio: recurso.obrigatorio || false,
+        };
+      }
+
+      if (!recurso.tipo || !recurso.descricao?.trim()) {
+        throw new BadRequestException(`Informe o recurso da linha ${indice + 1}.`);
+      }
+
+      return {
+        recurso_id: null,
+        tipo: recurso.tipo,
+        descricao: recurso.descricao.trim(),
+        unidade: recurso.unidade,
+        quantidade: recurso.quantidade,
+        obrigatorio: recurso.obrigatorio || false,
+      };
+    });
   }
 
   async listar(queryDto: QueryInstrucoesDto): Promise<{
@@ -139,7 +195,12 @@ export class InstrucoesService {
         orderBy: { ordem: 'asc' }
       }),
       this.prisma.recursos_instrucao.findMany({
-        where: { instrucao_id: id }
+        where: { instrucao_id: id },
+        // O catálogo vem junto: preço e unidade são lidos ao vivo, para que
+        // reajustar um custo se reflita nas instruções que o usam. O que
+        // congela é a OS, no momento em que é gerada.
+        include: { recurso: true },
+        orderBy: [{ tipo: 'asc' }, { descricao: 'asc' }]
       }),
       this.prisma.anexos_instrucao.findMany({
         where: { instrucao_id: id },
@@ -206,15 +267,9 @@ export class InstrucoesService {
         await tx.recursos_instrucao.deleteMany({ where: { instrucao_id: id } });
 
         if (updateDto.recursos.length > 0) {
+          const linhas = await this.montarLinhasDeRecurso(updateDto.recursos);
           await tx.recursos_instrucao.createMany({
-            data: updateDto.recursos.map(recurso => ({
-              instrucao_id: id,
-              tipo: recurso.tipo,
-              descricao: recurso.descricao,
-              quantidade: recurso.quantidade,
-              unidade: recurso.unidade,
-              obrigatorio: recurso.obrigatorio || false
-            }))
+            data: linhas.map(linha => ({ instrucao_id: id, ...linha }))
           });
         }
       }
