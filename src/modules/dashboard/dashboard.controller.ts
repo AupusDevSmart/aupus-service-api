@@ -2,6 +2,7 @@ import { Controller, Get, Query } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiQuery } from '@nestjs/swagger';
 import { DashboardService } from './dashboard.service';
 import { DashboardSimpleService } from './dashboard-simple.service';
+import { DashboardManutencaoService } from './dashboard-manutencao.service';
 import { Public, Permissions, CurrentUser } from '@aupus/api-shared';
 import { DashboardOverviewDto } from './dto/overview.dto';
 import { DashboardWorkOrdersDto } from './dto/work-orders.dto';
@@ -17,6 +18,7 @@ export class DashboardController {
   constructor(
     private readonly dashboardService: DashboardService,
     private readonly dashboardSimpleService: DashboardSimpleService,
+    private readonly dashboardManutencaoService: DashboardManutencaoService,
   ) {}
 
   @Get('overview')
@@ -89,6 +91,23 @@ export class DashboardController {
   })
   async getSystemStatus(@CurrentUser() user: any): Promise<DashboardSystemStatusDto> {
     return this.dashboardService.getSystemStatus(user);
+  }
+
+  @Get('manutencao')
+  @ApiOperation({
+    summary: 'Painel de gestão de manutenção e serviços',
+    description:
+      'Agrega tudo o que a tela mostra numa chamada só. Indicadores sem fonte no banco vêm ' +
+      'com `simulado: true` e o campo `pendencia` dizendo o que falta registrar para ' +
+      'que passem a ser reais.',
+  })
+  @ApiQuery({ name: 'periodo', required: false, enum: ['12meses', 'mes', 'trimestre', 'ano'] })
+  @ApiQuery({ name: 'plantaId', required: false })
+  @ApiQuery({ name: 'unidadeId', required: false })
+  @ApiQuery({ name: 'equipe', required: false })
+  @ApiQuery({ name: 'criticidade', required: false })
+  async getDashboardManutencao(@Query() filtros: any, @CurrentUser() user: any) {
+    return this.dashboardManutencaoService.getDashboard(filtros, user);
   }
 
   @Get('advanced')
