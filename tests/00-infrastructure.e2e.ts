@@ -1,4 +1,4 @@
-// tests/00-infrastructure.test.ts
+// tests/00-infrastructure.e2e.ts
 // FASE 1: Testes de Infraestrutura do Banco de Dados
 
 import { PrismaClient } from '@prisma/client';

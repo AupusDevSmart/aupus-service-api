@@ -1,10 +1,10 @@
 // tests/run-all-tests.ts
 // Script Principal para Executar Todos os Testes
 
-import { runInfrastructureTests } from './00-infrastructure.test';
-import { runCrudTests } from './01-api-crud.test';
-import { runAuthTests } from './02-authentication.test';
-import { runPermissionsTests } from './03-permissions.test';
+import { runInfrastructureTests } from './00-infrastructure.e2e';
+import { runCrudTests } from './01-api-crud.e2e';
+import { runAuthTests } from './02-authentication.e2e';
+import { runPermissionsTests } from './03-permissions.e2e';
 import * as fs from 'fs';
 import * as path from 'path';
 

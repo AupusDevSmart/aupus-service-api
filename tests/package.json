@@ -1,13 +1,13 @@
 {
-  "name": "aupus-nexon-tests",
+  "name": "aupus-service-api-e2e",
   "version": "1.0.0",
-  "description": "Suite completa de testes para o sistema de usuários e permissões do Aupus Nexon",
+  "description": "Suite e2e contra o aupus-service-api vivo: infraestrutura, CRUD de usuarios, autenticacao e permissoes",
   "scripts": {
     "test": "ts-node run-all-tests.ts",
-    "test:infra": "ts-node 00-infrastructure.test.ts",
-    "test:crud": "ts-node 01-api-crud.test.ts",
-    "test:auth": "ts-node 02-authentication.test.ts",
-    "test:perms": "ts-node 03-permissions.test.ts",
+    "test:infra": "ts-node 00-infrastructure.e2e.ts",
+    "test:crud": "ts-node 01-api-crud.e2e.ts",
+    "test:auth": "ts-node 02-authentication.e2e.ts",
+    "test:perms": "ts-node 03-permissions.e2e.ts",
     "test:watch": "nodemon --exec ts-node run-all-tests.ts",
     "test:report": "ts-node run-all-tests.ts && cat reports/test-report-*.json | tail -1"
   },

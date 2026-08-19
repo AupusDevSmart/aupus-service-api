@@ -1,4 +1,4 @@
-// tests/01-api-crud.test.ts
+// tests/01-api-crud.e2e.ts
 // FASE 2: Testes de API - CRUD Básico de Usuários
 
 import axios, { AxiosInstance } from 'axios';

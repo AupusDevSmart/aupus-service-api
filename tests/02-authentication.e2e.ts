@@ -1,4 +1,4 @@
-// tests/02-authentication.test.ts
+// tests/02-authentication.e2e.ts
 // FASE 3: Testes de Autenticação (Login, JWT, Guards)
 
 import axios, { AxiosInstance } from 'axios';

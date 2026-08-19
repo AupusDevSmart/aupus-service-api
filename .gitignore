@@ -110,3 +110,6 @@ playwright/.cache/
 
 # Yarn Integrity file
 .yarn-integrity
+# Relatorios gerados pela suite e2e (tests/). Sao artefato de execucao:
+# cada `pnpm test:e2e` escreve um JSON novo e sujaria o working tree.
+tests/reports/

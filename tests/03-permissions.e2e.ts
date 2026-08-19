@@ -1,4 +1,4 @@
-// tests/03-permissions.test.ts
+// tests/03-permissions.e2e.ts
 // FASE 4: Testes de Roles e Permissions
 
 import axios, { AxiosInstance } from 'axios';

@@ -1,10 +1,33 @@
-# Suite de Testes - Aupus Nexon
+# Suite e2e - aupus-service-api
 
-Suite completa de testes para validar o sistema de usuários, autenticação e permissões do Aupus Nexon.
+Suite **end-to-end** que valida usuários, autenticação e permissões batendo numa instância
+**viva** da API (`http://localhost:3000/api/v1`), com banco real e admin já seedado.
+
+## Isto NÃO faz parte do `pnpm test`
+
+`pnpm test` na raiz roda o **jest**, e o jest só enxerga os `*.spec.ts` dentro de `src/`.
+Os arquivos daqui ficam de fora **de propósito**, por três motivos:
+
+1. **Não são testes jest.** Não têm `describe`/`it`/`expect` — são scripts `ts-node` que montam
+   um relatório próprio. Se o jest os carregasse, falharia com
+   *"Your test suite must contain at least one test"*.
+2. **Exigem servidor de pé.** Sem a API rodando na porta 3000, todos falham por
+   `ECONNREFUSED` — e quem só quer rodar unit não deveria precisar subir backend.
+3. **Escrevem no banco.** Criam usuário, atribuem role e permissão e fazem soft delete. O banco
+   de dev é compartilhado com `iot_nexon`; isso não pode acontecer a cada `pnpm test`.
+
+Por isso o sufixo dos arquivos é `.e2e.ts`, e **não** `.test.ts`: nenhum runner do repo
+reivindica esse padrão, então não existe arquivo de teste órfão dando falsa impressão de
+cobertura (SN-4).
+
+| Comando | Onde | O que roda |
+|---|---|---|
+| `pnpm test` | raiz do `aupus-service-api` | os `*.spec.ts` de `src/` (jest, sem servidor) |
+| `pnpm test:e2e` | raiz do `aupus-service-api` | os 4 arquivos daqui (ts-node, **exige API viva**) |
 
 ## 📋 Estrutura dos Testes
 
-### Fase 1: Infraestrutura (`00-infrastructure.test.ts`)
+### Fase 1: Infraestrutura (`00-infrastructure.e2e.ts`)
 Valida a estrutura do banco de dados:
 - ✅ Existência de todas as tabelas necessárias
 - ✅ Constraints da coluna `role`
@@ -13,7 +36,7 @@ Valida a estrutura do banco de dados:
 - ✅ Permissions cadastradas
 - ✅ Relacionamentos entre tabelas
 
-### Fase 2: CRUD de Usuários (`01-api-crud.test.ts`)
+### Fase 2: CRUD de Usuários (`01-api-crud.e2e.ts`)
 Testa operações básicas da API:
 - ✅ Criar usuário simples
 - ✅ Criar usuário com role
@@ -23,7 +46,7 @@ Testa operações básicas da API:
 - ✅ Atualizar usuário
 - ✅ Deletar usuário (soft delete)
 
-### Fase 3: Autenticação (`02-authentication.test.ts`)
+### Fase 3: Autenticação (`02-authentication.e2e.ts`)
 Valida o sistema de autenticação JWT:
 - ✅ Login com credenciais válidas
 - ✅ Login com credenciais inválidas
@@ -32,7 +55,7 @@ Valida o sistema de autenticação JWT:
 - ✅ Acesso a rotas protegidas
 - ✅ Bloqueio de acesso sem token
 
-### Fase 4: Roles e Permissions (`03-permissions.test.ts`)
+### Fase 4: Roles e Permissions (`03-permissions.e2e.ts`)
 Testa o sistema de permissões:
 - ✅ Atribuir role a usuário
 - ✅ Atribuir permissão direta
@@ -68,6 +91,14 @@ ADMIN_PASSWORD=admin123
 ```
 
 ### 3. Executar Todos os Testes
+
+Da raiz do `aupus-service-api` (atalho, e o caminho normal):
+
+```bash
+pnpm test:e2e
+```
+
+Ou de dentro de `tests/`:
 
 ```bash
 npm test
@@ -179,7 +210,7 @@ Ao executar os testes, um plano de correção é gerado automaticamente para cad
 
 Ao adicionar novos testes:
 
-1. Siga o padrão de nomenclatura: `0X-nome.test.ts`
+1. Siga o padrão de nomenclatura: `0X-nome.e2e.ts`
 2. Use a interface `TestResult` para resultados
 3. Adicione logs descritivos
 4. Documente falhas esperadas
