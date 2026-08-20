@@ -524,18 +524,21 @@ export class SolicitacoesServicoService {
 
       // Atualizar instruções vinculadas se fornecidas
       if (instrucoes_ids !== undefined) {
-        // Remover associações existentes
+        // Atualiza so o vinculo. A proposta NAO e refeita aqui.
+        //
+        // Um dono para cada momento: na edicao, quem preenche itens e etapas e
+        // a tela, no instante em que a instrucao e vinculada — e ela grava por
+        // rotas proprias. Se o update tambem refizesse a copia, um sobrescreve
+        // o outro, e o preco que a pessoa acabou de ajustar sumiria ao salvar
+        // qualquer outro campo do formulario.
+        //
+        // Para refazer de proposito existe POST /proposta/recarregar.
         await prisma.solicitacoes_instrucoes.deleteMany({
           where: { solicitacao_id: id },
         });
-        // Criar novas associações
         if (instrucoes_ids && instrucoes_ids.length > 0) {
           await this.associarInstrucoes(prisma, id, instrucoes_ids);
         }
-        // Refaz a copia. Isso DESCARTA edicoes de preco dos itens que vieram
-        // de instrucao: mexer nas instrucoes e redefinir o escopo da proposta.
-        // Itens avulsos, adicionados a mao, sobrevivem.
-        await this.propostaService.materializarDeInstrucoes(id, prisma);
       }
 
       // Buscar a planta manualmente se existir e não estiver deletada
