@@ -415,6 +415,12 @@ export class SolicitacoesServicoController {
     return this.propostaService.salvarOutrosCustos(id, body?.custos ?? []);
   }
 
+  @Put(':id/proposta/subinstrucoes')
+  @ApiOperation({ summary: 'Substitui as etapas da proposta' })
+  async salvarSubinstrucoes(@Param('id') id: string, @Body() body: { subinstrucoes: any[] }) {
+    return this.propostaService.salvarSubinstrucoes(id, body?.subinstrucoes ?? []);
+  }
+
   @Put(':id/proposta/condicoes')
   @ApiOperation({ summary: 'Lucro, nota fiscal e aliquota' })
   async salvarCondicoes(@Param('id') id: string, @Body() body: any) {

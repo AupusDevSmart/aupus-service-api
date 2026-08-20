@@ -316,6 +316,37 @@ export class PropostaService {
     return this.obter(solicitacaoId);
   }
 
+  /**
+   * Substitui as etapas. Elas sao copia da instrucao, e editar aqui ajusta o
+   * escopo DESTA proposta sem tocar na instrucao original.
+   *
+   * Nao entram no calculo: o preco vem dos itens. O tempo aqui serve ao
+   * descritivo do servico no PDF.
+   */
+  async salvarSubinstrucoes(
+    solicitacaoId: string,
+    subinstrucoes: Array<{ descricao: string; tempo_estimado?: number | null }>,
+  ) {
+    await this.prisma.$transaction(async (tx) => {
+      await tx.solicitacoes_subinstrucoes.deleteMany({
+        where: { solicitacao_id: solicitacaoId },
+      });
+
+      if (subinstrucoes.length > 0) {
+        await tx.solicitacoes_subinstrucoes.createMany({
+          data: subinstrucoes.map((s, indice) => ({
+            solicitacao_id: solicitacaoId,
+            descricao: s.descricao,
+            tempo_estimado: s.tempo_estimado ?? null,
+            ordem: indice + 1,
+          })),
+        });
+      }
+    });
+
+    return this.obter(solicitacaoId);
+  }
+
   /** Lucro, nota fiscal e alíquota. Recalcula em seguida. */
   async salvarCondicoes(
     solicitacaoId: string,
