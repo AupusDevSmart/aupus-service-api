@@ -10,6 +10,7 @@ import { NestExpressApplication } from '@nestjs/platform-express';
 import { join } from 'path';
 import * as Sentry from '@sentry/nestjs';
 import logger from './config/logger.config';
+import { exceptionFactoryEmPortugues } from './common/pipes/mensagens-validacao';
 
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule, {
@@ -45,6 +46,9 @@ async function bootstrap() {
       transformOptions: {
         enableImplicitConversion: true,
       },
+      // Sem isto o usuario recebia a frase crua do class-validator, em ingles
+      // e com o nome da coluna: "tempo_estimado must not be less than 1".
+      exceptionFactory: exceptionFactoryEmPortugues,
     }),
   );
 

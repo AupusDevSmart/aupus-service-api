@@ -56,8 +56,12 @@ export class CreateInstrucaoDto {
   @Min(0.1)
   duracao_estimada: number;
 
+  // Min(0), e nao Min(1): o banco tem instrucoes com tempo_estimado zero, e
+  // exigir 1 as tornava impossiveis de salvar — abrir, mudar outra coisa e
+  // salvar era recusado por causa de um valor que ja estava la. Zero e um
+  // "ainda nao estimado" legitimo.
   @IsInt()
-  @Min(1)
+  @Min(0)
   @Type(() => Number)
   tempo_estimado: number;
 
