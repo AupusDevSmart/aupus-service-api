@@ -77,11 +77,16 @@ export class CreateSolicitacaoDto {
   @IsString()
   equipamento_id?: string;
 
-  @ApiProperty({ description: 'Local onde o serviço será realizado', maxLength: 255 })
-  @IsNotEmpty()
+  /**
+   * Opcional. A coluna e NOT NULL no banco, entao o default vazio entra aqui:
+   * "nao informado" vira string vazia, sem exigir migracao numa base
+   * compartilhada com o iot_nexon so para permitir nulo.
+   */
+  @ApiPropertyOptional({ description: 'Local onde o serviço será realizado', maxLength: 255 })
+  @IsOptional()
   @IsString()
   @MaxLength(255)
-  local: string;
+  local?: string = '';
 
   @ApiPropertyOptional({ description: 'Área específica', maxLength: 255 })
   @IsOptional()
