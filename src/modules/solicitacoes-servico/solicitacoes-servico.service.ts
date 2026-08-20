@@ -7,6 +7,7 @@ import {
   Logger,
 } from '@nestjs/common';
 import { PrismaService, PermissionScopeService, ScopedUser } from '@aupus/api-shared';
+import { PropostaService } from './proposta.service';
 import {
   CreateSolicitacaoDto,
   UpdateSolicitacaoDto,
@@ -28,6 +29,7 @@ export class SolicitacoesServicoService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly scopeService: PermissionScopeService,
+    private readonly propostaService: PropostaService,
   ) {}
 
   /**
@@ -197,6 +199,9 @@ export class SolicitacoesServicoService {
       // Associar instruções se fornecidas
       if (instrucoes_ids && instrucoes_ids.length > 0) {
         await this.associarInstrucoes(prisma, solicitacao.id, instrucoes_ids);
+        // Copia recursos e etapas para a proposta, com o preco do catalogo
+        // congelado no momento do vinculo.
+        await this.propostaService.materializarDeInstrucoes(solicitacao.id, prisma);
       }
 
       // Adicionar a planta ao objeto de resposta
@@ -527,6 +532,10 @@ export class SolicitacoesServicoService {
         if (instrucoes_ids && instrucoes_ids.length > 0) {
           await this.associarInstrucoes(prisma, id, instrucoes_ids);
         }
+        // Refaz a copia. Isso DESCARTA edicoes de preco dos itens que vieram
+        // de instrucao: mexer nas instrucoes e redefinir o escopo da proposta.
+        // Itens avulsos, adicionados a mao, sobrevivem.
+        await this.propostaService.materializarDeInstrucoes(id, prisma);
       }
 
       // Buscar a planta manualmente se existir e não estiver deletada

@@ -2,6 +2,7 @@ import {
   Controller,
   Get,
   Post,
+  Put,
   Body,
   Patch,
   Param,
@@ -31,6 +32,7 @@ import { Permissions } from '@aupus/api-shared';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { Response } from 'express';
 import { SolicitacoesServicoService } from './solicitacoes-servico.service';
+import { PropostaService } from './proposta.service';
 import {
   CreateSolicitacaoDto,
   UpdateSolicitacaoDto,
@@ -48,6 +50,7 @@ import {
 export class SolicitacoesServicoController {
   constructor(
     private readonly solicitacoesService: SolicitacoesServicoService,
+    private readonly propostaService: PropostaService,
   ) {}
 
   @Post()
@@ -379,5 +382,54 @@ export class SolicitacoesServicoController {
     // Por enquanto, não fazer nada
     // O serviço de anexos será implementado posteriormente
     return;
+  }
+
+  // ==========================================================================
+  // PROPOSTA COMERCIAL
+  //
+  // Itens, outros custos e condicoes (lucro, nota fiscal). Os totais sao
+  // calculados e GRAVADOS pelo servico a cada escrita: a tela, a listagem e o
+  // PDF precisam do mesmo numero, e recalcular em tres lugares e como eles
+  // comecam a divergir.
+  // ==========================================================================
+
+  @Get(':id/proposta')
+  @ApiOperation({ summary: 'Itens, custos e totais da proposta' })
+  async obterProposta(@Param('id') id: string) {
+    return this.propostaService.obter(id);
+  }
+
+  @Put(':id/proposta/itens')
+  @ApiOperation({
+    summary: 'Substitui a lista de itens',
+    description:
+      'O front manda o estado final da lista. Recalcula os totais em seguida.',
+  })
+  async salvarItensDaProposta(@Param('id') id: string, @Body() body: { itens: any[] }) {
+    return this.propostaService.salvarItens(id, body?.itens ?? []);
+  }
+
+  @Put(':id/proposta/outros-custos')
+  @ApiOperation({ summary: 'Substitui a lista de outros custos' })
+  async salvarOutrosCustos(@Param('id') id: string, @Body() body: { custos: any[] }) {
+    return this.propostaService.salvarOutrosCustos(id, body?.custos ?? []);
+  }
+
+  @Put(':id/proposta/condicoes')
+  @ApiOperation({ summary: 'Lucro, nota fiscal e aliquota' })
+  async salvarCondicoes(@Param('id') id: string, @Body() body: any) {
+    return this.propostaService.salvarCondicoes(id, body ?? {});
+  }
+
+  @Post(':id/proposta/recarregar')
+  @ApiOperation({
+    summary: 'Refaz a copia a partir das instrucoes vinculadas',
+    description:
+      'DESCARTA as edicoes de preco dos itens que vieram de instrucao — quem ' +
+      'recarrega esta redefinindo o escopo. Itens avulsos sobrevivem.',
+  })
+  async recarregarProposta(@Param('id') id: string) {
+    await this.propostaService.materializarDeInstrucoes(id);
+    return this.propostaService.obter(id);
   }
 }
