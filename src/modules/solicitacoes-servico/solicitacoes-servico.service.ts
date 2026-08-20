@@ -44,30 +44,32 @@ export class SolicitacoesServicoService {
   }
 
   /**
-   * Gera um número único para a solicitação
+   * O número da solicitação: ASS-00000, contínuo.
+   *
+   * Sem ano e sem reinício anual — a contagem não volta ao 1 em janeiro. Cinco
+   * dígitos dão folga para 99.999 solicitações; passando disso o número
+   * simplesmente cresce, em vez de estourar o formato.
+   *
+   * As solicitações antigas ficam no formato SSV-ANO-0000 e são ignoradas pela
+   * contagem: renumerar mexeria em documento que já pode ter sido enviado ao
+   * cliente. Os dois formatos convivem, e o prefixo diz de qual época é cada um.
    */
   private async gerarNumeroSolicitacao(): Promise<string> {
-    const ano = new Date().getFullYear();
-
-    // Busca a última solicitação do ano
-    const ultimaSolicitacao = await this.prisma.solicitacoes_servico.findFirst({
-      where: {
-        numero: {
-          startsWith: `SSV-${ano}-`,
-        },
-      },
-      orderBy: {
-        numero: 'desc',
-      },
+    const ultima = await this.prisma.solicitacoes_servico.findFirst({
+      where: { numero: { startsWith: 'ASS-' } },
+      orderBy: { numero: 'desc' },
+      select: { numero: true },
     });
 
     let sequencial = 1;
-    if (ultimaSolicitacao) {
-      const partes = ultimaSolicitacao.numero.split('-');
-      sequencial = parseInt(partes[2]) + 1;
+    if (ultima) {
+      // Ordenação alfabética serve porque o padding deixa todos do mesmo
+      // tamanho: "ASS-00010" vem depois de "ASS-00009" como texto também.
+      const lido = parseInt(ultima.numero.replace('ASS-', ''), 10);
+      if (Number.isFinite(lido)) sequencial = lido + 1;
     }
 
-    return `SSV-${ano}-${sequencial.toString().padStart(4, '0')}`;
+    return `ASS-${sequencial.toString().padStart(5, '0')}`;
   }
 
   /**

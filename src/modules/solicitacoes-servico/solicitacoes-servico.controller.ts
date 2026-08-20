@@ -387,10 +387,10 @@ export class SolicitacoesServicoController {
   // ==========================================================================
   // PROPOSTA COMERCIAL
   //
-  // Itens, outros custos e condicoes (lucro, nota fiscal). Os totais sao
-  // calculados e GRAVADOS pelo servico a cada escrita: a tela, a listagem e o
-  // PDF precisam do mesmo numero, e recalcular em tres lugares e como eles
-  // comecam a divergir.
+  // Itens, outros custos e os componentes do BDI. Os totais sao calculados e
+  // GRAVADOS pelo servico a cada escrita: a tela, a listagem e o PDF precisam
+  // do mesmo numero, e recalcular em tres lugares e como eles comecam a
+  // divergir.
   // ==========================================================================
 
   @Get(':id/proposta')
@@ -422,7 +422,11 @@ export class SolicitacoesServicoController {
   }
 
   @Put(':id/proposta/condicoes')
-  @ApiOperation({ summary: 'Lucro, nota fiscal e aliquota' })
+  @ApiOperation({
+    summary: 'Componentes do BDI',
+    description:
+      'Aceita bdi_regime e os nove percentuais. Recalcula os totais em seguida.',
+  })
   async salvarCondicoes(@Param('id') id: string, @Body() body: any) {
     return this.propostaService.salvarCondicoes(id, body ?? {});
   }

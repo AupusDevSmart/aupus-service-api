@@ -119,6 +119,47 @@ export class PropostaService {
   // CÁLCULO
   // ============================================================
 
+  /** Os nove componentes, em fração (5,00% vira 0,05). */
+  private componentesBdi(s: {
+    bdi_administracao_central?: Prisma.Decimal | null;
+    bdi_seguro_garantia?: Prisma.Decimal | null;
+    bdi_taxa_risco?: Prisma.Decimal | null;
+    bdi_despesas_financeiras?: Prisma.Decimal | null;
+    bdi_lucro?: Prisma.Decimal | null;
+    bdi_pis?: Prisma.Decimal | null;
+    bdi_cofins?: Prisma.Decimal | null;
+    bdi_cprb?: Prisma.Decimal | null;
+    bdi_issqn?: Prisma.Decimal | null;
+  }) {
+    const f = (v: Prisma.Decimal | null | undefined) => this.num(v) / 100;
+    return {
+      ac: f(s.bdi_administracao_central),
+      sg: f(s.bdi_seguro_garantia),
+      r: f(s.bdi_taxa_risco),
+      df: f(s.bdi_despesas_financeiras),
+      l: f(s.bdi_lucro),
+      i: f(s.bdi_pis) + f(s.bdi_cofins) + f(s.bdi_cprb) + f(s.bdi_issqn),
+    };
+  }
+
+  /**
+   * O BDI, pela fórmula do acórdão 2.622/2013 do TCU.
+   *
+   *   BDI = [ (1+AC+SG+R) × (1+DF) × (1+L) / (1-I) ] - 1
+   *
+   * Com a tabela GOINFRA sem REIDI (AC 5, SG 0,5, R 0, DF 0,5, L 5, I 14,65)
+   * o resultado é 0,3044 — os 30,44% da planilha de referência.
+   */
+  private calcularBdi(componentes: ReturnType<typeof this.componentesBdi>): number {
+    const { ac, sg, r, df, l, i } = componentes;
+
+    // Guarda contra I >= 100%, que faria a divisão explodir. Não é cenário
+    // real, mas o campo é editável e um dígito a mais derrubaria a conta.
+    if (i >= 1) return 0;
+
+    return ((1 + ac + sg + r) * (1 + df) * (1 + l)) / (1 - i) - 1;
+  }
+
   /**
    * Recalcula e GRAVA os totais.
    *
@@ -143,7 +184,18 @@ export class PropostaService {
     const [solicitacao, itens, outros] = await Promise.all([
       db.solicitacoes_servico.findFirst({
         where: { id: solicitacaoId },
-        select: { id: true, lucro_percentual: true, com_nota_fiscal: true, aliquota_percentual: true },
+        select: {
+          id: true,
+          bdi_administracao_central: true,
+          bdi_seguro_garantia: true,
+          bdi_taxa_risco: true,
+          bdi_despesas_financeiras: true,
+          bdi_lucro: true,
+          bdi_pis: true,
+          bdi_cofins: true,
+          bdi_cprb: true,
+          bdi_issqn: true,
+        },
       }),
       db.solicitacoes_itens.findMany({
         where: { solicitacao_id: solicitacaoId },
@@ -171,32 +223,31 @@ export class PropostaService {
       .reduce((soma, o) => soma + this.num(o.valor), 0);
 
     const totalCusto = this.centavos(custoItens + custoComum + custoFD);
-    const tributavel = custoItens + custoComum;
 
-    const aliquota = solicitacao.com_nota_fiscal
-      ? this.num(solicitacao.aliquota_percentual) / 100
-      : 0;
+    // O faturamento direto NÃO recebe BDI.
+    //
+    // É dinheiro que o cliente paga direto ao fornecedor: não passa pela
+    // empresa, então não tem administração central, não tem imposto e não tem
+    // lucro. Entra no total como repasse puro.
+    const baseDoBdi = custoItens + custoComum;
 
-    // Guarda contra alíquota de 100%, que faria uma divisão por zero.
-    const comImposto = aliquota > 0 && aliquota < 1 ? tributavel / (1 - aliquota) : tributavel;
-    const totalImposto = this.centavos(comImposto - tributavel);
-
-    const lucro = this.num(solicitacao.lucro_percentual) / 100;
-    const baseDoLucro = comImposto + custoFD;
-    const totalLucro = this.centavos(baseDoLucro * lucro);
-    const totalGeral = this.centavos(baseDoLucro + totalLucro);
+    const bdi = this.calcularBdi(this.componentesBdi(solicitacao));
+    const totalBdi = this.centavos(baseDoBdi * bdi);
+    const totalGeral = this.centavos(baseDoBdi + totalBdi + custoFD);
 
     await db.solicitacoes_servico.update({
       where: { id: solicitacaoId },
       data: {
         total_custo: totalCusto,
-        total_imposto: totalImposto,
-        total_lucro: totalLucro,
+        total_bdi: totalBdi,
+        // Três casas: 30,44% arredondado para 30,4% já move o total de uma
+        // proposta grande em dezenas de reais.
+        bdi_percentual: Math.round(bdi * 100 * 1000) / 1000,
         total_geral: totalGeral,
       },
     });
 
-    return { totalCusto, totalImposto, totalLucro, totalGeral, custoFD };
+    return { totalCusto, totalBdi, totalGeral, custoFD, bdi };
   }
 
   // ============================================================
@@ -220,12 +271,19 @@ export class PropostaService {
       this.prisma.solicitacoes_servico.findFirst({
         where: { id: solicitacaoId },
         select: {
-          lucro_percentual: true,
-          com_nota_fiscal: true,
-          aliquota_percentual: true,
+          bdi_regime: true,
+          bdi_administracao_central: true,
+          bdi_seguro_garantia: true,
+          bdi_taxa_risco: true,
+          bdi_despesas_financeiras: true,
+          bdi_lucro: true,
+          bdi_pis: true,
+          bdi_cofins: true,
+          bdi_cprb: true,
+          bdi_issqn: true,
+          bdi_percentual: true,
           total_custo: true,
-          total_imposto: true,
-          total_lucro: true,
+          total_bdi: true,
           total_geral: true,
         },
       }),
@@ -237,12 +295,19 @@ export class PropostaService {
       itens,
       subinstrucoes,
       outros_custos: outros,
-      lucro_percentual: this.num(solicitacao.lucro_percentual),
-      com_nota_fiscal: solicitacao.com_nota_fiscal,
-      aliquota_percentual: this.num(solicitacao.aliquota_percentual),
+      bdi_regime: solicitacao.bdi_regime,
+      bdi_administracao_central: this.num(solicitacao.bdi_administracao_central),
+      bdi_seguro_garantia: this.num(solicitacao.bdi_seguro_garantia),
+      bdi_taxa_risco: this.num(solicitacao.bdi_taxa_risco),
+      bdi_despesas_financeiras: this.num(solicitacao.bdi_despesas_financeiras),
+      bdi_lucro: this.num(solicitacao.bdi_lucro),
+      bdi_pis: this.num(solicitacao.bdi_pis),
+      bdi_cofins: this.num(solicitacao.bdi_cofins),
+      bdi_cprb: this.num(solicitacao.bdi_cprb),
+      bdi_issqn: this.num(solicitacao.bdi_issqn),
+      bdi_percentual: this.num(solicitacao.bdi_percentual),
       total_custo: this.num(solicitacao.total_custo),
-      total_imposto: this.num(solicitacao.total_imposto),
-      total_lucro: this.num(solicitacao.total_lucro),
+      total_bdi: this.num(solicitacao.total_bdi),
       total_geral: this.num(solicitacao.total_geral),
     };
   }
@@ -347,21 +412,50 @@ export class PropostaService {
     return this.obter(solicitacaoId);
   }
 
-  /** Lucro, nota fiscal e alíquota. Recalcula em seguida. */
+  /**
+   * Os componentes do BDI. Recalcula em seguida.
+   *
+   * O REIDI (Regime Especial de Incentivos para o Desenvolvimento da
+   * Infraestrutura) desonera PIS e COFINS. Trocar o regime zera os dois — ou
+   * os devolve ao padrão —, e a pessoa ainda pode ajustar cada um depois.
+   */
   async salvarCondicoes(
     solicitacaoId: string,
-    dados: { lucro_percentual?: number; com_nota_fiscal?: boolean; aliquota_percentual?: number },
+    dados: Record<string, number | string | undefined>,
   ) {
-    await this.prisma.solicitacoes_servico.update({
-      where: { id: solicitacaoId },
-      data: {
-        ...(dados.lucro_percentual !== undefined && { lucro_percentual: dados.lucro_percentual }),
-        ...(dados.com_nota_fiscal !== undefined && { com_nota_fiscal: dados.com_nota_fiscal }),
-        ...(dados.aliquota_percentual !== undefined && {
-          aliquota_percentual: dados.aliquota_percentual,
-        }),
-      },
-    });
+    const numericos = [
+      'bdi_administracao_central',
+      'bdi_seguro_garantia',
+      'bdi_taxa_risco',
+      'bdi_despesas_financeiras',
+      'bdi_lucro',
+      'bdi_pis',
+      'bdi_cofins',
+      'bdi_cprb',
+      'bdi_issqn',
+    ] as const;
+
+    const data: Record<string, number | string> = {};
+
+    for (const campo of numericos) {
+      const valor = dados[campo];
+      if (valor !== undefined && valor !== null && valor !== '') {
+        data[campo] = Number(valor);
+      }
+    }
+
+    if (dados.bdi_regime === 'COM_REIDI' || dados.bdi_regime === 'SEM_REIDI') {
+      data.bdi_regime = dados.bdi_regime;
+
+      // Só mexe em PIS e COFINS se o próprio pedido não os trouxe: quem manda
+      // regime E percentual está dizendo exatamente o que quer.
+      if (data.bdi_pis === undefined) data.bdi_pis = dados.bdi_regime === 'COM_REIDI' ? 0 : 0.65;
+      if (data.bdi_cofins === undefined) data.bdi_cofins = dados.bdi_regime === 'COM_REIDI' ? 0 : 3.0;
+    }
+
+    if (Object.keys(data).length > 0) {
+      await this.prisma.solicitacoes_servico.update({ where: { id: solicitacaoId }, data });
+    }
 
     await this.recalcular(solicitacaoId);
     return this.obter(solicitacaoId);
