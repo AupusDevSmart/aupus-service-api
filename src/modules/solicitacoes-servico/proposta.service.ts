@@ -302,6 +302,19 @@ export class PropostaService {
     return {
       itens,
       outros_custos: outros,
+      /**
+       * OBSOLETO, e só por isso ainda está aqui.
+       *
+       * A proposta não copia mais o escopo, e nada no front lê este campo.
+       * Ele volta vazio para o front ANTERIOR não quebrar durante o deploy:
+       * aquele lê `proposta.subinstrucoes.length` sem proteção, e o backend
+       * sobe primeiro — quem estivesse com a tela aberta veria a seção da
+       * proposta virar tela branca até recarregar.
+       *
+       * Pode sair depois que o front novo estiver em produção há tempo
+       * suficiente para ninguém mais ter o antigo carregado.
+       */
+      subinstrucoes: [] as never[],
       bdi_regime: solicitacao.bdi_regime,
       bdi_administracao_central: this.num(solicitacao.bdi_administracao_central),
       bdi_seguro_garantia: this.num(solicitacao.bdi_seguro_garantia),
