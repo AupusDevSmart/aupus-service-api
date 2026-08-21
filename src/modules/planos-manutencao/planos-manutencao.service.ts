@@ -92,15 +92,7 @@ export class PlanosManutencaoService {
       this.prisma.planos_manutencao.findMany({
         where,
         include: {
-          // A unidade e a planta vem aninhadas: quem escolhe um plano para uma
-          // OS precisa saber de qual ativo e de qual instalacao ele e — dois
-          // planos com o mesmo nome, em equipamentos diferentes, sao
-          // indistinguiveis sem isso.
-          equipamento: {
-            include: {
-              unidade: { include: { planta: { select: { id: true, nome: true } } } },
-            },
-          },
+          equipamento: true,
           categoria: { select: { id: true, nome: true } },
           usuario_criador: {
             select: {
@@ -127,6 +119,8 @@ export class PlanosManutencaoService {
       }),
       this.prisma.planos_manutencao.count({ where })
     ]);
+
+    if (vinculados) await this.hidratarEquipamentos(planos);
 
     return {
       data: planos.map(plano => this.mapearParaResponse(plano)),
@@ -859,6 +853,52 @@ export class PlanosManutencaoService {
         }
       }
     };
+  }
+
+  /**
+   * Preenche `equipamento` (com unidade e planta) nos planos, comparando ids
+   * SEM o padding.
+   *
+   * O include do Prisma nao serve aqui, e o motivo e sutil:
+   *
+   *   equipamentos.id                    character(26)      <- o Postgres
+   *                                                            completa com
+   *                                                            espaco ate 26
+   *   planos_manutencao.equipamento_id   character varying  <- guarda 25
+   *
+   * Em SQL o JOIN casa, porque o Postgres ignora espaco a direita ao comparar
+   * `char`. Mas o Prisma resolve a RELACAO em JavaScript, depois de trazer as
+   * duas pontas, e ali `'...xpfqi '` nao e igual a `'...xpfqi'`. O resultado e
+   * `equipamento: null` silencioso — em dev, 16 de 23 planos.
+   *
+   * O mesmo remendo ja existe em solicitacoes-servico.service, onde a planta e
+   * buscada a mao "usando TRIM". A correcao de raiz e alinhar o tipo das duas
+   * colunas, e nao cabe numa mudanca de tela.
+   */
+  private async hidratarEquipamentos(planos: any[]): Promise<void> {
+    const ids = [
+      ...new Set(
+        planos
+          .map(p => p.equipamento_id?.trim())
+          .filter((id): id is string => Boolean(id)),
+      ),
+    ];
+
+    if (ids.length === 0) return;
+
+    const equipamentos = await this.prisma.equipamentos.findMany({
+      where: { id: { in: ids }, deleted_at: null },
+      include: {
+        unidade: { include: { planta: { select: { id: true, nome: true } } } },
+      },
+    });
+
+    const porId = new Map(equipamentos.map(e => [e.id.trim(), e]));
+
+    for (const plano of planos) {
+      const chave = plano.equipamento_id?.trim();
+      if (chave) plano.equipamento = porId.get(chave) ?? null;
+    }
   }
 
   private construirFiltros(filters: Partial<QueryPlanosDto>, search?: string): Prisma.planos_manutencaoWhereInput {
