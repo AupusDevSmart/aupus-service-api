@@ -48,18 +48,36 @@ export class FerramentaProgramacaoDto {
   @Length(1, 255)
   descricao: string;
 
-  @ApiProperty({ description: 'Quantidade necessária', example: 1 })
-  @IsNumber()
-  @Min(1)
+  /**
+   * Decimal, e Min(0) em vez de Min(1).
+   *
+   * A ferramenta pode vir herdada da instrução, onde a quantidade é decimal
+   * ("2,5 m de cabo"). O piso em 1 rejeitava meia unidade, e o inteiro
+   * arredondava — a instrução dizia 2,5 e a OS gravava 2.
+   */
+  @ApiProperty({ description: 'Quantidade necessária', example: 2.5 })
+  @IsNumber({ maxDecimalPlaces: 3 })
+  @Min(0)
   quantidade: number;
+
+  @ApiPropertyOptional({ description: 'Unidade da quantidade', example: 'm' })
+  @IsOptional()
+  @IsString()
+  @Length(1, 20)
+  unidade?: string;
 }
 
 export class TecnicoProgramacaoDto {
-  @ApiProperty({ description: 'Nome do técnico', example: 'João Silva' })
+  /**
+   * Opcional: a linha pode nascer da instrução, que descreve o PERFIL
+   * necessário ("Eletricista") e não uma pessoa. O nome entra depois, quando
+   * alguém for de fato escalado.
+   */
+  @ApiPropertyOptional({ description: 'Nome do técnico', example: 'João Silva' })
+  @IsOptional()
   @IsString()
-  @IsNotEmpty()
   @Length(1, 255)
-  nome: string;
+  nome?: string;
 
   @ApiProperty({ description: 'Especialidade', example: 'Mecânico' })
   @IsString()

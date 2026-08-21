@@ -1278,6 +1278,8 @@ export class ProgramacaoOSService {
       programacao_id: programacaoId,
       descricao: ferramenta.descricao,
       quantidade: ferramenta.quantidade,
+      // A unidade acompanha a quantidade quando a ferramenta veio da instrucao.
+      unidade: ferramenta.unidade ?? null,
     }));
 
     await prisma.ferramentas_programacao_os.createMany({ data: dados });
