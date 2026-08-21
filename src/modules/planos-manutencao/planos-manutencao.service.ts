@@ -70,14 +70,18 @@ export class PlanosManutencaoService {
     limit: number;
     totalPages: number;
   }> {
-    const { page, limit, search, sort_by, sort_order, ...filters } = queryDto;
+    const { page, limit, search, sort_by, sort_order, vinculados, ...filters } = queryDto;
     const skip = (page - 1) * limit;
 
-    // Somente templates: as copias por equipamento nascem do vinculo e
-    // apareceriam duplicadas aqui, uma por equipamento vinculado.
+    // Por padrao, somente templates: as copias por equipamento nascem do
+    // vinculo e apareceriam duplicadas aqui, uma por equipamento vinculado.
+    //
+    // Com `vinculados`, o recorte inverte — sao justamente as copias que
+    // interessam a quem programa uma OS, porque a OS e para um ativo e o
+    // template nao tem equipamento.
     const where: Prisma.planos_manutencaoWhereInput = {
       deleted_at: null,
-      ...this.SOMENTE_TEMPLATES,
+      ...(vinculados ? { equipamento_id: { not: null } } : this.SOMENTE_TEMPLATES),
       ...this.construirFiltros(filters, search),
     };
 
@@ -88,7 +92,15 @@ export class PlanosManutencaoService {
       this.prisma.planos_manutencao.findMany({
         where,
         include: {
-          equipamento: true,
+          // A unidade e a planta vem aninhadas: quem escolhe um plano para uma
+          // OS precisa saber de qual ativo e de qual instalacao ele e — dois
+          // planos com o mesmo nome, em equipamentos diferentes, sao
+          // indistinguiveis sem isso.
+          equipamento: {
+            include: {
+              unidade: { include: { planta: { select: { id: true, nome: true } } } },
+            },
+          },
           categoria: { select: { id: true, nome: true } },
           usuario_criador: {
             select: {

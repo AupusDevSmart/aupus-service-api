@@ -1,6 +1,6 @@
 // src/modules/planos-manutencao/dto/query-planos.dto.ts
-import { IsOptional, IsEnum, IsString, IsInt, Min, Max } from 'class-validator';
-import { Type } from 'class-transformer';
+import { IsOptional, IsEnum, IsString, IsInt, IsBoolean, Min, Max } from 'class-validator';
+import { Type, Transform } from 'class-transformer';
 import { ApiPropertyOptional } from '@nestjs/swagger';
 
 export class QueryPlanosDto {
@@ -8,6 +8,22 @@ export class QueryPlanosDto {
   @IsOptional()
   @IsString()
   search?: string;
+
+  /**
+   * Inverte o recorte da lista: em vez dos templates, os planos JA VINCULADOS a
+   * um equipamento.
+   *
+   * Quem programa uma OS precisa destes: a OS e para um ativo, e o template nao
+   * tem equipamento. Sem o parametro a lista segue como estava, so com
+   * templates, que e o que a tela de planos usa.
+   */
+  @ApiPropertyOptional({
+    description: 'Lista os planos vinculados a equipamento, em vez dos templates',
+  })
+  @IsOptional()
+  @Transform(({ value }) => value === true || value === 'true')
+  @IsBoolean()
+  vinculados?: boolean;
 
   @ApiPropertyOptional({ description: 'ID da categoria de equipamento (filtra templates)' })
   @IsOptional()
