@@ -6,13 +6,22 @@ import { Prisma } from '@prisma/client';
 /**
  * A proposta comercial de uma solicitação de serviço.
  *
- * Os itens são CÓPIA dos recursos da instrução, não referência. Uma proposta é
- * um documento: se apontasse para o catálogo por id, reajustar o preço de um
- * recurso amanhã reescreveria retroativamente uma proposta já enviada ao
- * cliente, e o PDF gerado hoje sairia diferente do gerado no mês que vem.
+ * Uma linha por instrução vinculada, com o valor FECHADO daquela instrução.
+ * Nada da instrução é copiado item a item: o que a proposta guarda é o preço,
+ * não a composição.
+ *
+ * O valor NASCE da soma dos recursos do catálogo, como sugestão, e congela ali.
+ * Ele é cópia, e não referência, porque uma proposta é um documento: se
+ * apontasse para o catálogo por id, reajustar o preço de um recurso amanhã
+ * reescreveria retroativamente uma proposta já enviada ao cliente, e o PDF
+ * gerado hoje sairia diferente do gerado no mês que vem.
  *
  * É o mesmo padrão que a OS usa ao congelar tag, nome e descrição da tarefa em
  * `tarefas_os`.
+ *
+ * O escopo (as etapas) NÃO é copiado: o PDF lê as sub-instruções ao vivo na
+ * hora de gerar. Escopo é descrição do serviço, não preço — e quem corrige uma
+ * instrução quer a correção valendo.
  */
 @Injectable()
 export class PropostaService {
@@ -35,14 +44,15 @@ export class PropostaService {
   // ============================================================
 
   /**
-   * Materializa itens e etapas a partir das instruções vinculadas.
+   * Refaz a lista: uma linha por instrução vinculada, valendo a soma dos
+   * recursos daquela instrução no catálogo.
    *
-   * Chamado quando as instruções da solicitação mudam. Refaz a lista inteira,
-   * e por isso **descarta edições de preço** dos itens que vieram de instrução
-   * — quem mexe nas instruções está redefinindo o escopo da proposta.
+   * **Descarta os valores editados.** Quem manda recarregar está redefinindo o
+   * escopo — é a mesma decisão de antes, só que agora a unidade descartada é o
+   * valor fechado da instrução, e não o preço de cada recurso.
    *
-   * Os itens avulsos (sem `instrucao_id`), adicionados à mão na proposta,
-   * sobrevivem: eles não pertencem a instrução nenhuma.
+   * Para preservar o que já foi ajustado, o caminho é `salvarItens`: o front
+   * manda o estado final e decide o que mantém.
    */
   async materializarDeInstrucoes(solicitacaoId: string, tx?: Prisma.TransactionClient) {
     const db = tx ?? this.prisma;
@@ -55,64 +65,66 @@ export class PropostaService {
 
     const instrucaoIds = vinculos.map((v) => v.instrucao_id.trim());
 
-    await db.solicitacoes_itens.deleteMany({
-      where: { solicitacao_id: solicitacaoId, instrucao_id: { not: null } },
-    });
-    await db.solicitacoes_subinstrucoes.deleteMany({
-      where: { solicitacao_id: solicitacaoId },
-    });
+    // Limpa TUDO que veio de instrução — inclusive as linhas por recurso do
+    // formato antigo, que ficariam soltas na tela sem instrução a que pertencer.
+    await db.solicitacoes_itens.deleteMany({ where: { solicitacao_id: solicitacaoId } });
 
     if (instrucaoIds.length === 0) {
       await this.recalcular(solicitacaoId, db);
       return;
     }
 
-    const [recursos, subinstrucoes] = await Promise.all([
+    const [instrucoes, recursos] = await Promise.all([
+      db.instrucoes.findMany({
+        where: { id: { in: instrucaoIds } },
+        select: { id: true, tag: true, nome: true },
+      }),
       db.recursos_instrucao.findMany({
         where: { instrucao_id: { in: instrucaoIds } },
         include: { recurso: true },
-        orderBy: [{ tipo: 'asc' }, { descricao: 'asc' }],
-      }),
-      db.sub_instrucoes.findMany({
-        where: { instrucao_id: { in: instrucaoIds } },
-        orderBy: { ordem: 'asc' },
       }),
     ]);
 
-    if (recursos.length > 0) {
-      await db.solicitacoes_itens.createMany({
-        data: recursos.map((r, indice) => {
-          // O preço vem do catálogo AGORA e congela aqui. `recurso` pode ser
-          // nulo nas linhas antigas, digitadas antes de o catálogo existir.
-          const preco = this.num(r.recurso?.preco_medio);
-          return {
-            solicitacao_id: solicitacaoId,
-            instrucao_id: r.instrucao_id,
-            recurso_id: r.recurso_id,
-            descricao: r.descricao,
-            unidade: r.unidade,
-            quantidade: this.num(r.quantidade) || 1,
-            preco_unitario_original: preco,
-            preco_unitario: preco,
-            ordem: indice + 1,
-          };
-        }),
-      });
+    // A soma do catálogo por instrução, que vira a sugestão de valor.
+    const somaPorInstrucao = new Map<string, number>();
+    for (const r of recursos) {
+      const chave = r.instrucao_id.trim();
+      const preco = this.num(r.recurso?.preco_medio);
+      const quantidade = this.num(r.quantidade) || 1;
+      somaPorInstrucao.set(chave, (somaPorInstrucao.get(chave) ?? 0) + preco * quantidade);
     }
 
-    if (subinstrucoes.length > 0) {
-      await db.solicitacoes_subinstrucoes.createMany({
-        data: subinstrucoes.map((s, indice) => ({
+    const porId = new Map(instrucoes.map((i) => [i.id.trim(), i]));
+
+    // A ordem segue a dos vínculos, não a do findMany: é a ordem em que a
+    // pessoa vinculou, e é a que ela vê na tela.
+    const linhas = instrucaoIds
+      .filter((id) => porId.has(id))
+      .map((id, indice) => {
+        const instrucao = porId.get(id)!;
+        const valor = this.centavos(somaPorInstrucao.get(id) ?? 0);
+        return {
           solicitacao_id: solicitacaoId,
-          instrucao_id: s.instrucao_id,
-          descricao: s.descricao,
-          tempo_estimado: s.tempo_estimado,
-          ordem: s.ordem ?? indice + 1,
-        })),
+          instrucao_id: id,
+          descricao: this.rotulo(instrucao.tag, instrucao.nome),
+          quantidade: 1,
+          preco_unitario_original: valor,
+          preco_unitario: valor,
+          ordem: indice + 1,
+        };
       });
+
+    if (linhas.length > 0) {
+      await db.solicitacoes_itens.createMany({ data: linhas });
     }
 
     await this.recalcular(solicitacaoId, db);
+  }
+
+  /** "INST-003 - Troca de rolamento", ou só o nome quando não há tag. */
+  private rotulo(tag: string | null | undefined, nome: string): string {
+    const limpa = tag?.trim();
+    return limpa ? `${limpa} - ${nome}` : nome;
   }
 
   // ============================================================
@@ -255,12 +267,8 @@ export class PropostaService {
   // ============================================================
 
   async obter(solicitacaoId: string) {
-    const [itens, subinstrucoes, outros, solicitacao] = await Promise.all([
+    const [itens, outros, solicitacao] = await Promise.all([
       this.prisma.solicitacoes_itens.findMany({
-        where: { solicitacao_id: solicitacaoId },
-        orderBy: { ordem: 'asc' },
-      }),
-      this.prisma.solicitacoes_subinstrucoes.findMany({
         where: { solicitacao_id: solicitacaoId },
         orderBy: { ordem: 'asc' },
       }),
@@ -293,7 +301,6 @@ export class PropostaService {
 
     return {
       itens,
-      subinstrucoes,
       outros_custos: outros,
       bdi_regime: solicitacao.bdi_regime,
       bdi_administracao_central: this.num(solicitacao.bdi_administracao_central),
@@ -376,37 +383,6 @@ export class PropostaService {
       }
 
       await this.recalcular(solicitacaoId, tx);
-    });
-
-    return this.obter(solicitacaoId);
-  }
-
-  /**
-   * Substitui as etapas. Elas sao copia da instrucao, e editar aqui ajusta o
-   * escopo DESTA proposta sem tocar na instrucao original.
-   *
-   * Nao entram no calculo: o preco vem dos itens. O tempo aqui serve ao
-   * descritivo do servico no PDF.
-   */
-  async salvarSubinstrucoes(
-    solicitacaoId: string,
-    subinstrucoes: Array<{ descricao: string; tempo_estimado?: number | null }>,
-  ) {
-    await this.prisma.$transaction(async (tx) => {
-      await tx.solicitacoes_subinstrucoes.deleteMany({
-        where: { solicitacao_id: solicitacaoId },
-      });
-
-      if (subinstrucoes.length > 0) {
-        await tx.solicitacoes_subinstrucoes.createMany({
-          data: subinstrucoes.map((s, indice) => ({
-            solicitacao_id: solicitacaoId,
-            descricao: s.descricao,
-            tempo_estimado: s.tempo_estimado ?? null,
-            ordem: indice + 1,
-          })),
-        });
-      }
     });
 
     return this.obter(solicitacaoId);

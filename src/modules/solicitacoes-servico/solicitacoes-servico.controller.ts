@@ -401,7 +401,7 @@ export class SolicitacoesServicoController {
 
   @Put(':id/proposta/itens')
   @ApiOperation({
-    summary: 'Substitui a lista de itens',
+    summary: 'Substitui a lista de itens — uma linha por instrucao vinculada',
     description:
       'O front manda o estado final da lista. Recalcula os totais em seguida.',
   })
@@ -413,12 +413,6 @@ export class SolicitacoesServicoController {
   @ApiOperation({ summary: 'Substitui a lista de outros custos' })
   async salvarOutrosCustos(@Param('id') id: string, @Body() body: { custos: any[] }) {
     return this.propostaService.salvarOutrosCustos(id, body?.custos ?? []);
-  }
-
-  @Put(':id/proposta/subinstrucoes')
-  @ApiOperation({ summary: 'Substitui as etapas da proposta' })
-  async salvarSubinstrucoes(@Param('id') id: string, @Body() body: { subinstrucoes: any[] }) {
-    return this.propostaService.salvarSubinstrucoes(id, body?.subinstrucoes ?? []);
   }
 
   @Put(':id/proposta/condicoes')
