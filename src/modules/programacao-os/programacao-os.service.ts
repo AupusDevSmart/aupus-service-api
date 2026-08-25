@@ -1322,11 +1322,24 @@ export class ProgramacaoOSService {
     // Use a instância fornecida (pode ser this.prisma ou uma transação)
     const prismaClient = prismaOrTransaction || this.prisma;
 
+    // O nome vem do id quando ha id: as chamadas passavam 'Sistema' como autor
+    // e o usuarioId de verdade ao lado, entao a trilha guardava quem foi mas
+    // mostrava "Sistema" em toda linha.
+    let autor = usuario;
+
+    if (usuarioId) {
+      const dono = await prismaClient.usuarios.findUnique({
+        where: { id: usuarioId.trim() },
+        select: { nome: true },
+      });
+      if (dono?.nome) autor = dono.nome;
+    }
+
     await prismaClient.historico_programacao_os.create({
       data: {
         programacao_id: programacaoId,
         acao,
-        usuario,
+        usuario: autor,
         usuario_id: usuarioId,
         observacoes,
         status_anterior: statusAnterior,
