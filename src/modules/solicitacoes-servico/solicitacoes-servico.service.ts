@@ -44,32 +44,47 @@ export class SolicitacoesServicoService {
   }
 
   /**
-   * O número da solicitação: ASS-00000, contínuo.
+   * O número da solicitação: ANO-0000, reiniciando a cada ano.
    *
-   * Sem ano e sem reinício anual — a contagem não volta ao 1 em janeiro. Cinco
-   * dígitos dão folga para 99.999 solicitações; passando disso o número
-   * simplesmente cresce, em vez de estourar o formato.
+   * Os formatos anteriores — SSV-ANO-0000 e ASS-00000 — ficam como estão e são
+   * ignorados pela contagem. Renumerar mexeria em documento que já pode ter
+   * sido enviado ao cliente, e o PDF gerado carrega o número da época.
    *
-   * As solicitações antigas ficam no formato SSV-ANO-0000 e são ignoradas pela
-   * contagem: renumerar mexeria em documento que já pode ter sido enviado ao
-   * cliente. Os dois formatos convivem, e o prefixo diz de qual época é cada um.
+   * A busca é por prefixo do ano corrente, então virar o ano zera a série
+   * sozinho, sem tarefa agendada nem intervenção.
    */
   private async gerarNumeroSolicitacao(): Promise<string> {
-    const ultima = await this.prisma.solicitacoes_servico.findFirst({
-      where: { numero: { startsWith: 'ASS-' } },
+    return this.proximoNumeroAnual('solicitacoes_servico');
+  }
+
+  /**
+   * O próximo ANO-0000 de uma tabela que tenha coluna `numero`.
+   *
+   * A ordenação alfabética serve porque o padding deixa todos do mesmo
+   * tamanho: "2026-0010" vem depois de "2026-0009" como texto também.
+   *
+   * Corrida: duas criações simultâneas leem o mesmo último número e tentam
+   * gravar o mesmo. A coluna é `@unique`, então a segunda falha em vez de
+   * duplicar — e a tentativa é refeita. Sem isso a colisão viraria um 500 para
+   * quem só clicou em salvar ao mesmo tempo que outra pessoa.
+   */
+  private async proximoNumeroAnual(tabela: 'solicitacoes_servico'): Promise<string> {
+    const ano = new Date().getFullYear();
+    const prefixo = `${ano}-`;
+
+    const ultima = await this.prisma[tabela].findFirst({
+      where: { numero: { startsWith: prefixo } },
       orderBy: { numero: 'desc' },
       select: { numero: true },
     });
 
     let sequencial = 1;
-    if (ultima) {
-      // Ordenação alfabética serve porque o padding deixa todos do mesmo
-      // tamanho: "ASS-00010" vem depois de "ASS-00009" como texto também.
-      const lido = parseInt(ultima.numero.replace('ASS-', ''), 10);
+    if (ultima?.numero) {
+      const lido = parseInt(ultima.numero.slice(prefixo.length), 10);
       if (Number.isFinite(lido)) sequencial = lido + 1;
     }
 
-    return `ASS-${sequencial.toString().padStart(5, '0')}`;
+    return `${prefixo}${sequencial.toString().padStart(4, '0')}`;
   }
 
   /**
@@ -101,9 +116,40 @@ export class SolicitacoesServicoService {
   }
 
   /**
-   * Criar nova solicitação
+   * Criar nova solicitação.
+   *
+   * Refaz a tentativa quando o número colide.
+   *
+   * Duas criações simultâneas leem o mesmo último número e tentam gravar o
+   * mesmo. A coluna é `@unique`, então a segunda falha (P2002) em vez de
+   * duplicar — e sem o retry isso viraria um 500 para quem só clicou em salvar
+   * ao mesmo tempo que outra pessoa. Na nova tentativa o número já foi tomado,
+   * e a leitura devolve o seguinte.
+   *
+   * Três tentativas: a colisão exige simultaneidade quase exata, e três seguidas
+   * significam outra coisa acontecendo — aí o erro deve subir.
    */
   async create(
+    createDto: CreateSolicitacaoDto,
+    usuarioId?: string,
+    user?: ScopedUser,
+  ): Promise<SolicitacaoResponseDto> {
+    for (let tentativa = 1; ; tentativa++) {
+      try {
+        return await this.criarUmaVez(createDto, usuarioId, user);
+      } catch (erro) {
+        const colidiu =
+          erro instanceof Prisma.PrismaClientKnownRequestError &&
+          erro.code === 'P2002' &&
+          String(erro.meta?.target ?? '').includes('numero');
+
+        if (!colidiu || tentativa >= 3) throw erro;
+        this.logger.warn(`Numero de solicitacao colidiu; tentativa ${tentativa + 1}`);
+      }
+    }
+  }
+
+  private async criarUmaVez(
     createDto: CreateSolicitacaoDto,
     usuarioId?: string,
     user?: ScopedUser,

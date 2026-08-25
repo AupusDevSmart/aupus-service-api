@@ -1,6 +1,6 @@
 // src/modules/anomalias/dto/create-anomalia.dto.ts
-import { ApiProperty } from '@nestjs/swagger';
-import { IsString, IsNotEmpty, IsOptional, IsEnum, IsArray, ValidateNested } from 'class-validator';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { IsString, IsNotEmpty, IsOptional, IsEnum, IsArray, IsDateString, ValidateNested } from 'class-validator';
 import { Type } from 'class-transformer';
 
 export enum PrioridadeAnomalia {
@@ -88,6 +88,20 @@ export class CreateAnomaliaDto {
   @IsOptional()
   @IsString()
   observacoes?: string;
+
+  /**
+   * Ate quando a anomalia precisa estar resolvida.
+   *
+   * Opcional: nem toda anomalia tem data limite, e exigir uma faria a pessoa
+   * inventar um numero so para conseguir salvar.
+   */
+  @ApiPropertyOptional({
+    description: 'Prazo para resolucao (data e hora)',
+    example: '2026-09-15T18:00:00.000Z',
+  })
+  @IsOptional()
+  @IsDateString()
+  prazo?: string;
 
   @ApiProperty({
     description: 'Anexos (arquivos)',

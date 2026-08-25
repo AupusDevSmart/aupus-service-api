@@ -45,7 +45,59 @@ export class AnomaliasService {
     };
   }
 
+  /**
+   * O numero da anomalia: ANO-0000, reiniciando a cada ano.
+   *
+   * A busca e por prefixo do ano corrente, entao virar o ano zera a serie
+   * sozinho. A ordenacao alfabetica serve porque o padding deixa todos do mesmo
+   * tamanho: "2026-0010" vem depois de "2026-0009" como texto tambem.
+   *
+   * As anomalias anteriores a este campo ficam sem numero e sao ignoradas pela
+   * contagem — atribuir um agora inventaria historico.
+   */
+  private async gerarNumero(): Promise<string> {
+    const ano = new Date().getFullYear();
+    const prefixo = `${ano}-`;
+
+    const ultima = await this.prisma.anomalias.findFirst({
+      where: { numero: { startsWith: prefixo } },
+      orderBy: { numero: 'desc' },
+      select: { numero: true },
+    });
+
+    let sequencial = 1;
+    if (ultima?.numero) {
+      const lido = parseInt(ultima.numero.slice(prefixo.length), 10);
+      if (Number.isFinite(lido)) sequencial = lido + 1;
+    }
+
+    return `${prefixo}${sequencial.toString().padStart(4, '0')}`;
+  }
+
+  /**
+   * Cria a anomalia, refazendo a tentativa quando o numero colide.
+   *
+   * Duas criacoes simultaneas leem o mesmo ultimo numero. A coluna e `@unique`,
+   * entao a segunda falha (P2002) em vez de duplicar — e sem o retry isso
+   * viraria um 500 para quem so clicou em salvar ao mesmo tempo que outra
+   * pessoa. Tres tentativas: a colisao exige simultaneidade quase exata.
+   */
   async create(createAnomaliaDto: CreateAnomaliaDto, user?: UserCtx) {
+    for (let tentativa = 1; ; tentativa++) {
+      try {
+        return await this.criarUmaVez(createAnomaliaDto, user);
+      } catch (erro) {
+        const colidiu =
+          erro instanceof Prisma.PrismaClientKnownRequestError &&
+          erro.code === 'P2002' &&
+          String(erro.meta?.target ?? '').includes('numero');
+
+        if (!colidiu || tentativa >= 3) throw erro;
+      }
+    }
+  }
+
+  private async criarUmaVez(createAnomaliaDto: CreateAnomaliaDto, user?: UserCtx) {
     const { localizacao, anexos, instrucoes_ids, ...anomaliaData } = createAnomaliaDto;
     const userId = user?.id;
 
@@ -60,6 +112,7 @@ export class AnomaliasService {
 
     const data: Prisma.anomaliasCreateInput = {
       ...anomaliaData,
+      numero: await this.gerarNumero(),
       local: localizacao.local,
       ativo: localizacao.ativo,
       status: 'REGISTRADA',
