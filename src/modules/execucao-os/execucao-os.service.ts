@@ -531,7 +531,12 @@ export class ExecucaoOSService {
           responsavel: dto.responsavel_execucao || programacao.responsavel,
           responsavel_id: programacao.responsavel_id,
           time_equipe: programacao.time_equipe,
-          data_hora_programada: programacao.data_hora_programada,
+          // Mesma precedencia do outro caminho de geracao de OS: a coluna
+          // `data_hora_programada` so e preenchida pela programacao detalhada,
+          // que segue comentada no formulario. Copiada crua, a OS nascia com a
+          // data nula — sumia da tabela e escapava do filtro de atrasadas.
+          data_hora_programada:
+            programacao.data_hora_programada || programacao.data_previsao_inicio,
           data_hora_inicio_real: dataHoraInicio,
           equipe_presente: dto.equipe_presente as any,
           orcamento_previsto: programacao.orcamento_previsto,

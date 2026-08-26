@@ -1540,6 +1540,32 @@ export class ProgramacaoOSService {
   /**
    * Cria uma reserva de veículo para a ordem de serviço
    */
+  /**
+   * Janela da reserva de veiculo, com a mesma precedencia usada na geracao da OS.
+   *
+   * Estava repetida em tres metodos de reserva, cada um com `|| new Date()` no
+   * fim. Esse ultimo termo raramente e o que se quer: `data_hora_programada` so
+   * e preenchida pela programacao detalhada, que segue comentada no formulario,
+   * entao a cadeia caia direto no "agora" e a reserva nascia para hoje em vez de
+   * para o dia planejado.
+   *
+   * `data_previsao_inicio` e o que o usuario preenche hoje e entra antes do
+   * ultimo recurso. Num lugar so, para as tres reservas nao divergirem.
+   */
+  private datasDaReserva(programacao: any) {
+    const planejada =
+      programacao.data_hora_programada || programacao.data_previsao_inicio || new Date();
+
+    return {
+      dataInicio: programacao.reserva_data_inicio
+        ? new Date(programacao.reserva_data_inicio)
+        : planejada,
+      dataFim: programacao.reserva_data_fim
+        ? new Date(programacao.reserva_data_fim)
+        : programacao.data_previsao_fim || planejada,
+    };
+  }
+
   private async criarReservaVeiculo(
     prisma: any,
     programacao: any,
@@ -1568,14 +1594,7 @@ export class ProgramacaoOSService {
         return null;
       }
 
-      // Determinar datas da reserva
-      const dataInicio = programacao.reserva_data_inicio
-        ? new Date(programacao.reserva_data_inicio)
-        : programacao.data_hora_programada || new Date();
-
-      const dataFim = programacao.reserva_data_fim
-        ? new Date(programacao.reserva_data_fim)
-        : programacao.data_hora_programada || new Date();
+      const { dataInicio, dataFim } = this.datasDaReserva(programacao);
 
       const horaInicio = programacao.reserva_hora_inicio || '08:00';
       const horaFim = programacao.reserva_hora_fim || '18:00';
@@ -1624,14 +1643,7 @@ export class ProgramacaoOSService {
       // ✅ CORRIGIR: Remover espaços em branco do ID
       const veiculoId = programacao.veiculo_id ? programacao.veiculo_id.trim() : null;
 
-      // Determinar datas da reserva
-      const dataInicio = programacao.reserva_data_inicio
-        ? new Date(programacao.reserva_data_inicio)
-        : programacao.data_hora_programada || new Date();
-
-      const dataFim = programacao.reserva_data_fim
-        ? new Date(programacao.reserva_data_fim)
-        : programacao.data_hora_programada || new Date();
+      const { dataInicio, dataFim } = this.datasDaReserva(programacao);
 
       const horaInicio = programacao.reserva_hora_inicio || '08:00';
       const horaFim = programacao.reserva_hora_fim || '18:00';
@@ -1700,14 +1712,7 @@ export class ProgramacaoOSService {
 
       this.logger.log(`[RESERVA] Veículo encontrado: ${veiculo.marca} ${veiculo.modelo} (${veiculo.placa})`);
 
-      // Determinar datas da reserva
-      const dataInicio = programacao.reserva_data_inicio
-        ? new Date(programacao.reserva_data_inicio)
-        : programacao.data_hora_programada || new Date();
-
-      const dataFim = programacao.reserva_data_fim
-        ? new Date(programacao.reserva_data_fim)
-        : programacao.data_hora_programada || new Date();
+      const { dataInicio, dataFim } = this.datasDaReserva(programacao);
 
       const horaInicio = programacao.reserva_hora_inicio || '08:00';
       const horaFim = programacao.reserva_hora_fim || '18:00';
