@@ -21,6 +21,7 @@ import {
   ListarOSResponseDto,
 } from './dto';
 import { StatusOS, PrioridadeOS, Prisma } from '@aupus/api-shared';
+import { gerarNumeroOS } from '../../common/helpers/numeracao-os';
 
 /**
  * Nome da tarefa dentro de uma OS, sem depender da tarefa viva.
@@ -505,7 +506,7 @@ export class ExecucaoOSService {
 
     await this.prisma.$transaction(async (prisma) => {
       // Gerar número da OS
-      const numeroOS = await this.gerarNumeroOS(prisma, programacao.origem);
+      const numeroOS = await gerarNumeroOS(prisma, programacao.origem);
 
       // Criar ordem de serviço
       const os = await prisma.ordens_servico.create({
@@ -662,61 +663,6 @@ export class ExecucaoOSService {
     return { os_id: osId! };
   }
 
-  /**
-   * O prefixo da OS, pela origem.
-   *
-   * O código diz de onde a OS veio antes de qualquer clique — numa lista de
-   * cem, isso poupa abrir uma a uma para descobrir a procedência.
-   *
-   * TAREFA cai em OSP porque tarefa é o conteúdo de um plano: as duas nascem do
-   * mesmo fluxo, e separá-las criaria um quarto prefixo para a mesma coisa.
-   */
-  private prefixoPorOrigem(origem?: string): string {
-    switch (origem) {
-      case 'PLANO_MANUTENCAO':
-      case 'TAREFA':
-        return 'OSP';
-      case 'SOLICITACAO_SERVICO':
-        return 'OSS';
-      case 'ANOMALIA':
-        return 'OSE';
-      default:
-        // MANUAL e qualquer origem futura. Não fica sem prefixo: número sem
-        // prefixo quebraria a leitura da coluna e a busca por "OS".
-        return 'OSM';
-    }
-  }
-
-  /**
-   * O número da OS: PREFIXO-ANO-0000, com série PRÓPRIA por prefixo.
-   *
-   * A contagem é por prefixo e por ano — OSP-2026-0021 e OSS-2026-0014 convivem
-   * sem relação entre si. Uma série global faria os números de um mesmo tipo
-   * saltarem conforme os outros fossem criados, e o salto não significaria nada.
-   *
-   * O formato antigo, OS-ANO-00000, fica como está e é ignorado pela contagem:
-   * renumerar mexeria em OS que já pode ter sido impressa.
-   *
-   * A ordenação alfabética serve porque o padding deixa todos do mesmo tamanho.
-   */
-  private async gerarNumeroOS(prisma: any, origem?: string): Promise<string> {
-    const ano = new Date().getFullYear();
-    const prefixo = `${this.prefixoPorOrigem(origem)}-${ano}-`;
-
-    const ultima = await prisma.ordens_servico.findFirst({
-      where: { numero_os: { startsWith: prefixo } },
-      orderBy: { numero_os: 'desc' },
-      select: { numero_os: true },
-    });
-
-    let sequencial = 1;
-    if (ultima?.numero_os) {
-      const lido = parseInt(ultima.numero_os.slice(prefixo.length), 10);
-      if (Number.isFinite(lido)) sequencial = lido + 1;
-    }
-
-    return `${prefixo}${String(sequencial).padStart(4, '0')}`;
-  }
 
   async pausar(id: string, dto: PausarExecucaoDto, usuarioId?: string, user?: ScopedUser): Promise<void> {
     if (user) await this.scopeService.assertEntityInScope('ordem_servico', id, user);

@@ -3,6 +3,7 @@ import { Prisma, StatusProgramacaoOS } from '@aupus/api-shared';
 import { PrismaService, PermissionScopeService, ScopedUser } from '@aupus/api-shared';
 import { variantesDeIds } from '../tarefas/ids';
 import { AnomaliasService } from '../anomalias/anomalias.service';
+import { gerarNumeroOS } from '../../common/helpers/numeracao-os';
 import {
   AdicionarTarefasDto,
   AprovarProgramacaoDto,
@@ -1363,14 +1364,16 @@ export class ProgramacaoOSService {
       },
     });
 
-    // Gerar número da OS
-    const ano = new Date().getFullYear();
-    const count = await prisma.ordens_servico.count({
-      where: {
-        numero_os: { startsWith: `OS-${ano}-` },
-      },
-    });
-    const numeroOS = `OS-${ano}-${String(count + 1).padStart(3, '0')}`;
+    // O mesmo gerador do outro caminho de criacao de OS.
+    //
+    // Aqui havia uma numeracao propria, no formato antigo `OS-ANO-000`. Como a
+    // OS gerada a partir da OP passa por este metodo, era ela que continuava
+    // saindo sem o prefixo de origem — o formato novo tinha sido aplicado so no
+    // `ExecucaoOSService`.
+    //
+    // Contava linhas com `count`, o que ainda repete numero depois de qualquer
+    // exclusao. O gerador compartilhado le o ultimo da serie.
+    const numeroOS = await gerarNumeroOS(prisma, programacao.origem);
 
     // Criar OS com status PENDENTE
     const os = await prisma.ordens_servico.create({
