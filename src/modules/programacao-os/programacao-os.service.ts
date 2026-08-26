@@ -1394,7 +1394,18 @@ export class ProgramacaoOSService {
         // Planejamento
         tempo_estimado: programacao.tempo_estimado,
         duracao_estimada: programacao.duracao_estimada,
-        data_hora_programada: programacao.data_hora_programada || new Date(),
+        // A data planejada da OP, e nao o instante em que a OS foi gerada.
+        //
+        // `data_hora_programada` so e preenchida pela programacao detalhada, que
+        // segue comentada no formulario. Sem o segundo termo, toda OS vinda do
+        // formulario atual nascia agendada para "agora" — um valor plausivel e
+        // errado, que a tabela de OS exibe como se fosse o combinado.
+        //
+        // `data_previsao_inicio` e o campo que o usuario preenche hoje. `new
+        // Date()` fica como ultimo recurso para nao gravar nulo numa coluna que
+        // o resto do fluxo assume preenchida.
+        data_hora_programada:
+          programacao.data_hora_programada || programacao.data_previsao_inicio || new Date(),
         responsavel: programacao.responsavel || null,
         responsavel_id: programacao.responsavel_id,
         time_equipe: programacao.time_equipe,
