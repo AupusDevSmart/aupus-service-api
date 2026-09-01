@@ -46,7 +46,11 @@
     },
     "transformIgnorePatterns": [
       "node_modules/(?!.*(nanoid|uuid)/)"
-    ]
+    ],
+    "setupFiles": [
+      "<rootDir>/../test/setup-db.ts"
+    ],
+    "testTimeout": 30000
   },
   "devDependencies": {
     "@nestjs/cli": "^11.0.0",
@@ -71,7 +75,7 @@
     "typescript": "^5.9.2"
   },
   "dependencies": {
-    "@aupus/api-shared": "git+https://github.com/AupusDevSmart/api-shared.git#v0.30.0",
+    "@aupus/api-shared": "git+https://github.com/AupusDevSmart/api-shared.git#v0.31.0",
     "@nestjs/config": "^4.0.2",
     "@nestjs/jwt": "^11.0.0",
     "@nestjs/passport": "^11.0.5",

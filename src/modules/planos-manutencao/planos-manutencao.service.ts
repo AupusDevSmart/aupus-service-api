@@ -15,6 +15,7 @@ import {
 } from './dto';
 import { Prisma } from '@aupus/api-shared';
 import { PropagacaoPlanosService } from './propagacao-planos.service';
+import { categoriaDoEquipamento } from './categoria-do-equipamento';
 
 @Injectable()
 export class PlanosManutencaoService {
@@ -726,21 +727,18 @@ export class PlanosManutencaoService {
   }
 
   /** Categoria do modelo (tipo_equipamento) do equipamento, ou null. */
+  /**
+   * Delega para `categoria-do-equipamento.ts`.
+   *
+   * Saiu daqui para poder ser testada contra o banco sem montar este service
+   * inteiro — ele depende de scope e propagacao, que nao tem nada a ver com a
+   * pergunta "de qual categoria e este equipamento".
+   *
+   * A regra tambem mudou: a categoria agora vem da POSICAO quando ela existe, e
+   * so cai no modelo do equipamento como fallback.
+   */
   private async categoriaDoEquipamento(equipamentoId: string): Promise<string | null> {
-    const equipamento = await this.prisma.equipamentos.findFirst({
-      where: { id: equipamentoId.trim(), deleted_at: null },
-      select: { tipo_equipamento_id: true }
-    });
-
-    const tipoId = equipamento?.tipo_equipamento_id?.trim();
-    if (!tipoId) return null;
-
-    const modelo = await this.prisma.tipos_equipamentos.findUnique({
-      where: { id: tipoId },
-      select: { categoria_id: true }
-    });
-
-    return modelo?.categoria_id?.trim() ?? null;
+    return categoriaDoEquipamento(this.prisma, equipamentoId);
   }
 
   // Métodos privados auxiliares
