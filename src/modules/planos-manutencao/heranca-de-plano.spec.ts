@@ -1,5 +1,5 @@
 import { PrismaClient } from '@prisma/client';
-import { planoAHerdar, aplicarDatasHerdadas } from './heranca-de-plano';
+import { planoAHerdar, aplicarDatasHerdadas, mapearAjustesParaCopia } from './heranca-de-plano';
 
 /**
  * A heranca de plano quando o equipamento de uma posicao e trocado.
@@ -196,6 +196,57 @@ describe('heranca de plano (banco real)', () => {
 
       const intacta = await prisma.tarefas.findUnique({ where: { id: doAntigo!.id } });
       expect(intacta?.data_ultima_execucao?.toISOString().slice(0, 10)).toBe('2026-06-02');
+    });
+  });
+  describe('mapearAjustesParaCopia', () => {
+    it('casa a tarefa antiga com a nova pela origem no template', async () => {
+      const { copia } = await montarTroca();
+      const doAntigo = await prisma.tarefas.findFirst({ where: { plano_manutencao_id: copia } });
+      const template = await prisma.planos_manutencao.findFirst({
+        where: { categoria_id: ID_CATEGORIA, plano_origem_id: null },
+      });
+
+      // A tarefa do antigo saiu de uma tarefa do template.
+      const doTemplate = await prisma.tarefas.create({
+        data: {
+          plano_manutencao_id: template!.id, planta_id: ID_PLANTA,
+          tag: 'TRF-HER-TPL', nome: 'Troca de oleo', criticidade: 3, ordem: 1,
+        },
+      });
+      await prisma.tarefas.update({
+        where: { id: doAntigo!.id }, data: { tarefa_origem_id: doTemplate.id },
+      });
+
+      // A copia do equipamento novo sai da MESMA tarefa do template.
+      const copiaNova = await prisma.planos_manutencao.create({
+        data: { nome: 'Preventiva semestral', equipamento_id: novo, plano_origem_id: template!.id },
+      });
+      const doNovo = await prisma.tarefas.create({
+        data: {
+          plano_manutencao_id: copiaNova.id, equipamento_id: novo, planta_id: ID_PLANTA,
+          tag: 'TRF-HER-NOV', nome: 'Troca de oleo', criticidade: 3, ordem: 1,
+          tarefa_origem_id: doTemplate.id,
+        },
+      });
+
+      const traduzidos = await mapearAjustesParaCopia(prisma as any, novo, [
+        { tarefa_id: doAntigo!.id, data_ultima_execucao: new Date('2026-04-02T00:00:00Z') },
+      ]);
+
+      expect(traduzidos).toHaveLength(1);
+      expect(traduzidos[0].tarefa_id).toBe(doNovo.id.trim());
+    });
+
+    it('descarta tarefa antiga sem origem no template, que nao tem par', async () => {
+      const { copia } = await montarTroca();
+      // A tarefa criada em montarTroca nasce sem tarefa_origem_id.
+      const solta = await prisma.tarefas.findFirst({ where: { plano_manutencao_id: copia } });
+
+      const traduzidos = await mapearAjustesParaCopia(prisma as any, novo, [
+        { tarefa_id: solta!.id, data_ultima_execucao: new Date('2026-04-02T00:00:00Z') },
+      ]);
+
+      expect(traduzidos).toHaveLength(0);
     });
   });
 });

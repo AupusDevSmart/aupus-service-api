@@ -8,6 +8,8 @@ import {
   QueryPlanosPorPlantaDto,
   VincularPlanoDto,
   VincularPlanoResponseDto,
+  HerdarPlanoDto,
+  HerdarPlanoResponseDto,
   PreviaDesvinculoDto,
   PlanoManutencaoResponseDto,
   PlanoResumoDto,
@@ -16,6 +18,7 @@ import {
 import { Prisma } from '@/core';
 import { PropagacaoPlanosService } from './propagacao-planos.service';
 import { categoriaDoEquipamento } from './categoria-do-equipamento';
+import { planoAHerdar, mapearAjustesParaCopia, aplicarDatasHerdadas } from './heranca-de-plano';
 
 @Injectable()
 export class PlanosManutencaoService {
@@ -560,6 +563,49 @@ export class PlanosManutencaoService {
       total_tarefas: copia.tarefas.length,
       tarefas_proprias: copia.tarefas.filter(t => t.origem_status === 'PROPRIA').length,
       tarefas_customizadas: copia.tarefas.filter(t => t.origem_status === 'CUSTOMIZADA').length
+    };
+  }
+
+  /**
+   * Herda para o equipamento novo o plano que o ocupante anterior da posicao tinha.
+   *
+   * Copiar e ajustar as datas e uma operacao so porque as tarefas da copia nova
+   * so passam a existir depois da copia — o cliente nao teria como mandar os ids
+   * num segundo passo. Ele manda as datas pelas tarefas do equipamento ANTIGO,
+   * que sao as que a tela mostrou, e o mapeamento acontece aqui.
+   */
+  async herdarPlano(dto: HerdarPlanoDto, user?: ScopedUser): Promise<HerdarPlanoResponseDto> {
+    const heranca = await planoAHerdar(this.prisma, dto.ativo_funcional_id);
+    if (!heranca?.template_id) {
+      throw new NotFoundException(
+        'Esta posicao nao tem ocupante anterior com plano para herdar',
+      );
+    }
+
+    const vinculo = await this.vincularEquipamento(
+      {
+        equipamento_id: dto.equipamento_id,
+        plano_id: heranca.template_id,
+        criado_por: dto.criado_por,
+      },
+      user,
+    );
+
+    // Sem ajustes o plano entra zerado. E o padrao seguro: data herdada errada
+    // produz vencimento errado sem ninguem perceber, enquanto tarefa sem data
+    // aparece como pendente de definicao.
+    const ajustes = (dto.ajustes ?? []).map(a => ({
+      tarefa_id: a.tarefa_id,
+      data_ultima_execucao: a.data_ultima_execucao ? new Date(a.data_ultima_execucao) : null,
+    }));
+
+    const traduzidos = await mapearAjustesParaCopia(this.prisma, dto.equipamento_id, ajustes);
+    const datas_aplicadas = await aplicarDatasHerdadas(this.prisma, dto.equipamento_id, traduzidos);
+
+    return {
+      plano_id: vinculo.plano_id,
+      tarefas_copiadas: vinculo.tarefas_copiadas,
+      datas_aplicadas,
     };
   }
 

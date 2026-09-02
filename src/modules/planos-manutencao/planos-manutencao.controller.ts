@@ -23,6 +23,8 @@ import {
   QueryPlanosPorPlantaDto,
   VincularPlanoDto,
   VincularPlanoResponseDto,
+  HerdarPlanoDto,
+  HerdarPlanoResponseDto,
   PreviaDesvinculoDto,
   PlanoManutencaoResponseDto,
   PlanoResumoDto,
@@ -273,6 +275,27 @@ export class PlanosManutencaoController {
     @CurrentUser() user?: any,
   ): Promise<VincularPlanoResponseDto> {
     return this.planosManutencaoService.vincularEquipamento(
+      { ...dto, criado_por: dto.criado_por || user?.id },
+      user,
+    );
+  }
+
+  @Post('herdar')
+  @HttpCode(HttpStatus.CREATED)
+  @ApiOperation({
+    summary: 'Herdar para o equipamento novo o plano que o ocupante anterior da posicao tinha',
+    description:
+      'Copia o TEMPLATE (nao a copia do equipamento antigo) e aplica as datas revisadas. ' +
+      'Uma chamada so porque as tarefas da copia nova so existem depois de copiadas: ' +
+      'o cliente nao tem como saber os ids para ajustar num segundo passo.',
+  })
+  @ApiResponse({ status: HttpStatus.CREATED, type: HerdarPlanoResponseDto })
+  @ApiResponse({ status: HttpStatus.NOT_FOUND, description: 'A posicao nao tem ocupante anterior com plano' })
+  async herdarPlano(
+    @Body() dto: HerdarPlanoDto,
+    @CurrentUser() user?: any,
+  ): Promise<HerdarPlanoResponseDto> {
+    return this.planosManutencaoService.herdarPlano(
       { ...dto, criado_por: dto.criado_por || user?.id },
       user,
     );

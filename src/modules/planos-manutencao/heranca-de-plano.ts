@@ -49,8 +49,20 @@ export async function planoAHerdar(
   });
   if (!anterior) return null;
 
+  // As duas formas do mesmo id. `ativos_funcionais_equipamentos.equipamento_id`
+  // e char(26) e sempre devolve com padding; `planos_manutencao.equipamento_id`
+  // e VARCHAR(26) e guarda exatamente o que quem escreveu mandou — trimado pelo
+  // `vincularEquipamento`, com padding por quem gravou direto. char nao ignora
+  // espaco nessa comparacao, entao procurar so uma das formas perde metade das
+  // linhas, e a heranca sumiria calada: a tela diria "nada a herdar" com o plano
+  // existindo no banco.
+  const idDoAnterior = anterior.equipamento_id;
+
   const plano = await prisma.planos_manutencao.findFirst({
-    where: { equipamento_id: anterior.equipamento_id, deleted_at: null },
+    where: {
+      equipamento_id: { in: [idDoAnterior, idDoAnterior.trim()] },
+      deleted_at: null,
+    },
     select: {
       nome: true,
       plano_origem_id: true,
@@ -124,4 +136,58 @@ export async function aplicarDatasHerdadas(
   }
 
   return ajustadas;
+}
+
+/**
+ * Traduz os ajustes vindos da tela para as tarefas da copia NOVA.
+ *
+ * A tela edita as datas olhando as tarefas do equipamento ANTIGO — sao as unicas
+ * que existiam quando a pessoa abriu o painel. As tarefas do novo so nascem
+ * quando o template e copiado, ja com outros ids.
+ *
+ * A ponte entre as duas e `tarefa_origem_id`: as duas copias saem da MESMA
+ * tarefa do template, entao apontam para o mesmo id. Casar por nome ou por
+ * `ordem` daria empate silencioso em plano com duas tarefas de nome parecido, ou
+ * erraria de linha se o template tivesse sido reordenado no meio.
+ *
+ * Tarefa antiga sem origem (criada a mao no equipamento anterior) nao tem
+ * correspondente e fica de fora — nao ha o que casar.
+ */
+export async function mapearAjustesParaCopia(
+  prisma: PrismaService,
+  equipamentoId: string,
+  ajustes: AjusteDeData[],
+): Promise<AjusteDeData[]> {
+  const equipamento = equipamentoId?.trim();
+  if (!equipamento || !ajustes?.length) return [];
+
+  const antigas = await prisma.tarefas.findMany({
+    where: { id: { in: ajustes.map(a => a.tarefa_id?.trim()).filter(Boolean) } },
+    select: { id: true, tarefa_origem_id: true },
+  });
+  const origemDaAntiga = new Map(
+    antigas
+      .filter(t => t.tarefa_origem_id)
+      .map(t => [t.id.trim(), t.tarefa_origem_id!.trim()]),
+  );
+
+  const novas = await prisma.tarefas.findMany({
+    where: {
+      equipamento_id: equipamento,
+      deleted_at: null,
+      tarefa_origem_id: { in: [...new Set(origemDaAntiga.values())] },
+    },
+    select: { id: true, tarefa_origem_id: true },
+  });
+  const novaPorOrigem = new Map(
+    novas.map(t => [t.tarefa_origem_id!.trim(), t.id.trim()]),
+  );
+
+  const traduzidos: AjusteDeData[] = [];
+  for (const ajuste of ajustes) {
+    const origem = origemDaAntiga.get(ajuste.tarefa_id?.trim());
+    const nova = origem && novaPorOrigem.get(origem);
+    if (nova) traduzidos.push({ tarefa_id: nova, data_ultima_execucao: ajuste.data_ultima_execucao });
+  }
+  return traduzidos;
 }
