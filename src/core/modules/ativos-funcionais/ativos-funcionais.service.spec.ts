@@ -88,10 +88,13 @@ describe('AtivosFuncionaisService (banco real)', () => {
     categoriaId = ID_CATEGORIA;
   });
   beforeEach(async () => {
+    // Ordem importa: o equipamento aponta para a posicao por FK. Apagar posicao
+    // com equipamento ainda apontando viola a constraint, e o teste falha por
+    // sujeira de limpeza — nao por defeito no codigo.
     await prisma.ativos_funcionais_equipamentos.deleteMany({});
-    await prisma.equipamentos.deleteMany({ where: { unidade_id: ID_UNIDADE } });
+    await prisma.equipamentos.updateMany({ data: { ativo_funcional_id: null, ativo_na_posicao: false } });
+    await prisma.equipamentos.deleteMany({ where: { unidade_id: ID_UNIDADE } });
     await prisma.ativos_funcionais.deleteMany({});
-
     const a = await service.criar({
       nome: 'Inversor 1', categoria_id: categoriaId, unidade_id: unidadeId,
     });

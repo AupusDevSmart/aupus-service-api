@@ -23,7 +23,8 @@
     "docker:production:logs": "docker-compose -f docker-compose.production.yml logs -f app",
     "docker:logs": "docker-compose logs -f app",
     "backup": "ts-node src/scripts/backup-database.ts",
-    "restore": "ts-node src/scripts/restore-database.ts"
+    "restore": "ts-node src/scripts/restore-database.ts",
+    "test:db": "jest --runInBand src/core/modules/ativos-funcionais src/modules/planos-manutencao"
   },
   "jest": {
     "moduleFileExtensions": [
@@ -51,7 +52,8 @@
     "setupFiles": [
       "<rootDir>/../test/setup-db.ts"
     ],
-    "testTimeout": 30000
+    "testTimeout": 30000,
+    "maxWorkers": 1
   },
   "devDependencies": {
     "@nestjs/cli": "^11.0.0",

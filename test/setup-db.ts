@@ -21,3 +21,17 @@ if (!/aupus_test/.test(url)) {
     `Os testes so rodam contra o banco de teste. DATABASE_URL aponta para: ${url}`,
   );
 }
+
+/**
+ * Os specs de banco rodam em SERIE (`maxWorkers: 1` no package.json).
+ *
+ * Eles compartilham um banco so, e cada um limpa as tabelas que usa no
+ * `beforeEach`. Em paralelo, um apaga a fixture do outro no meio da execucao: a
+ * mesma suite passa sozinha e falha junto, o que e a forma mais cara de bug de
+ * teste — parece defeito no codigo e nao e.
+ *
+ * Medido: 21 de 21 em serie, 19 de 21 em paralelo.
+ *
+ * Dar um schema por suite resolveria sem perder paralelismo, e e o caminho se a
+ * suite crescer a ponto de a lentidao incomodar.
+ */
