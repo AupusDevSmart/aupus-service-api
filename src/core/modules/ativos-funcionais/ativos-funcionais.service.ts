@@ -4,6 +4,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
+import { planoAHerdar } from '../../../modules/planos-manutencao/heranca-de-plano';
 
 interface CriarAtivoFuncionalDto {
   nome: string;
@@ -254,6 +255,16 @@ export class AtivosFuncionaisService {
       equipamento_ativo: aberto?.equipamento ?? null,
       anteriores: vinculos.filter(v => v.removido_em !== null),
     };
+  }
+
+  /**
+   * O plano do ocupante anterior, para a tela oferecer a heranca.
+   *
+   * Delega para `planos-manutencao/heranca-de-plano.ts`: plano e assunto do
+   * Service, e a regra fica junto do modulo que a entende.
+   */
+  async planoAHerdar(ativoFuncionalId: string) {
+    return planoAHerdar(this.prisma, ativoFuncionalId);
   }
 
   /** Tudo que ja passou pela posicao, do mais recente para o mais antigo. */

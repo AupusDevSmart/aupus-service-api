@@ -56,6 +56,19 @@ export class AtivosFuncionaisController {
     return this.service.buscarPorId(id);
   }
 
+  @Get(":id/plano-a-herdar")
+  @ApiOperation({
+    summary: "O plano que o ocupante anterior tinha",
+    description:
+      "Devolve o TEMPLATE e as datas de cada tarefa. As datas vem junto porque sao " +
+      "o que precisa de ajuste: uma preventiva semestral feita ha 3 meses no " +
+      "equipamento antigo pode ter sido feita ha 5 no novo.",
+  })
+  @ApiResponse({ status: 200, description: "Nulo quando nao houve ocupante anterior ou ele nao tinha plano" })
+  async planoAHerdar(@Param("id") id: string) {
+    return this.service.planoAHerdar(id);
+  }
+
   @Get(':id/historico')
   @ApiOperation({ summary: 'Tudo que ja passou pela posicao, do mais recente para o mais antigo' })
   async historico(@Param('id') id: string) {
