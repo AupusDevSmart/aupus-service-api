@@ -18,7 +18,7 @@
  */
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from '../src/app.module';
-import { PrismaService } from '@aupus/api-shared';
+import { PrismaService } from '@/core';
 import { InstrucoesService } from '../src/modules/instrucoes/instrucoes.service';
 import { PlanosManutencaoService } from '../src/modules/planos-manutencao/planos-manutencao.service';
 import { TarefasService } from '../src/modules/tarefas/tarefas.service';

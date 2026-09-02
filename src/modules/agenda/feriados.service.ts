@@ -1,5 +1,5 @@
 import { Injectable, NotFoundException, BadRequestException, ConflictException } from '@nestjs/common';
-import { PrismaService } from '@aupus/api-shared';
+import { PrismaService } from '@/core';
 import {
   CreateFeriadoDto,
   UpdateFeriadoDto,
@@ -7,7 +7,7 @@ import {
   FeriadoResponseDto,
   AssociarPlantasDto
 } from './dto';
-import { Prisma } from '@aupus/api-shared';
+import { Prisma } from '@/core';
 
 export interface PaginatedResponse<T> {
   data: T[];

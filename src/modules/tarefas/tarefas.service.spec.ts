@@ -1,6 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { NotFoundException } from '@nestjs/common';
-import { PrismaService, PermissionScopeService } from '@aupus/api-shared';
+import { PrismaService, PermissionScopeService } from '@/core';
 import { TarefasService } from './tarefas.service';
 import { PropagacaoPlanosService } from '../planos-manutencao/propagacao-planos.service';
 

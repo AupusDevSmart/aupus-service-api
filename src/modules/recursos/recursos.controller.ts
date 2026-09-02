@@ -12,7 +12,7 @@ import {
   HttpStatus,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiParam } from '@nestjs/swagger';
-import { Permissions } from '@aupus/api-shared';
+import { Permissions } from '@/core';
 import { RecursosService } from './recursos.service';
 import { CreateRecursoDto, UpdateRecursoDto, QueryRecursosDto } from './dto/recurso.dto';
 

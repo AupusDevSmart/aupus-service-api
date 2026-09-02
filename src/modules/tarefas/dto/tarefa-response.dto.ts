@@ -7,7 +7,7 @@ import {
   CondicaoAtivo,
   TipoRecurso,
   TipoAnexo
-} from '@aupus/api-shared';
+} from '@/core';
 
 export class UsuarioResumoDto {
   id: string;

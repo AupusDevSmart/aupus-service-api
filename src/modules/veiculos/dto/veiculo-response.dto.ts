@@ -1,4 +1,4 @@
-import { StatusVeiculo, TipoVeiculo, TipoCombustivel } from '@aupus/api-shared';
+import { StatusVeiculo, TipoVeiculo, TipoCombustivel } from '@/core';
 
 export class DocumentacaoResumoDto {
   id: string;

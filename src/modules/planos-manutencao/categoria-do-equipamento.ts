@@ -1,4 +1,4 @@
-import { PrismaService } from '@aupus/api-shared';
+import { PrismaService } from '@/core';
 
 /**
  * A categoria de um equipamento, para casar com o template de plano.

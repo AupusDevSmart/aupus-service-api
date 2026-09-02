@@ -1,5 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { TipoDocumentacaoVeiculo } from '@aupus/api-shared';
+import { TipoDocumentacaoVeiculo } from '@/core';
 
 export class DocumentacaoVeiculoResponseDto {
   @ApiProperty({

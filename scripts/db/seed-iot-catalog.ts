@@ -18,7 +18,7 @@
  *   pnpm ts-node scripts/db/seed-iot-catalog.ts --force
  */
 
-import { PrismaClient } from '@aupus/api-shared';
+import { PrismaClient } from '@/core';
 import * as crypto from 'crypto';
 import * as fs from 'fs';
 import * as path from 'path';

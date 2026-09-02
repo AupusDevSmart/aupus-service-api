@@ -1,9 +1,9 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { ExecucaoOSService } from './execucao-os.service';
-import { PrismaService, PermissionScopeService } from '@aupus/api-shared';
+import { PrismaService, PermissionScopeService } from '@/core';
 import { AnomaliasService } from '../anomalias/anomalias.service';
 import { NotFoundException, BadRequestException, ConflictException } from '@nestjs/common';
-import { StatusOS, CondicaoOS, TipoOS, PrioridadeOS, OrigemOS } from '@aupus/api-shared';
+import { StatusOS, CondicaoOS, TipoOS, PrioridadeOS, OrigemOS } from '@/core';
 import {
   OSFiltersDto,
   IniciarExecucaoDto,

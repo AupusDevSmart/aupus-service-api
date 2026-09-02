@@ -1,8 +1,8 @@
 // src/anomalias/anomalias.service.ts
 import { Injectable, NotFoundException, ConflictException, BadRequestException, ForbiddenException, Logger } from '@nestjs/common';
-import { PrismaService, PermissionScopeService, PlantaScope } from '@aupus/api-shared';
+import { PrismaService, PermissionScopeService, PlantaScope } from '@/core';
 import { CreateAnomaliaDto, UpdateAnomaliaDto, AnomaliaFiltersDto, AnomaliaStatsDto } from './dto';
-import { Prisma } from '@aupus/api-shared';
+import { Prisma } from '@/core';
 
 type UserCtx = { id: string; role?: string | null; permissions?: string[] } | undefined;
 

@@ -1,6 +1,6 @@
 // src/modules/recursos/recursos.module.ts
 import { Module } from '@nestjs/common';
-import { PrismaModule } from '@aupus/api-shared';
+import { PrismaModule } from '@/core';
 import { RecursosController } from './recursos.controller';
 import { RecursosService } from './recursos.service';
 

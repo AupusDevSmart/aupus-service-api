@@ -1,7 +1,7 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
-import { PrismaService } from '@aupus/api-shared';
+import { PrismaService } from '@/core';
 import { AdicionarAnexoDto, AnexoOSResponseDto } from './dto';
-import { TipoAnexoOS } from '@aupus/api-shared';
+import { TipoAnexoOS } from '@/core';
 import * as path from 'path';
 import * as fs from 'fs';
 

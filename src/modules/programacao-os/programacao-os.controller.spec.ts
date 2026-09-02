@@ -13,7 +13,7 @@ import {
   AdicionarTarefasDto,
   AtualizarTarefasDto,
 } from './dto/programacao-actions.dto';
-import { CondicaoOS, TipoOS, PrioridadeOS, OrigemOS, StatusProgramacaoOS } from '@aupus/api-shared';
+import { CondicaoOS, TipoOS, PrioridadeOS, OrigemOS, StatusProgramacaoOS } from '@/core';
 
 describe('ProgramacaoOSController', () => {
   let controller: ProgramacaoOSController;

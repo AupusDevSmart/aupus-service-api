@@ -1,7 +1,7 @@
 // src/modules/tarefas/tarefas-scheduler.service.ts
 import { Injectable, Logger } from '@nestjs/common';
 import { Cron } from '@nestjs/schedule';
-import { PrismaService } from '@aupus/api-shared';
+import { PrismaService } from '@/core';
 import { ProgramacaoOSService } from '../programacao-os/programacao-os.service';
 import { calcularProximaExecucao } from './periodicidade';
 import { variantesDeIds } from './ids';

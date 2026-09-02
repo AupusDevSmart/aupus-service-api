@@ -6,7 +6,7 @@ import {
   CategoriaTarefa, 
   TipoManutencao,
   FrequenciaTarefa 
-} from '@aupus/api-shared';
+} from '@/core';
 
 export class QueryTarefasDto {
   @IsOptional()

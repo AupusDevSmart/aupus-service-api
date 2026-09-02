@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { PrismaService } from '@aupus/api-shared';
+import { PrismaService } from '@/core';
 import { calcularProximaExecucao, diasAteProxima } from './periodicidade';
 
 /** A situacao de UMA tarefa do equipamento: o que ja rodou e quando roda de novo. */

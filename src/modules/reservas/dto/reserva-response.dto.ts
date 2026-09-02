@@ -1,5 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { StatusReserva, TipoSolicitante } from '@aupus/api-shared';
+import { StatusReserva, TipoSolicitante } from '@/core';
 
 export class VeiculoReservaDto {
   @ApiProperty({

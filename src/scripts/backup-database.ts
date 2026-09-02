@@ -1,4 +1,4 @@
-import { PrismaClient } from '@aupus/api-shared';
+import { PrismaClient } from '@/core';
 import * as fs from 'fs';
 import * as path from 'path';
 

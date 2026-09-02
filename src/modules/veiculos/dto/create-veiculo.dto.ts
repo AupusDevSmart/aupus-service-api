@@ -14,7 +14,7 @@ import {
 } from 'class-validator';
 import { Type, Transform } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { StatusVeiculo, TipoVeiculo, TipoCombustivel } from '@aupus/api-shared';
+import { StatusVeiculo, TipoVeiculo, TipoCombustivel } from '@/core';
 
 export class CreateVeiculoDto {
   @ApiProperty({

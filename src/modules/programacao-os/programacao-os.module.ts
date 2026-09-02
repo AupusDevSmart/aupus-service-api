@@ -1,5 +1,5 @@
 import { Module, forwardRef } from '@nestjs/common';
-import { PrismaModule } from '@aupus/api-shared';
+import { PrismaModule } from '@/core';
 import { ProgramacaoOSController } from './programacao-os.controller';
 import { ProgramacaoOSService } from './programacao-os.service';
 import { AnomaliasService } from '../anomalias/anomalias.service';

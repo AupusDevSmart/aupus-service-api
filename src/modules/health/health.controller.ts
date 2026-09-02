@@ -2,8 +2,8 @@ import { Controller, Get, Post } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
 import { HealthService } from './health.service';
 import { AlertService } from './alert.service';
-import { Public } from '@aupus/api-shared';
-import { PrismaService } from '@aupus/api-shared';
+import { Public } from '@/core';
+import { PrismaService } from '@/core';
 
 @ApiTags('Health Check')
 @Controller('health')

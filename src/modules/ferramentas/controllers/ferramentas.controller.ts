@@ -21,7 +21,7 @@ import {
   ApiQuery,
   ApiParam,
 } from '@nestjs/swagger';
-import { Permissions } from '@aupus/api-shared';
+import { Permissions } from '@/core';
 import { FerramentasService } from '../services/ferramentas.service';
 import { CreateFerramentaDto } from '../dto/create-ferramenta.dto';
 import { UpdateFerramentaDto } from '../dto/update-ferramenta.dto';

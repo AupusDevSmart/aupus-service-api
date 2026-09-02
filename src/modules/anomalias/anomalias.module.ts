@@ -3,7 +3,7 @@ import { Module } from '@nestjs/common';
 import { AnomaliasService } from './anomalias.service';
 import { AnexosAnomaliasService } from './anexos-anomalias.service';
 import { AnomaliasController } from './anomalias.controller';
-import { PrismaModule } from '@aupus/api-shared';
+import { PrismaModule } from '@/core';
 
 @Module({
   imports: [PrismaModule],

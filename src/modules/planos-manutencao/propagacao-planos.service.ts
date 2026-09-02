@@ -1,7 +1,7 @@
 // src/modules/planos-manutencao/propagacao-planos.service.ts
 import { Injectable, Logger } from '@nestjs/common';
 import { Cron } from '@nestjs/schedule';
-import { PrismaService } from '@aupus/api-shared';
+import { PrismaService } from '@/core';
 
 /** Campos que a propagacao pode escrever. Ver comentario em aplicarNaCopia. */
 const CAMPOS_DE_DEFINICAO = [

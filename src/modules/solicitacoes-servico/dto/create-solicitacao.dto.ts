@@ -14,7 +14,7 @@ import {
   TipoSolicitacaoServico,
   PrioridadeSolicitacao,
   OrigemSolicitacao,
-} from '@aupus/api-shared';
+} from '@/core';
 
 
 

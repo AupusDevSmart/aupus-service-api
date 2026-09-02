@@ -20,7 +20,7 @@
  *   npx ts-node scripts/db/sync-rbac.ts --apply --fix-guards      # corrige guard divergente (DEV apenas)
  */
 
-import { PrismaClient } from '@aupus/api-shared';
+import { PrismaClient } from '@/core';
 import { PERMISSIONS, ROLE_PERMISSIONS, ROLE_PERMISSIONS_TO_REMOVE, ROLES } from './permissions-structure';
 
 const prisma = new PrismaClient();

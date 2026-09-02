@@ -4,7 +4,7 @@ import {
   TipoSolicitacaoServico,
   PrioridadeSolicitacao,
   OrigemSolicitacao
-} from '@aupus/api-shared';
+} from '@/core';
 
 export class SolicitacaoResponseDto {
   @ApiProperty()

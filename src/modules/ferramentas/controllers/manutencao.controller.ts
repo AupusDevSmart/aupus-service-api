@@ -16,7 +16,7 @@ import {
   ApiResponse,
   ApiParam,
 } from '@nestjs/swagger';
-import { Permissions } from '@aupus/api-shared';
+import { Permissions } from '@/core';
 import { ManutencaoService } from '../services/manutencao.service';
 import { CreateManutencaoDto } from '../dto/create-manutencao.dto';
 import { UpdateManutencaoDto } from '../dto/update-manutencao.dto';

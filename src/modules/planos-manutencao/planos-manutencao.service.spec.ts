@@ -1,6 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { BadRequestException, NotFoundException } from '@nestjs/common';
-import { PrismaService, PermissionScopeService } from '@aupus/api-shared';
+import { PrismaService, PermissionScopeService } from '@/core';
 import { PlanosManutencaoService } from './planos-manutencao.service';
 import { PropagacaoPlanosService } from './propagacao-planos.service';
 

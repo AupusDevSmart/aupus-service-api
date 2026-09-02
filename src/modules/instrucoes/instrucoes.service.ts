@@ -1,6 +1,6 @@
 // src/modules/instrucoes/instrucoes.service.ts
 import { Injectable, NotFoundException, ConflictException, BadRequestException } from '@nestjs/common';
-import { PrismaService } from '@aupus/api-shared';
+import { PrismaService } from '@/core';
 import { PropagacaoPlanosService } from '../planos-manutencao/propagacao-planos.service';
 import {
   CreateInstrucaoDto,
@@ -11,7 +11,7 @@ import {
   DashboardInstrucoesDto,
   CreateRecursoInstrucaoDto,
 } from './dto';
-import { StatusTarefa, Prisma } from '@aupus/api-shared';
+import { StatusTarefa, Prisma } from '@/core';
 
 @Injectable()
 export class InstrucoesService {

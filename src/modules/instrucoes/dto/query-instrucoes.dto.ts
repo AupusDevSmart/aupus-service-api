@@ -5,7 +5,7 @@ import {
   StatusTarefa,
   CategoriaTarefa,
   TipoManutencao
-} from '@aupus/api-shared';
+} from '@/core';
 
 export class QueryInstrucoesDto {
   @IsOptional()

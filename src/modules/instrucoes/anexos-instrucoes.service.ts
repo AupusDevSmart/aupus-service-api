@@ -1,6 +1,6 @@
 // src/modules/instrucoes/anexos-instrucoes.service.ts
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
-import { PrismaService } from '@aupus/api-shared';
+import { PrismaService } from '@/core';
 import { AnexoInstrucaoDetalhesDto } from './dto';
 import * as path from 'path';
 import * as fs from 'fs';

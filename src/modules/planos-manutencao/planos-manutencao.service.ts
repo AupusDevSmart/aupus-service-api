@@ -1,6 +1,6 @@
 // src/modules/planos-manutencao/planos-manutencao.service.ts
 import { Injectable, NotFoundException, ConflictException, BadRequestException } from '@nestjs/common';
-import { PrismaService, PermissionScopeService, ScopedUser } from '@aupus/api-shared';
+import { PrismaService, PermissionScopeService, ScopedUser } from '@/core';
 import {
   CreatePlanoManutencaoDto,
   UpdatePlanoManutencaoDto,
@@ -13,7 +13,7 @@ import {
   PlanoResumoDto,
   DashboardPlanosDto
 } from './dto';
-import { Prisma } from '@aupus/api-shared';
+import { Prisma } from '@/core';
 import { PropagacaoPlanosService } from './propagacao-planos.service';
 import { categoriaDoEquipamento } from './categoria-do-equipamento';
 

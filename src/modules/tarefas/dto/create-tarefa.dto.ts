@@ -11,7 +11,7 @@ import {
 } from 'class-validator';
 import { Type } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { FrequenciaTarefa } from '@aupus/api-shared';
+import { FrequenciaTarefa } from '@/core';
 
 /**
  * A tarefa tem quatro campos: nome, instrucao, periodicidade e criticidade.

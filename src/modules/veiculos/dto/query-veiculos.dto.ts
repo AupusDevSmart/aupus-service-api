@@ -1,7 +1,7 @@
 import { IsOptional, IsString, IsInt, Min, Max, IsIn, IsEnum, IsBoolean } from 'class-validator';
 import { Type, Transform } from 'class-transformer';
 import { ApiPropertyOptional } from '@nestjs/swagger';
-import { StatusVeiculo, TipoVeiculo, TipoCombustivel } from '@aupus/api-shared';
+import { StatusVeiculo, TipoVeiculo, TipoCombustivel } from '@/core';
 
 export class QueryVeiculosDto {
   @ApiPropertyOptional({ example: 1, minimum: 1, description: 'Página atual' })

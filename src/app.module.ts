@@ -1,5 +1,5 @@
 // aupus-service-api - modulo raiz
-// Importa modulos compartilhados de @aupus/api-shared + modulos especificos do Service
+// Modulos do nucleo (src/core, antes o pacote @aupus/api-shared) + modulos do Service
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { ScheduleModule } from '@nestjs/schedule';
@@ -26,7 +26,7 @@ import { SolicitacoesServicoModule } from './modules/solicitacoes-servico/solici
 import { InstrucoesModule } from './modules/instrucoes/instrucoes.module';
 import { RecursosModule } from './modules/recursos/recursos.module';
 
-// Modulos compartilhados (de @aupus/api-shared)
+// Modulos do nucleo (src/core)
 import {
   PrismaModule,
   MailModule,
@@ -42,7 +42,7 @@ import {
   TiposEquipamentosModule,
   CategoriasEquipamentosModule,
   ConcessionariasModule,
-} from '@aupus/api-shared';
+} from '@/core';
 
 @Module({
   imports: [

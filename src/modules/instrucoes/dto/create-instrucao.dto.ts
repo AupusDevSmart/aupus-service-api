@@ -18,7 +18,7 @@ import {
   TipoManutencao,
   CondicaoAtivo,
   StatusTarefa
-} from '@aupus/api-shared';
+} from '@/core';
 import { CreateSubInstrucaoDto } from './create-sub-instrucao.dto';
 import { CreateRecursoInstrucaoDto } from './create-recurso-instrucao.dto';
 

@@ -8,7 +8,7 @@
  */
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from '../src/app.module';
-import { PrismaService } from '@aupus/api-shared';
+import { PrismaService } from '@/core';
 import { ExecucaoOSService } from '../src/modules/execucao-os/execucao-os.service';
 
 async function main() {

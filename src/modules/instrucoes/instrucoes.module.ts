@@ -3,7 +3,7 @@ import { Module, forwardRef } from '@nestjs/common';
 import { InstrucoesController } from './instrucoes.controller';
 import { InstrucoesService } from './instrucoes.service';
 import { AnexosInstrucoesService } from './anexos-instrucoes.service';
-import { PrismaModule } from '@aupus/api-shared';
+import { PrismaModule } from '@/core';
 import { PlanosManutencaoModule } from '../planos-manutencao/planos-manutencao.module';
 
 @Module({

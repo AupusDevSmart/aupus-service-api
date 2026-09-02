@@ -1,6 +1,6 @@
 // src/modules/tarefas/tarefas.service.ts
 import { Injectable, NotFoundException, BadRequestException, ConflictException, ForbiddenException } from '@nestjs/common';
-import { PrismaService, PermissionScopeService, ScopedUser } from '@aupus/api-shared';
+import { PrismaService, PermissionScopeService, ScopedUser } from '@/core';
 import {
   CreateTarefaDto,
   UpdateTarefaDto,
@@ -8,7 +8,7 @@ import {
   ReordenarTarefaDto,
   TarefaResponseDto,
 } from './dto';
-import { StatusTarefa, Prisma } from '@aupus/api-shared';
+import { StatusTarefa, Prisma } from '@/core';
 import { PropagacaoPlanosService } from '../planos-manutencao/propagacao-planos.service';
 
 @Injectable()

@@ -1,7 +1,7 @@
 import { IsString, IsNotEmpty, IsOptional, IsInt, IsArray, Min } from 'class-validator';
 import { Type } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { TipoVeiculo } from '@aupus/api-shared';
+import { TipoVeiculo } from '@/core';
 
 export class VeiculosDisponiveisDto {
   @ApiProperty({

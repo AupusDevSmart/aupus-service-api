@@ -14,7 +14,7 @@ import {
   ParseUUIDPipe
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiParam, ApiQuery } from '@nestjs/swagger';
-import { Permissions, CurrentUser } from '@aupus/api-shared';
+import { Permissions, CurrentUser } from '@/core';
 import { PlanosManutencaoService } from './planos-manutencao.service';
 import {
   CreatePlanoManutencaoDto,

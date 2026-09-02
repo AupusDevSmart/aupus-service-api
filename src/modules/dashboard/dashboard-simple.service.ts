@@ -1,5 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { PrismaService, PermissionScopeService, PlantaScope } from '@aupus/api-shared';
+import { PrismaService, PermissionScopeService, PlantaScope } from '@/core';
 
 type UserCtx = { id: string; role?: string | null } | undefined;
 

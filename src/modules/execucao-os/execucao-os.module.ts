@@ -1,5 +1,5 @@
 import { Module } from '@nestjs/common';
-import { PrismaModule } from '@aupus/api-shared';
+import { PrismaModule } from '@/core';
 import { ExecucaoOSController } from './execucao-os.controller';
 import { ExecucaoOSService } from './execucao-os.service';
 import { AnexosOSService } from './anexos-os.service';

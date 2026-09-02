@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { PrismaService, PermissionScopeService, PlantaScope } from '@aupus/api-shared';
+import { PrismaService, PermissionScopeService, PlantaScope } from '@/core';
 import { DashboardOverviewDto } from './dto/overview.dto';
 import { DashboardWorkOrdersDto } from './dto/work-orders.dto';
 import { DashboardTaskPrioritiesDto } from './dto/task-priorities.dto';

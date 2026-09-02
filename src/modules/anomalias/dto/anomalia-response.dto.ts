@@ -1,7 +1,7 @@
 // src/modules/anomalias/dto/anomalia-response.dto.ts
 import { ApiProperty } from '@nestjs/swagger';
 import { CondicaoAnomalia, OrigemAnomalia, PrioridadeAnomalia } from './create-anomalia.dto';
-import { StatusAnomalia } from '@aupus/api-shared';
+import { StatusAnomalia } from '@/core';
 import { AnexoAnomaliaResponseDto } from './anexo-anomalia.dto';
 export class AnomaliaResponseDto {
   @ApiProperty()

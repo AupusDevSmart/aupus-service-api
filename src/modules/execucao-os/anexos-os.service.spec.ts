@@ -1,8 +1,8 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { AnexosOSService } from './anexos-os.service';
-import { PrismaService } from '@aupus/api-shared';
+import { PrismaService } from '@/core';
 import { NotFoundException, BadRequestException } from '@nestjs/common';
-import { TipoAnexoOS } from '@aupus/api-shared';
+import { TipoAnexoOS } from '@/core';
 import * as fs from 'fs';
 import * as path from 'path';
 

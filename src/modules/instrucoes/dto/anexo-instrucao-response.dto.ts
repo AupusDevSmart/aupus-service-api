@@ -1,4 +1,4 @@
-import { TipoAnexo } from '@aupus/api-shared';
+import { TipoAnexo } from '@/core';
 
 export class AnexoInstrucaoDetalhesDto {
   id: string;

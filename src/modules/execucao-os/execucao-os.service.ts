@@ -1,5 +1,5 @@
 import { Injectable, NotFoundException, BadRequestException, ConflictException, ForbiddenException, Logger } from '@nestjs/common';
-import { PrismaService, PermissionScopeService, ScopedUser } from '@aupus/api-shared';
+import { PrismaService, PermissionScopeService, ScopedUser } from '@/core';
 import { AnomaliasService } from '../anomalias/anomalias.service';
 import {
   OSFiltersDto,
@@ -20,7 +20,7 @@ import {
   OrdemServicoDetalhesResponseDto,
   ListarOSResponseDto,
 } from './dto';
-import { StatusOS, PrioridadeOS, Prisma } from '@aupus/api-shared';
+import { StatusOS, PrioridadeOS, Prisma } from '@/core';
 import { gerarNumeroOS } from '../../common/helpers/numeracao-os';
 
 /**

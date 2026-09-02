@@ -14,7 +14,7 @@ import {
   Request
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiQuery } from '@nestjs/swagger';
-import { Permissions, CurrentUser } from '@aupus/api-shared';
+import { Permissions, CurrentUser } from '@/core';
 import { ReservasService } from './reservas.service';
 import { ReservasSchedulerService } from './reservas-scheduler.service';
 import {

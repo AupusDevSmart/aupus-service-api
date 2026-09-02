@@ -15,7 +15,7 @@ import {
   ApiResponse,
   ApiParam,
 } from '@nestjs/swagger';
-import { Permissions } from '@aupus/api-shared';
+import { Permissions } from '@/core';
 import { CalibracaoService } from '../services/calibracao.service';
 import { CreateCalibracaoDto } from '../dto/create-calibracao.dto';
 

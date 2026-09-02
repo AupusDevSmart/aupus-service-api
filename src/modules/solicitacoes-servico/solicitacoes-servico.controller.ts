@@ -28,7 +28,7 @@ import {
   ApiConsumes,
   ApiBody,
 } from '@nestjs/swagger';
-import { Permissions } from '@aupus/api-shared';
+import { Permissions } from '@/core';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { Response } from 'express';
 import { SolicitacoesServicoService } from './solicitacoes-servico.service';

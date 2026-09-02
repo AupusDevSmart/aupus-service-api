@@ -1,6 +1,6 @@
 import { ConflictException, ForbiddenException, Injectable, Logger, NotFoundException } from '@nestjs/common';
-import { Prisma, StatusProgramacaoOS } from '@aupus/api-shared';
-import { PrismaService, PermissionScopeService, ScopedUser } from '@aupus/api-shared';
+import { Prisma, StatusProgramacaoOS } from '@/core';
+import { PrismaService, PermissionScopeService, ScopedUser } from '@/core';
 import { variantesDeIds } from '../tarefas/ids';
 import { AnomaliasService } from '../anomalias/anomalias.service';
 import { gerarNumeroOS } from '../../common/helpers/numeracao-os';

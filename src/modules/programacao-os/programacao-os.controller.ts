@@ -10,7 +10,7 @@ import {
   Post,
   Query,
 } from '@nestjs/common';
-import { CurrentUser, Permissions } from '@aupus/api-shared';
+import { CurrentUser, Permissions } from '@/core';
 import { ParseULIDPipe } from '../../shared/pipes/parse-ulid.pipe';
 import {
   ApiOperation,

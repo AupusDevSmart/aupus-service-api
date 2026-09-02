@@ -1,7 +1,7 @@
 import { Injectable, NotFoundException, BadRequestException, ConflictException, ForbiddenException } from '@nestjs/common';
-import { PrismaService, PermissionScopeService, ScopedUser } from '@aupus/api-shared';
+import { PrismaService, PermissionScopeService, ScopedUser } from '@/core';
 import { VeiculosService } from '../veiculos/veiculos.service';
-import { StatusVeiculo, StatusReserva, Prisma } from '@aupus/api-shared';
+import { StatusVeiculo, StatusReserva, Prisma } from '@/core';
 import {
   CreateReservaDto,
   UpdateReservaDto,

@@ -5,7 +5,7 @@ import { TarefasService } from './tarefas.service';
 import { TarefasSchedulerService } from './tarefas-scheduler.service';
 import { HistoricoEquipamentoController } from './historico-equipamento.controller';
 import { HistoricoEquipamentoService } from './historico-equipamento.service';
-import { PrismaModule } from '@aupus/api-shared';
+import { PrismaModule } from '@/core';
 import { ProgramacaoOSModule } from '../programacao-os/programacao-os.module';
 import { PlanosManutencaoModule } from '../planos-manutencao/planos-manutencao.module';
 

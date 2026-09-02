@@ -6,7 +6,7 @@ import {
   NotFoundException,
   BadRequestException,
 } from '@nestjs/common';
-import { PrismaService } from '@aupus/api-shared';
+import { PrismaService } from '@/core';
 import { CreateCalibracaoDto } from '../dto/create-calibracao.dto';
 
 @Injectable()

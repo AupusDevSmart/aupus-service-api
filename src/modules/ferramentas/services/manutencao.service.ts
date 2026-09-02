@@ -6,7 +6,7 @@ import {
   NotFoundException,
   BadRequestException,
 } from '@nestjs/common';
-import { PrismaService } from '@aupus/api-shared';
+import { PrismaService } from '@/core';
 import { CreateManutencaoDto, StatusManutencao } from '../dto/create-manutencao.dto';
 import { UpdateManutencaoDto } from '../dto/update-manutencao.dto';
 

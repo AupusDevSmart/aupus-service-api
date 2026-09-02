@@ -1,6 +1,6 @@
 // src/modules/solicitacoes-servico/proposta.service.ts
 import { Injectable, NotFoundException } from '@nestjs/common';
-import { PrismaService } from '@aupus/api-shared';
+import { PrismaService } from '@/core';
 import { Prisma } from '@prisma/client';
 
 /**

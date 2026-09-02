@@ -1,5 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { PrismaService } from '@aupus/api-shared';
+import { PrismaService } from '@/core';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 

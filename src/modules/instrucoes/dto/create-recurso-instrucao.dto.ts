@@ -1,6 +1,6 @@
 // src/modules/instrucoes/dto/create-recurso-instrucao.dto.ts
 import { IsString, IsNotEmpty, IsEnum, IsOptional, IsBoolean } from 'class-validator';
-import { TipoRecurso } from '@aupus/api-shared';
+import { TipoRecurso } from '@/core';
 import { Transform } from 'class-transformer';
 
 /**

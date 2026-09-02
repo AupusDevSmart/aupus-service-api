@@ -10,7 +10,7 @@
  *   cd aupus-service-api && pnpm ts-node scripts/db/verify-iot-catalog.ts
  */
 
-import { PrismaClient } from '@aupus/api-shared';
+import { PrismaClient } from '@/core';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as vm from 'vm';

@@ -1,7 +1,7 @@
 import { IsString, IsOptional, IsEnum, IsInt, Min, Max } from 'class-validator';
 import { Type } from 'class-transformer';
 import { ApiPropertyOptional } from '@nestjs/swagger';
-import { StatusReserva, TipoSolicitante } from '@aupus/api-shared';
+import { StatusReserva, TipoSolicitante } from '@/core';
 
 export class QueryReservasDto {
   @ApiPropertyOptional({

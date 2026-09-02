@@ -6,7 +6,7 @@ import {
   ForbiddenException,
   Logger,
 } from '@nestjs/common';
-import { PrismaService, PermissionScopeService, ScopedUser } from '@aupus/api-shared';
+import { PrismaService, PermissionScopeService, ScopedUser } from '@/core';
 import { PropostaService } from './proposta.service';
 import {
   CreateSolicitacaoDto,
@@ -17,10 +17,10 @@ import {
   SolicitacaoStatsDto,
   AdicionarComentarioDto,
 } from './dto';
-import { Prisma } from '@aupus/api-shared';
+import { Prisma } from '@/core';
 
 // Import the enum from Prisma
-import { StatusSolicitacaoServico } from '@aupus/api-shared';
+import { StatusSolicitacaoServico } from '@/core';
 
 @Injectable()
 export class SolicitacoesServicoService {

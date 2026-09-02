@@ -4,7 +4,7 @@ import { ExecucaoOSService } from './execucao-os.service';
 import { AnexosOSService } from './anexos-os.service';
 import { Response } from 'express';
 import { StreamableFile } from '@nestjs/common';
-import { StatusOS, TipoOS, PrioridadeOS, OrigemOS, CondicaoOS, TipoAnexoOS } from '@aupus/api-shared';
+import { StatusOS, TipoOS, PrioridadeOS, OrigemOS, CondicaoOS, TipoAnexoOS } from '@/core';
 import {
   OSFiltersDto,
   IniciarExecucaoDto,

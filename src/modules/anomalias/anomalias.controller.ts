@@ -16,7 +16,7 @@ import {
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { ApiTags, ApiOperation, ApiResponse, ApiConsumes, ApiQuery, ApiBody } from '@nestjs/swagger';
-import { Permissions, CurrentUser } from '@aupus/api-shared';
+import { Permissions, CurrentUser } from '@/core';
 import { AnomaliasService } from './anomalias.service';
 import { AnexosAnomaliasService } from './anexos-anomalias.service';
 import { 

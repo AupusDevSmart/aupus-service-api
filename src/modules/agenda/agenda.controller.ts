@@ -19,7 +19,7 @@ import {
   ApiParam,
   ApiQuery
 } from '@nestjs/swagger';
-import { Permissions } from '@aupus/api-shared';
+import { Permissions } from '@/core';
 import { AgendaService, DiaUtilResponse, ProximosDiasUteisResponse } from './agenda.service';
 import { FeriadosService, PaginatedResponse } from './feriados.service';
 import { ConfiguracoesDiasUteisService } from './configuracoes-dias-uteis.service';

@@ -8,7 +8,7 @@ import {
 } from 'class-validator';
 import { Type } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { TipoSolicitante } from '@aupus/api-shared';
+import { TipoSolicitante } from '@/core';
 
 export class CreateReservaDto {
   @ApiProperty({

@@ -14,7 +14,7 @@ import {
   Res,
   StreamableFile,
 } from '@nestjs/common';
-import { CurrentUser, Permissions } from '@aupus/api-shared';
+import { CurrentUser, Permissions } from '@/core';
 import {
   ApiTags,
   ApiOperation,
@@ -49,7 +49,7 @@ import {
   ListarOSResponseDto,
   AnexoOSResponseDto,
 } from './dto';
-import { TipoAnexoOS } from '@aupus/api-shared';
+import { TipoAnexoOS } from '@/core';
 import * as fs from 'fs';
 import * as path from 'path';
 

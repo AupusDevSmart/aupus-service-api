@@ -1,5 +1,5 @@
 import { Injectable, NotFoundException, BadRequestException, ConflictException, ForbiddenException } from '@nestjs/common';
-import { PrismaService, PermissionScopeService, ScopedUser } from '@aupus/api-shared';
+import { PrismaService, PermissionScopeService, ScopedUser } from '@/core';
 import {
   CreateVeiculoDto,
   UpdateVeiculoDto,
@@ -9,7 +9,7 @@ import {
   InativarVeiculoDto,
   VeiculosDisponiveisDto
 } from './dto';
-import { StatusVeiculo, Prisma } from '@aupus/api-shared';
+import { StatusVeiculo, Prisma } from '@/core';
 
 export interface PaginatedResponse<T> {
   data: T[];

@@ -3,7 +3,7 @@ import { ApiProperty } from '@nestjs/swagger';
 import { IsString, IsOptional, IsEnum } from 'class-validator';
 import { Transform } from 'class-transformer';
 import { PrioridadeAnomalia, OrigemAnomalia } from './create-anomalia.dto';
-import { StatusAnomalia } from '@aupus/api-shared';
+import { StatusAnomalia } from '@/core';
 
 export class AnomaliaFiltersDto {
   @ApiProperty({ required: false, description: 'Busca por texto livre' })

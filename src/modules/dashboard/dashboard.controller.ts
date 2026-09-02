@@ -3,7 +3,7 @@ import { ApiTags, ApiOperation, ApiResponse, ApiQuery } from '@nestjs/swagger';
 import { DashboardService } from './dashboard.service';
 import { DashboardSimpleService } from './dashboard-simple.service';
 import { DashboardManutencaoService } from './dashboard-manutencao.service';
-import { Public, Permissions, CurrentUser } from '@aupus/api-shared';
+import { Public, Permissions, CurrentUser } from '@/core';
 import { DashboardOverviewDto } from './dto/overview.dto';
 import { DashboardWorkOrdersDto } from './dto/work-orders.dto';
 import { DashboardTaskPrioritiesDto } from './dto/task-priorities.dto';
