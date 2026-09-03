@@ -49,18 +49,9 @@ export async function planoAHerdar(
   });
   if (!anterior) return null;
 
-  // As duas formas do mesmo id. `ativos_funcionais_equipamentos.equipamento_id`
-  // e char(26) e sempre devolve com padding; `planos_manutencao.equipamento_id`
-  // e VARCHAR(26) e guarda exatamente o que quem escreveu mandou — trimado pelo
-  // `vincularEquipamento`, com padding por quem gravou direto. char nao ignora
-  // espaco nessa comparacao, entao procurar so uma das formas perde metade das
-  // linhas, e a heranca sumiria calada: a tela diria "nada a herdar" com o plano
-  // existindo no banco.
-  const idDoAnterior = anterior.equipamento_id;
-
   const plano = await prisma.planos_manutencao.findFirst({
     where: {
-      equipamento_id: { in: [idDoAnterior, idDoAnterior.trim()] },
+      equipamento_id: anterior.equipamento_id.trim(),
       deleted_at: null,
     },
     select: {

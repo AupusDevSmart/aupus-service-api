@@ -903,21 +903,16 @@ export class PlanosManutencaoService {
    * Preenche `equipamento` (com unidade e planta) nos planos, comparando ids
    * SEM o padding.
    *
-   * O include do Prisma nao serve aqui, e o motivo e sutil:
+   * A causa raiz que motivou este metodo — `equipamentos.id` em `char(26)`
+   * contra `planos_manutencao.equipamento_id` em `varchar`, fazendo o include
+   * nativo do Prisma comparar `'...xpfqi '` com `'...xpfqi'` e devolver
+   * `equipamento: null` calado — foi corrigida em 2026-09-03 (ver
+   * `prisma/sql/2026-09-02-alinhar-tipo-equipamento-id.sql`); as duas colunas
+   * sao `char(26)` agora.
    *
-   *   equipamentos.id                    character(26)      <- o Postgres
-   *                                                            completa com
-   *                                                            espaco ate 26
-   *   planos_manutencao.equipamento_id   character varying  <- guarda 25
-   *
-   * Em SQL o JOIN casa, porque o Postgres ignora espaco a direita ao comparar
-   * `char`. Mas o Prisma resolve a RELACAO em JavaScript, depois de trazer as
-   * duas pontas, e ali `'...xpfqi '` nao e igual a `'...xpfqi'`. O resultado e
-   * `equipamento: null` silencioso — em dev, 16 de 23 planos.
-   *
-   * O mesmo remendo ja existe em solicitacoes-servico.service, onde a planta e
-   * buscada a mao "usando TRIM". A correcao de raiz e alinhar o tipo das duas
-   * colunas, e nao cabe numa mudanca de tela.
+   * O metodo ficou porque continua correto e trocar por include nativo aqui e
+   * uma mudanca de comportamento em rota de listagem, que merece teste e commit
+   * proprios — nao entrou no escopo do alinhamento de tipo.
    */
   private async hidratarEquipamentos(planos: any[]): Promise<void> {
     const ids = [

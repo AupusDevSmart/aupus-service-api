@@ -41,6 +41,35 @@
 --   SELECT count(*) FILTER (WHERE equipamento_id <> btrim(equipamento_id)) AS com_padding,
 --          count(*) FILTER (WHERE equipamento_id IS NOT NULL)              AS total
 --   FROM planos_manutencao WHERE deleted_at IS NULL;
+--
+-- RISCO QUE O PROPRIO @unique REVELA
+-- A coluna tem indice unico, mas em VARCHAR 'xpfqi' e 'xpfqi ' sao valores
+-- DIFERENTES — a mesma id de equipamento gravada uma vez com padding e outra
+-- vez sem escaparia da unicidade hoje, como dois planos "diferentes" para o
+-- mesmo equipamento. Depois do ALTER as duas formas colapsam na mesma string
+-- CHAR(26), e o proprio ALTER falharia com violacao de unicidade — mas so
+-- DEPOIS de já ter travado a tabela. O bloco abaixo checa isso ANTES e aborta
+-- com mensagem clara se houver colisao, em vez de deixar o Postgres estourar
+-- um erro generico de indice no meio do ALTER.
+DO $$
+DECLARE
+  v_colisoes INT;
+BEGIN
+  SELECT count(*) INTO v_colisoes FROM (
+    SELECT btrim(equipamento_id) AS eq
+    FROM planos_manutencao
+    WHERE equipamento_id IS NOT NULL
+    GROUP BY btrim(equipamento_id)
+    HAVING count(*) > 1
+  ) x;
+
+  IF v_colisoes > 0 THEN
+    RAISE EXCEPTION
+      'ABORTADO: % equipamento(s) com mais de um plano quando comparado sem padding — '
+      'resolver a duplicata (ver SELECT no comentario acima) antes de rodar este arquivo de novo',
+      v_colisoes;
+  END IF;
+END $$;
 
 DO $$
 BEGIN

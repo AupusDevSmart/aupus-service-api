@@ -1489,7 +1489,7 @@ model planos_manutencao {
   // Copia: equipamento_id e plano_origem_id preenchidos, categoria_id nulo.
   categoria_id        String?                  @db.Char(26)
   plano_origem_id     String?                  @db.VarChar(26)
-  equipamento_id      String?                  @unique @db.VarChar(26)
+  equipamento_id      String?                  @unique @db.Char(26)
   nome                String                   @db.VarChar(200)
   descricao           String?
   versao              String                   @default("1.0") @db.VarChar(20)
