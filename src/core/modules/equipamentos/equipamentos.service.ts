@@ -860,7 +860,14 @@ export class EquipamentosService {
               id: true,
               codigo: true,
               nome: true,
+              // `categoria_id` e `fabricante` NAO sao opcionais aqui: o transform
+              // do front monta `tipoEquipamentoObj.categoriaId` a partir deles, e
+              // e esse id que reabre o sheet com a categoria ja selecionada. Sem
+              // ele o campo Categoria vem vazio e o de Modelo fica travado em
+              // "Selecione uma categoria primeiro" — sem erro nenhum no console.
+              categoria_id: true,
               categoria: true,
+              fabricante: true,
               largura_padrao: true,
               altura_padrao: true,
               icone_svg: true,
@@ -937,7 +944,14 @@ export class EquipamentosService {
             id: true,
             codigo: true,
             nome: true,
+            // `categoria_id` e `fabricante` NAO sao opcionais aqui: o transform
+            // do front monta `tipoEquipamentoObj.categoriaId` a partir deles, e
+            // e esse id que reabre o sheet com a categoria ja selecionada. Sem
+            // ele o campo Categoria vem vazio e o de Modelo fica travado em
+            // "Selecione uma categoria primeiro" — sem erro nenhum no console.
+            categoria_id: true,
             categoria: true,
+            fabricante: true,
             largura_padrao: true,
             altura_padrao: true,
             icone_svg: true,
