@@ -48,7 +48,7 @@ pnpm install --frozen-lockfile
 # descobrir isso no meio de um deploy. A CLI vem do devDependency fixado em
 # 6.19.3, a mesma versao do client — sem isso, `pnpm prisma` cairia no global.
 step "pnpm prisma generate"
-pnpm prisma generate --schema=node_modules/@aupus/api-shared/prisma/schema.prisma
+pnpm prisma generate --schema=prisma/schema.prisma
 
 step "Snapshot de dist/ anterior em dist.previous/"
 rm -rf dist.previous
