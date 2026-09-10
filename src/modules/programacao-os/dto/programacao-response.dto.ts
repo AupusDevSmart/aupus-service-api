@@ -247,7 +247,30 @@ export class HistoricoProgramacaoResponseDto {
   dados_extras?: any;
 }
 
+export class InstalacaoDaProgramacaoDto {
+  @ApiProperty({ description: 'ID da instalação (unidade)' })
+  id: string;
+
+  @ApiProperty({ description: 'Nome da instalação' })
+  nome: string;
+}
+
 export class ProgramacaoResponseDto {
+  /**
+   * A instalação não é coluna da programação — é derivada da origem
+   * (equipamento da tarefa, da anomalia, ou a unidade da solicitação).
+   *
+   * Lista porque uma programação agrupa N tarefas, que podem estar em
+   * instalações diferentes. Vazia porque a origem MANUAL não registra nem
+   * equipamento nem unidade: não há de onde tirar. Ausente porque nem todo
+   * endpoint apura — ausente é "não olhei", vazio é "olhei e não tem".
+   */
+  @ApiPropertyOptional({
+    type: [InstalacaoDaProgramacaoDto],
+    description: 'Instalações derivadas da origem. Vazio quando a origem não tem instalação.',
+  })
+  instalacoes?: InstalacaoDaProgramacaoDto[];
+
   @ApiProperty({ description: 'ID da programação' })
   id: string;
 

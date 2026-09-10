@@ -22,6 +22,7 @@ import {
 } from './dto';
 import { StatusOS, PrioridadeOS, Prisma } from '@/core';
 import { gerarNumeroOS } from '../../common/helpers/numeracao-os';
+import { Instalacao, instalacoesDasOrdens } from '../../common/helpers/instalacao-da-os';
 
 /**
  * Nome da tarefa dentro de uma OS, sem depender da tarefa viva.
@@ -244,8 +245,15 @@ export class ExecucaoOSService {
     // Buscar estatísticas
     const stats = await this.obterEstatisticas();
 
+    // A instalação não é coluna da OS: sai do equipamento congelado na tarefa,
+    // da anomalia ou da solicitação, conforme a origem. Uma consulta para a
+    // página inteira.
+    const instalacoes = await instalacoesDasOrdens(this.prisma, ordens.map(ordem => ordem.id));
+
     return {
-      data: ordens.map(ordem => this.mapearParaResponse(ordem)),
+      data: ordens.map(ordem =>
+        this.mapearParaResponse(ordem, instalacoes.get(ordem.id) ?? []),
+      ),
       pagination: {
         page,
         limit,
@@ -403,7 +411,9 @@ export class ExecucaoOSService {
       }
     }
 
-    return this.mapearParaDetalhes(os);
+    const instalacoes = await instalacoesDasOrdens(this.prisma, [os.id]);
+
+    return this.mapearParaDetalhes(os, instalacoes.get(os.id) ?? []);
   }
 
   async iniciar(id: string, dto: IniciarExecucaoDto, usuarioId?: string, user?: ScopedUser): Promise<void> {
@@ -1554,8 +1564,14 @@ export class ExecucaoOSService {
     return resultado;
   }
 
-  private mapearParaResponse(os: any): OrdemServicoResponseDto {
+  /**
+   * `instalacoes` ausente é diferente de vazio: vazio significa "esta origem
+   * não tem instalação" — a OS manual não tem —, e é o que a tela mostra como
+   * "—". Ausente é o chamador que não apurou.
+   */
+  private mapearParaResponse(os: any, instalacoes?: Instalacao[]): OrdemServicoResponseDto {
     return {
+      instalacoes,
       id: os.id,
       criado_em: os.criado_em,
       atualizado_em: os.atualizado_em,
@@ -1707,8 +1723,8 @@ export class ExecucaoOSService {
     };
   }
 
-  private mapearParaDetalhes(os: any): OrdemServicoDetalhesResponseDto {
-    const base = this.mapearParaResponse(os);
+  private mapearParaDetalhes(os: any, instalacoes?: Instalacao[]): OrdemServicoDetalhesResponseDto {
+    const base = this.mapearParaResponse(os, instalacoes);
 
     return {
       ...base,

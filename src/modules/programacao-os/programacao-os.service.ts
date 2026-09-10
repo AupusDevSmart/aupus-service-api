@@ -4,6 +4,7 @@ import { PrismaService, PermissionScopeService, ScopedUser } from '@/core';
 import { variantesDeIds } from '../tarefas/ids';
 import { AnomaliasService } from '../anomalias/anomalias.service';
 import { gerarNumeroOS } from '../../common/helpers/numeracao-os';
+import { Instalacao, instalacoesDasProgramacoes } from '../../common/helpers/instalacao-da-os';
 import {
   AdicionarTarefasDto,
   AprovarProgramacaoDto,
@@ -158,8 +159,17 @@ export class ProgramacaoOSService {
     // Buscar estatísticas
     const stats = await this.obterEstatisticas();
 
+    // A instalação não é coluna da programação: sai de equipamento, anomalia ou
+    // solicitação, conforme a origem. Uma consulta para a página inteira.
+    const instalacoes = await instalacoesDasProgramacoes(
+      this.prisma,
+      programacoes.map(programacao => programacao.id),
+    );
+
     return {
-      data: programacoes.map(programacao => this.mapearParaResponse(programacao)),
+      data: programacoes.map(programacao =>
+        this.mapearParaResponse(programacao, instalacoes.get(programacao.id) ?? []),
+      ),
       pagination: {
         page,
         limit,
@@ -230,7 +240,9 @@ export class ProgramacaoOSService {
       });
     }
 
-    return this.mapearParaDetalhes(programacao, reserva);
+    const instalacoes = await instalacoesDasProgramacoes(this.prisma, [programacao.id]);
+
+    return this.mapearParaDetalhes(programacao, reserva, instalacoes.get(programacao.id) ?? []);
   }
 
   async buscarPorUnidade(unidadeId: string, filters?: Partial<ProgramacaoFiltersDto>, user?: ScopedUser): Promise<ListarProgramacoesResponseDto> {
@@ -1829,8 +1841,16 @@ export class ProgramacaoOSService {
     return resultado;
   }
 
-  private mapearParaResponse(programacao: any): ProgramacaoResponseDto {
+  /**
+   * `instalacoes` fica ausente quando o chamador não apurou — e ausente é
+   * diferente de vazio. Vazio significa "esta origem não tem instalação"
+   * (a OP manual não tem), e é isso que a tela mostra como "—". Se create e
+   * update mandassem `[]` só por não terem consultado, diriam a mesma coisa
+   * sem terem olhado.
+   */
+  private mapearParaResponse(programacao: any, instalacoes?: Instalacao[]): ProgramacaoResponseDto {
     return {
+      instalacoes,
       id: programacao.id,
       criado_em: programacao.criado_em,
       atualizado_em: programacao.atualizado_em,
@@ -1914,8 +1934,12 @@ export class ProgramacaoOSService {
     };
   }
 
-  private mapearParaDetalhes(programacao: any, reserva?: any): ProgramacaoDetalhesResponseDto {
-    const base = this.mapearParaResponse(programacao);
+  private mapearParaDetalhes(
+    programacao: any,
+    reserva?: any,
+    instalacoes?: Instalacao[],
+  ): ProgramacaoDetalhesResponseDto {
+    const base = this.mapearParaResponse(programacao, instalacoes);
 
     return {
       ...base,

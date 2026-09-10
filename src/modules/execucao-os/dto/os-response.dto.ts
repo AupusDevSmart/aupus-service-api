@@ -438,7 +438,30 @@ export class ReservaVeiculoResponseDto {
   atualizado_em: string;
 }
 
+export class InstalacaoDaOSDto {
+  @ApiProperty({ description: 'ID da instalação (unidade)' })
+  id: string;
+
+  @ApiProperty({ description: 'Nome da instalação' })
+  nome: string;
+}
+
 export class OrdemServicoResponseDto {
+  /**
+   * A instalação não é coluna da OS — é derivada da origem (equipamento
+   * congelado na tarefa, equipamento da anomalia, ou a unidade da solicitação,
+   * alcançada pela programação).
+   *
+   * Lista porque uma OS agrupa N tarefas, que podem estar em instalações
+   * diferentes. Vazia porque a origem MANUAL não registra nem equipamento nem
+   * unidade. Ausente porque nem todo endpoint apura.
+   */
+  @ApiPropertyOptional({
+    type: [InstalacaoDaOSDto],
+    description: 'Instalações derivadas da origem. Vazio quando a origem não tem instalação.',
+  })
+  instalacoes?: InstalacaoDaOSDto[];
+
   @ApiProperty({ description: 'ID da OS' })
   id: string;
 
