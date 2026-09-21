@@ -4,8 +4,6 @@ import {
   IsEnum,
   IsOptional,
   IsInt,
-  IsDecimal,
-  IsBoolean,
   IsDate,
   Length,
   Matches,
@@ -14,7 +12,7 @@ import {
 } from 'class-validator';
 import { Type, Transform } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { StatusVeiculo, TipoVeiculo, TipoCombustivel } from '@/core';
+import { TipoVeiculo, TipoCombustivel } from '@/core';
 
 export class CreateVeiculoDto {
   @ApiProperty({

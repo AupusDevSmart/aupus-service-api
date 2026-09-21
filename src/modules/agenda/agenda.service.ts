@@ -97,7 +97,7 @@ export class AgendaService {
     const { quantidade, dataInicio = new Date(), plantaId } = dto;
 
     const diasUteis: Date[] = [];
-    let dataAtual = new Date(dataInicio);
+    const dataAtual = new Date(dataInicio);
     let tentativas = 0;
     const maxTentativas = quantidade * 10; // Evitar loop infinito
 
@@ -159,7 +159,7 @@ export class AgendaService {
     diasUteis: number,
     plantaId?: string
   ): Promise<Date> {
-    let dataAtual = new Date(dataBase);
+    const dataAtual = new Date(dataBase);
     let diasAdicionados = 0;
     let tentativas = 0;
     const maxTentativas = diasUteis * 10;

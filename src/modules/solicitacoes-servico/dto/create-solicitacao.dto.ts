@@ -7,7 +7,6 @@ import {
   IsNumber,
   IsNotEmpty,
   MaxLength,
-  IsDecimal,
   IsArray,
 } from 'class-validator';
 import {

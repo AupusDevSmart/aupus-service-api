@@ -1,7 +1,7 @@
 // ===============================
 // src/modules/ferramentas/dto/query-ferramentas.dto.ts
 // ===============================
-import { IsOptional, IsString, IsEnum, IsBoolean, IsNumberString, Min, Max } from 'class-validator';
+import { IsOptional, IsString, IsEnum, IsBoolean, Min, Max } from 'class-validator';
 import { Transform, Type } from 'class-transformer';
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { StatusFerramenta } from './create-ferramenta.dto';

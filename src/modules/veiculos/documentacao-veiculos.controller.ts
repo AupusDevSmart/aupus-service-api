@@ -9,8 +9,6 @@ import {
   Query,
   HttpCode,
   HttpStatus,
-  UseGuards,
-  Request,
   UseInterceptors,
   UploadedFile,
   Res,
@@ -26,7 +24,6 @@ import {
   UpdateDocumentacaoVeiculoDto,
   DocumentacaoVeiculoResponseDto
 } from './dto';
-import * as path from 'path';
 
 @ApiTags('Documentação de Veículos')
 @Controller('veiculos/:veiculoId/documentacao')
