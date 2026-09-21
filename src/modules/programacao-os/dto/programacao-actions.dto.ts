@@ -1,4 +1,4 @@
-import { IsString, IsOptional, IsNumber, IsDateString, IsArray, IsNotEmpty, Length, ValidateIf } from 'class-validator';
+import { IsString, IsOptional, IsNumber, IsDateString, IsArray, IsNotEmpty, Length } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export class AprovarProgramacaoDto {

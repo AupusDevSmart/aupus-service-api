@@ -6,7 +6,6 @@ import { UpdateProgramacaoDto } from './dto/update-programacao.dto';
 import { ProgramacaoFiltersDto } from './dto/programacao-filters.dto';
 import {
   AprovarProgramacaoDto,
-  FinalizarProgramacaoDto,
   CancelarProgramacaoDto,
   CreateProgramacaoAnomaliaDto,
   CreateProgramacaoTarefasDto,

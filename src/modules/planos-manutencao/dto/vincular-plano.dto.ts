@@ -1,6 +1,6 @@
 // src/modules/planos-manutencao/dto/vincular-plano.dto.ts
 import { IsString, IsNotEmpty, IsOptional } from 'class-validator';
-import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { ApiProperty } from '@nestjs/swagger';
 
 export class VincularPlanoDto {
   @ApiProperty({ description: 'ID do equipamento (precisa ser UC)' })

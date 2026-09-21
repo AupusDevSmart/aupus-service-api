@@ -2,7 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { ProgramacaoOSService } from './programacao-os.service';
 import { PrismaService, PermissionScopeService } from '@/core';
 import { AnomaliasService } from '../anomalias/anomalias.service';
-import { NotFoundException, BadRequestException, ConflictException } from '@nestjs/common';
+import { NotFoundException, ConflictException } from '@nestjs/common';
 import { StatusProgramacaoOS, CondicaoOS, TipoOS, PrioridadeOS, OrigemOS } from '@/core';
 import {
   CreateProgramacaoDto,
@@ -162,6 +162,12 @@ describe('ProgramacaoOSService', () => {
     ordens_servico: {
       create: jest.fn(),
       count: jest.fn(),
+      /**
+       * `gerarNumeroOS` procura a ultima OS do ano com o mesmo prefixo para
+       * continuar a sequencia. `null` e "nenhuma ainda", que faz a numeracao
+       * comecar do 1 — o cenario destes testes, que aprovam a primeira.
+       */
+      findFirst: jest.fn().mockResolvedValue(null),
     },
     tarefas_os: {
       createMany: jest.fn(),
@@ -175,7 +181,28 @@ describe('ProgramacaoOSService', () => {
     tecnicos_os: {
       createMany: jest.fn(),
     },
+    /**
+     * `registrarHistorico` busca o nome de quem agiu para gravar junto do
+     * evento. Sem o modelo no mock, toda escrita que registra historico —
+     * criar, atualizar, aprovar, cancelar, deletar — morria no
+     * `usuarios.findUnique`. `null` e um usuario nao encontrado, caso que o
+     * servico ja trata caindo no rotulo generico.
+     */
+    usuarios: {
+      findUnique: jest.fn().mockResolvedValue(null),
+    },
     $transaction: jest.fn(),
+    /**
+     * A instalacao (unidade) de cada programacao sai de uma consulta crua —
+     * `instalacoesDasProgramacoes`, em `common/helpers/instalacao-da-os.ts` —
+     * porque o caminho ate a unidade passa por quatro origens diferentes e
+     * precisa de UNION com DISTINCT, que o Prisma nao expressa.
+     *
+     * Sem este mock o helper recebe `undefined` no lugar de `$queryRaw` e
+     * derruba listar/buscarPorId, e com eles quase toda a suite. Lista vazia e
+     * o certo aqui: quem testa instalacao e o teste do helper, nao estes.
+     */
+    $queryRaw: jest.fn().mockResolvedValue([]),
   };
 
   beforeEach(async () => {
@@ -677,7 +704,12 @@ describe('ProgramacaoOSService', () => {
       expect(mockPrismaService.ordens_servico.create).toHaveBeenCalledWith({
         data: expect.objectContaining({
           programacao_id: 'clrx1234567890123456789012',
-          numero_os: expect.stringMatching(/^OS-\d{4}-001$/),
+          // `OSP` porque a origem e PLANO_MANUTENCAO, e quatro digitos: a serie
+          // e propria por prefixo e por ano (ver `common/helpers/numeracao-os`).
+          // A expectativa aqui era `/^OS-\d{4}-001$/`, o formato ANTIGO — ela
+          // nunca chegou a rodar, porque o teste morria antes nos mocks que
+          // faltavam, e por isso envelheceu sem ninguem ver.
+          numero_os: expect.stringMatching(/^OSP-\d{4}-0001$/),
           descricao: mockProgramacaoData.descricao,
           status: 'PENDENTE',
           tipo: mockProgramacaoData.tipo,

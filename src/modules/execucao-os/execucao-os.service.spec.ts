@@ -2,7 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { ExecucaoOSService } from './execucao-os.service';
 import { PrismaService, PermissionScopeService } from '@/core';
 import { AnomaliasService } from '../anomalias/anomalias.service';
-import { NotFoundException, BadRequestException, ConflictException } from '@nestjs/common';
+import { NotFoundException, ConflictException } from '@nestjs/common';
 import { StatusOS, CondicaoOS, TipoOS, PrioridadeOS, OrigemOS } from '@/core';
 import {
   OSFiltersDto,
@@ -114,7 +114,22 @@ describe('ExecucaoOSService', () => {
     historico_os: {
       create: jest.fn(),
     },
+    /**
+     * `registrarHistorico` busca o nome de quem agiu para gravar junto do
+     * evento; sem o modelo, toda escrita que registra historico morria aqui.
+     * `null` e "usuario nao encontrado", caso que o servico ja trata.
+     */
+    usuarios: {
+      findUnique: jest.fn().mockResolvedValue(null),
+    },
     $transaction: jest.fn(),
+    /**
+     * A instalacao (unidade) de cada OS sai de uma consulta crua
+     * (`common/helpers/instalacao-da-os.ts`): o caminho ate a unidade tem
+     * quatro origens e precisa de UNION com DISTINCT, que o Prisma nao
+     * expressa. Sem o mock, `listar` e `buscarPorId` derrubavam a suite.
+     */
+    $queryRaw: jest.fn().mockResolvedValue([]),
   };
 
   beforeEach(async () => {

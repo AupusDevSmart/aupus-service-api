@@ -1,5 +1,5 @@
 // src/modules/planos-manutencao/planos-manutencao.service.ts
-import { Injectable, NotFoundException, ConflictException, BadRequestException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { PrismaService, PermissionScopeService, ScopedUser } from '@/core';
 import {
   CreatePlanoManutencaoDto,

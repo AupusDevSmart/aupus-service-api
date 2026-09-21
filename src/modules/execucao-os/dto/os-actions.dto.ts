@@ -4,7 +4,6 @@ import {
   IsNumber,
   IsDateString,
   IsArray,
-  IsUUID,
   IsNotEmpty,
   Length,
   IsBoolean,

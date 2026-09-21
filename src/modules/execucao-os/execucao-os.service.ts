@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, BadRequestException, ConflictException, ForbiddenException, Logger } from '@nestjs/common';
+import { Injectable, NotFoundException, ConflictException, Logger } from '@nestjs/common';
 import { PrismaService, PermissionScopeService, ScopedUser } from '@/core';
 import { AnomaliasService } from '../anomalias/anomalias.service';
 import {
@@ -1017,7 +1017,12 @@ export class ExecucaoOSService {
       try {
         const usuario = await this.prisma.usuarios.findUnique({ where: { id: usuarioId }, select: { nome: true } });
         if (usuario) nomeAuditor = usuario.nome;
-      } catch {}
+      } catch (erro) {
+        // Falhar aqui nao pode derrubar a operacao: o nome e so o rotulo do
+        // historico, e ja existe fallback. Mas engolir calado escondia uma
+        // consulta quebrada indefinidamente — o aviso deixa ela aparecer.
+        this.logger.warn(`Nao foi possivel ler o nome do usuario ${usuarioId}: ${erro}`);
+      }
     }
 
     await this.prisma.$transaction(async (prisma) => {
@@ -1089,7 +1094,12 @@ export class ExecucaoOSService {
       try {
         const usuario = await this.prisma.usuarios.findUnique({ where: { id: usuarioId }, select: { nome: true } });
         if (usuario) nomeFinalizador = usuario.nome;
-      } catch {}
+      } catch (erro) {
+        // Falhar aqui nao pode derrubar a operacao: o nome e so o rotulo do
+        // historico, e ja existe fallback. Mas engolir calado escondia uma
+        // consulta quebrada indefinidamente — o aviso deixa ela aparecer.
+        this.logger.warn(`Nao foi possivel ler o nome do usuario ${usuarioId}: ${erro}`);
+      }
     }
 
     await this.prisma.$transaction(async (prisma) => {
@@ -1650,12 +1660,14 @@ export class ExecucaoOSService {
         instrucao_id: to.tarefa?.instrucao_id ?? null,
         plano_id: to.tarefa?.plano_manutencao?.id ?? null,
         plano_nome: to.tarefa?.plano_manutencao?.nome ?? null,
+        // Só id e nome: `categoria` e `tipo_manutencao` foram droppadas da
+        // tabela `tarefas` no PR6 e saíam `undefined` daqui. O conteúdo da
+        // época está nos campos `*_snapshot` acima; o atual, na instrução que
+        // `instrucao_id` abre.
         tarefa: to.tarefa
           ? {
               id: to.tarefa.id,
               nome: to.tarefa.nome,
-              categoria: to.tarefa.categoria,
-              tipo_manutencao: to.tarefa.tipo_manutencao,
             }
           : null,
       })) || [],

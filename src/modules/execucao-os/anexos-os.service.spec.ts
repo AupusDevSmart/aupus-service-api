@@ -4,7 +4,6 @@ import { PrismaService } from '@/core';
 import { NotFoundException, BadRequestException } from '@nestjs/common';
 import { TipoAnexoOS } from '@/core';
 import * as fs from 'fs';
-import * as path from 'path';
 
 // Mock do módulo fs
 jest.mock('fs');
@@ -152,7 +151,8 @@ describe('AnexosOSService', () => {
       );
 
       expect(mockFsModule.mkdirSync).toHaveBeenCalledWith(
-        expect.stringMatching(/uploads[\\\/]anexos-os$/),
+        // Dentro de [] a barra nao precisa de escape; `\/` ali e so ruido.
+        expect.stringMatching(/uploads[\\/]anexos-os$/),
         { recursive: true }
       );
 

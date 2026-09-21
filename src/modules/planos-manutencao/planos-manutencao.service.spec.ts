@@ -199,6 +199,11 @@ describe('PlanosManutencaoService', () => {
       mockPrismaService.planos_manutencao.create.mockResolvedValue({ id: 'copia_0000000000000000' });
       mockPrismaService.tarefas.create.mockResolvedValue({});
       mockPrismaService.tarefas.count.mockResolvedValue(0);
+      // A TAG de cada tarefa copiada sai de `proximoNumeroDeTag`, que varre
+      // TODAS as tarefas do banco atras do maior numero em uso. Sem este mock a
+      // varredura recebe `undefined` e quebra no `.reduce` — banco vazio e o
+      // cenario certo aqui: a primeira copia comeca a numeracao.
+      mockPrismaService.tarefas.findMany.mockResolvedValue([]);
     };
 
     it('copia as tarefas do template marcando todas como HERDADA', async () => {

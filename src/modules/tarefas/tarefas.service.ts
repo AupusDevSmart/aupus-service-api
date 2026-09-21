@@ -1,5 +1,5 @@
 // src/modules/tarefas/tarefas.service.ts
-import { Injectable, NotFoundException, BadRequestException, ConflictException, ForbiddenException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException, ConflictException } from '@nestjs/common';
 import { PrismaService, PermissionScopeService, ScopedUser } from '@/core';
 import {
   CreateTarefaDto,
@@ -8,7 +8,7 @@ import {
   ReordenarTarefaDto,
   TarefaResponseDto,
 } from './dto';
-import { StatusTarefa, Prisma } from '@/core';
+import { Prisma } from '@/core';
 import { PropagacaoPlanosService } from '../planos-manutencao/propagacao-planos.service';
 
 @Injectable()
@@ -750,32 +750,43 @@ export class TarefasService {
     return orderBy;
   }
 
+  /**
+   * A tarefa que sai daqui tem QUATRO campos de definicao — nome, instrucao,
+   * periodicidade e criticidade — mais o estado de sistema. Todo o conteudo
+   * (descricao, categoria, tipo, duracao, sub-etapas, recursos) vive na
+   * INSTRUCAO e e lido de `tarefa.instrucao`.
+   *
+   * Isto e uma lista explicita: **campo novo na tabela nao chega sozinho na
+   * resposta**. Ate 09/2026 faltavam `origem_status`, `data_ancora` e
+   * `tarefa_origem_id`, e o rotulo "herdada/customizada/propria" da tela nunca
+   * apareceu por causa disso — chegava `undefined` num tipo que o front
+   * declarava opcional, entao nada quebrou e ninguem viu.
+   *
+   * Na mesma limpeza sairam as colunas droppadas no PR6, que ainda eram
+   * copiadas daqui e saiam `undefined` — e `duracao_estimada` saia `NaN`,
+   * porque `Number(undefined)` nao e nulo.
+   */
   private mapearParaResponse(tarefa: any): TarefaResponseDto {
     return {
-      id: tarefa.id?.trim() || tarefa.id, // ✅ TRIM para remover espaços extras
-      plano_manutencao_id: tarefa.plano_manutencao_id?.trim() || tarefa.plano_manutencao_id, // ✅ TRIM
+      // Os ids sao aparados porque o banco tem colunas `Char(26)` e devolve
+      // padding a direita; comparacao sem trim falha calada.
+      id: tarefa.id?.trim() || tarefa.id,
+      plano_manutencao_id: tarefa.plano_manutencao_id?.trim() || tarefa.plano_manutencao_id,
       tag: tarefa.tag,
       nome: tarefa.nome,
-      descricao: tarefa.descricao,
-      categoria: tarefa.categoria,
-      tipo_manutencao: tarefa.tipo_manutencao,
       frequencia: tarefa.frequencia,
       frequencia_personalizada: tarefa.frequencia_personalizada,
-      condicao_ativo: tarefa.condicao_ativo,
       criticidade: tarefa.criticidade,
-      duracao_estimada: Number(tarefa.duracao_estimada),
-      tempo_estimado: tarefa.tempo_estimado,
       ordem: tarefa.ordem,
-      planta_id: tarefa.planta_id?.trim() || tarefa.planta_id, // ✅ TRIM
-      equipamento_id: tarefa.equipamento_id?.trim() || tarefa.equipamento_id, // ✅ TRIM
+      planta_id: tarefa.planta_id?.trim() || tarefa.planta_id,
+      equipamento_id: tarefa.equipamento_id?.trim() || tarefa.equipamento_id,
       instrucao_id: tarefa.instrucao_id?.trim() || tarefa.instrucao_id,
-      planejador: tarefa.planejador,
-      responsavel: tarefa.responsavel,
-      observacoes: tarefa.observacoes,
-      status: tarefa.status,
       ativo: tarefa.ativo,
       data_ultima_execucao: tarefa.data_ultima_execucao,
       numero_execucoes: tarefa.numero_execucoes,
+      data_ancora: tarefa.data_ancora,
+      origem_status: tarefa.origem_status,
+      tarefa_origem_id: tarefa.tarefa_origem_id?.trim() || tarefa.tarefa_origem_id,
       created_at: tarefa.created_at,
       updated_at: tarefa.updated_at,
       criado_por: tarefa.criado_por,
@@ -789,22 +800,11 @@ export class TarefasService {
     };
   }
 
-  // Métodos auxiliares para dashboard
-  private contarPorStatus(stats: any[], status: StatusTarefa): number {
-    return stats.find(s => s.status === status)?._count || 0;
-  }
-
-  private contarPorCriticidade(stats: any[], criticidade: number): number {
-    return stats.find(s => s.criticidade === criticidade)?._count || 0;
-  }
-
-  private contarPorTipo(stats: any[], tipo: string): number {
-    return stats.find(s => s.tipo_manutencao === tipo)?._count || 0;
-  }
-
-  private contarPorCategoria(stats: any[], categoria: string): number {
-    return stats.find(s => s.categoria === categoria)?._count || 0;
-  }
+  // Os quatro contadores de dashboard que existiam aqui foram removidos em
+  // 09/2026: nenhum era chamado, e tres agregavam por colunas droppadas no PR6
+  // (`status`, `tipo_manutencao`, `categoria`) — se algum dashboard voltasse a
+  // chama-los, agregaria por campo inexistente. O conteudo hoje e da INSTRUCAO,
+  // entao um dashboard por categoria tem de agrupar por `instrucao.categoria`.
 
   private calcularProximaExecucao(
     dataUltimaExecucao: Date,

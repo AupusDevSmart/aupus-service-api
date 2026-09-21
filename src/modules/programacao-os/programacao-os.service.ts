@@ -1,4 +1,4 @@
-import { ConflictException, ForbiddenException, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { ConflictException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { Prisma, StatusProgramacaoOS } from '@/core';
 import { PrismaService, PermissionScopeService, ScopedUser } from '@/core';
 import { variantesDeIds } from '../tarefas/ids';
@@ -286,7 +286,12 @@ export class ProgramacaoOSService {
       try {
         const usuario = await this.prisma.usuarios.findUnique({ where: { id: usuarioId }, select: { nome: true } });
         if (usuario) nomeCriador = usuario.nome;
-      } catch {}
+      } catch (erro) {
+        // Falhar aqui nao pode derrubar a operacao: o nome e so o rotulo do
+        // historico, e ja existe fallback. Mas engolir calado escondia uma
+        // consulta quebrada indefinidamente — o aviso deixa ela aparecer.
+        this.logger.warn(`Nao foi possivel ler o nome do usuario ${usuarioId}: ${erro}`);
+      }
     }
 
     return await this.prisma.$transaction(async (prisma) => {
@@ -569,7 +574,12 @@ export class ProgramacaoOSService {
       try {
         const usuario = await this.prisma.usuarios.findUnique({ where: { id: usuarioId }, select: { nome: true } });
         if (usuario) nomeAprovador = usuario.nome;
-      } catch {}
+      } catch (erro) {
+        // Falhar aqui nao pode derrubar a operacao: o nome e so o rotulo do
+        // historico, e ja existe fallback. Mas engolir calado escondia uma
+        // consulta quebrada indefinidamente — o aviso deixa ela aparecer.
+        this.logger.warn(`Nao foi possivel ler o nome do usuario ${usuarioId}: ${erro}`);
+      }
     }
 
     await this.prisma.$transaction(async (prisma) => {
@@ -683,7 +693,12 @@ export class ProgramacaoOSService {
       try {
         const usuario = await this.prisma.usuarios.findUnique({ where: { id: usuarioId }, select: { nome: true } });
         if (usuario) nomeUsuario = usuario.nome;
-      } catch {}
+      } catch (erro) {
+        // Falhar aqui nao pode derrubar a operacao: o nome e so o rotulo do
+        // historico, e ja existe fallback. Mas engolir calado escondia uma
+        // consulta quebrada indefinidamente — o aviso deixa ela aparecer.
+        this.logger.warn(`Nao foi possivel ler o nome do usuario ${usuarioId}: ${erro}`);
+      }
     }
 
     await this.prisma.programacoes_os.update({
@@ -1905,13 +1920,15 @@ export class ProgramacaoOSService {
         observacoes: tp.observacoes,
         created_at: tp.created_at,
         updated_at: tp.updated_at,
+        // Só id e nome: `categoria`, `tipo_manutencao`, `tempo_estimado` e
+        // `duracao_estimada` foram droppadas da tabela `tarefas` no PR6. As
+        // duas primeiras saíam `undefined` e as duas últimas saíam **NaN**,
+        // porque `Number(undefined)` não é nulo — e NaN vira `null` no JSON,
+        // então nada estourava e a tela só mostrava vazio. O conteúdo vive na
+        // instrução.
         tarefa: tp.tarefa ? {
           id: tp.tarefa.id,
           nome: tp.tarefa.nome,
-          categoria: tp.tarefa.categoria,
-          tipo_manutencao: tp.tarefa.tipo_manutencao,
-          tempo_estimado: Number(tp.tarefa.tempo_estimado),
-          duracao_estimada: Number(tp.tarefa.duracao_estimada),
         } : null,
       })) || [],
       criado_por: programacao.criado_por,

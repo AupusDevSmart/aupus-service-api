@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '@/core';
-import { AdicionarAnexoDto, AnexoOSResponseDto } from './dto';
+import { AnexoOSResponseDto } from './dto';
 import { TipoAnexoOS } from '@/core';
 import * as path from 'path';
 import * as fs from 'fs';

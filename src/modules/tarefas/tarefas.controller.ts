@@ -9,19 +9,10 @@ import {
   Param, 
   Query,
   HttpStatus,
-  HttpCode,
-  UseGuards,
-  ParseUUIDPipe,
-  UseInterceptors,
-  UploadedFile,
-  Res,
-  Headers
+  HttpCode
 } from '@nestjs/common';
-import { FileInterceptor } from '@nestjs/platform-express';
-import { ApiTags, ApiOperation, ApiResponse, ApiParam, ApiQuery, ApiConsumes } from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiResponse, ApiParam } from '@nestjs/swagger';
 import { Permissions, CurrentUser } from '@/core';
-import { Response } from 'express';
-import * as path from 'path';
 import { TarefasService } from './tarefas.service';
 import { TarefasSchedulerService } from './tarefas-scheduler.service';
 import {

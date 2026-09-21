@@ -8,7 +8,6 @@ import {
   Param,
   Query,
   HttpStatus,
-  ParseUUIDPipe,
   UseInterceptors,
   UploadedFile,
   Res,
@@ -21,7 +20,6 @@ import {
   ApiResponse,
   ApiParam,
   ApiQuery,
-  ApiBearerAuth,
   ApiConsumes,
 } from '@nestjs/swagger';
 import { FileInterceptor } from '@nestjs/platform-express';
@@ -44,14 +42,12 @@ import {
   FinalizarOSDto,
   CancelarOSDto,
   AdicionarAnexoDto,
-  OrdemServicoResponseDto,
   OrdemServicoDetalhesResponseDto,
   ListarOSResponseDto,
   AnexoOSResponseDto,
 } from './dto';
 import { TipoAnexoOS } from '@/core';
 import * as fs from 'fs';
-import * as path from 'path';
 
 @ApiTags('Execução OS')
 @Controller('execucao-os')
