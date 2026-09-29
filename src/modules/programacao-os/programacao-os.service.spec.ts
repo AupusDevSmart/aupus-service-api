@@ -1,7 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { ProgramacaoOSService } from './programacao-os.service';
 import { PrismaService, PermissionScopeService } from '@/core';
-import { AnomaliasService } from '../anomalias/anomalias.service';
 import { NotFoundException, ConflictException } from '@nestjs/common';
 import { StatusProgramacaoOS, CondicaoOS, TipoOS, PrioridadeOS, OrigemOS } from '@/core';
 import {
@@ -53,6 +52,7 @@ describe('ProgramacaoOSService', () => {
     local: 'Planta A',
     ativo: 'Motor 001',
     condicao: 'FUNCIONANDO',
+    status: 'REGISTRADA',
     prioridade: PrioridadeOS.ALTA,
     data: new Date(),
     planta_id: 'clrx1234567890123456789012',
@@ -212,14 +212,6 @@ describe('ProgramacaoOSService', () => {
         {
           provide: PrismaService,
           useValue: mockPrismaService,
-        },
-        {
-          provide: AnomaliasService,
-          useValue: {
-            marcarComoFinalizada: jest.fn(),
-            marcarComoProgramada: jest.fn(),
-            voltarParaRegistrada: jest.fn(),
-          },
         },
         {
           // Sem escopo: os testes chamam os metodos sem `user`, entao as

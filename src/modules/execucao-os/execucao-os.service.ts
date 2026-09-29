@@ -1,6 +1,5 @@
 import { Injectable, NotFoundException, ConflictException, Logger } from '@nestjs/common';
 import { PrismaService, PermissionScopeService, ScopedUser } from '@/core';
-import { AnomaliasService } from '../anomalias/anomalias.service';
 import {
   OSFiltersDto,
   IniciarExecucaoDto,
@@ -23,6 +22,8 @@ import {
 import { StatusOS, PrioridadeOS, Prisma } from '@/core';
 import { gerarNumeroOS } from '../../common/helpers/numeracao-os';
 import { Instalacao, instalacoesDasOrdens } from '../../common/helpers/instalacao-da-os';
+import { finalizarOrigem, origemDaProgramacao } from '../../common/helpers/status-da-origem';
+import { cancelarOS } from './cancelar-os';
 
 /**
  * Nome da tarefa dentro de uma OS, sem depender da tarefa viva.
@@ -45,7 +46,6 @@ export class ExecucaoOSService {
 
   constructor(
     private readonly prisma: PrismaService,
-    private readonly anomaliasService: AnomaliasService,
     private readonly scopeService: PermissionScopeService,
   ) {}
 
@@ -1123,49 +1123,32 @@ export class ExecucaoOSService {
         StatusOS.FINALIZADA,
       );
 
-      // Propagar status para origem: anomalia → FINALIZADA
-      if (os.anomalia_id) {
-        try {
-          await this.anomaliasService.marcarComoFinalizada(os.anomalia_id);
-          this.logger.log(`Anomalia ${os.anomalia_id} marcada como FINALIZADA`);
-        } catch (error) {
-          this.logger.warn(`Erro ao atualizar status da anomalia: ${error.message}`);
-        }
+      // A programacao e a origem fecham junto com a OS, na mesma transacao.
+      // Antes cada passo tinha um try/catch que so logava: se a origem falhasse,
+      // a OS finalizava e a anomalia ficava PROGRAMADA para sempre.
+      const programacao = await prisma.programacoes_os.findUnique({
+        where: { id: os.programacao_id },
+        select: { id: true, status: true, anomalia_id: true, solicitacao_servico_id: true, dados_origem: true },
+      });
+
+      if (programacao && programacao.status !== 'FINALIZADA') {
+        await prisma.programacoes_os.update({
+          where: { id: programacao.id },
+          data: {
+            status: 'FINALIZADA',
+            finalizado_por: nomeFinalizador,
+            finalizado_por_id: usuarioId,
+            data_finalizacao: new Date(),
+            observacoes_finalizacao: dto.observacoes || 'Finalizada automaticamente via OS',
+          },
+        });
       }
 
-      // Propagar status para origem: programação → FINALIZADA
-      if (os.programacao_id) {
-        try {
-          const programacao = await prisma.programacoes_os.update({
-            where: { id: os.programacao_id },
-            data: {
-              status: 'FINALIZADA',
-              finalizado_por: nomeFinalizador,
-              finalizado_por_id: usuarioId,
-              data_finalizacao: new Date(),
-              observacoes_finalizacao: dto.observacoes || 'Finalizada automaticamente via OS',
-            },
-          });
-          this.logger.log(`Programação ${os.programacao_id} marcada como FINALIZADA`);
-
-          // Propagar status para origem: solicitação → FINALIZADA
-          const solIdFin = programacao.solicitacao_servico_id?.trim()
-            || (programacao.dados_origem as any)?.solicitacaoServicoId?.trim();
-          if (solIdFin) {
-            try {
-              await prisma.solicitacoes_servico.update({
-                where: { id: solIdFin },
-                data: { status: 'FINALIZADA' },
-              });
-              this.logger.log(`Solicitação ${solIdFin} marcada como FINALIZADA`);
-            } catch (error) {
-              this.logger.warn(`Erro ao atualizar status da solicitação: ${error.message}`);
-            }
-          }
-        } catch (error) {
-          this.logger.warn(`Erro ao atualizar status da programação: ${error.message}`);
-        }
-      }
+      const origem = programacao
+        ? origemDaProgramacao(programacao)
+        : { anomaliaId: null, solicitacaoId: null };
+      origem.anomaliaId = origem.anomaliaId ?? (os.anomalia_id?.trim() || null);
+      await finalizarOrigem(prisma, origem, { usuarioId, numeroOS: os.numero_os });
 
       // Registrar execução APENAS das tarefas efetivamente concluídas.
       // Uma OS pode ser finalizada com tarefas PENDENTE ou CANCELADA — marcar
@@ -1209,109 +1192,16 @@ export class ExecucaoOSService {
 
   async cancelar(id: string, dto: CancelarOSDto, usuarioId?: string, user?: ScopedUser): Promise<void> {
     if (user) await this.scopeService.assertEntityInScope('ordem_servico', id, user);
-    const os = await this.buscarPorId(id);
+    await this.buscarPorId(id);
 
-    if (os.status === StatusOS.FINALIZADA || os.status === StatusOS.CANCELADA) {
-      throw new ConflictException('OS finalizada ou cancelada não pode ser cancelada');
-    }
-
-    const statusAnterior = os.status;
-
-    await this.prisma.$transaction(async (prisma) => {
-      await prisma.ordens_servico.update({
-        where: { id },
-        data: {
-          status: StatusOS.CANCELADA,
-          motivo_cancelamento: dto.motivo_cancelamento,
-        },
-      });
-
-      // Cancelar reserva de veículo se existir
-      if (os.reserva_id) {
-        const reservaId = os.reserva_id.trim();
-        const reserva = await prisma.reserva_veiculo.findUnique({
-          where: { id: reservaId },
-        });
-
-        if (reserva && reserva.status === 'ativa') {
-          await prisma.reserva_veiculo.update({
-            where: { id: reservaId },
-            data: {
-              status: 'cancelada',
-              motivo_cancelamento: dto.motivo_cancelamento,
-              data_cancelamento: new Date(),
-              cancelado_por_id: usuarioId,
-            },
-          });
-        }
-      }
-
-      await this.registrarHistorico(
-        prisma,
-        id,
-        'CANCELAMENTO',
-        'Sistema',
+    // Reserva, ancora das tarefas, programacao e origem vao juntas — ver cancelarOS.
+    await this.prisma.$transaction((prisma) =>
+      cancelarOS(prisma, id, {
+        motivo: dto.motivo_cancelamento,
+        observacoes: dto.observacoes,
         usuarioId,
-        `${dto.motivo_cancelamento}. ${dto.observacoes || ''}`,
-        statusAnterior,
-        StatusOS.CANCELADA,
-      );
-
-      // Cancelar a OS inteira e decisao de planejamento: aquele ciclo nao vai
-      // acontecer. A ancora da tarefa avanca para o ciclo cancelado, entao a
-      // proxima geracao cai no ciclo seguinte em vez de recriar a mesma
-      // programacao na madrugada seguinte.
-      const vinculosComCiclo = await prisma.tarefas_os.findMany({
-        where: { os_id: id, tarefa_id: { not: null }, ciclo_referencia: { not: null } },
-        select: { tarefa_id: true, ciclo_referencia: true },
-      });
-
-      for (const vinculo of vinculosComCiclo) {
-        const tarefaId = vinculo.tarefa_id?.trim();
-        if (!tarefaId || !vinculo.ciclo_referencia) continue;
-
-        await prisma.tarefas.update({
-          where: { id: tarefaId },
-          data: { data_ancora: vinculo.ciclo_referencia },
-        });
-      }
-
-      if (vinculosComCiclo.length > 0) {
-        this.logger.log(
-          `OS ${id} cancelada: ${vinculosComCiclo.length} tarefas tiveram o ciclo pulado`,
-        );
-      }
-
-      // Retornar anomalia vinculada para REGISTRADA
-      if (os.anomalia_id) {
-        try {
-          await this.anomaliasService.voltarParaRegistrada(os.anomalia_id);
-          this.logger.log(`Anomalia ${os.anomalia_id} retornada para REGISTRADA`);
-        } catch (error) {
-          this.logger.warn(`Erro ao atualizar status da anomalia: ${error.message}`);
-        }
-      }
-
-      // Retornar solicitação vinculada para REGISTRADA (via programação)
-      if (os.programacao_id) {
-        try {
-          const programacao = await prisma.programacoes_os.findUnique({
-            where: { id: os.programacao_id },
-            select: { solicitacao_servico_id: true, dados_origem: true },
-          });
-          const solIdCanc = programacao?.solicitacao_servico_id?.trim()
-            || (programacao?.dados_origem as any)?.solicitacaoServicoId?.trim();
-          if (solIdCanc) {
-            await prisma.solicitacoes_servico.update({
-              where: { id: solIdCanc },
-              data: { status: 'REGISTRADA' },
-            });
-          }
-        } catch (error) {
-          this.logger.warn(`Erro ao atualizar status da solicitação: ${error.message}`);
-        }
-      }
-    });
+      }),
+    );
   }
 
   // Métodos auxiliares privados

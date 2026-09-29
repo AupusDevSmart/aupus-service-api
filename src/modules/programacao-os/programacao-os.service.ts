@@ -2,9 +2,17 @@ import { ConflictException, Injectable, Logger, NotFoundException } from '@nestj
 import { Prisma, StatusProgramacaoOS } from '@/core';
 import { PrismaService, PermissionScopeService, ScopedUser } from '@/core';
 import { variantesDeIds } from '../tarefas/ids';
-import { AnomaliasService } from '../anomalias/anomalias.service';
 import { gerarNumeroOS } from '../../common/helpers/numeracao-os';
 import { Instalacao, instalacoesDasProgramacoes } from '../../common/helpers/instalacao-da-os';
+import {
+  finalizarOrigem,
+  liberarOrigem,
+  nomeDoAutor,
+  OrigemDaOS,
+  origemDaProgramacao,
+  programarOrigem,
+} from '../../common/helpers/status-da-origem';
+import { avancarAncoraDosCiclos, cancelarOS } from '../execucao-os/cancelar-os';
 import {
   AdicionarTarefasDto,
   AprovarProgramacaoDto,
@@ -27,7 +35,6 @@ export class ProgramacaoOSService {
 
   constructor(
     private readonly prisma: PrismaService,
-    private readonly anomaliasService: AnomaliasService,
     private readonly scopeService: PermissionScopeService,
   ) { }
 
@@ -395,17 +402,14 @@ export class ProgramacaoOSService {
         StatusProgramacaoOS.PENDENTE,
       );
 
-      // Marcar anomalia como PROGRAMADA
-      if (programacao.anomalia_id) {
-        try {
-          await this.anomaliasService.marcarComoProgramada(programacao.anomalia_id, programacao.id);
-          this.logger.log(`Anomalia ${programacao.anomalia_id} marcada como PROGRAMADA`);
-        } catch (error) {
-          this.logger.warn(`Erro ao atualizar status da anomalia: ${error.message}`);
-        }
-      }
-
-      // Nota: Solicitação é atualizada em criarDeSolicitacao() com programacao_os_id e histórico
+      // Anomalia/solicitacao -> PROGRAMADA, na mesma transacao. Recusa a origem
+      // que ja tem programacao em aberto: antes a mesma anomalia chegava a ter
+      // varias OS, e a solicitacao criada pelo formulario ficava REGISTRADA.
+      await programarOrigem(prisma, origemDaProgramacao(programacao), {
+        programacaoId: programacao.id,
+        codigo: programacao.codigo,
+        usuarioId,
+      });
 
       return this.mapearParaResponse(programacao);
     }, {
@@ -449,6 +453,8 @@ export class ProgramacaoOSService {
         }
       }
     });
+
+    this.normalizarOrigemDaEdicao(updateData);
 
     return await this.prisma.$transaction(async (prisma) => {
       const programacaoAtualizada = await prisma.programacoes_os.update({
@@ -554,10 +560,64 @@ export class ProgramacaoOSService {
         'Programação atualizada',
       );
 
+      await this.trocarOrigem(
+        prisma,
+        origemDaProgramacao(programacao),
+        origemDaProgramacao(programacaoAtualizada),
+        { programacaoId: id, codigo: programacao.codigo, usuarioId },
+      );
+
       return this.mapearParaResponse(programacaoAtualizada);
     }, {
       timeout: 15000,
     });
+  }
+
+  /**
+   * O formulario reenvia a origem inteira na edicao, mas so manda `anomalia_id`
+   * quando ha anomalia escolhida — trocar o tipo de origem deixava o id antigo
+   * na coluna. E a solicitacao vem so dentro de `dados_origem`, como na criacao.
+   */
+  private normalizarOrigemDaEdicao(updateData: Record<string, unknown>): void {
+    if (typeof updateData.anomalia_id === 'string') {
+      updateData.anomalia_id = updateData.anomalia_id.trim() || null;
+    }
+
+    const dados = updateData.dados_origem as { solicitacaoServicoId?: unknown } | undefined;
+    if (updateData.solicitacao_servico_id === undefined && typeof dados?.solicitacaoServicoId === 'string') {
+      updateData.solicitacao_servico_id = dados.solicitacaoServicoId.trim() || null;
+    }
+
+    if (updateData.origem !== undefined) {
+      if (updateData.origem !== 'ANOMALIA') updateData.anomalia_id = null;
+      if (updateData.origem !== 'SOLICITACAO_SERVICO') updateData.solicitacao_servico_id = null;
+    }
+  }
+
+  /**
+   * Edicao que troca a origem: a antiga volta para a fila, a nova sai dela.
+   * Antes a antiga ficava PROGRAMADA sem programacao nenhuma apontando para ela.
+   */
+  private async trocarOrigem(
+    prisma: Prisma.TransactionClient,
+    antes: OrigemDaOS,
+    depois: OrigemDaOS,
+    contexto: { programacaoId: string; codigo: string; usuarioId?: string },
+  ): Promise<void> {
+    const saiu: OrigemDaOS = {
+      anomaliaId: antes.anomaliaId !== depois.anomaliaId ? antes.anomaliaId : null,
+      solicitacaoId: antes.solicitacaoId !== depois.solicitacaoId ? antes.solicitacaoId : null,
+    };
+    const entrou: OrigemDaOS = {
+      anomaliaId: antes.anomaliaId !== depois.anomaliaId ? depois.anomaliaId : null,
+      solicitacaoId: antes.solicitacaoId !== depois.solicitacaoId ? depois.solicitacaoId : null,
+    };
+
+    await liberarOrigem(prisma, saiu, {
+      usuarioId: contexto.usuarioId,
+      motivo: `Removida da programação ${contexto.codigo} na edição`,
+    });
+    await programarOrigem(prisma, entrou, contexto);
   }
 
   async aprovar(id: string, dto: AprovarProgramacaoDto, usuarioId?: string, user?: ScopedUser): Promise<void> {
@@ -616,30 +676,14 @@ export class ProgramacaoOSService {
       // Gerar OS automaticamente com status PENDENTE
       const osId = await this.gerarOrdemServico(prisma, id);
 
-      // Propagar status para origem: anomalia → PROGRAMADA
-      if (programacao.anomalia_id) {
-        try {
-          await this.anomaliasService.marcarComoProgramada(programacao.anomalia_id, id);
-          this.logger.log(`Anomalia ${programacao.anomalia_id} marcada como PROGRAMADA`);
-        } catch (error) {
-          this.logger.warn(`Erro ao atualizar status da anomalia: ${error.message}`);
-        }
-      }
-
-      // Propagar status para origem: solicitação → PROGRAMADA
-      const solIdAprovar = programacao.solicitacao_servico_id?.trim()
-        || (programacao.dados_origem as any)?.solicitacaoServicoId?.trim();
-      if (solIdAprovar) {
-        try {
-          await prisma.solicitacoes_servico.update({
-            where: { id: solIdAprovar },
-            data: { status: 'PROGRAMADA' },
-          });
-          this.logger.log(`Solicitação ${solIdAprovar} marcada como PROGRAMADA`);
-        } catch (error) {
-          this.logger.warn(`Erro ao atualizar status da solicitação: ${error.message}`);
-        }
-      }
+      // A origem ja esta PROGRAMADA desde a criacao. Isto so alcanca a
+      // programacao anterior a essa regra, que chegou aqui com ela REGISTRADA.
+      await programarOrigem(prisma, origemDaProgramacao(programacao), {
+        programacaoId: id,
+        codigo: programacao.codigo,
+        usuarioId,
+        exigirRegistrada: false,
+      });
 
       // Vincular reserva de veículo à OS
       if (programacao.reserva_id) {
@@ -687,66 +731,46 @@ export class ProgramacaoOSService {
       throw new ConflictException('Apenas programações aprovadas podem ser finalizadas');
     }
 
-    // Buscar nome do usuário se disponível
-    let nomeUsuario = 'Sistema';
-    if (usuarioId) {
-      try {
-        const usuario = await this.prisma.usuarios.findUnique({ where: { id: usuarioId }, select: { nome: true } });
-        if (usuario) nomeUsuario = usuario.nome;
-      } catch (erro) {
-        // Falhar aqui nao pode derrubar a operacao: o nome e so o rotulo do
-        // historico, e ja existe fallback. Mas engolir calado escondia uma
-        // consulta quebrada indefinidamente — o aviso deixa ela aparecer.
-        this.logger.warn(`Nao foi possivel ler o nome do usuario ${usuarioId}: ${erro}`);
-      }
+    // Quem finaliza a programacao aprovada e a OS dela, ao ser finalizada.
+    // Finalizar a programacao por fora dava a anomalia como resolvida com a OS
+    // ainda aberta. Fica o caminho manual so para a programacao sem OS.
+    const os = programacao.ordem_servico;
+    if (os && os.status !== 'FINALIZADA') {
+      throw new ConflictException(
+        `A programação é finalizada junto com a OS ${os.numero_os}: finalize a OS pela tela de Execução de OS`,
+      );
     }
 
-    await this.prisma.programacoes_os.update({
-      where: { id },
-      data: {
-        status: StatusProgramacaoOS.FINALIZADA,
-        observacoes_finalizacao: dto.observacoes || null,
-        finalizado_por: nomeUsuario,
-        finalizado_por_id: usuarioId || null,
-        data_finalizacao: new Date(),
-      },
+    await this.prisma.$transaction(async (prisma) => {
+      const nomeUsuario = await nomeDoAutor(prisma, usuarioId);
+
+      await prisma.programacoes_os.update({
+        where: { id },
+        data: {
+          status: StatusProgramacaoOS.FINALIZADA,
+          observacoes_finalizacao: dto.observacoes || null,
+          finalizado_por: nomeUsuario,
+          finalizado_por_id: usuarioId || null,
+          data_finalizacao: new Date(),
+        },
+      });
+
+      await this.registrarHistorico(
+        prisma,
+        id,
+        'FINALIZACAO',
+        nomeUsuario,
+        usuarioId,
+        dto.observacoes,
+        StatusProgramacaoOS.APROVADA,
+        StatusProgramacaoOS.FINALIZADA,
+      );
+
+      await finalizarOrigem(prisma, origemDaProgramacao(programacao), {
+        usuarioId,
+        numeroOS: os?.numero_os ?? programacao.codigo,
+      });
     });
-
-    await this.registrarHistorico(
-      this.prisma,
-      id,
-      'FINALIZACAO',
-      nomeUsuario,
-      usuarioId,
-      dto.observacoes,
-      StatusProgramacaoOS.APROVADA,
-      StatusProgramacaoOS.FINALIZADA,
-    );
-
-    // Propagar status para anomalia → FINALIZADA
-    if (programacao.anomalia_id) {
-      try {
-        await this.anomaliasService.marcarComoFinalizada(programacao.anomalia_id);
-        this.logger.log(`Anomalia ${programacao.anomalia_id} marcada como FINALIZADA`);
-      } catch (error) {
-        this.logger.warn(`Erro ao atualizar status da anomalia: ${error.message}`);
-      }
-    }
-
-    // Propagar status para solicitação → FINALIZADA
-    const solIdFinalizar = programacao.solicitacao_servico_id?.trim()
-      || (programacao.dados_origem as any)?.solicitacaoServicoId?.trim();
-    if (solIdFinalizar) {
-      try {
-        await this.prisma.solicitacoes_servico.update({
-          where: { id: solIdFinalizar },
-          data: { status: 'FINALIZADA' },
-        });
-        this.logger.log(`Solicitação ${solIdFinalizar} marcada como FINALIZADA`);
-      } catch (error) {
-        this.logger.warn(`Erro ao atualizar status da solicitação: ${error.message}`);
-      }
-    }
   }
 
   async cancelar(id: string, dto: CancelarProgramacaoDto, usuarioId?: string, user?: ScopedUser): Promise<void> {
@@ -757,74 +781,63 @@ export class ProgramacaoOSService {
       throw new ConflictException('Programação não pode ser cancelada neste status');
     }
 
-    const statusAnterior = programacao.status;
+    // Aprovada, a programacao ja gerou a OS, e cancelar uma sem a outra deixava
+    // a OS PENDENTE viva — executavel, e finalizando uma anomalia que tinha
+    // voltado para a fila. Enquanto a OS nao comecou, as duas saem juntas; depois
+    // de iniciada, cancelar e decisao de quem executa, na tela da OS.
+    const os = programacao.ordem_servico;
+    if (os && os.status !== 'CANCELADA') {
+      if (os.status !== 'PENDENTE') {
+        throw new ConflictException(
+          `A OS ${os.numero_os} já foi iniciada: cancele pela tela de Execução de OS`,
+        );
+      }
+      await this.prisma.$transaction((prisma) =>
+        cancelarOS(prisma, os.id, { motivo: dto.motivo_cancelamento, usuarioId }),
+      );
+      return;
+    }
 
-    await this.prisma.programacoes_os.update({
-      where: { id },
-      data: {
-        status: StatusProgramacaoOS.CANCELADA,
-        motivo_cancelamento: dto.motivo_cancelamento,
-      },
+    await this.prisma.$transaction(async (prisma) => {
+      await prisma.programacoes_os.update({
+        where: { id },
+        data: {
+          status: StatusProgramacaoOS.CANCELADA,
+          motivo_cancelamento: dto.motivo_cancelamento,
+        },
+      });
+
+      await this.registrarHistorico(
+        prisma,
+        id,
+        'CANCELAMENTO',
+        'Sistema',
+        usuarioId,
+        dto.motivo_cancelamento,
+        programacao.status as StatusProgramacaoOS,
+        StatusProgramacaoOS.CANCELADA,
+      );
+
+      await this.cancelarReservaDaProgramacao(
+        prisma,
+        programacao.reserva_id,
+        `Programação ${programacao.codigo} foi cancelada: ${dto.motivo_cancelamento}`,
+      );
+
+      // Mesma regra do cancelamento da OS: o ciclo que o cron gerou e foi
+      // cancelado fica para tras. Sem isso a programacao voltava na madrugada
+      // seguinte, identica.
+      const vinculos = await prisma.tarefas_programacao_os.findMany({
+        where: { programacao_id: id, tarefa_id: { not: null }, ciclo_referencia: { not: null } },
+        select: { tarefa_id: true, ciclo_referencia: true },
+      });
+      await avancarAncoraDosCiclos(prisma, vinculos);
+
+      await liberarOrigem(prisma, origemDaProgramacao(programacao), {
+        usuarioId,
+        motivo: `Programação ${programacao.codigo} cancelada: ${dto.motivo_cancelamento}`,
+      });
     });
-
-    await this.registrarHistorico(
-      this.prisma,
-      id,
-      'CANCELAMENTO',
-      'Sistema',
-      usuarioId,
-      dto.motivo_cancelamento,
-      statusAnterior as StatusProgramacaoOS,
-      StatusProgramacaoOS.CANCELADA,
-    );
-
-    // Cancelar reserva de veículo vinculada
-    if (programacao.reserva_id) {
-      try {
-        const reservaId = programacao.reserva_id.trim();
-        const reserva = await this.prisma.reserva_veiculo.findUnique({
-          where: { id: reservaId },
-        });
-        if (reserva && reserva.status === 'ativa') {
-          await this.prisma.reserva_veiculo.update({
-            where: { id: reservaId },
-            data: {
-              status: 'cancelada',
-              motivo_cancelamento: `Programação ${id} foi cancelada: ${dto.motivo_cancelamento}`,
-              data_cancelamento: new Date(),
-            },
-          });
-          this.logger.log(`Reserva ${reservaId} cancelada após cancelamento da programação`);
-        }
-      } catch (error) {
-        this.logger.warn(`Erro ao cancelar reserva da programação: ${error.message}`);
-      }
-    }
-
-    // Retornar anomalia vinculada para REGISTRADA
-    if (programacao.anomalia_id) {
-      try {
-        await this.anomaliasService.voltarParaRegistrada(programacao.anomalia_id);
-        this.logger.log(`Anomalia ${programacao.anomalia_id} retornada para REGISTRADA após cancelamento`);
-      } catch (error) {
-        this.logger.warn(`Erro ao atualizar status da anomalia: ${error.message}`);
-      }
-    }
-
-    // Retornar solicitação vinculada para REGISTRADA
-    const solIdCancelar = programacao.solicitacao_servico_id?.trim()
-      || (programacao.dados_origem as any)?.solicitacaoServicoId?.trim();
-    if (solIdCancelar) {
-      try {
-        await this.prisma.solicitacoes_servico.update({
-          where: { id: solIdCancelar },
-          data: { status: 'REGISTRADA' },
-        });
-        this.logger.log(`Solicitação ${solIdCancelar} retornada para REGISTRADA após cancelamento`);
-      } catch (error) {
-        this.logger.warn(`Erro ao atualizar status da solicitação: ${error.message}`);
-      }
-    }
   }
 
   async criarDeAnomalia(anomaliaId: string, dto: CreateProgramacaoAnomaliaDto, usuarioId?: string): Promise<ProgramacaoResponseDto> {
@@ -839,6 +852,10 @@ export class ProgramacaoOSService {
 
     if (!anomalia) {
       throw new NotFoundException('Anomalia não encontrada');
+    }
+
+    if (anomalia.status !== 'REGISTRADA') {
+      throw new ConflictException('Apenas anomalias registradas podem gerar programação');
     }
 
     const createDto: CreateProgramacaoDto = {
@@ -860,12 +877,8 @@ export class ProgramacaoOSService {
       },
     };
 
-    const programacao = await this.criar(createDto, usuarioId);
-
-    // ✅ NOVO: Atualizar status da anomalia para EM_ANALISE
-    // (Não precisa do try-catch aqui pois o método criar() já faz isso)
-
-    return programacao;
+    // criar() passa a anomalia para PROGRAMADA
+    return this.criar(createDto, usuarioId);
   }
 
   async criarDeSolicitacao(
@@ -933,32 +946,8 @@ export class ProgramacaoOSService {
       ...dto, // Permitir sobrescrever campos via DTO
     };
 
-    // Criar a programação
+    // criar() ja passa a solicitacao para PROGRAMADA, com vinculo e historico
     const programacao = await this.criar(createDto, usuarioId);
-
-    // Atualizar status da solicitação e vincular programação
-    await this.prisma.$transaction(async (prisma) => {
-      await prisma.solicitacoes_servico.update({
-        where: { id: solicitacaoId },
-        data: {
-          status: 'PROGRAMADA',
-          programacao_os_id: programacao.id,
-        },
-      });
-
-      // Registrar no histórico da solicitação
-      await prisma.historico_solicitacao_servico.create({
-        data: {
-          solicitacao_id: solicitacaoId,
-          acao: 'PROGRAMACAO',
-          usuario_nome: 'Sistema',
-          usuario_id: usuarioId,
-          observacoes: `Programação OS ${programacao.codigo} gerada`,
-          status_anterior: 'REGISTRADA',
-          status_novo: 'PROGRAMADA',
-        },
-      });
-    });
 
     this.logger.log(`Programação ${programacao.codigo} criada a partir da solicitação ${solicitacao.numero}`);
     return programacao;
@@ -1108,23 +1097,55 @@ export class ProgramacaoOSService {
   async deletar(id: string, usuarioId?: string): Promise<void> {
     const programacao = await this.buscarPorId(id);
 
-    if (programacao.status === StatusProgramacaoOS.APROVADA) {
-      throw new ConflictException('Programações aprovadas não podem ser deletadas');
+    // Aprovada ou finalizada ja tem OS: excluir a programacao deixaria a OS sem
+    // pai. O caminho ali e cancelar.
+    if (programacao.status !== StatusProgramacaoOS.PENDENTE && programacao.status !== StatusProgramacaoOS.CANCELADA) {
+      throw new ConflictException('Apenas programações pendentes ou canceladas podem ser excluídas');
     }
 
-    await this.prisma.programacoes_os.update({
-      where: { id },
-      data: { deletado_em: new Date() },
-    });
+    await this.prisma.$transaction(async (prisma) => {
+      await prisma.programacoes_os.update({
+        where: { id },
+        data: { deletado_em: new Date() },
+      });
 
-    await this.registrarHistorico(
-      this.prisma,
-      id,
-      'EXCLUSAO',
-      'Sistema',
-      usuarioId,
-      'Programação excluída',
-    );
+      await this.registrarHistorico(
+        prisma,
+        id,
+        'EXCLUSAO',
+        'Sistema',
+        usuarioId,
+        'Programação excluída',
+      );
+
+      // A cancelada ja devolveu a origem e a reserva ao ser cancelada. A pendente
+      // precisa devolver aqui — antes a anomalia ficava PROGRAMADA apontando para
+      // uma programacao que nao aparece em lugar nenhum, e o veiculo seguia
+      // reservado.
+      if (programacao.status === StatusProgramacaoOS.PENDENTE) {
+        await this.cancelarReservaDaProgramacao(
+          prisma,
+          programacao.reserva_id,
+          `Programação ${programacao.codigo} foi excluída`,
+        );
+        await liberarOrigem(prisma, origemDaProgramacao(programacao), {
+          usuarioId,
+          motivo: `Programação ${programacao.codigo} excluída`,
+        });
+      }
+    });
+  }
+
+  private async cancelarReservaDaProgramacao(
+    prisma: Prisma.TransactionClient,
+    reservaId: string | null | undefined,
+    motivo: string,
+  ): Promise<void> {
+    if (!reservaId) return;
+    await prisma.reserva_veiculo.updateMany({
+      where: { id: reservaId.trim(), status: 'ativa' },
+      data: { status: 'cancelada', motivo_cancelamento: motivo, data_cancelamento: new Date() },
+    });
   }
 
   // Métodos auxiliares privados

@@ -1,7 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { ExecucaoOSService } from './execucao-os.service';
 import { PrismaService, PermissionScopeService } from '@/core';
-import { AnomaliasService } from '../anomalias/anomalias.service';
 import { NotFoundException, ConflictException } from '@nestjs/common';
 import { StatusOS, CondicaoOS, TipoOS, PrioridadeOS, OrigemOS } from '@/core';
 import {
@@ -102,6 +101,33 @@ describe('ExecucaoOSService', () => {
     },
     reserva_veiculo: {
       create: jest.fn(),
+      updateMany: jest.fn(),
+    },
+    /**
+     * Finalizar e cancelar a OS levam junto a programacao e a origem
+     * (`cancelar-os.ts`, `common/helpers/status-da-origem.ts`). Sem programacao
+     * nem origem, os defaults deixam esses passos sem efeito.
+     */
+    programacoes_os: {
+      findUnique: jest.fn().mockResolvedValue(null),
+      update: jest.fn(),
+    },
+    historico_programacao_os: {
+      create: jest.fn(),
+    },
+    anomalias: {
+      updateMany: jest.fn().mockResolvedValue({ count: 0 }),
+      findFirst: jest.fn().mockResolvedValue(null),
+    },
+    historico_anomalias: {
+      create: jest.fn(),
+    },
+    solicitacoes_servico: {
+      updateMany: jest.fn().mockResolvedValue({ count: 0 }),
+      findFirst: jest.fn().mockResolvedValue(null),
+    },
+    historico_solicitacao_servico: {
+      create: jest.fn(),
     },
     checklist_atividades_os: {
       count: jest.fn(),
@@ -141,13 +167,6 @@ describe('ExecucaoOSService', () => {
           useValue: mockPrismaService,
         },
         {
-          provide: AnomaliasService,
-          useValue: {
-            marcarComoFinalizada: jest.fn(),
-            voltarParaRegistrada: jest.fn(),
-          },
-        },
-        {
           // Sem escopo: os testes chamam os metodos sem `user`, entao as
           // assercoes de escopo nao devem interferir.
           provide: PermissionScopeService,
@@ -160,6 +179,10 @@ describe('ExecucaoOSService', () => {
         },
       ],
     }).compile();
+
+    mockPrismaService.ordens_servico.findUnique.mockImplementation((...args: unknown[]) =>
+      mockPrismaService.ordens_servico.findFirst(...args),
+    );
 
     service = module.get<ExecucaoOSService>(ExecucaoOSService);
     prisma = module.get<PrismaService>(PrismaService);
@@ -663,6 +686,7 @@ describe('ExecucaoOSService', () => {
         findUnique: jest.fn().mockResolvedValue({ nome: 'Admin' }),
       };
       (mockPrismaService as any).programacoes_os = {
+        findUnique: jest.fn().mockResolvedValue(null),
         update: jest.fn().mockResolvedValue({ solicitacao_servico_id: null }),
       };
 
@@ -707,6 +731,7 @@ describe('ExecucaoOSService', () => {
         findUnique: jest.fn().mockResolvedValue({ nome: 'Admin' }),
       };
       (mockPrismaService as any).programacoes_os = {
+        findUnique: jest.fn().mockResolvedValue(null),
         update: jest.fn().mockResolvedValue({ solicitacao_servico_id: null }),
       };
       mockPrismaService.ordens_servico.update.mockResolvedValue({});
@@ -864,6 +889,7 @@ describe('ExecucaoOSService', () => {
           findUnique: jest.fn().mockResolvedValue({ nome: 'Admin' }),
         };
         (mockPrismaService as any).programacoes_os = {
+          findUnique: jest.fn().mockResolvedValue(null),
           update: jest.fn().mockResolvedValue({ solicitacao_servico_id: null }),
         };
 
@@ -900,6 +926,7 @@ describe('ExecucaoOSService', () => {
           findUnique: jest.fn().mockResolvedValue({ nome: 'Admin' }),
         };
         (mockPrismaService as any).programacoes_os = {
+          findUnique: jest.fn().mockResolvedValue(null),
           update: jest.fn().mockResolvedValue({ solicitacao_servico_id: null }),
         };
 
@@ -937,6 +964,7 @@ describe('ExecucaoOSService', () => {
           findUnique: jest.fn().mockResolvedValue({ nome: 'Admin' }),
         };
         (mockPrismaService as any).programacoes_os = {
+          findUnique: jest.fn().mockResolvedValue(null),
           update: jest.fn().mockResolvedValue({ solicitacao_servico_id: null }),
         };
 

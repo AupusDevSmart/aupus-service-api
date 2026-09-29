@@ -404,39 +404,6 @@ export class AnomaliasService {
     return { total, registradas, programadas, finalizadas, criticas };
   }
 
-  async marcarComoProgramada(id: string, programacao_os_id?: string): Promise<void> {
-    const anomalia = await this.findOne(id);
-
-    await this.prisma.anomalias.update({
-      where: { id },
-      data: {
-        status: 'PROGRAMADA',
-      },
-    });
-
-    this.logger.log(`Anomalia ${id} marcada como programada`);
-  }
-
-  async marcarComoFinalizada(id: string): Promise<void> {
-    await this.prisma.anomalias.update({
-      where: { id },
-      data: { status: 'FINALIZADA' },
-    });
-
-    this.logger.log(`Anomalia ${id} marcada como finalizada`);
-  }
-
-  async voltarParaRegistrada(id: string): Promise<void> {
-    await this.prisma.anomalias.update({
-      where: { id },
-      data: {
-        status: 'REGISTRADA',
-      },
-    });
-
-    this.logger.log(`Anomalia ${id} voltou para registrada`);
-  }
-
   /**
    * Quando o usuario nao tem `anomalias.manage`, exige que ele seja o autor da anomalia
    * (anomalias.manage_own). Sem permissions na sessao -> deixa passar (caller ja confiou no guard).

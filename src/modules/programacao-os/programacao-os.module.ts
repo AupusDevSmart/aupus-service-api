@@ -2,7 +2,6 @@ import { Module, forwardRef } from '@nestjs/common';
 import { PrismaModule } from '@/core';
 import { ProgramacaoOSController } from './programacao-os.controller';
 import { ProgramacaoOSService } from './programacao-os.service';
-import { AnomaliasService } from '../anomalias/anomalias.service';
 import { SolicitacoesServicoModule } from '../solicitacoes-servico/solicitacoes-servico.module';
 
 @Module({
@@ -11,7 +10,7 @@ import { SolicitacoesServicoModule } from '../solicitacoes-servico/solicitacoes-
     forwardRef(() => SolicitacoesServicoModule), // Para evitar dependência circular
   ],
   controllers: [ProgramacaoOSController],
-  providers: [ProgramacaoOSService, AnomaliasService],
+  providers: [ProgramacaoOSService],
   exports: [ProgramacaoOSService],
 })
 export class ProgramacaoOSModule {}
