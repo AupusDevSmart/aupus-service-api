@@ -20,6 +20,7 @@ import { Prisma } from '@/core';
 
 // Import the enum from Prisma
 import { StatusSolicitacaoServico } from '@/core';
+import { comDataNecessidadeNormalizada } from './data-necessidade';
 
 @Injectable()
 export class SolicitacoesServicoService {
@@ -208,7 +209,8 @@ export class SolicitacoesServicoService {
       if (user) await this.scopeService.assertPlantaInScope(planta_id, user);
 
       // Extrair campos que não são colunas da tabela antes de criar
-      const { instrucoes_ids, tarefas_ids, ...createData } = createDto as any;
+      const { instrucoes_ids, tarefas_ids, ...camposDaTabela } = createDto as any;
+      const createData = comDataNecessidadeNormalizada(camposDaTabela);
 
       // Criar solicitação com solicitante_id e solicitante_nome preenchidos
       // Removido o include da planta para evitar erro com soft delete
@@ -555,7 +557,8 @@ export class SolicitacoesServicoService {
     }
 
     // Extrair instrucoes_ids antes de passar para o Prisma (não é coluna da tabela)
-    const { instrucoes_ids, ...prismaData } = updateDto as any;
+    const { instrucoes_ids, ...camposDaTabela } = updateDto as any;
+    const prismaData = comDataNecessidadeNormalizada(camposDaTabela);
 
     return await this.prisma.$transaction(async (prisma) => {
       const solicitacaoAtualizada = await prisma.solicitacoes_servico.update({
