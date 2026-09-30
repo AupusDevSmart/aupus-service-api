@@ -1,4 +1,4 @@
-import { IsOptional, IsEnum, IsDateString, IsString, IsNumber, Min, Length } from 'class-validator';
+import { IsOptional, IsEnum, IsDateString, IsString, IsNumber, Min, Length, MaxLength } from 'class-validator';
 import { Type } from 'class-transformer';
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { StatusProgramacaoOS, TipoOS, PrioridadeOS, OrigemOS } from '@/core';
@@ -64,6 +64,19 @@ export class ProgramacaoFiltersDto {
   @IsOptional()
   @IsDateString()
   data_fim?: string;
+
+  // Sem @Length(26): ids antigos de anomalia tem 25 caracteres (cuid).
+  @ApiPropertyOptional({ description: 'Programações desta anomalia (atalho "Ver programação")' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(26)
+  anomalia_id?: string;
+
+  @ApiPropertyOptional({ description: 'Programações desta solicitação (atalho "Ver programação")' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(26)
+  solicitacao_servico_id?: string;
 
   @ApiPropertyOptional({ description: 'ID do criador' })
   @IsOptional()

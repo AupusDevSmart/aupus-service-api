@@ -96,6 +96,15 @@ export class ProgramacaoOSService {
       where.origem = origem;
     }
 
+    // Char(26) com padding contra id de 25 caracteres: as duas formas.
+    if (filters.anomalia_id?.trim()) {
+      where.anomalia_id = { in: variantesDeIds([filters.anomalia_id.trim()]) };
+    }
+
+    if (filters.solicitacao_servico_id?.trim()) {
+      where.solicitacao_servico_id = { in: variantesDeIds([filters.solicitacao_servico_id.trim()]) };
+    }
+
     if (planta_id) {
       where.planta_id = planta_id;
     }

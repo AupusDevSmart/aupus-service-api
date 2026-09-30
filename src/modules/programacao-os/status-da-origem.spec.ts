@@ -244,6 +244,36 @@ describe('status da origem acompanha programacao e OS (banco real)', () => {
     });
   });
 
+  describe('listar por origem (atalho "Ver programação")', () => {
+    it('filtra pela anomalia, com id de 25 caracteres em Char(26)', async () => {
+      const alvo = await novaAnomalia('filtro-alvo');
+      const outra = await novaAnomalia('filtro-outra');
+      const prog = await programarAnomalia(alvo);
+      await programarAnomalia(outra);
+
+      const r = await programacoes.listar({ anomalia_id: alvo, page: 1, limit: 50 } as never);
+
+      expect(r.data.map((p) => p.id)).toEqual([prog.id]);
+    });
+
+    it('filtra pela solicitação', async () => {
+      const solId = await novaSolicitacao('filtro');
+      const prog = await programacoes.criar({
+        descricao: `${PREFIXO} programacao`,
+        condicoes: 'FUNCIONANDO',
+        tipo: 'CORRETIVA',
+        prioridade: 'MEDIA',
+        origem: 'SOLICITACAO_SERVICO',
+        planta_id: ID_PLANTA,
+        dados_origem: { tipo: 'SOLICITACAO_SERVICO', solicitacaoServicoId: solId },
+      } as never);
+
+      const r = await programacoes.listar({ solicitacao_servico_id: solId, page: 1, limit: 50 } as never);
+
+      expect(r.data.map((p) => p.id)).toEqual([prog.id]);
+    });
+  });
+
   describe('solicitacao de servico', () => {
     const programarSolicitacao = (solicitacaoId: string) =>
       programacoes.criar({
