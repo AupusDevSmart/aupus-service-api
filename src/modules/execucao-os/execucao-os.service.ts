@@ -24,6 +24,7 @@ import { gerarNumeroOS } from '../../common/helpers/numeracao-os';
 import { Instalacao, instalacoesDasOrdens } from '../../common/helpers/instalacao-da-os';
 import { finalizarOrigem, origemDaProgramacao } from '../../common/helpers/status-da-origem';
 import { cancelarOS } from './cancelar-os';
+import { variantesDeIds } from '../tarefas/ids';
 
 /**
  * Nome da tarefa dentro de uma OS, sem depender da tarefa viva.
@@ -733,30 +734,26 @@ export class ExecucaoOSService {
   }
 
   async atualizarChecklist(id: string, dto: AtualizarChecklistDto, usuarioId?: string): Promise<void> {
-    await this.buscarPorId(id); // Verificar se existe
+    const os = await this.buscarPorId(id);
+    this.exigirEmExecucao(os.status);
+    const autor = await this.nomeDoUsuario(usuarioId);
 
     await this.prisma.$transaction(async (prisma) => {
       for (const atividade of dto.atividades) {
-        await prisma.checklist_atividades_os.update({
-          where: { id: atividade.id },
+        // updateMany com os_id: item de outra OS não é alterado por engano
+        await prisma.checklist_atividades_os.updateMany({
+          where: { id: atividade.id, os_id: id },
           data: {
             concluida: atividade.concluida,
             observacoes: atividade.observacoes,
             concluida_em: atividade.concluida ? new Date() : null,
-            concluida_por_id: atividade.concluida ? usuarioId : null,
+            concluida_por: atividade.concluida ? autor : null,
+            concluida_por_id: atividade.concluida ? usuarioId ?? null : null,
           },
         });
       }
-
-      // Registrar histórico
-      await this.registrarHistorico(
-        prisma,
-        id,
-        'ATUALIZACAO_CHECKLIST',
-        'Sistema',
-        usuarioId,
-        `Checklist atualizado: ${dto.atividades.length} atividade(s)`,
-      );
+      // Sem linha no histórico da OS: a tela grava item a item, e cada clique
+      // virava um "Checklist atualizado". Quem marcou e quando fica no item.
     });
   }
 
@@ -815,19 +812,21 @@ export class ExecucaoOSService {
   }
 
   async concluirTarefa(id: string, tarefaId: string, dto: ConcluirTarefaDto, usuarioId?: string): Promise<void> {
-    await this.buscarPorId(id); // Verificar se existe
+    const os = await this.buscarPorId(id);
+    this.exigirEmExecucao(os.status);
+    const tarefa = await this.vinculoDaTarefa(id, tarefaId);
 
-    const tarefa = await this.prisma.tarefas_os.findFirst({
-      where: {
-        os_id: id,
-        tarefa_id: tarefaId,
-      },
-      include: { tarefa: true },
+    // D1: a tarefa só conclui com os itens obrigatórios dela marcados.
+    const obrigatoriosPendentes = await this.prisma.checklist_atividades_os.count({
+      where: { os_id: id, tarefa_os_id: tarefa.id, obrigatoria: true, concluida: false },
     });
-
-    if (!tarefa) {
-      throw new NotFoundException('Tarefa não encontrada na OS');
+    if (obrigatoriosPendentes > 0) {
+      throw new ConflictException(
+        `Marque os ${obrigatoriosPendentes} item(ns) obrigatório(s) do checklist desta tarefa antes de concluí-la`,
+      );
     }
+
+    const autor = dto.concluida_por || (await this.nomeDoUsuario(usuarioId));
 
     await this.prisma.$transaction(async (prisma) => {
       // Atualizar tarefa
@@ -836,8 +835,8 @@ export class ExecucaoOSService {
         data: {
           status: 'CONCLUIDA',
           data_conclusao: new Date(),
-          concluida_por: dto.concluida_por || 'Sistema',
-          observacoes: dto.observacoes,
+          concluida_por: autor,
+          observacoes: dto.observacoes ?? null,
         },
       });
 
@@ -846,7 +845,7 @@ export class ExecucaoOSService {
         await prisma.registros_tempo_os.create({
           data: {
             os_id: id,
-            tecnico_nome: dto.concluida_por || 'Sistema',
+            tecnico_nome: autor,
             data_hora_inicio: new Date(),
             tempo_total: dto.tempo_execucao,
             atividade: `Execução da tarefa: ${nomeDaTarefa(tarefa)}`,
@@ -860,7 +859,7 @@ export class ExecucaoOSService {
         prisma,
         id,
         'CONCLUSAO_TAREFA',
-        dto.concluida_por || 'Sistema',
+        autor,
         usuarioId,
         `Tarefa concluída: ${nomeDaTarefa(tarefa)}. ${dto.problemas_encontrados ? `Problemas: ${dto.problemas_encontrados}` : ''}`,
       );
@@ -868,27 +867,20 @@ export class ExecucaoOSService {
   }
 
   async cancelarTarefa(id: string, tarefaId: string, dto: CancelarTarefaDto, usuarioId?: string): Promise<void> {
-    await this.buscarPorId(id); // Verificar se existe
-
-    const tarefa = await this.prisma.tarefas_os.findFirst({
-      where: {
-        os_id: id,
-        tarefa_id: tarefaId,
-      },
-      include: { tarefa: true },
-    });
-
-    if (!tarefa) {
-      throw new NotFoundException('Tarefa não encontrada na OS');
-    }
+    const os = await this.buscarPorId(id);
+    this.exigirEmExecucao(os.status);
+    const tarefa = await this.vinculoDaTarefa(id, tarefaId);
 
     await this.prisma.$transaction(async (prisma) => {
-      // Atualizar tarefa
+      // "Não feita": o motivo fica no vínculo e continua devendo no plano
+      // (o cron só conta CONCLUIDA). Não avança a âncora — diferente de
+      // cancelar a OS inteira, que é decisão de pular o ciclo.
       await prisma.tarefas_os.update({
         where: { id: tarefa.id },
         data: {
           status: 'CANCELADA',
-          observacoes: `${dto.motivo_cancelamento}. ${dto.observacoes || ''}`,
+          data_conclusao: null,
+          observacoes: [dto.motivo_cancelamento, dto.observacoes].filter(Boolean).join('. '),
         },
       });
 
@@ -902,6 +894,55 @@ export class ExecucaoOSService {
         `Tarefa cancelada: ${nomeDaTarefa(tarefa)}. Motivo: ${dto.motivo_cancelamento}`,
       );
     });
+  }
+
+  /** Desfaz "feita" ou "não feita" enquanto a OS está em execução (clique errado) */
+  async reabrirTarefa(id: string, tarefaId: string, usuarioId?: string): Promise<void> {
+    const os = await this.buscarPorId(id);
+    this.exigirEmExecucao(os.status);
+    const tarefa = await this.vinculoDaTarefa(id, tarefaId);
+
+    await this.prisma.$transaction(async (prisma) => {
+      await prisma.tarefas_os.update({
+        where: { id: tarefa.id },
+        data: { status: 'PENDENTE', data_conclusao: null, concluida_por: null, observacoes: null },
+      });
+      await this.registrarHistorico(
+        prisma, id, 'REABERTURA_TAREFA', 'Sistema', usuarioId,
+        `Tarefa reaberta: ${nomeDaTarefa(tarefa)}`,
+      );
+    });
+  }
+
+  /**
+   * O vínculo da tarefa na OS, pelo id do vínculo (o que a tela usa) ou pelo id
+   * da tarefa do plano (contrato antigo). O vínculo existe mesmo quando a cópia
+   * do plano foi apagada; e o id da tarefa vem com as duas formas do Char(26).
+   */
+  private async vinculoDaTarefa(osId: string, ref: string) {
+    const alvo = ref.trim();
+    const vinculo = await this.prisma.tarefas_os.findFirst({
+      where: { os_id: osId, OR: [{ id: alvo }, { tarefa_id: { in: [alvo, alvo.padEnd(26, ' ')] } }] },
+      include: { tarefa: true },
+    });
+    if (!vinculo) throw new NotFoundException('Tarefa não encontrada na OS');
+    return vinculo;
+  }
+
+  /** Checklist e tarefas só mudam com a OS em execução ou pausada */
+  private exigirEmExecucao(status: string) {
+    if (status !== StatusOS.EM_EXECUCAO && status !== StatusOS.PAUSADA) {
+      throw new ConflictException('Checklist e tarefas só podem ser alterados com a OS em execução ou pausada');
+    }
+  }
+
+  private async nomeDoUsuario(usuarioId?: string): Promise<string> {
+    if (!usuarioId) return 'Sistema';
+    const usuario = await this.prisma.usuarios.findUnique({
+      where: { id: usuarioId.trim() },
+      select: { nome: true },
+    });
+    return usuario?.nome ?? 'Sistema';
   }
 
   async executar(id: string, dto: ExecutarOSDto, usuarioId?: string, user?: ScopedUser): Promise<void> {
@@ -921,7 +962,52 @@ export class ExecucaoOSService {
 
     const custoReal = await this.calcularCustoReal(id, dto);
 
+    // D2: executar não bloqueia por tarefa pendente, mas exige o motivo de cada
+    // uma. Não fazer uma tarefa é comum (a equipe viaja e não consegue); o que
+    // não pode é ela sumir sem registro.
+    const pendentes = await this.prisma.tarefas_os.findMany({
+      where: { os_id: id, status: 'PENDENTE' },
+      include: { tarefa: true },
+    });
+    const motivos = new Map(
+      (dto.tarefas_nao_feitas ?? [])
+        .filter((t) => t.motivo?.trim())
+        .map((t) => [t.id.trim(), t.motivo.trim()]),
+    );
+    const semMotivo = pendentes.filter((t) => !motivos.has(t.id.trim()));
+    if (semMotivo.length > 0) {
+      throw new ConflictException(
+        `Informe por que estas tarefas não foram feitas: ${semMotivo.map(nomeDaTarefa).join(', ')}`,
+      );
+    }
+
+    // Os itens gerais (segurança e encerramento, sem tarefa) marcados como
+    // obrigatórios valem para qualquer OS: sem eles a marca "obrigatório" era
+    // só um rótulo, e a OS saía executada com tudo desmarcado.
+    const geraisPendentes = await this.prisma.checklist_atividades_os.findMany({
+      where: { os_id: id, tarefa_os_id: null, obrigatoria: true, concluida: false },
+      select: { atividade: true },
+      orderBy: { ordem: 'asc' },
+    });
+    if (geraisPendentes.length > 0) {
+      throw new ConflictException(
+        `Marque os itens obrigatórios de segurança e encerramento: ${geraisPendentes.map((i) => i.atividade).join(', ')}`,
+      );
+    }
+
     await this.prisma.$transaction(async (prisma) => {
+      for (const tarefa of pendentes) {
+        const motivo = motivos.get(tarefa.id.trim())!;
+        await prisma.tarefas_os.update({
+          where: { id: tarefa.id },
+          data: { status: 'CANCELADA', data_conclusao: null, observacoes: motivo },
+        });
+        await this.registrarHistorico(
+          prisma, id, 'TAREFA_NAO_FEITA', 'Sistema', usuarioId,
+          `Tarefa não feita: ${nomeDaTarefa(tarefa)}. Motivo: ${motivo}`,
+        );
+      }
+
       await prisma.ordens_servico.update({
         where: { id },
         data: {
@@ -1230,30 +1316,59 @@ export class ExecucaoOSService {
       ordem: number;
       obrigatoria: boolean;
       tempo_estimado?: number | null;
+      tarefa_os_id?: string | null;
     }> = [];
 
-    const tarefasDaOS = await prisma.tarefas_os.findMany({
+    const vinculos = await prisma.tarefas_os.findMany({
       where: { os_id: osId, tarefa_id: { not: null } },
       orderBy: { ordem: 'asc' },
-      select: {
-        nome_snapshot: true,
-        instrucao_nome: true,
-        tarefa: {
-          select: {
-            nome: true,
-            instrucao: {
-              select: {
-                nome: true,
-                sub_instrucoes: {
-                  orderBy: { ordem: 'asc' },
-                  select: { descricao: true, obrigatoria: true, tempo_estimado: true },
-                },
-              },
-            },
-          },
-        },
-      },
+      select: { id: true, tarefa_id: true, nome_snapshot: true, instrucao_nome: true },
     });
+
+    // As tarefas vêm numa consulta à parte, pelo id sem espaço. Pelo include
+    // da relação, `tarefas_os.tarefa_id` (Char(26), com padding) contra
+    // `tarefas.id` (VarChar(26)) volta NULO para ids de 25 caracteres — o
+    // Prisma compara em JS —, e a OS nascia só com os itens gerais, sem as
+    // sub-instruções das tarefas.
+    const idsDasTarefas = vinculos.map((v) => v.tarefa_id!.trim());
+    const tarefasBase: Array<{ id: string; nome: string; instrucao_id: string | null; instrucao: { nome: string } | null }> =
+      idsDasTarefas.length
+        ? await prisma.tarefas.findMany({
+            where: { id: { in: variantesDeIds(idsDasTarefas) } },
+            select: { id: true, nome: true, instrucao_id: true, instrucao: { select: { nome: true } } },
+          })
+        : [];
+
+    // Mesma armadilha um nível abaixo: `sub_instrucoes.instrucao_id` é Char(26)
+    // e `instrucoes.id` é VarChar(26). Pelo include, instrução de id com 25
+    // caracteres vinha com a lista de sub-instruções VAZIA.
+    const idsDasInstrucoes = [...new Set(tarefasBase.map((t) => t.instrucao_id?.trim()).filter(Boolean) as string[])];
+    const subs: Array<{ instrucao_id: string; descricao: string; obrigatoria: boolean | null; tempo_estimado: number | null }> =
+      idsDasInstrucoes.length
+        ? await prisma.sub_instrucoes.findMany({
+            where: { instrucao_id: { in: variantesDeIds(idsDasInstrucoes) } },
+            orderBy: { ordem: 'asc' },
+            select: { instrucao_id: true, descricao: true, obrigatoria: true, tempo_estimado: true },
+          })
+        : [];
+    const subsPorInstrucao = new Map<string, typeof subs>();
+    for (const s of subs) {
+      const chave = s.instrucao_id.trim();
+      subsPorInstrucao.set(chave, [...(subsPorInstrucao.get(chave) ?? []), s]);
+    }
+
+    const tarefaPorId = new Map(
+      tarefasBase.map((t) => [
+        t.id.trim(),
+        {
+          nome: t.nome,
+          instrucao: t.instrucao
+            ? { nome: t.instrucao.nome, sub_instrucoes: subsPorInstrucao.get(t.instrucao_id?.trim() ?? '') ?? [] }
+            : null,
+        },
+      ]),
+    );
+    const tarefasDaOS = vinculos.map((v) => ({ ...v, tarefa: tarefaPorId.get(v.tarefa_id!.trim()) ?? null }));
 
     let ordem = 1;
     for (const vinculo of tarefasDaOS) {
@@ -1276,6 +1391,8 @@ export class ExecucaoOSService {
           ordem: ordem++,
           obrigatoria: sub.obrigatoria ?? false,
           tempo_estimado: sub.tempo_estimado ?? null,
+          // A tela agrupa por tarefa e exige os obrigatórios dela (D4)
+          tarefa_os_id: vinculo.id,
         });
       }
     }
@@ -1696,6 +1813,7 @@ export class ExecucaoOSService {
         concluida_em: c.concluida_em,
         concluida_por: c.concluida_por,
         concluida_por_id: c.concluida_por_id,
+        tarefa_os_id: c.tarefa_os_id ?? null,
         created_at: c.created_at,
         updated_at: c.updated_at,
       })) || [],

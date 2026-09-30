@@ -2067,6 +2067,8 @@ model tarefas_os {
   updated_at           DateTime       @updatedAt @map("updated_at")
   ordem_servico        ordens_servico @relation(fields: [os_id], references: [id], onDelete: Cascade)
   tarefa               tarefas?       @relation(fields: [tarefa_id], references: [id])
+  /// Itens do checklist que pertencem a esta tarefa (SPEC-EXECUCAO-DA-OS, D4)
+  checklist            checklist_atividades_os[]
 
   @@index([os_id])
   @@index([tarefa_id])
@@ -2195,12 +2197,18 @@ model checklist_atividades_os {
   concluida_em     DateTime?      @map("concluida_em")
   concluida_por    String?        @map("concluida_por") @db.VarChar(255)
   concluida_por_id String?        @map("concluida_por_id") @db.Char(26)
+  /// A tarefa da OS a que o item pertence. Nulo nos itens gerais de segurança.
+  /// Antes o vínculo existia só no texto ("Tarefa: item"), e a tela não tinha
+  /// como agrupar o checklist por tarefa nem exigir os obrigatórios dela.
+  tarefa_os_id     String?        @map("tarefa_os_id")
   created_at       DateTime       @default(now()) @map("created_at")
   updated_at       DateTime       @updatedAt @map("updated_at")
   ordem_servico    ordens_servico @relation(fields: [os_id], references: [id], onDelete: Cascade)
+  tarefa_os        tarefas_os?    @relation(fields: [tarefa_os_id], references: [id], onDelete: SetNull)
 
   @@index([os_id])
   @@index([ordem])
+  @@index([tarefa_os_id])
   @@map("checklist_atividades_os")
 }
 

@@ -294,7 +294,30 @@ export class FerramentaFinalizacaoDto {
   observacoes?: string;
 }
 
+/** Tarefa que a equipe não conseguiu fazer, com o motivo (SPEC-EXECUCAO-DA-OS, D2) */
+export class TarefaNaoFeitaDto {
+  @ApiProperty({ description: 'ID do vínculo da tarefa na OS (tarefas_os.id)' })
+  @IsString()
+  @IsNotEmpty()
+  id: string;
+
+  @ApiProperty({ description: 'Por que não foi feita' })
+  @IsString()
+  @IsNotEmpty()
+  motivo: string;
+}
+
 export class ExecutarOSDto {
+  @ApiPropertyOptional({
+    description: 'Tarefas pendentes que não foram feitas, cada uma com o motivo. Toda tarefa ainda pendente precisa estar aqui.',
+    type: [TarefaNaoFeitaDto],
+  })
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => TarefaNaoFeitaDto)
+  tarefas_nao_feitas?: TarefaNaoFeitaDto[];
+
   @ApiPropertyOptional({ description: 'Data e hora de fim real', example: '2025-02-15T17:00:00Z' })
   @IsOptional()
   @IsDateString()

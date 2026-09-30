@@ -279,6 +279,22 @@ export class ExecucaoOSController {
     return { message: 'Tarefa cancelada' };
   }
 
+  @Patch(':id/tarefas/:tarefaId/reabrir')
+  @ApiOperation({
+    summary: 'Reabrir tarefa da OS',
+    description: 'Desfaz "feita" ou "não feita" enquanto a OS está em execução',
+  })
+  @ApiParam({ name: 'id', description: 'ID da OS' })
+  @ApiParam({ name: 'tarefaId', description: 'ID do vínculo (tarefas_os) ou da tarefa' })
+  async reabrirTarefa(
+    @Param('id') id: string,
+    @Param('tarefaId') tarefaId: string,
+    @CurrentUser() user?: any,
+  ): Promise<{ message: string }> {
+    await this.execucaoOSService.reabrirTarefa(id.trim(), tarefaId.trim(), user?.id);
+    return { message: 'Tarefa reaberta' };
+  }
+
   @Post(':id/anexos')
   @ApiOperation({
     summary: 'Adicionar anexo à OS',

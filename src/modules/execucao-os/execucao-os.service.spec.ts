@@ -85,6 +85,10 @@ describe('ExecucaoOSService', () => {
     // no cancelamento
     tarefas: {
       update: jest.fn(),
+      findMany: jest.fn().mockResolvedValue([]),
+    },
+    sub_instrucoes: {
+      findMany: jest.fn().mockResolvedValue([]),
     },
     materiais_os: {
       findMany: jest.fn(),
@@ -133,6 +137,7 @@ describe('ExecucaoOSService', () => {
       count: jest.fn(),
       createMany: jest.fn(),
       update: jest.fn(),
+      updateMany: jest.fn(),
     },
     registros_tempo_os: {
       create: jest.fn(),
@@ -484,14 +489,16 @@ describe('ExecucaoOSService', () => {
       });
 
       mockPrismaService.$transaction.mockImplementation(mockTransaction);
-      mockPrismaService.ordens_servico.findFirst.mockResolvedValue(mockOSData);
-      mockPrismaService.checklist_atividades_os.update.mockResolvedValue({});
+      // Checklist só muda com a OS em execução (SPEC-EXECUCAO-DA-OS)
+      mockPrismaService.ordens_servico.findFirst.mockResolvedValue({ ...mockOSData, status: StatusOS.EM_EXECUCAO });
+      mockPrismaService.checklist_atividades_os.updateMany.mockResolvedValue({ count: 1 });
       mockPrismaService.historico_os.create.mockResolvedValue({});
 
       await service.atualizarChecklist('clrx1234567890123456789012', checklistDto, 'user123');
 
-      expect(mockPrismaService.checklist_atividades_os.update).toHaveBeenCalledWith({
-        where: { id: checklistDto.atividades[0].id },
+      // updateMany com os_id: item de outra OS não é alterado por engano
+      expect(mockPrismaService.checklist_atividades_os.updateMany).toHaveBeenCalledWith({
+        where: { id: checklistDto.atividades[0].id, os_id: 'clrx1234567890123456789012' },
         data: expect.objectContaining({
           concluida: true,
           observacoes: 'Atividade concluída',
@@ -499,6 +506,8 @@ describe('ExecucaoOSService', () => {
           concluida_por_id: 'user123',
         }),
       });
+      // A tela grava item a item: uma linha de histórico por clique poluía o registro
+      expect(mockPrismaService.historico_os.create).not.toHaveBeenCalled();
     });
   });
 
@@ -585,7 +594,8 @@ describe('ExecucaoOSService', () => {
       });
 
       mockPrismaService.$transaction.mockImplementation(mockTransaction);
-      mockPrismaService.ordens_servico.findFirst.mockResolvedValue(mockOSData);
+      mockPrismaService.ordens_servico.findFirst.mockResolvedValue({ ...mockOSData, status: StatusOS.EM_EXECUCAO });
+      mockPrismaService.checklist_atividades_os.count.mockResolvedValue(0);
       mockPrismaService.tarefas_os.findFirst.mockResolvedValue(mockTarefaData);
       mockPrismaService.tarefas_os.update.mockResolvedValue({});
       mockPrismaService.registros_tempo_os.create.mockResolvedValue({});
@@ -619,7 +629,8 @@ describe('ExecucaoOSService', () => {
     });
 
     it('deve lançar NotFoundException para tarefa não encontrada', async () => {
-      mockPrismaService.ordens_servico.findFirst.mockResolvedValue(mockOSData);
+      mockPrismaService.ordens_servico.findFirst.mockResolvedValue({ ...mockOSData, status: StatusOS.EM_EXECUCAO });
+      mockPrismaService.checklist_atividades_os.count.mockResolvedValue(0);
       mockPrismaService.tarefas_os.findFirst.mockResolvedValue(null);
 
       await expect(service.concluirTarefa(
@@ -643,7 +654,8 @@ describe('ExecucaoOSService', () => {
       });
 
       mockPrismaService.$transaction.mockImplementation(mockTransaction);
-      mockPrismaService.ordens_servico.findFirst.mockResolvedValue(mockOSData);
+      mockPrismaService.ordens_servico.findFirst.mockResolvedValue({ ...mockOSData, status: StatusOS.EM_EXECUCAO });
+      mockPrismaService.checklist_atividades_os.count.mockResolvedValue(0);
       mockPrismaService.tarefas_os.findFirst.mockResolvedValue(mockTarefaData);
       mockPrismaService.tarefas_os.update.mockResolvedValue({});
       mockPrismaService.historico_os.create.mockResolvedValue({});
@@ -659,6 +671,7 @@ describe('ExecucaoOSService', () => {
         where: { id: mockTarefaData.id },
         data: {
           status: 'CANCELADA',
+          data_conclusao: null,
           observacoes: `${cancelarDto.motivo_cancelamento}. ${cancelarDto.observacoes}`,
         },
       });
@@ -1070,21 +1083,17 @@ describe('ExecucaoOSService', () => {
         mockPrismaService.registros_tempo_os.create.mockResolvedValue({});
         mockPrismaService.historico_os.create.mockResolvedValue({});
 
+        // Vínculo, tarefa e sub-instruções em consultas separadas: pelo include
+        // do Prisma, ids de 25 caracteres em Char(26) voltavam sem relação.
         mockPrismaService.tarefas_os.findMany.mockResolvedValue([
-          {
-            nome_snapshot: 'Relação de transformação',
-            instrucao_nome: 'Ensaio TTR',
-            tarefa: {
-              nome: 'Relação de transformação',
-              instrucao: {
-                nome: 'Ensaio TTR',
-                sub_instrucoes: [
-                  { descricao: 'Desconectar os cabos', obrigatoria: true, tempo_estimado: 10 },
-                  { descricao: 'Realizar o ensaio', obrigatoria: true, tempo_estimado: 20 },
-                ],
-              },
-            },
-          },
+          { id: 'VINC1', tarefa_id: 'TAREFA1 ', nome_snapshot: 'Relação de transformação', instrucao_nome: 'Ensaio TTR' },
+        ]);
+        mockPrismaService.tarefas.findMany.mockResolvedValue([
+          { id: 'TAREFA1', nome: 'Relação de transformação', instrucao_id: 'INST1', instrucao: { nome: 'Ensaio TTR' } },
+        ]);
+        mockPrismaService.sub_instrucoes.findMany.mockResolvedValue([
+          { instrucao_id: 'INST1 ', descricao: 'Desconectar os cabos', obrigatoria: true, tempo_estimado: 10 },
+          { instrucao_id: 'INST1 ', descricao: 'Realizar o ensaio', obrigatoria: true, tempo_estimado: 20 },
         ]);
 
         await service.iniciar('clrx1234567890123456789012', {
@@ -1102,6 +1111,7 @@ describe('ExecucaoOSService', () => {
             ordem: 1,
             obrigatoria: true,
             tempo_estimado: 10,
+            tarefa_os_id: 'VINC1',
           }),
         );
         expect(dados[1].atividade).toBe('Relação de transformação: Realizar o ensaio');
@@ -1126,7 +1136,7 @@ describe('ExecucaoOSService', () => {
         mockPrismaService.historico_os.create.mockResolvedValue({});
 
         mockPrismaService.tarefas_os.findMany.mockResolvedValue([
-          { nome_snapshot: 'Sem instrucao', tarefa: { nome: 'Sem instrucao', instrucao: null } },
+          { id: 'VINC2', tarefa_id: 'TAREFA2', nome_snapshot: 'Sem instrucao', instrucao_nome: null },
         ]);
 
         await service.iniciar('clrx1234567890123456789012', {

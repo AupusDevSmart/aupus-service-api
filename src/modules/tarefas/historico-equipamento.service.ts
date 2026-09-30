@@ -26,6 +26,11 @@ export interface TarefaDoHistorico {
   status: string;
   data_conclusao: Date | null;
   concluida_por: string | null;
+  /**
+   * Motivo de a tarefa não ter sido feita (vínculo CANCELADA). É o que a equipe
+   * registrou ao executar a OS — a tarefa continua devendo e volta na agenda.
+   */
+  motivo_nao_feita: string | null;
 }
 
 export interface ItemHistorico {
@@ -285,6 +290,7 @@ export class HistoricoEquipamentoService {
         status: vinculo.status,
         data_conclusao: vinculo.data_conclusao,
         concluida_por: vinculo.concluida_por,
+        motivo_nao_feita: vinculo.status === 'CANCELADA' ? vinculo.observacoes ?? null : null,
       });
     }
 
@@ -315,6 +321,7 @@ export class HistoricoEquipamentoService {
         status: vinculo.status,
         data_conclusao: null,
         concluida_por: null,
+        motivo_nao_feita: null,
       });
     }
 
