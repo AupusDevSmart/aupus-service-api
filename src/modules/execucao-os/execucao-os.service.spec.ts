@@ -997,7 +997,7 @@ describe('ExecucaoOSService', () => {
     });
 
     describe('gerarChecklistPadrao', () => {
-      it('deve gerar checklist padrão quando não existir', async () => {
+      it('OS sem sub-instruções nas tarefas não ganha checklist (não há itens genéricos)', async () => {
         const mockTransaction = jest.fn(async (callback) => {
           return await callback(mockPrismaService);
         });
@@ -1010,7 +1010,7 @@ describe('ExecucaoOSService', () => {
 
         // Simular que não existe checklist
         mockPrismaService.checklist_atividades_os.count.mockResolvedValue(0);
-        mockPrismaService.checklist_atividades_os.createMany.mockResolvedValue({ count: 6 });
+        mockPrismaService.tarefas_os.findMany.mockResolvedValue([]);
 
         mockPrismaService.ordens_servico.update.mockResolvedValue({});
         mockPrismaService.registros_tempo_os.create.mockResolvedValue({});
@@ -1024,21 +1024,8 @@ describe('ExecucaoOSService', () => {
 
         await service.iniciar('clrx1234567890123456789012', iniciarDto, 'user123');
 
-        expect(mockPrismaService.checklist_atividades_os.createMany).toHaveBeenCalledWith({
-          data: expect.arrayContaining([
-            expect.objectContaining({
-              os_id: 'clrx1234567890123456789012',
-              atividade: 'Verificar equipamentos de segurança',
-              ordem: 1,
-              obrigatoria: true,
-            }),
-            expect.objectContaining({
-              atividade: 'Conferir materiais e ferramentas',
-              ordem: 2,
-              obrigatoria: true,
-            }),
-          ]),
-        });
+        // A seção genérica de segurança saiu (pedido do usuário, 2026-10-01)
+        expect(mockPrismaService.checklist_atividades_os.createMany).not.toHaveBeenCalled();
       });
 
       it('não deve gerar checklist se já existir', async () => {
@@ -1070,7 +1057,7 @@ describe('ExecucaoOSService', () => {
         expect(mockPrismaService.checklist_atividades_os.createMany).not.toHaveBeenCalled();
       });
 
-      it('semeia o checklist com as sub-instrucoes reais antes dos itens genericos', async () => {
+      it('semeia o checklist só com as sub-instrucoes reais das tarefas', async () => {
         const mockTransaction = jest.fn(async (callback) => callback(mockPrismaService));
         mockPrismaService.$transaction.mockImplementation(mockTransaction);
         mockPrismaService.ordens_servico.findFirst.mockResolvedValue({
@@ -1116,10 +1103,8 @@ describe('ExecucaoOSService', () => {
         );
         expect(dados[1].atividade).toBe('Relação de transformação: Realizar o ensaio');
 
-        // Os genericos de seguranca fecham a lista, sem sobrescrever a ordem
-        expect(dados[2].atividade).toBe('Verificar equipamentos de segurança');
-        expect(dados[2].ordem).toBe(3);
-        expect(dados.map((d: any) => d.ordem)).toEqual([1, 2, 3, 4, 5, 6, 7]);
+        // Sem itens genéricos de segurança no fim
+        expect(dados.map((d: any) => d.ordem)).toEqual([1, 2]);
       });
 
       it('ignora tarefa cuja instrucao nao tem sub-instrucoes', async () => {
@@ -1144,9 +1129,7 @@ describe('ExecucaoOSService', () => {
           responsavel_execucao: 'João Silva',
         } as IniciarExecucaoDto, 'user123');
 
-        const dados = mockPrismaService.checklist_atividades_os.createMany.mock.calls[0][0].data;
-        expect(dados).toHaveLength(5);
-        expect(dados[0].atividade).toBe('Verificar equipamentos de segurança');
+        expect(mockPrismaService.checklist_atividades_os.createMany).not.toHaveBeenCalled();
       });
     });
 

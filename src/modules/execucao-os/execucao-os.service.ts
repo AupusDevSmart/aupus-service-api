@@ -981,19 +981,6 @@ export class ExecucaoOSService {
       );
     }
 
-    // Os itens gerais (segurança e encerramento, sem tarefa) marcados como
-    // obrigatórios valem para qualquer OS: sem eles a marca "obrigatório" era
-    // só um rótulo, e a OS saía executada com tudo desmarcado.
-    const geraisPendentes = await this.prisma.checklist_atividades_os.findMany({
-      where: { os_id: id, tarefa_os_id: null, obrigatoria: true, concluida: false },
-      select: { atividade: true },
-      orderBy: { ordem: 'asc' },
-    });
-    if (geraisPendentes.length > 0) {
-      throw new ConflictException(
-        `Marque os itens obrigatórios de segurança e encerramento: ${geraisPendentes.map((i) => i.atividade).join(', ')}`,
-      );
-    }
 
     await this.prisma.$transaction(async (prisma) => {
       for (const tarefa of pendentes) {
@@ -1296,9 +1283,10 @@ export class ExecucaoOSService {
    * Semeia o checklist da OS.
    *
    * Antes eram apenas seis itens genericos, sem nenhuma relacao com o que foi
-   * pedido: a OS nao sabia dizer o que era para ter sido feito. Agora as
-   * sub-instrucoes reais de cada tarefa vem primeiro, e os itens genericos de
-   * seguranca ficam no fim, como fecho.
+   * pedido: a OS nao sabia dizer o que era para ter sido feito. Agora sao so
+   * as sub-instrucoes reais de cada tarefa. Os genericos de seguranca que
+   * fechavam a lista sairam em 2026-10-01, a pedido do usuario: repetiam o
+   * mesmo texto em toda OS e so faziam a pessoa marcar mais caixas.
    *
    * O texto e copiado (a tabela guarda `atividade` como texto, nao FK), entao o
    * checklist fica congelado junto com o resto do conteudo da OS.
@@ -1397,17 +1385,7 @@ export class ExecucaoOSService {
       }
     }
 
-    const atividadesGerais = [
-      { atividade: 'Verificar equipamentos de segurança', obrigatoria: true },
-      { atividade: 'Conferir materiais e ferramentas', obrigatoria: true },
-      { atividade: 'Testar funcionamento após execução', obrigatoria: true },
-      { atividade: 'Limpar área de trabalho', obrigatoria: false },
-      { atividade: 'Documentar resultados', obrigatoria: true },
-    ];
-
-    for (const item of atividadesGerais) {
-      dados.push({ os_id: osId, ordem: ordem++, ...item });
-    }
+    if (dados.length === 0) return;
 
     await prisma.checklist_atividades_os.createMany({ data: dados });
   }

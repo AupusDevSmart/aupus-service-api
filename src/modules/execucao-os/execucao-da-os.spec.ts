@@ -117,24 +117,14 @@ describe('execução da OS: checklist por tarefa, concluir e executar (banco rea
   const itensDaTarefa = (osId: string, tarefaOsId: string) =>
     prisma.checklist_atividades_os.findMany({ where: { os_id: osId, tarefa_os_id: tarefaOsId }, orderBy: { ordem: 'asc' } });
 
-  /** Marca os itens gerais obrigatórios (segurança e encerramento), exigidos para executar. */
-  const marcarGeraisObrigatorios = async (osId: string) => {
-    const gerais = await prisma.checklist_atividades_os.findMany({
-      where: { os_id: osId, tarefa_os_id: null, obrigatoria: true },
-    });
-    await execucoes.atualizarChecklist(osId, {
-      atividades: gerais.map((i) => ({ id: i.id, concluida: true })),
-    } as never);
-  };
-
-  it('iniciar gera o checklist com cada item ligado à sua tarefa; os gerais ficam sem tarefa', async () => {
+  it('iniciar gera o checklist com cada item ligado à sua tarefa, sem itens gerais', async () => {
     const { osId, comItens } = await osEmExecucao();
 
     const daTarefa = await itensDaTarefa(osId, comItens.id);
     expect(daTarefa.map((i) => i.obrigatoria)).toEqual([true, true, false]);
 
     const gerais = await prisma.checklist_atividades_os.count({ where: { os_id: osId, tarefa_os_id: null } });
-    expect(gerais).toBeGreaterThan(0);
+    expect(gerais).toBe(0);
   });
 
   it('a resposta da OS traz o checklist com a tarefa de cada item', async () => {
@@ -193,22 +183,9 @@ describe('execução da OS: checklist por tarefa, concluir e executar (banco rea
     ).rejects.toBeInstanceOf(ConflictException);
   });
 
-  it('executar com item geral obrigatório desmarcado é recusado', async () => {
-    const { osId, comItens, semItens } = await osEmExecucao();
-    await execucoes.concluirTarefa(osId, semItens.id, {} as never);
-
-    await expect(
-      execucoes.executar(osId, {
-        resultado_servico: 'ok',
-        tarefas_nao_feitas: [{ id: comItens.id, motivo: 'Faltou a graxa' }],
-      } as never),
-    ).rejects.toThrow(/obrigatório/);
-  });
-
   it('executar com o motivo deixa a tarefa como não feita, com o motivo registrado', async () => {
     const { osId, comItens, semItens } = await osEmExecucao();
     await execucoes.concluirTarefa(osId, semItens.id, {} as never);
-    await marcarGeraisObrigatorios(osId);
 
     await execucoes.executar(osId, {
       resultado_servico: 'Feito em parte',
@@ -224,7 +201,6 @@ describe('execução da OS: checklist por tarefa, concluir e executar (banco rea
   it('checklist e tarefas só mudam com a OS em execução', async () => {
     const { osId, semItens } = await osEmExecucao();
     await execucoes.concluirTarefa(osId, semItens.id, {} as never);
-    await marcarGeraisObrigatorios(osId);
     await execucoes.executar(osId, {
       resultado_servico: 'ok',
       tarefas_nao_feitas: [{ id: (await prisma.tarefas_os.findFirstOrThrow({ where: { os_id: osId, status: 'PENDENTE' } })).id, motivo: 'x' }],
