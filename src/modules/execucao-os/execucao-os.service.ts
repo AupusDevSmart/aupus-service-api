@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, ConflictException, Logger } from '@nestjs/common';
+import { Injectable, NotFoundException, ConflictException, BadRequestException, Logger } from '@nestjs/common';
 import { PrismaService, PermissionScopeService, ScopedUser } from '@/core';
 import {
   OSFiltersDto,
@@ -24,7 +24,8 @@ import { gerarNumeroOS } from '../../common/helpers/numeracao-os';
 import { Instalacao, instalacoesDasOrdens } from '../../common/helpers/instalacao-da-os';
 import { finalizarOrigem, origemDaProgramacao } from '../../common/helpers/status-da-origem';
 import { cancelarOS } from './cancelar-os';
-import { variantesDeIds } from '../tarefas/ids';
+import { variantesDeId, variantesDeIds } from '../tarefas/ids';
+import { devolverViatura } from '../reservas/ocupacao-da-viatura';
 
 /**
  * Nome da tarefa dentro de uma OS, sem depender da tarefa viva.
@@ -452,6 +453,19 @@ export class ExecucaoOSService {
 
       // Gerar checklist padrão se não existir
       await this.gerarChecklistPadrao(prisma, id);
+
+      // Viatura sai: km inicial (opcional) na reserva e viatura "em uso" (D4
+      // da SPEC-RESERVAS-DE-VIATURA). Antes iniciar não tocava na viatura.
+      const reserva = await this.reservaAtivaDaOS(prisma, os.reserva_id);
+      if (reserva) {
+        if (dto.km_inicial != null) {
+          await prisma.reserva_veiculo.update({ where: { id: reserva.id }, data: { km_inicial: dto.km_inicial } });
+        }
+        await prisma.veiculo.updateMany({
+          where: { id: { in: variantesDeId(reserva.veiculo_id) }, status: 'disponivel' },
+          data: { status: 'em_uso' },
+        });
+      }
 
       await this.registrarHistorico(
         prisma,
@@ -1043,25 +1057,27 @@ export class ExecucaoOSService {
         }
       }
 
-      // Finalizar reserva de veículo se existir
-      if (os.reserva_id) {
-        const reservaId = os.reserva_id.trim();
-        const reserva = await prisma.reserva_veiculo.findUnique({
-          where: { id: reservaId },
-        });
-
-        if (reserva && reserva.status === 'ativa') {
-          await prisma.reserva_veiculo.update({
-            where: { id: reservaId },
-            data: {
-              status: 'finalizada',
-              km_final: dto.km_final,
-              observacoes_finalizacao: dto.observacoes_veiculo,
-              data_finalizacao: dataHoraFim,
-              finalizado_por_id: usuarioId,
-            },
-          });
+      // Viatura volta: reserva finalizada com o km final, quilometragem da
+      // viatura atualizada e viatura disponível. É aqui que ela fica livre (D3).
+      const reserva = await this.reservaAtivaDaOS(prisma, os.reserva_id);
+      if (reserva) {
+        if (dto.km_final != null && reserva.km_inicial != null && dto.km_final < reserva.km_inicial) {
+          throw new BadRequestException(
+            `O km final (${dto.km_final}) não pode ser menor que o inicial (${reserva.km_inicial})`,
+          );
         }
+        await prisma.reserva_veiculo.update({
+          where: { id: reserva.id },
+          data: {
+            status: 'finalizada',
+            km_final: dto.km_final,
+            observacoes_finalizacao: dto.observacoes_veiculo,
+            data_finalizacao: dataHoraFim,
+            finalizado_por: await this.nomeDoUsuario(usuarioId),
+            finalizado_por_id: usuarioId,
+          },
+        });
+        await devolverViatura(prisma, reserva.veiculo_id, dto.km_final);
       }
 
       await this.registrarHistorico(
@@ -1278,6 +1294,12 @@ export class ExecucaoOSService {
   }
 
   // Métodos auxiliares privados
+
+  private async reservaAtivaDaOS(prisma: Prisma.TransactionClient, reservaId?: string | null) {
+    if (!reservaId?.trim()) return null;
+    const reserva = await prisma.reserva_veiculo.findFirst({ where: { id: { in: variantesDeId(reservaId) } } });
+    return reserva?.status === 'ativa' ? reserva : null;
+  }
 
   /**
    * Semeia o checklist da OS.

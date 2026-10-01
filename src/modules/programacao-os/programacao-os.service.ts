@@ -1,7 +1,14 @@
 import { ConflictException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { Prisma, StatusProgramacaoOS } from '@/core';
 import { PrismaService, PermissionScopeService, ScopedUser } from '@/core';
-import { variantesDeIds } from '../tarefas/ids';
+import { variantesDeId, variantesDeIds } from '../tarefas/ids';
+import {
+  camposDaJanela,
+  garantirViaturaLivre,
+  instanteEmBrasilia,
+  moverJanela,
+  type JanelaDaReserva,
+} from '../reservas/ocupacao-da-viatura';
 import { gerarNumeroOS } from '../../common/helpers/numeracao-os';
 import { Instalacao, instalacoesDasProgramacoes } from '../../common/helpers/instalacao-da-os';
 import {
@@ -396,7 +403,7 @@ export class ProgramacaoOSService {
 
       // Criar reserva de veículo imediatamente (vinculada à programação)
       if (createDto.necessita_veiculo && createDto.veiculo_id) {
-        await this.criarReservaVeiculoProgramacao(prisma, programacao, usuarioId);
+        await this.reservarViaturaDaProgramacao(prisma, programacao, usuarioId);
       }
 
       // Registrar histórico
@@ -456,7 +463,9 @@ export class ProgramacaoOSService {
         // Converter campos de data para Date object
         if (key === 'data_previsao_inicio' || key === 'data_previsao_fim' || key === 'data_hora_programada' ||
             key === 'reserva_data_inicio' || key === 'reserva_data_fim') {
-          updateData[key] = new Date(value as string);
+          // null limpa o campo: `new Date(null)` gravava 1970-01-01, que ainda
+          // vencia a precedência da janela da reserva e da data da OS
+          updateData[key] = value === null || value === '' ? null : new Date(value as string);
         } else {
           updateData[key] = value;
         }
@@ -529,34 +538,13 @@ export class ProgramacaoOSService {
         }
       }
 
-      // Criar/atualizar/cancelar reserva de veículo vinculada à programação
-      // ✅ CORREÇÃO: Só criar/atualizar reserva se necessita_veiculo for true E houver veiculo_id
+      // Reserva da viatura: revalida o horário a cada edição (excluindo a
+      // própria). Sem viatura (desmarcou ou limpou), a reserva é cancelada.
       if (programacaoAtualizada.necessita_veiculo && programacaoAtualizada.veiculo_id) {
-        await this.criarReservaVeiculoProgramacao(prisma, programacaoAtualizada, usuarioId);
-      } else if (!programacaoAtualizada.necessita_veiculo && programacao.reserva_id) {
-        // Se desmarcou necessita_veiculo, cancelar reserva existente
-        try {
-          const reservaIdLimpo = programacao.reserva_id.trim();
-          await prisma.reserva_veiculo.update({
-            where: { id: reservaIdLimpo },
-            data: {
-              status: 'cancelada',
-              motivo_cancelamento: 'Programação não necessita mais de veículo',
-              data_cancelamento: new Date(),
-              cancelado_por: 'Sistema',
-            },
-          });
-
-          // Remover reserva_id da programação
-          await prisma.programacoes_os.update({
-            where: { id },
-            data: { reserva_id: null },
-          });
-
-          this.logger.log(`Reserva ${reservaIdLimpo} cancelada automaticamente`);
-        } catch (error) {
-          this.logger.error(`Erro ao cancelar reserva: ${error.message}`);
-        }
+        await this.reservarViaturaDaProgramacao(prisma, programacaoAtualizada, usuarioId);
+      } else if (programacao.reserva_id) {
+        await this.cancelarReservaDaProgramacao(prisma, programacao.reserva_id, 'Programação não necessita mais de viatura');
+        await prisma.programacoes_os.update({ where: { id }, data: { reserva_id: null } });
       }
 
       // Registrar histórico
@@ -664,8 +652,9 @@ export class ProgramacaoOSService {
           data_programada_sugerida: dto.data_programada_sugerida ? new Date(dto.data_programada_sugerida) : null,
           hora_programada_sugerida: dto.hora_programada_sugerida || null,
           orcamento_previsto: dto.ajustes_orcamento || programacao.orcamento_previsto,
+          // Hora de Brasília: com o "Z" literal, 09:00 virava 06:00 na tela
           data_hora_programada: dto.data_programada_sugerida && dto.hora_programada_sugerida
-            ? new Date(`${dto.data_programada_sugerida}T${dto.hora_programada_sugerida}:00Z`)
+            ? instanteEmBrasilia(dto.data_programada_sugerida, dto.hora_programada_sugerida)
             : programacao.data_hora_programada,
         },
       });
@@ -694,40 +683,11 @@ export class ProgramacaoOSService {
         exigirRegistrada: false,
       });
 
-      // Vincular reserva de veículo à OS
-      if (programacao.reserva_id) {
-        const reservaId = programacao.reserva_id.trim();
-        const reservaProgramacao = await prisma.reserva_veiculo.findUnique({
-          where: { id: reservaId },
-        });
-
-        if (reservaProgramacao) {
-          await prisma.reserva_veiculo.update({
-            where: { id: reservaProgramacao.id },
-            data: {
-              solicitante_id: osId,
-              tipo_solicitante: 'ordem_servico',
-              finalidade: `Execução de OS: ${programacao.descricao}`,
-            },
-          });
-
-          await prisma.ordens_servico.update({
-            where: { id: osId },
-            data: { reserva_id: reservaProgramacao.id },
-          });
-
-          this.logger.log(`Reserva ${reservaProgramacao.id} vinculada à OS ${osId}`);
-        }
-      } else if (programacao.necessita_veiculo && programacao.veiculo_id) {
-        const novaReservaId = await this.criarReservaVeiculo(prisma, programacao, osId, usuarioId);
-
-        if (novaReservaId) {
-          await prisma.ordens_servico.update({
-            where: { id: osId },
-            data: { reserva_id: novaReservaId },
-          });
-        }
-      }
+      // A reserva passa para a OS; com nova data sugerida, vai junto
+      await this.reservarViaturaDaOS(prisma, programacao, osId, {
+        dia: dto.data_programada_sugerida || null,
+        hora: dto.hora_programada_sugerida || null,
+      }, usuarioId);
     }, {
       timeout: 15000,
     });
@@ -1152,7 +1112,7 @@ export class ProgramacaoOSService {
   ): Promise<void> {
     if (!reservaId) return;
     await prisma.reserva_veiculo.updateMany({
-      where: { id: reservaId.trim(), status: 'ativa' },
+      where: { id: { in: variantesDeId(reservaId) }, status: 'ativa' },
       data: { status: 'cancelada', motivo_cancelamento: motivo, data_cancelamento: new Date() },
     });
   }
@@ -1598,258 +1558,144 @@ export class ProgramacaoOSService {
   }
 
   /**
-   * Cria uma reserva de veículo para a ordem de serviço
+   * Janela da reserva da programação: os campos de reserva; sem eles, o dia
+   * planejado. Sem hora, a reserva ocupa o dia inteiro (D2 da
+   * SPEC-RESERVAS-DE-VIATURA) — antes caía num 08:00–18:00 fixo, e fora dele a
+   * viatura aparecia livre.
    */
-  /**
-   * Janela da reserva de veiculo, com a mesma precedencia usada na geracao da OS.
-   *
-   * Estava repetida em tres metodos de reserva, cada um com `|| new Date()` no
-   * fim. Esse ultimo termo raramente e o que se quer: `data_hora_programada` so
-   * e preenchida pela programacao detalhada, que segue comentada no formulario,
-   * entao a cadeia caia direto no "agora" e a reserva nascia para hoje em vez de
-   * para o dia planejado.
-   *
-   * `data_previsao_inicio` e o que o usuario preenche hoje e entra antes do
-   * ultimo recurso. Num lugar so, para as tres reservas nao divergirem.
-   */
-  private datasDaReserva(programacao: any) {
-    const planejada =
-      programacao.data_hora_programada || programacao.data_previsao_inicio || new Date();
-
+  private janelaDaReserva(programacao: {
+    reserva_data_inicio?: Date | null;
+    reserva_data_fim?: Date | null;
+    reserva_hora_inicio?: string | null;
+    reserva_hora_fim?: string | null;
+    data_hora_programada?: Date | null;
+    data_previsao_inicio?: Date | null;
+    data_previsao_fim?: Date | null;
+  }): JanelaDaReserva {
+    const inicio =
+      programacao.reserva_data_inicio || programacao.data_hora_programada || programacao.data_previsao_inicio || new Date();
     return {
-      dataInicio: programacao.reserva_data_inicio
-        ? new Date(programacao.reserva_data_inicio)
-        : planejada,
-      dataFim: programacao.reserva_data_fim
-        ? new Date(programacao.reserva_data_fim)
-        : programacao.data_previsao_fim || planejada,
+      data_inicio: inicio,
+      data_fim: programacao.reserva_data_fim || programacao.data_previsao_fim || inicio,
+      hora_inicio: programacao.reserva_hora_inicio || null,
+      hora_fim: programacao.reserva_hora_fim || null,
     };
   }
 
-  private async criarReservaVeiculo(
-    prisma: any,
+  /**
+   * Onde a reserva começa no dia sugerido: na hora sugerida, ou na hora que ela
+   * já tinha. A de dia inteiro só troca de dia — começar às 09:00 a faria
+   * atravessar a meia-noite.
+   */
+  private novoInicioDaReserva(base: JanelaDaReserva, dia: string, hora: string | null): Date {
+    const diaInteiro = (base.hora_inicio || '00:00') === '00:00' && (base.hora_fim || '23:59') === '23:59';
+    return instanteEmBrasilia(dia, diaInteiro ? '00:00' : hora || base.hora_inicio || '00:00');
+  }
+
+  /** A reserva ativa da programação: pelo `reserva_id` ou, nas antigas, pelo solicitante */
+  private async reservaAtivaDa(prisma: Prisma.TransactionClient, programacao: { id: string; reserva_id?: string | null }) {
+    const reserva = programacao.reserva_id
+      ? await prisma.reserva_veiculo.findFirst({ where: { id: { in: variantesDeId(programacao.reserva_id) } } })
+      : await prisma.reserva_veiculo.findFirst({
+          where: { solicitante_id: programacao.id.trim(), tipo_solicitante: 'programacao_os', status: 'ativa' },
+        });
+    return reserva?.status === 'ativa' ? reserva : null;
+  }
+
+  /**
+   * Cria ou atualiza a reserva da programação, checando conflito de horário
+   * (D1: conflito bloqueia). Antes não checava nada — duas programações
+   * levavam a mesma viatura no mesmo horário —, forçava `status: 'ativa'`
+   * (ressuscitando reserva cancelada à mão) e engolia qualquer erro.
+   */
+  private async reservarViaturaDaProgramacao(
+    prisma: Prisma.TransactionClient,
+    programacao: any,
+    usuarioId?: string,
+  ): Promise<void> {
+    const veiculoId = programacao.veiculo_id?.trim();
+    if (!veiculoId) return;
+
+    const janela = this.janelaDaReserva(programacao);
+    const atual = await this.reservaAtivaDa(prisma, programacao);
+    await garantirViaturaLivre(prisma, { veiculoId, janela, excluirReservaId: atual?.id });
+
+    const dados = {
+      veiculo_id: veiculoId,
+      ...camposDaJanela(janela),
+      responsavel: programacao.responsavel || 'Sistema',
+      responsavel_id: programacao.responsavel_id,
+      finalidade: programacao.reserva_finalidade || `Programação ${programacao.codigo}: ${programacao.descricao}`,
+      observacoes: programacao.observacoes_veiculo,
+    };
+
+    const reservaId = atual
+      ? (await prisma.reserva_veiculo.update({ where: { id: atual.id }, data: dados })).id
+      : (
+          await prisma.reserva_veiculo.create({
+            data: {
+              ...dados,
+              solicitante_id: programacao.id.trim(),
+              tipo_solicitante: 'programacao_os',
+              status: 'ativa',
+              criado_por: 'Sistema',
+              criado_por_id: usuarioId,
+            },
+          })
+        ).id;
+
+    await prisma.programacoes_os.update({ where: { id: programacao.id }, data: { reserva_id: reservaId } });
+  }
+
+  /**
+   * Na aprovação a reserva passa para a OS. Com nova data sugerida, ela vai
+   * junto, com a mesma duração, e o conflito é checado no dia novo.
+   */
+  private async reservarViaturaDaOS(
+    prisma: Prisma.TransactionClient,
     programacao: any,
     osId: string,
-    usuarioId?: string
-  ): Promise<string | null> {
-    try {
-      // Validar se o veículo existe
-      if (!programacao.veiculo_id) {
-        this.logger.warn('Tentativa de criar reserva sem veiculo_id');
-        return null;
-      }
-
-      // ✅ CORRIGIR: Remover espaços em branco do ID
-      const veiculoId = programacao.veiculo_id.trim();
-
-      const veiculo = await prisma.veiculo.findFirst({
-        where: {
-          id: veiculoId,
-          ativo: true,
-        },
-      });
-
-      if (!veiculo) {
-        this.logger.warn(`Veículo ${veiculoId} não encontrado. Reserva não será criada.`);
-        return null;
-      }
-
-      const { dataInicio, dataFim } = this.datasDaReserva(programacao);
-
-      const horaInicio = programacao.reserva_hora_inicio || '08:00';
-      const horaFim = programacao.reserva_hora_fim || '18:00';
-
-      const finalidade = programacao.reserva_finalidade
-        || `Execução de OS: ${programacao.descricao}`;
-
-      const reserva = await prisma.reserva_veiculo.create({
-        data: {
-          veiculo_id: veiculoId,
-          solicitante_id: osId,
-          tipo_solicitante: 'ordem_servico',
-          data_inicio: dataInicio,
-          data_fim: dataFim,
-          hora_inicio: horaInicio,
-          hora_fim: horaFim,
-          responsavel: programacao.responsavel || 'Sistema',
-          responsavel_id: programacao.responsavel_id,
-          finalidade,
-          observacoes: programacao.observacoes_veiculo,
-          status: 'ativa',
-          criado_por: 'Sistema',
-          criado_por_id: usuarioId,
-        },
-      });
-
-      this.logger.log(`Reserva de veículo criada para OS ${osId}`);
-      return reserva.id;
-    } catch (error) {
-      this.logger.error(`Erro ao criar reserva de veículo: ${error.message}`, error.stack);
-      // Não lançar erro para não interromper a aprovação
-      return null;
-    }
-  }
-
-  /**
-   * Atualiza uma reserva de veículo existente
-   */
-  private async atualizarReservaVeiculo(
-    prisma: any,
-    reservaId: string,
-    programacao: any,
-    usuarioId?: string
+    novaData: { dia: string | null; hora: string | null },
+    usuarioId?: string,
   ): Promise<void> {
-    try {
-      // ✅ CORRIGIR: Remover espaços em branco do ID
-      const veiculoId = programacao.veiculo_id ? programacao.veiculo_id.trim() : null;
+    const veiculoId = programacao.necessita_veiculo ? programacao.veiculo_id?.trim() : null;
+    if (!veiculoId && !programacao.reserva_id) return;
+    const atual = await this.reservaAtivaDa(prisma, programacao);
 
-      const { dataInicio, dataFim } = this.datasDaReserva(programacao);
-
-      const horaInicio = programacao.reserva_hora_inicio || '08:00';
-      const horaFim = programacao.reserva_hora_fim || '18:00';
-
-      const finalidade = programacao.reserva_finalidade
-        || `Execução de OS: ${programacao.descricao}`;
-
-      await prisma.reserva_veiculo.update({
-        where: { id: reservaId },
-        data: {
-          veiculo_id: veiculoId,
-          data_inicio: dataInicio,
-          data_fim: dataFim,
-          hora_inicio: horaInicio,
-          hora_fim: horaFim,
-          responsavel: programacao.responsavel || 'Sistema',
-          responsavel_id: programacao.responsavel_id,
-          finalidade,
-          observacoes: programacao.observacoes_veiculo,
-          atualizado_por: 'Sistema',
-          atualizado_por_id: usuarioId,
-        },
-      });
-
-      this.logger.log(`Reserva de veículo ${reservaId} atualizada`);
-    } catch (error) {
-      this.logger.error(`Erro ao atualizar reserva de veículo: ${error.message}`, error.stack);
-      // Não lançar erro para não interromper a atualização
+    if (!veiculoId) {
+      if (atual) await this.cancelarReservaDaProgramacao(prisma, atual.id, 'Programação aprovada sem viatura');
+      return;
     }
-  }
 
-  /**
-   * Cria uma reserva de veículo vinculada à programação (antes da aprovação)
-   */
-  private async criarReservaVeiculoProgramacao(
-    prisma: any,
-    programacao: any,
-    usuarioId?: string
-  ): Promise<void> {
-    try {
-      this.logger.log(`[RESERVA] Iniciando criação de reserva para programação ${programacao.id}`);
-      this.logger.log(`[RESERVA] Veiculo ID: ${programacao.veiculo_id}`);
-      this.logger.log(`[RESERVA] Necessita veículo: ${programacao.necessita_veiculo}`);
+    const base: JanelaDaReserva = atual ?? this.janelaDaReserva(programacao);
+    const janela = novaData.dia ? moverJanela(base, this.novoInicioDaReserva(base, novaData.dia, novaData.hora)) : base;
+    await garantirViaturaLivre(prisma, { veiculoId, janela, excluirReservaId: atual?.id });
 
-      // Validar se o veículo existe
-      if (!programacao.veiculo_id) {
-        this.logger.warn('[RESERVA] Tentativa de criar reserva sem veiculo_id');
-        return;
-      }
+    const dados = {
+      veiculo_id: veiculoId,
+      ...camposDaJanela(janela),
+      solicitante_id: osId,
+      tipo_solicitante: 'ordem_servico' as const,
+      finalidade: `Execução de OS: ${programacao.descricao}`,
+    };
+    const reservaId = atual
+      ? (await prisma.reserva_veiculo.update({ where: { id: atual.id }, data: dados })).id
+      : (
+          await prisma.reserva_veiculo.create({
+            data: {
+              ...dados,
+              responsavel: programacao.responsavel || 'Sistema',
+              responsavel_id: programacao.responsavel_id,
+              observacoes: programacao.observacoes_veiculo,
+              status: 'ativa',
+              criado_por: 'Sistema',
+              criado_por_id: usuarioId,
+            },
+          })
+        ).id;
 
-      // ✅ CORRIGIR: Remover espaços em branco do ID
-      const veiculoId = programacao.veiculo_id.trim();
-      this.logger.log(`[RESERVA] Veiculo ID (limpo): ${veiculoId}`);
-
-      const veiculo = await prisma.veiculo.findFirst({
-        where: {
-          id: veiculoId,
-          ativo: true,
-        },
-      });
-
-      if (!veiculo) {
-        this.logger.warn(`[RESERVA] Veículo ${veiculoId} não encontrado. Reserva não será criada.`);
-        return;
-      }
-
-      this.logger.log(`[RESERVA] Veículo encontrado: ${veiculo.marca} ${veiculo.modelo} (${veiculo.placa})`);
-
-      const { dataInicio, dataFim } = this.datasDaReserva(programacao);
-
-      const horaInicio = programacao.reserva_hora_inicio || '08:00';
-      const horaFim = programacao.reserva_hora_fim || '18:00';
-
-      const finalidade = programacao.reserva_finalidade
-        || `Programação de OS: ${programacao.descricao}`;
-
-      // Verificar se já existe uma reserva para esta programação
-      const reservaExistente = await prisma.reserva_veiculo.findFirst({
-        where: {
-          solicitante_id: programacao.id,
-          tipo_solicitante: 'programacao_os',
-        },
-      });
-
-      if (reservaExistente) {
-        this.logger.log(`[RESERVA] Reserva existente encontrada: ${reservaExistente.id}, atualizando...`);
-
-        // Atualizar reserva existente usando Prisma
-        await prisma.reserva_veiculo.update({
-          where: { id: reservaExistente.id },
-          data: {
-            veiculo_id: veiculoId,
-            data_inicio: dataInicio,
-            data_fim: dataFim,
-            hora_inicio: horaInicio,
-            hora_fim: horaFim,
-            responsavel: programacao.responsavel || 'Sistema',
-            responsavel_id: programacao.responsavel_id,
-            finalidade,
-            observacoes: programacao.observacoes_veiculo,
-            status: 'ativa',
-          },
-        });
-
-        // ✅ Atualizar programacao com reserva_id
-        await prisma.programacoes_os.update({
-          where: { id: programacao.id },
-          data: { reserva_id: reservaExistente.id },
-        });
-
-        this.logger.log(`[RESERVA] ✅ Reserva de veículo atualizada: ${reservaExistente.id}`);
-      } else {
-        this.logger.log(`[RESERVA] Nenhuma reserva existente, criando nova...`);
-
-        // Criar nova reserva usando Prisma (gerará CUID automaticamente)
-        const novaReserva = await prisma.reserva_veiculo.create({
-          data: {
-            veiculo_id: veiculoId,
-            solicitante_id: programacao.id,
-            tipo_solicitante: 'programacao_os',
-            data_inicio: dataInicio,
-            data_fim: dataFim,
-            hora_inicio: horaInicio,
-            hora_fim: horaFim,
-            responsavel: programacao.responsavel || 'Sistema',
-            responsavel_id: programacao.responsavel_id,
-            finalidade,
-            observacoes: programacao.observacoes_veiculo,
-            status: 'ativa',
-            criado_por: 'Sistema',
-            criado_por_id: usuarioId,
-          },
-        });
-
-        // ✅ Atualizar programacao com reserva_id
-        await prisma.programacoes_os.update({
-          where: { id: programacao.id },
-          data: { reserva_id: novaReserva.id },
-        });
-
-        this.logger.log(`[RESERVA] ✅ Reserva de veículo criada: ${novaReserva.id}`);
-      }
-    } catch (error) {
-      this.logger.error(`[RESERVA] ❌ Erro ao criar/atualizar reserva de veículo: ${error.message}`, error.stack);
-      // Não lançar erro para não interromper a criação/edição
-    }
+    await prisma.ordens_servico.update({ where: { id: osId }, data: { reserva_id: reservaId } });
+    await prisma.programacoes_os.update({ where: { id: programacao.id }, data: { reserva_id: reservaId } });
   }
 
   private async obterEstatisticas(): Promise<any> {

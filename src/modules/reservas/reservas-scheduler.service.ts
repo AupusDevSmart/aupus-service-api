@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Cron } from '@nestjs/schedule';
 import { PrismaService } from '@/core';
+import { intervaloDaReserva } from './ocupacao-da-viatura';
 
 @Injectable()
 export class ReservasSchedulerService {
@@ -23,22 +24,30 @@ export class ReservasSchedulerService {
   }
 
   /**
-   * Marca reservas ativas cuja data_fim já passou como vencidas.
-   * Pode ser chamado via cron ou endpoint manual.
+   * Vence a reserva AVULSA (manual, viagem, manutenção) cujo horário já acabou.
+   *
+   * A de programação/OS não vence: a viatura só fica livre quando a OS é
+   * executada ou cancelada (D3 da SPEC-RESERVAS-DE-VIATURA). Antes o cron
+   * comparava `data_fim` (meia-noite UTC do dia) com agora e vencia a reserva
+   * no próprio dia de uso, à 01:00 — a viatura passava a contar como livre e o
+   * km final do Executar era descartado.
    */
-  async marcarReservasVencidas(): Promise<number> {
-    const agora = new Date();
-
-    const resultado = await this.prisma.reserva_veiculo.updateMany({
+  async marcarReservasVencidas(agora = new Date()): Promise<number> {
+    const candidatas = await this.prisma.reserva_veiculo.findMany({
       where: {
         status: 'ativa',
+        tipo_solicitante: { in: ['manual', 'viagem', 'manutencao'] },
         data_fim: { lt: agora },
       },
-      data: {
-        status: 'vencida',
-      },
+      select: { id: true, data_inicio: true, data_fim: true, hora_inicio: true, hora_fim: true },
     });
+    const vencidas = candidatas.filter((r) => intervaloDaReserva(r).fim <= agora).map((r) => r.id);
+    if (vencidas.length === 0) return 0;
 
+    const resultado = await this.prisma.reserva_veiculo.updateMany({
+      where: { id: { in: vencidas }, status: 'ativa' },
+      data: { status: 'vencida' },
+    });
     return resultado.count;
   }
 }

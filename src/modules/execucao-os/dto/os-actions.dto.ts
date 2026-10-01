@@ -2,6 +2,7 @@ import {
   IsString,
   IsOptional,
   IsNumber,
+  IsInt,
   IsDateString,
   IsArray,
   IsNotEmpty,
@@ -121,6 +122,12 @@ export class IniciarExecucaoDto {
   @IsOptional()
   @IsDateString()
   data_hora_inicio_real?: string;
+
+  @ApiPropertyOptional({ description: 'Km da viatura na saída (opcional; só com reserva)', example: 12500 })
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  km_inicial?: number;
 }
 
 export class PausarExecucaoDto {

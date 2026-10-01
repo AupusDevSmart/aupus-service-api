@@ -1,7 +1,8 @@
-import { Injectable, NotFoundException, BadRequestException, ConflictException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { PrismaService, PermissionScopeService, ScopedUser } from '@/core';
 import { VeiculosService } from '../veiculos/veiculos.service';
-import { StatusVeiculo, StatusReserva, Prisma } from '@/core';
+import { StatusReserva, Prisma } from '@/core';
+import { camposDaJanela, garantirViaturaLivre, validarJanela, type JanelaDaReserva } from './ocupacao-da-viatura';
 import {
   CreateReservaDto,
   UpdateReservaDto,
@@ -36,26 +37,24 @@ export class ReservasService {
       throw new BadRequestException('Veículo não está ativo');
     }
 
-    if (veiculo.status !== StatusVeiculo.disponivel) {
-      throw new BadRequestException('Veículo não está disponível para reserva');
-    }
+    // "Em uso" não impede reservar outro horário; manutenção/inativa e
+    // conflito de horário são checados pela regra única (ocupacao-da-viatura)
+    const janela: JanelaDaReserva = {
+      data_inicio: createDto.dataInicio,
+      data_fim: createDto.dataFim,
+      hora_inicio: createDto.horaInicio,
+      hora_fim: createDto.horaFim,
+    };
+    this.recusarNoPassado(janela);
 
-    // Validar período
-    this.validarPeriodo(createDto.dataInicio, createDto.dataFim, createDto.horaInicio, createDto.horaFim);
-
-    // Verificar conflitos
-    await this.verificarConflitos(createDto.veiculoId, createDto.dataInicio, createDto.dataFim, createDto.horaInicio, createDto.horaFim);
-
-    // Criar reserva
-    const reserva = await this.prisma.reserva_veiculo.create({
+    const reserva = await this.prisma.$transaction(async (tx) => {
+      await garantirViaturaLivre(tx, { veiculoId: createDto.veiculoId, janela });
+      return tx.reserva_veiculo.create({
       data: {
-        veiculo_id: createDto.veiculoId,
+        veiculo_id: createDto.veiculoId.trim(),
         solicitante_id: createDto.solicitanteId,
         tipo_solicitante: createDto.tipoSolicitante,
-        data_inicio: createDto.dataInicio,
-        data_fim: createDto.dataFim,
-        hora_inicio: createDto.horaInicio,
-        hora_fim: createDto.horaFim,
+        ...camposDaJanela(janela),
         responsavel: createDto.responsavel,
         responsavel_id: createDto.responsavelId,
         finalidade: createDto.finalidade,
@@ -75,6 +74,7 @@ export class ReservasService {
           }
         }
       }
+      });
     });
 
     return this.mapearParaResponse(reserva);
@@ -193,46 +193,37 @@ export class ReservasService {
       throw new BadRequestException('Só é possível editar reservas ativas');
     }
 
-    // Se está alterando o veículo, verificar se está disponível
     if (updateDto.veiculoId && updateDto.veiculoId !== reservaExistente.veiculoId) {
-      const veiculo = await this.veiculosService.buscarPorId(updateDto.veiculoId, user);
+      await this.veiculosService.buscarPorId(updateDto.veiculoId, user);
+    }
 
-      if (!veiculo.ativo || veiculo.status !== StatusVeiculo.disponivel) {
-        throw new BadRequestException('Veículo não está disponível para reserva');
+    // Trocar viatura, dia ou hora revalida o horário (antes trocar só a
+    // viatura não checava conflito nenhum)
+    const mudouJanela = Boolean(
+      updateDto.veiculoId || updateDto.dataInicio || updateDto.dataFim || updateDto.horaInicio || updateDto.horaFim,
+    );
+    const janela: JanelaDaReserva = {
+      data_inicio: updateDto.dataInicio || reservaExistente.dataInicio,
+      data_fim: updateDto.dataFim || reservaExistente.dataFim,
+      hora_inicio: updateDto.horaInicio || reservaExistente.horaInicio,
+      hora_fim: updateDto.horaFim || reservaExistente.horaFim,
+    };
+
+    const reserva = await this.prisma.$transaction(async (tx) => {
+      if (mudouJanela) {
+        await garantirViaturaLivre(tx, {
+          veiculoId: updateDto.veiculoId || reservaExistente.veiculoId,
+          janela,
+          excluirReservaId: id,
+        });
       }
-    }
-
-    // Se está alterando período, validar
-    if (updateDto.dataInicio || updateDto.dataFim || updateDto.horaInicio || updateDto.horaFim) {
-      const dataInicio = updateDto.dataInicio || reservaExistente.dataInicio;
-      const dataFim = updateDto.dataFim || reservaExistente.dataFim;
-      const horaInicio = updateDto.horaInicio || reservaExistente.horaInicio;
-      const horaFim = updateDto.horaFim || reservaExistente.horaFim;
-
-      this.validarPeriodo(dataInicio, dataFim, horaInicio, horaFim);
-
-      // Verificar conflitos (excluindo a própria reserva)
-      await this.verificarConflitos(
-        updateDto.veiculoId || reservaExistente.veiculoId,
-        dataInicio,
-        dataFim,
-        horaInicio,
-        horaFim,
-        id
-      );
-    }
-
-    // Atualizar reserva
-    const reserva = await this.prisma.reserva_veiculo.update({
+      return tx.reserva_veiculo.update({
       where: { id },
       data: {
-        veiculo_id: updateDto.veiculoId,
+        veiculo_id: updateDto.veiculoId?.trim(),
         solicitante_id: updateDto.solicitanteId,
         tipo_solicitante: updateDto.tipoSolicitante,
-        data_inicio: updateDto.dataInicio,
-        data_fim: updateDto.dataFim,
-        hora_inicio: updateDto.horaInicio,
-        hora_fim: updateDto.horaFim,
+        ...(mudouJanela ? camposDaJanela(janela) : {}),
         responsavel: updateDto.responsavel,
         responsavel_id: updateDto.responsavelId,
         finalidade: updateDto.finalidade,
@@ -249,6 +240,7 @@ export class ReservasService {
           }
         }
       }
+      });
     });
 
     return this.mapearParaResponse(reserva);
@@ -284,7 +276,7 @@ export class ReservasService {
 
     await this.prisma.reserva_veiculo.update({
       where: { id },
-      data: { status: StatusReserva.finalizada }
+      data: { status: StatusReserva.finalizada, data_finalizacao: new Date() }
     });
   }
 
@@ -315,54 +307,10 @@ export class ReservasService {
     return reservas.map(reserva => this.mapearParaResponse(reserva));
   }
 
-  private validarPeriodo(dataInicio: Date, dataFim: Date, horaInicio: string, horaFim: string): void {
-    const inicio = new Date(dataInicio);
-    const fim = new Date(dataFim);
-
-    if (inicio > fim) {
-      throw new BadRequestException('Data de início deve ser anterior à data de fim');
-    }
-
-    if (inicio.toDateString() === fim.toDateString() && horaInicio >= horaFim) {
-      throw new BadRequestException('Hora de início deve ser anterior à hora de fim no mesmo dia');
-    }
-
-    // Não permitir reservas no passado
-    const hoje = new Date();
-    hoje.setHours(0, 0, 0, 0);
-
-    if (inicio < hoje) {
+  /** Reserva que já terminou não faz sentido (a de hoje, ainda em curso, pode) */
+  private recusarNoPassado(janela: JanelaDaReserva): void {
+    if (validarJanela(janela).fim <= new Date()) {
       throw new BadRequestException('Não é possível criar reservas no passado');
-    }
-  }
-
-  private async verificarConflitos(
-    veiculoId: string,
-    dataInicio: Date,
-    dataFim: Date,
-    horaInicio: string,
-    horaFim: string,
-    excluirReservaId?: string
-  ): Promise<void> {
-    const conflitos = await this.prisma.reserva_veiculo.findMany({
-      where: {
-        veiculo_id: veiculoId,
-        status: StatusReserva.ativa,
-        ...(excluirReservaId && { id: { not: excluirReservaId } }),
-        OR: [
-          {
-            data_inicio: { lte: dataFim },
-            data_fim: { gte: dataInicio }
-          }
-        ]
-      }
-    });
-
-    if (conflitos.length > 0) {
-      const conflito = conflitos[0];
-      throw new ConflictException(
-        `Existe conflito com reserva de ${conflito.data_inicio.toLocaleDateString()} a ${conflito.data_fim.toLocaleDateString()}`
-      );
     }
   }
 

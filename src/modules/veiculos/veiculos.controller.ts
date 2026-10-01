@@ -77,6 +77,13 @@ export class VeiculosController {
     return this.veiculosService.buscarTodos(queryDto, user);
   }
 
+  @Get('disponibilidade')
+  @ApiOperation({ summary: 'Cada viatura com livre/ocupada na janela, e o motivo quando ocupada' })
+  @ApiResponse({ status: 200, description: 'Lista de viaturas com disponibilidade' })
+  async disponibilidade(@Query() queryDto: VeiculosDisponiveisDto, @CurrentUser() user?: any) {
+    return this.veiculosService.disponibilidade(queryDto, user);
+  }
+
   @Get('disponiveis')
   @ApiOperation({ summary: 'Buscar veículos disponíveis para período específico' })
   @ApiResponse({

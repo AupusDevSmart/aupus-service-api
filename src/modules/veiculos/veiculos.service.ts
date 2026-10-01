@@ -10,6 +10,7 @@ import {
   VeiculosDisponiveisDto
 } from './dto';
 import { StatusVeiculo, Prisma } from '@/core';
+import { disponibilidadeDasViaturas, type DisponibilidadeDaViatura } from '../reservas/ocupacao-da-viatura';
 
 export interface PaginatedResponse<T> {
   data: T[];
@@ -418,59 +419,44 @@ export class VeiculosService {
     return this.mapearParaResponse(veiculoAtualizado);
   }
 
-  async buscarDisponiveis(queryDto: VeiculosDisponiveisDto, user?: ScopedUser): Promise<any> {
+  /**
+   * Cada viatura com livre/ocupada na janela, pela regra única de ocupação
+   * (docs/SPEC-RESERVAS-DE-VIATURA.md). Antes comparava só os dias e ignorava
+   * as horas; a tela, por sua vez, nunca via conflito nenhum.
+   */
+  async disponibilidade(queryDto: VeiculosDisponiveisDto, user?: ScopedUser): Promise<DisponibilidadeDaViatura[]> {
     const { dataInicio, dataFim, horaInicio, horaFim, capacidadeMinima, tiposVeiculo, excluirReservaId } = queryDto;
+    const filtro: Prisma.veiculoWhereInput = {
+      ...(capacidadeMinima && { capacidade_passageiros: { gte: capacidadeMinima } }),
+      ...(tiposVeiculo && { tipo: { in: tiposVeiculo } }),
+    };
+    if (user) await this.applyScope(filtro, user);
+    return disponibilidadeDasViaturas(
+      this.prisma,
+      { data_inicio: dataInicio, data_fim: dataFim, hora_inicio: horaInicio, hora_fim: horaFim },
+      excluirReservaId,
+      { filtro },
+    );
+  }
 
-    // Validar período
-    if (new Date(dataInicio) > new Date(dataFim)) {
-      throw new BadRequestException('Data de início deve ser anterior à data de fim');
-    }
-
-    // Buscar veículos disponíveis
-    const veiculos = await this.prisma.veiculo.findMany({
-      where: {
-        ativo: true,
-        status: StatusVeiculo.disponivel,
-        ...(capacidadeMinima && { capacidade_passageiros: { gte: capacidadeMinima } }),
-        ...(tiposVeiculo && { tipo: { in: tiposVeiculo } }),
-        NOT: {
-          reservas: {
-            some: {
-              status: 'ativa',
-              id: excluirReservaId ? { not: excluirReservaId } : undefined,
-              OR: [
-                {
-                  data_inicio: { lte: new Date(dataFim) },
-                  data_fim: { gte: new Date(dataInicio) }
-                }
-              ]
-            }
-          }
-        }
-      },
-      include: {
-        _count: {
-          select: {
-            reservas: true
-          }
-        }
-      }
-    });
-
+  /** Formato antigo (só as livres), mantido para as telas que já o usam */
+  async buscarDisponiveis(queryDto: VeiculosDisponiveisDto, user?: ScopedUser): Promise<any> {
+    const livres = (await this.disponibilidade(queryDto, user)).filter((v) => v.disponivel);
     return {
-      veiculos: veiculos.map(veiculo => ({
+      veiculos: livres.map((veiculo) => ({
         id: veiculo.id,
         nome: veiculo.nome,
         placa: veiculo.placa,
         capacidadePassageiros: veiculo.capacidade_passageiros,
         tipo: veiculo.tipo,
         disponivel: true,
-        proximaIndisponibilidade: null
+        proximaIndisponibilidade: null,
       })),
       conflitos: [],
-      sugestoes: []
+      sugestoes: [],
     };
   }
+
 
   private validarTransicaoStatus(statusAtual: StatusVeiculo, novoStatus: StatusVeiculo): void {
     const transicoesPermitidas: Record<StatusVeiculo, StatusVeiculo[]> = {

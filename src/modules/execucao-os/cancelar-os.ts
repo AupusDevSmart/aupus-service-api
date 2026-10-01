@@ -1,6 +1,8 @@
 import { ConflictException, NotFoundException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { liberarOrigem, nomeDoAutor, origemDaProgramacao } from '../../common/helpers/status-da-origem';
+import { devolverViatura } from '../reservas/ocupacao-da-viatura';
+import { variantesDeIds } from '../tarefas/ids';
 
 type Tx = Prisma.TransactionClient;
 
@@ -49,16 +51,32 @@ export async function cancelarOS(
     data: { status: 'CANCELADA', motivo_cancelamento: dados.motivo },
   });
 
-  if (os.reserva_id) {
-    await tx.reserva_veiculo.updateMany({
-      where: { id: os.reserva_id.trim(), status: 'ativa' },
-      data: {
-        status: 'cancelada',
-        motivo_cancelamento: dados.motivo,
-        data_cancelamento: new Date(),
-        cancelado_por_id: dados.usuarioId ?? null,
-      },
+  // A reserva pode estar só na programação (aprovação antiga que não a
+  // vinculou à OS): as duas são lidas, senão a viatura ficava presa.
+  const daProgramacao = await tx.programacoes_os.findUnique({
+    where: { id: os.programacao_id },
+    select: { reserva_id: true },
+  });
+  const idsDaReserva = [os.reserva_id, daProgramacao?.reserva_id].filter(Boolean).map((r) => r!.trim());
+  if (idsDaReserva.length) {
+    const ativas = await tx.reserva_veiculo.findMany({
+      where: { id: { in: variantesDeIds(idsDaReserva) }, status: 'ativa' },
+      select: { id: true, veiculo_id: true },
     });
+    for (const reserva of ativas) {
+      await tx.reserva_veiculo.update({
+        where: { id: reserva.id },
+        data: {
+          status: 'cancelada',
+          motivo_cancelamento: dados.motivo,
+          data_cancelamento: new Date(),
+          cancelado_por: autor,
+          cancelado_por_id: dados.usuarioId ?? null,
+        },
+      });
+      // OS cancelada em campo: a viatura "em uso" volta para disponível
+      await devolverViatura(tx, reserva.veiculo_id);
+    }
   }
 
   await tx.historico_os.create({
