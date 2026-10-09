@@ -72,6 +72,11 @@ function traduzir(campo: string, restricao: string, original: string): string {
       return `${nome} deve ter ao menos ${numero} caracteres.`;
     case 'maxLength':
       return `${nome} deve ter no máximo ${numero} caracteres.`;
+    case 'isLength':
+      // @Length(min, max): o class-validator diz qual dos dois limites falhou.
+      return original.includes('shorter')
+        ? `${nome} deve ter no máximo ${numero} caracteres.`
+        : `${nome} deve ter ao menos ${numero} caracteres.`;
     case 'isInt':
       return `${nome} deve ser um número inteiro.`;
     case 'isNumber':

@@ -180,6 +180,9 @@ export class ImportacaoService {
       await emCurso.tx.$executeRawUnsafe('RELEASE SAVEPOINT registro_importado');
 
       if (atual) this.avisarSeMudouDepoisDaExportacao(resultado, registro, atualizadoAntes);
+      for (const mensagem of cadastro.avisos?.(atual, dto) ?? []) {
+        resultado.avisos.push({ aba: registro.aba, linha: registro.linha, mensagem });
+      }
 
       const acao = atual ? 'alterado' : 'novo';
       resultado[acao === 'novo' ? 'novos' : 'alterados']++;

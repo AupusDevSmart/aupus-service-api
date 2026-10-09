@@ -12,6 +12,7 @@ import {
 import { promises as arquivos } from 'fs';
 import * as caminho from 'path';
 import { PrismaService } from '../../prisma/prisma.service';
+import { depoisDeGravar } from '../../prisma/transacao-em-curso';
 import { RolesService } from '../roles/roles.service';
 import { PermissionsService } from '../permissions/permissions.service';
 import { 
@@ -417,10 +418,13 @@ export class UsuariosService {
 
       console.log('✅ [CREATE USER] Usuário criado com sucesso');
 
-      // Enviar email de boas-vindas (fire-and-forget)
-      this.mailService
-        .sendWelcomeEmail(data.email, data.nome, senhaTemporaria)
-        .catch(err => this.logger.error(`Erro ao enviar email de boas-vindas: ${err.message}`));
+      // Enviar email de boas-vindas (fire-and-forget). Dentro de uma importação
+      // de planilha, só depois de confirmada: a prévia desfaz o usuário.
+      depoisDeGravar(() =>
+        this.mailService
+          .sendWelcomeEmail(data.email, data.nome, senhaTemporaria)
+          .catch(err => this.logger.error(`Erro ao enviar email de boas-vindas: ${err.message}`)),
+      );
 
       const result = await this.mapToUsuarioResponseDto(novoUsuario);
 

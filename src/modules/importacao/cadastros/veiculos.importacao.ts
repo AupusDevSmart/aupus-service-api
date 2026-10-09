@@ -4,6 +4,22 @@ import { VeiculosService } from '@/modules/veiculos/veiculos.service';
 import { CreateVeiculoDto } from '@/modules/veiculos/dto/create-veiculo.dto';
 import { UpdateVeiculoDto } from '@/modules/veiculos/dto/update-veiculo.dto';
 import { CadastroImportavel, UsuarioDaImportacao } from '../importacao.types';
+import { semOQueNaoMudou } from '../sem-o-que-nao-mudou';
+
+/** Campo do formulário → coluna (os de texto, onde mora o dado antigo fora da regra). */
+const COLUNAS: Record<string, keyof veiculo> = {
+  nome: 'nome',
+  placa: 'placa',
+  marca: 'marca',
+  modelo: 'modelo',
+  cor: 'cor',
+  responsavel: 'responsavel',
+  localizacaoAtual: 'localizacao_atual',
+  chassi: 'chassi',
+  renavam: 'renavam',
+  seguradora: 'seguradora',
+  observacoes: 'observacoes',
+};
 
 const dia = (d: Date | null) => (d ? d.toISOString().slice(0, 10) : null);
 const numero = (v: unknown) => (v === null || v === undefined ? null : Number(v));
@@ -33,16 +49,12 @@ export class VeiculosImportacao implements CadastroImportavel<veiculo> {
   }
 
   /**
-   * Com reserva ativa, o service recusa qualquer `placa` no payload, mesmo
-   * igual à atual. A planilha manda a linha inteira: a placa que não mudou
-   * sai, senão reimportar sem mexer daria erro.
+   * O que não mudou sai do payload. Além do dado antigo fora da regra de hoje
+   * (`semOQueNaoMudou`), há a placa: com reserva ativa o service recusa
+   * qualquer `placa` no payload, mesmo igual à atual.
    */
   async prepararDados(dados: Record<string, unknown>, _usuario: UsuarioDaImportacao, atual: veiculo | null) {
-    if (atual && dados.placa === atual.placa) {
-      const { placa: _mesma, ...resto } = dados;
-      return resto;
-    }
-    return dados;
+    return semOQueNaoMudou(dados, atual, COLUNAS);
   }
 
   async criar(dto: object, usuario: UsuarioDaImportacao) {

@@ -96,6 +96,12 @@ export interface CadastroImportavel<TAtual = unknown> {
   criar(dto: object, usuario: UsuarioDaImportacao): Promise<{ id: string }>;
   atualizar(atual: TAtual, dto: object, usuario: UsuarioDaImportacao): Promise<unknown>;
 
+  /**
+   * Avisos de um registro que vai ser gravado (não bloqueiam): o que a pessoa
+   * precisa saber antes de confirmar e que nenhuma regra recusa.
+   */
+  avisos?(atual: TAtual | null, dto: object): string[];
+
   /** O que conta para "alterado" — sem ids de filho nem datas, que mudam sem o dado mudar. */
   retrato(id: string): Promise<unknown>;
 

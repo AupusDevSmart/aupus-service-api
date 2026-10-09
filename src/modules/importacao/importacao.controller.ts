@@ -8,6 +8,7 @@ import { RecursosImportacao } from './cadastros/recursos.importacao';
 import { VeiculosImportacao } from './cadastros/veiculos.importacao';
 import { FeriadosImportacao } from './cadastros/feriados.importacao';
 import { ConcessionariasImportacao } from './cadastros/concessionarias.importacao';
+import { UsuariosImportacao } from './cadastros/usuarios.importacao';
 
 /**
  * Uma rota por cadastro, cada uma com as MESMAS permissões das rotas de criar
@@ -24,6 +25,7 @@ export class ImportacaoController {
     private readonly veiculos: VeiculosImportacao,
     private readonly feriados: FeriadosImportacao,
     private readonly concessionarias: ConcessionariasImportacao,
+    private readonly usuarios: UsuariosImportacao,
   ) {}
 
   @Post('recursos')
@@ -60,5 +62,24 @@ export class ImportacaoController {
   @ApiOperation({ summary: 'Prévia ou gravação da planilha de concessionárias' })
   importarConcessionarias(@Body() corpo: ImportarPlanilhaDto, @CurrentUser() usuario: UsuarioDaImportacao) {
     return this.importacao.importar(this.concessionarias, corpo.registros, corpo.confirmar, usuario);
+  }
+
+  /**
+   * Criar e editar usuário pedem permissões diferentes: a rota aceita
+   * qualquer uma delas, e cada linha confere a sua (editar = usuarios.manage;
+   * dar um tipo = usuarios.create_<tipo>).
+   */
+  @Post('usuarios')
+  @HttpCode(HttpStatus.OK)
+  @Permissions(
+    'usuarios.manage',
+    'usuarios.create_operador',
+    'usuarios.create_proprietario',
+    'usuarios.create_analista',
+    'usuarios.create_admin',
+  )
+  @ApiOperation({ summary: 'Prévia ou gravação da planilha de usuários' })
+  importarUsuarios(@Body() corpo: ImportarPlanilhaDto, @CurrentUser() usuario: UsuarioDaImportacao) {
+    return this.importacao.importar(this.usuarios, corpo.registros, corpo.confirmar, usuario);
   }
 }

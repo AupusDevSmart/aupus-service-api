@@ -3,6 +3,7 @@ import { PrismaService, recursos } from '@/core';
 import { RecursosService } from '@/modules/recursos/recursos.service';
 import { CreateRecursoDto, UpdateRecursoDto } from '@/modules/recursos/dto/recurso.dto';
 import { CadastroImportavel } from '../importacao.types';
+import { semOQueNaoMudou } from '../sem-o-que-nao-mudou';
 
 /** Recursos: cadastro plano, sem referência a outro cadastro e sem escopo de planta. */
 @Injectable()
@@ -18,6 +19,11 @@ export class RecursosImportacao implements CadastroImportavel<recursos> {
 
   buscar(id: string) {
     return this.recursos.buscarPorId(id);
+  }
+
+  /** Nome e unidade antigos, fora da regra de hoje, não travam a linha se não mudaram. */
+  async prepararDados(dados: Record<string, unknown>, _usuario: unknown, atual: recursos | null) {
+    return semOQueNaoMudou(dados, atual, { nome: 'nome', unidade: 'unidade' });
   }
 
   async criar(dto: object) {
