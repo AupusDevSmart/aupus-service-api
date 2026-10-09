@@ -145,6 +145,16 @@ describe('ImportacaoService (banco real)', () => {
       expect(depois.updated_at).toEqual(antes.updated_at);
     });
 
+    it('espaço sobrando gravado pela tela não conta como mudança (a planilha apara o que lê)', async () => {
+      await prisma.recursos.update({ where: { id }, data: { unidade: 'h  ' } });
+      exportadoEm = (await prisma.recursos.findUniqueOrThrow({ where: { id } })).updated_at.toISOString();
+
+      const r = await importacao.importar(recursos, [comoExportado()], true, usuario);
+
+      expect(r).toMatchObject({ inalterados: 1, alterados: 0, erros: [] });
+      expect((await prisma.recursos.findUniqueOrThrow({ where: { id } })).unidade).toBe('h  ');
+    });
+
     it('alterado grava, e o aviso de "mudou depois" não dispara falso', async () => {
       const r = await importacao.importar(recursos, [comoExportado({ preco_medio: 90 })], true, usuario);
 

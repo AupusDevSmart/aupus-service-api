@@ -316,6 +316,13 @@ function onde(registro: RegistroImportado) {
   return `aba ${registro.aba}, linha ${registro.linha}`;
 }
 
+/**
+ * Retratos iguais, com texto aparado e vazio igual a nulo: a planilha apara o
+ * que lê, e um "Nicolas " gravado pela tela voltaria "Nicolas" — sem isso a
+ * reimportação sem mexer acusaria "alterado" onde ninguém mudou nada.
+ */
 function igual(a: unknown, b: unknown) {
-  return JSON.stringify(a) === JSON.stringify(b);
+  const normalizar = (_chave: string, valor: unknown) =>
+    typeof valor === 'string' ? valor.trim() || null : valor;
+  return JSON.stringify(a, normalizar) === JSON.stringify(b, normalizar);
 }

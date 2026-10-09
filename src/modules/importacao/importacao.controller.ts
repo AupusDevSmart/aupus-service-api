@@ -5,6 +5,7 @@ import { ImportacaoService } from './importacao.service';
 import { ImportarPlanilhaDto } from './dto/importar-planilha.dto';
 import { UsuarioDaImportacao } from './importacao.types';
 import { RecursosImportacao } from './cadastros/recursos.importacao';
+import { VeiculosImportacao } from './cadastros/veiculos.importacao';
 
 /**
  * Uma rota por cadastro, cada uma com as MESMAS permissões das rotas de criar
@@ -18,6 +19,7 @@ export class ImportacaoController {
   constructor(
     private readonly importacao: ImportacaoService,
     private readonly recursos: RecursosImportacao,
+    private readonly veiculos: VeiculosImportacao,
   ) {}
 
   @Post('recursos')
@@ -26,5 +28,13 @@ export class ImportacaoController {
   @ApiOperation({ summary: 'Prévia ou gravação da planilha de recursos' })
   importarRecursos(@Body() corpo: ImportarPlanilhaDto, @CurrentUser() usuario: UsuarioDaImportacao) {
     return this.importacao.importar(this.recursos, corpo.registros, corpo.confirmar, usuario);
+  }
+
+  @Post('veiculos')
+  @HttpCode(HttpStatus.OK)
+  @Permissions('recursos.manage')
+  @ApiOperation({ summary: 'Prévia ou gravação da planilha de veículos' })
+  importarVeiculos(@Body() corpo: ImportarPlanilhaDto, @CurrentUser() usuario: UsuarioDaImportacao) {
+    return this.importacao.importar(this.veiculos, corpo.registros, corpo.confirmar, usuario);
   }
 }
