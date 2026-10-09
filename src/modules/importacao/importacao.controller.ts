@@ -7,6 +7,7 @@ import { UsuarioDaImportacao } from './importacao.types';
 import { RecursosImportacao } from './cadastros/recursos.importacao';
 import { VeiculosImportacao } from './cadastros/veiculos.importacao';
 import { FeriadosImportacao } from './cadastros/feriados.importacao';
+import { ConcessionariasImportacao } from './cadastros/concessionarias.importacao';
 
 /**
  * Uma rota por cadastro, cada uma com as MESMAS permissões das rotas de criar
@@ -22,6 +23,7 @@ export class ImportacaoController {
     private readonly recursos: RecursosImportacao,
     private readonly veiculos: VeiculosImportacao,
     private readonly feriados: FeriadosImportacao,
+    private readonly concessionarias: ConcessionariasImportacao,
   ) {}
 
   @Post('recursos')
@@ -46,5 +48,17 @@ export class ImportacaoController {
   @ApiOperation({ summary: 'Prévia ou gravação da planilha de feriados' })
   importarFeriados(@Body() corpo: ImportarPlanilhaDto, @CurrentUser() usuario: UsuarioDaImportacao) {
     return this.importacao.importar(this.feriados, corpo.registros, corpo.confirmar, usuario);
+  }
+
+  /**
+   * A API de concessionárias não tem @Permissions (SN-11); a planilha exige a
+   * mesma permissão que guarda a tela.
+   */
+  @Post('concessionarias')
+  @HttpCode(HttpStatus.OK)
+  @Permissions('equipamentos.manage')
+  @ApiOperation({ summary: 'Prévia ou gravação da planilha de concessionárias' })
+  importarConcessionarias(@Body() corpo: ImportarPlanilhaDto, @CurrentUser() usuario: UsuarioDaImportacao) {
+    return this.importacao.importar(this.concessionarias, corpo.registros, corpo.confirmar, usuario);
   }
 }
