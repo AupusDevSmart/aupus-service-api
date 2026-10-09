@@ -19,6 +19,8 @@ export class CatalogoPorNome {
   constructor(
     itens: Array<{ id: string; nome: string | null; codigo?: string | null }>,
     private readonly oQue: string,
+    /** Para a concordância: "uma planta chamada", "um recurso chamado". */
+    private readonly genero: 'm' | 'f' = 'm',
   ) {
     for (const item of itens) {
       const id = item.id.trim();
@@ -38,7 +40,8 @@ export class CatalogoPorNome {
    */
   procurar(texto: string | null | undefined, idsDaLinha: Array<string | null | undefined> = []): string | { erro: string } {
     const nome = texto?.trim() ?? '';
-    if (!nome) return { erro: `Informe o ${this.oQue}.` };
+    const [o, um, chamado] = this.genero === 'f' ? ['a', 'uma', 'chamada'] : ['o', 'um', 'chamado'];
+    if (!nome) return { erro: `Informe ${o} ${this.oQue}.` };
 
     const k = chave(nome);
     for (const id of idsDaLinha) {
@@ -54,12 +57,12 @@ export class CatalogoPorNome {
 
     if (ids.length === 0) {
       return {
-        erro: `Não existe ${this.oQue} chamado "${nome}". Use o nome exatamente como na aba REFERÊNCIAS.`,
+        erro: `Não existe ${this.oQue} ${chamado} "${nome}". Use o nome exatamente como na aba REFERÊNCIAS.`,
       };
     }
 
     return {
-      erro: `Há mais de um ${this.oQue} chamado "${nome}". Na linha exportada, mantenha a coluna de ID que veio com ela; em linha nova, renomeie um deles no cadastro antes de importar.`,
+      erro: `Há mais de ${um} ${this.oQue} ${chamado} "${nome}". Na linha exportada, mantenha a coluna de ID que veio com ela; em linha nova, renomeie um deles no cadastro antes de importar.`,
     };
   }
 }
