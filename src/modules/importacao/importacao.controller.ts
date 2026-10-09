@@ -10,6 +10,7 @@ import { FeriadosImportacao } from './cadastros/feriados.importacao';
 import { ConcessionariasImportacao } from './cadastros/concessionarias.importacao';
 import { UsuariosImportacao } from './cadastros/usuarios.importacao';
 import { InstrucoesImportacao } from './cadastros/instrucoes.importacao';
+import { PlanosImportacao } from './cadastros/planos.importacao';
 
 /**
  * Uma rota por cadastro, cada uma com as MESMAS permissões das rotas de criar
@@ -28,6 +29,7 @@ export class ImportacaoController {
     private readonly concessionarias: ConcessionariasImportacao,
     private readonly usuarios: UsuariosImportacao,
     private readonly instrucoes: InstrucoesImportacao,
+    private readonly planos: PlanosImportacao,
   ) {}
 
   @Post('recursos')
@@ -91,5 +93,13 @@ export class ImportacaoController {
   @ApiOperation({ summary: 'Prévia ou gravação da planilha de instruções' })
   importarInstrucoes(@Body() corpo: ImportarPlanilhaDto, @CurrentUser() usuario: UsuarioDaImportacao) {
     return this.importacao.importar(this.instrucoes, corpo.registros, corpo.confirmar, usuario);
+  }
+
+  @Post('planos-manutencao')
+  @HttpCode(HttpStatus.OK)
+  @Permissions('manutencao.manage')
+  @ApiOperation({ summary: 'Prévia ou gravação da planilha de planos de manutenção (templates)' })
+  importarPlanos(@Body() corpo: ImportarPlanilhaDto, @CurrentUser() usuario: UsuarioDaImportacao) {
+    return this.importacao.importar(this.planos, corpo.registros, corpo.confirmar, usuario);
   }
 }

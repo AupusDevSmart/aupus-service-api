@@ -1,7 +1,7 @@
 // src/modules/planos-manutencao/propagacao-planos.service.ts
 import { Injectable, Logger } from '@nestjs/common';
 import { Cron } from '@nestjs/schedule';
-import { PrismaService } from '@/core';
+import { PrismaService, depoisDeGravar } from '@/core';
 
 /** Campos que a propagacao pode escrever. Ver comentario em aplicarNaCopia. */
 const CAMPOS_DE_DEFINICAO = [
@@ -59,9 +59,13 @@ export class PropagacaoPlanosService {
     });
 
     // Sem await: quem salvou o template nao espera a propagacao terminar.
-    void this.processarFila().catch((error) => {
-      this.logger.warn(`Disparo imediato da propagacao falhou: ${error.message}`);
-    });
+    // Dentro de uma importacao de planilha, so depois de confirmada: a linha
+    // da fila acima esta na transacao, e a previa a desfaz.
+    depoisDeGravar(() =>
+      this.processarFila().catch((error) => {
+        this.logger.warn(`Disparo imediato da propagacao falhou: ${error.message}`);
+      }),
+    );
 
     return registro.id;
   }

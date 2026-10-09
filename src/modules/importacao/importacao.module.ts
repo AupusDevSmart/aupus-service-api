@@ -4,6 +4,8 @@ import { RecursosModule } from '@/modules/recursos/recursos.module';
 import { VeiculosModule } from '@/modules/veiculos/veiculos.module';
 import { AgendaModule } from '@/modules/agenda/agenda.module';
 import { InstrucoesModule } from '@/modules/instrucoes/instrucoes.module';
+import { PlanosManutencaoModule } from '@/modules/planos-manutencao/planos-manutencao.module';
+import { TarefasModule } from '@/modules/tarefas/tarefas.module';
 import { ImportacaoController } from './importacao.controller';
 import { ImportacaoService } from './importacao.service';
 import { RecursosImportacao } from './cadastros/recursos.importacao';
@@ -12,10 +14,11 @@ import { FeriadosImportacao } from './cadastros/feriados.importacao';
 import { ConcessionariasImportacao } from './cadastros/concessionarias.importacao';
 import { UsuariosImportacao } from './cadastros/usuarios.importacao';
 import { InstrucoesImportacao } from './cadastros/instrucoes.importacao';
+import { PlanosImportacao } from './cadastros/planos.importacao';
 
 @Module({
-  imports: [PrismaModule, RecursosModule, VeiculosModule, AgendaModule, ConcessionariasModule, UsuariosModule, InstrucoesModule],
+  imports: [PrismaModule, RecursosModule, VeiculosModule, AgendaModule, ConcessionariasModule, UsuariosModule, InstrucoesModule, PlanosManutencaoModule, TarefasModule],
   controllers: [ImportacaoController],
-  providers: [ImportacaoService, RecursosImportacao, VeiculosImportacao, FeriadosImportacao, ConcessionariasImportacao, UsuariosImportacao, InstrucoesImportacao],
+  providers: [ImportacaoService, RecursosImportacao, VeiculosImportacao, FeriadosImportacao, ConcessionariasImportacao, UsuariosImportacao, InstrucoesImportacao, PlanosImportacao],
 })
 export class ImportacaoModule {}

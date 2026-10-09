@@ -157,7 +157,9 @@ export class ImportacaoService {
       const preparados = cadastro.prepararDados
         ? await cadastro.prepararDados(dados, usuario, atual)
         : dados;
-      const dto = await validarComoOFormulario(atual ? cadastro.dtoDeEdicao : cadastro.dtoDeCriacao, preparados);
+      const dto = cadastro.validar
+        ? await cadastro.validar(preparados, atual)
+        : await validarComoOFormulario(atual ? cadastro.dtoDeEdicao : cadastro.dtoDeCriacao, preparados);
       if (cadastro.autorizar) await cadastro.autorizar(usuario, dto, atual);
 
       let id: string;
@@ -278,10 +280,12 @@ export class ImportacaoService {
 export async function validarComoOFormulario(
   Dto: new () => object,
   dados: Record<string, unknown>,
+  /** Para item de lista validado à parte: `tarefas.3` → `tarefas.3.nome`. */
+  prefixo = '',
 ): Promise<object> {
   const instancia = plainToInstance(Dto, dados, { enableImplicitConversion: true });
   const erros = await validate(instancia, { whitelist: true, forbidNonWhitelisted: true });
-  if (erros.length > 0) throw new ErrosDaLinha(errosPorCampo(erros));
+  if (erros.length > 0) throw new ErrosDaLinha(errosPorCampo(erros, prefixo));
   return instancia;
 }
 

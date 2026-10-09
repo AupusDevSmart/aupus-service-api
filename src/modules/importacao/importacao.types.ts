@@ -90,6 +90,13 @@ export interface CadastroImportavel<TAtual = unknown> {
     atual: TAtual | null,
   ): Promise<Record<string, unknown>>;
 
+  /**
+   * Para o registro que grava por mais de um endpoint da tela (o plano e as
+   * tarefas dele): valida cada parte com o DTO dela. Sem isto, o payload
+   * inteiro passa pelo `dtoDeCriacao`/`dtoDeEdicao`.
+   */
+  validar?(dados: Record<string, unknown>, atual: TAtual | null): Promise<object>;
+
   /** Permissão que depende do registro (ex.: o papel do usuário criado). */
   autorizar?(usuario: UsuarioDaImportacao, dto: object, atual: TAtual | null): Promise<void>;
 
