@@ -25,6 +25,7 @@ import { DashboardModule } from './modules/dashboard/dashboard.module';
 import { SolicitacoesServicoModule } from './modules/solicitacoes-servico/solicitacoes-servico.module';
 import { InstrucoesModule } from './modules/instrucoes/instrucoes.module';
 import { RecursosModule } from './modules/recursos/recursos.module';
+import { ImportacaoModule } from './modules/importacao/importacao.module';
 
 // Modulos do nucleo (src/core)
 import {
@@ -86,6 +87,7 @@ import {
     SolicitacoesServicoModule,
     InstrucoesModule,
     RecursosModule,
+    ImportacaoModule,
     DashboardModule,
     UploadsModule,
   ],

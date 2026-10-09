@@ -35,6 +35,10 @@ async function bootstrap() {
     credentials: true,
   });
 
+  // O padrão do body-parser (100 kB) não cabe uma planilha de cadastro
+  // importada: centenas de registros com as listas de cada um.
+  app.useBodyParser('json', { limit: '20mb' });
+
   // ✅ Prefix global da API
   app.setGlobalPrefix('api/v1');
 

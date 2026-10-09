@@ -1,5 +1,44 @@
 import { Injectable, OnModuleInit, OnModuleDestroy, Logger } from '@nestjs/common';
-import { PrismaClient } from '@prisma/client';
+import { Prisma, PrismaClient } from '@prisma/client';
+import { TransacaoEmCurso } from './transacao-em-curso';
+
+/** Os métodos de SQL cru que a transação também tem. */
+const SQL_CRU = new Set(['$executeRaw', '$executeRawUnsafe', '$queryRaw', '$queryRawUnsafe']);
+
+/**
+ * O `$transaction` de um service, quando já existe uma transação em curso:
+ * vira parte dela. Postgres não aninha transação; o isolamento por registro é
+ * de quem abriu a de fora (a importação usa um savepoint por registro).
+ */
+function transacaoAninhada(tx: Prisma.TransactionClient) {
+  return async (operacoes: unknown) => {
+    if (typeof operacoes === 'function') return operacoes(tx);
+
+    const resultados: unknown[] = [];
+    for (const operacao of operacoes as Array<Promise<unknown>>) {
+      resultados.push(await operacao);
+    }
+    return resultados;
+  };
+}
+
+function desviarParaTransacaoEmCurso(alvo: PrismaService, propriedade: string | symbol, receptor: unknown) {
+  const emCurso = TransacaoEmCurso.atual();
+
+  if (emCurso && typeof propriedade === 'string') {
+    if (propriedade === '$transaction') return transacaoAninhada(emCurso.tx);
+
+    const ehModel = !propriedade.startsWith('$') && !propriedade.startsWith('_');
+    if ((ehModel || SQL_CRU.has(propriedade)) && propriedade in emCurso.tx) {
+      const valor = (emCurso.tx as unknown as Record<string, unknown>)[propriedade];
+      // Chamado como `prisma.$executeRaw(...)`, o `this` seria o PrismaService
+      // e o SQL sairia pela conexão de fora da transação.
+      return typeof valor === 'function' ? valor.bind(emCurso.tx) : valor;
+    }
+  }
+
+  return Reflect.get(alvo, propriedade, receptor);
+}
 
 @Injectable()
 export class PrismaService extends PrismaClient implements OnModuleInit, OnModuleDestroy {
@@ -45,6 +84,10 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
     this.$on('warn' as never, (e: any) => {
       this.logger.warn(`Aviso do Prisma: ${e.message || JSON.stringify(e)}`);
     });
+
+    // Com uma transação em curso (a da importação de planilha), models, SQL
+    // cru e $transaction vão para ela. Sem, tudo segue como sempre.
+    return new Proxy(this, { get: desviarParaTransacaoEmCurso });
   }
 
   async onModuleInit() {

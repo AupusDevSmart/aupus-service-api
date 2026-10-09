@@ -105,25 +105,34 @@ function traduzir(campo: string, restricao: string, original: string): string {
   }
 }
 
-/** Achata os erros aninhados (listas dentro do payload) numa lista de frases. */
-function coletar(erros: ValidationError[], prefixo = ''): string[] {
-  const frases: string[] = [];
+export type ErroDeCampo = {
+  /** O caminho no payload: `nome`, `sub_instrucoes.2.descricao`. */
+  campo: string;
+  mensagem: string;
+};
+
+/**
+ * Achata os erros aninhados (listas dentro do payload), guardando o caminho de
+ * cada um — a importação de planilha usa o índice do item para apontar a linha.
+ */
+export function errosPorCampo(erros: ValidationError[], prefixo = ''): ErroDeCampo[] {
+  const lista: ErroDeCampo[] = [];
 
   for (const erro of erros) {
     const campo = prefixo ? `${prefixo}.${erro.property}` : erro.property;
 
     if (erro.constraints) {
       for (const [restricao, texto] of Object.entries(erro.constraints)) {
-        frases.push(traduzir(erro.property, restricao, texto));
+        lista.push({ campo, mensagem: traduzir(erro.property, restricao, texto) });
       }
     }
 
     if (erro.children?.length) {
-      frases.push(...coletar(erro.children, campo));
+      lista.push(...errosPorCampo(erro.children, campo));
     }
   }
 
-  return frases;
+  return lista;
 }
 
 /**
@@ -131,6 +140,6 @@ function coletar(erros: ValidationError[], prefixo = ''): string[] {
  * sabe ler (`formatApiError` junta com "; ").
  */
 export function exceptionFactoryEmPortugues(erros: ValidationError[]) {
-  const frases = coletar(erros);
+  const frases = errosPorCampo(erros).map((e) => e.mensagem);
   return new BadRequestException(frases.length > 0 ? frases : ['Dados inválidos.']);
 }
