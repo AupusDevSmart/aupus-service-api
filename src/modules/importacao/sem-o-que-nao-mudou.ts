@@ -1,6 +1,8 @@
 const normalizar = (v: unknown) => {
   if (typeof v === 'string') return v.trim() || null;
   if (v === undefined) return null;
+  // Decimal do Prisma (latitude, valores): compara como número.
+  if (v && typeof v === 'object' && 'toNumber' in v && typeof v.toNumber === 'function') return v.toNumber();
   return v;
 };
 

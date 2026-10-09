@@ -11,6 +11,7 @@ import { ConcessionariasImportacao } from './cadastros/concessionarias.importaca
 import { UsuariosImportacao } from './cadastros/usuarios.importacao';
 import { InstrucoesImportacao } from './cadastros/instrucoes.importacao';
 import { PlanosImportacao } from './cadastros/planos.importacao';
+import { PlantasImportacao } from './cadastros/plantas.importacao';
 
 /**
  * Uma rota por cadastro, cada uma com as MESMAS permissões das rotas de criar
@@ -30,6 +31,7 @@ export class ImportacaoController {
     private readonly usuarios: UsuariosImportacao,
     private readonly instrucoes: InstrucoesImportacao,
     private readonly planos: PlanosImportacao,
+    private readonly plantas: PlantasImportacao,
   ) {}
 
   @Post('recursos')
@@ -101,5 +103,14 @@ export class ImportacaoController {
   @ApiOperation({ summary: 'Prévia ou gravação da planilha de planos de manutenção (templates)' })
   importarPlanos(@Body() corpo: ImportarPlanilhaDto, @CurrentUser() usuario: UsuarioDaImportacao) {
     return this.importacao.importar(this.planos, corpo.registros, corpo.confirmar, usuario);
+  }
+
+  /** As unidades da ficha pedem também unidades.manage (conferido por linha). */
+  @Post('plantas')
+  @HttpCode(HttpStatus.OK)
+  @Permissions('plantas.manage')
+  @ApiOperation({ summary: 'Prévia ou gravação da planilha de plantas (com as unidades)' })
+  importarPlantas(@Body() corpo: ImportarPlanilhaDto, @CurrentUser() usuario: UsuarioDaImportacao) {
+    return this.importacao.importar(this.plantas, corpo.registros, corpo.confirmar, usuario);
   }
 }
