@@ -7,6 +7,7 @@ import { Prisma } from '@prisma/client';
 import { promises as arquivos } from 'fs';
 import * as caminho from 'path';
 import { PrismaService } from '../../prisma/prisma.service';
+import { depoisDeGravar } from '../../prisma/transacao-em-curso';
 import { IMqttBroker, MQTT_BROKER } from '../../common/interfaces/mqtt-broker.interface';
 import { CreateEquipamentoDto } from './dto/create-equipamento.dto';
 import { UpdateEquipamentoDto } from './dto/update-equipamento.dto';
@@ -36,8 +37,10 @@ export class EquipamentosService {
    * Sem-op se EventEmitter2 nao foi provido (consumidor sem @nestjs/event-emitter).
    */
   private emitMqttChanged(payload: EquipamentoMqttChangedPayload): void {
-    if (!this.eventEmitter) return;
-    this.eventEmitter.emit(EQUIPAMENTO_MQTT_CHANGED, payload);
+    const emissor = this.eventEmitter;
+    if (!emissor) return;
+    // Dentro de uma importação de planilha, só depois de confirmada.
+    depoisDeGravar(() => emissor.emit(EQUIPAMENTO_MQTT_CHANGED, payload));
   }
 
   /**

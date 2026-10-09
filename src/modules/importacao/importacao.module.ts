@@ -1,5 +1,5 @@
 import { Module } from '@nestjs/common';
-import { ConcessionariasModule, PlantasModule, PrismaModule, UnidadesModule, UsuariosModule } from '@/core';
+import { ConcessionariasModule, EquipamentosModule, PlantasModule, PrismaModule, UnidadesModule, UsuariosModule } from '@/core';
 import { RecursosModule } from '@/modules/recursos/recursos.module';
 import { VeiculosModule } from '@/modules/veiculos/veiculos.module';
 import { AgendaModule } from '@/modules/agenda/agenda.module';
@@ -16,10 +16,11 @@ import { UsuariosImportacao } from './cadastros/usuarios.importacao';
 import { InstrucoesImportacao } from './cadastros/instrucoes.importacao';
 import { PlanosImportacao } from './cadastros/planos.importacao';
 import { PlantasImportacao } from './cadastros/plantas.importacao';
+import { EquipamentosImportacao } from './cadastros/equipamentos.importacao';
 
 @Module({
-  imports: [PrismaModule, RecursosModule, VeiculosModule, AgendaModule, ConcessionariasModule, UsuariosModule, InstrucoesModule, PlanosManutencaoModule, TarefasModule, PlantasModule, UnidadesModule],
+  imports: [PrismaModule, RecursosModule, VeiculosModule, AgendaModule, ConcessionariasModule, UsuariosModule, InstrucoesModule, PlanosManutencaoModule, TarefasModule, PlantasModule, UnidadesModule, EquipamentosModule],
   controllers: [ImportacaoController],
-  providers: [ImportacaoService, RecursosImportacao, VeiculosImportacao, FeriadosImportacao, ConcessionariasImportacao, UsuariosImportacao, InstrucoesImportacao, PlanosImportacao, PlantasImportacao],
+  providers: [ImportacaoService, RecursosImportacao, VeiculosImportacao, FeriadosImportacao, ConcessionariasImportacao, UsuariosImportacao, InstrucoesImportacao, PlanosImportacao, PlantasImportacao, EquipamentosImportacao],
 })
 export class ImportacaoModule {}

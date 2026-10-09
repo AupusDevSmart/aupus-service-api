@@ -12,6 +12,7 @@ import { UsuariosImportacao } from './cadastros/usuarios.importacao';
 import { InstrucoesImportacao } from './cadastros/instrucoes.importacao';
 import { PlanosImportacao } from './cadastros/planos.importacao';
 import { PlantasImportacao } from './cadastros/plantas.importacao';
+import { EquipamentosImportacao } from './cadastros/equipamentos.importacao';
 
 /**
  * Uma rota por cadastro, cada uma com as MESMAS permissões das rotas de criar
@@ -32,6 +33,7 @@ export class ImportacaoController {
     private readonly instrucoes: InstrucoesImportacao,
     private readonly planos: PlanosImportacao,
     private readonly plantas: PlantasImportacao,
+    private readonly equipamentos: EquipamentosImportacao,
   ) {}
 
   @Post('recursos')
@@ -112,5 +114,14 @@ export class ImportacaoController {
   @ApiOperation({ summary: 'Prévia ou gravação da planilha de plantas (com as unidades)' })
   importarPlantas(@Body() corpo: ImportarPlanilhaDto, @CurrentUser() usuario: UsuarioDaImportacao) {
     return this.importacao.importar(this.plantas, corpo.registros, corpo.confirmar, usuario);
+  }
+
+  /** Trocar o plano pede também manutencao.manage (conferido por linha). */
+  @Post('equipamentos')
+  @HttpCode(HttpStatus.OK)
+  @Permissions('equipamentos.manage')
+  @ApiOperation({ summary: 'Prévia ou gravação da planilha de equipamentos (UC com componentes)' })
+  importarEquipamentos(@Body() corpo: ImportarPlanilhaDto, @CurrentUser() usuario: UsuarioDaImportacao) {
+    return this.importacao.importar(this.equipamentos, corpo.registros, corpo.confirmar, usuario);
   }
 }
