@@ -3,6 +3,7 @@ import { PassportStrategy } from '@nestjs/passport';
 import { ExtractJwt, Strategy } from 'passport-jwt';
 import { ConfigService } from '@nestjs/config';
 import { UsuariosService } from '../../usuarios/usuarios.service';
+import { segredoDoJwt } from '../segredo-do-jwt';
 
 /**
  * Estratégia JWT para autenticação via Passport
@@ -17,9 +18,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     super({
       jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
       ignoreExpiration: false,
-      secretOrKey:
-        configService.get<string>('JWT_SECRET') ||
-        'your-secret-key-change-in-production',
+      secretOrKey: segredoDoJwt(configService),
     });
   }
 
@@ -37,13 +36,14 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       throw new UnauthorizedException('Usuário inválido ou inativo');
     }
 
-    // Retornar dados que serão injetados em req.user
+    // Papel e permissões de AGORA, lidos do banco nesta mesma consulta: os do
+    // token valiam até ele vencer (1 h), e quem perdia um papel continuava com ele.
     return {
       id: payload.sub,
       email: payload.email,
       nome: payload.nome,
-      role: payload.role,
-      permissions: payload.permissions || [],
+      role: usuario.roles?.[0]?.name ?? null,
+      permissions: [...new Set((usuario.all_permissions ?? []).map((p) => p.name))],
     };
   }
 }
