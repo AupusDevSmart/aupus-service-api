@@ -22,6 +22,8 @@ const mockPrismaService = () => ({
     count: jest.fn(),
     update: jest.fn(),
   },
+  // O servico envolve as consultas em executeWithRetry (reconexao).
+  executeWithRetry: jest.fn((fn: () => unknown) => fn()),
 });
 
 type MockPrismaService = ReturnType<typeof mockPrismaService>;
@@ -95,7 +97,7 @@ describe('PlantasService', () => {
           provide: PermissionScopeService,
           useFactory: () => ({
             getScope: jest.fn().mockResolvedValue(null),
-            isScoped: jest.fn().mockResolvedValue(false),
+            isScoped: jest.fn().mockReturnValue(false), // sincrono no servico de verdade
             assertPlantaInScope: jest.fn().mockResolvedValue(undefined),
           }),
         },
@@ -197,7 +199,7 @@ describe('PlantasService', () => {
             }
           }
         },
-        orderBy: { nome: 'asc' },
+        orderBy: [{ nome: 'asc' }, { id: 'asc' }],
         skip: 0,
         take: 10
       });
@@ -222,7 +224,8 @@ describe('PlantasService', () => {
               { cnpj: { contains: 'Industrial', mode: 'insensitive' } },
               { localizacao: { contains: 'Industrial', mode: 'insensitive' } },
               { cidade: { contains: 'Industrial', mode: 'insensitive' } },
-              { logradouro: { contains: 'Industrial', mode: 'insensitive' } }
+              { logradouro: { contains: 'Industrial', mode: 'insensitive' } },
+              { proprietario: { nome: { contains: 'Industrial', mode: 'insensitive' } } }
             ]
           })
         })
@@ -285,7 +288,7 @@ describe('PlantasService', () => {
       // Assert
       expect(prismaService.plantas.findMany).toHaveBeenCalledWith(
         expect.objectContaining({
-          orderBy: { cnpj: 'desc' }
+          orderBy: [{ cnpj: 'desc' }, { id: 'asc' }]
         })
       );
     });
