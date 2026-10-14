@@ -676,9 +676,13 @@ export class SolicitacoesServicoService {
   }
 
   /**
-   * Obter estatísticas
+   * Obter estatísticas — no escopo de quem pede, como a listagem.
    */
-  async getStats(): Promise<SolicitacaoStatsDto> {
+  async getStats(user?: ScopedUser): Promise<SolicitacaoStatsDto> {
+    const scope = await this.scopeService.getScope(user);
+    const base: Prisma.solicitacoes_servicoWhereInput = this.scopeService.isScoped(scope)
+      ? { deleted_at: null, planta_id: { in: scope.length > 0 ? scope : ['__NEVER__'] } }
+      : { deleted_at: null };
     const [
       total,
       registradas,
@@ -687,28 +691,12 @@ export class SolicitacoesServicoService {
       porPrioridade,
       porTipo,
     ] = await Promise.all([
-      this.prisma.solicitacoes_servico.count({
-        where: { deleted_at: null },
-      }),
-      this.prisma.solicitacoes_servico.count({
-        where: { status: StatusSolicitacaoServico.REGISTRADA, deleted_at: null },
-      }),
-      this.prisma.solicitacoes_servico.count({
-        where: { status: StatusSolicitacaoServico.PROGRAMADA, deleted_at: null },
-      }),
-      this.prisma.solicitacoes_servico.count({
-        where: { status: StatusSolicitacaoServico.FINALIZADA, deleted_at: null },
-      }),
-      this.prisma.solicitacoes_servico.groupBy({
-        by: ['prioridade'],
-        where: { deleted_at: null },
-        _count: true,
-      }),
-      this.prisma.solicitacoes_servico.groupBy({
-        by: ['tipo'],
-        where: { deleted_at: null },
-        _count: true,
-      }),
+      this.prisma.solicitacoes_servico.count({ where: base }),
+      this.prisma.solicitacoes_servico.count({ where: { ...base, status: StatusSolicitacaoServico.REGISTRADA } }),
+      this.prisma.solicitacoes_servico.count({ where: { ...base, status: StatusSolicitacaoServico.PROGRAMADA } }),
+      this.prisma.solicitacoes_servico.count({ where: { ...base, status: StatusSolicitacaoServico.FINALIZADA } }),
+      this.prisma.solicitacoes_servico.groupBy({ by: ['prioridade'], where: base, _count: true }),
+      this.prisma.solicitacoes_servico.groupBy({ by: ['tipo'], where: base, _count: true }),
     ]);
 
     const prioridadeMap = { baixa: 0, media: 0, alta: 0, urgente: 0 };
@@ -728,44 +716,6 @@ export class SolicitacoesServicoService {
       finalizadas,
       porPrioridade: prioridadeMap,
       porTipo: tipoMap,
-    };
-  }
-
-  /**
-   * DEBUG - Check unidade data
-   */
-  async debugCheckUnidade(): Promise<any> {
-    // Get last created solicitacao
-    const lastSolicitacao = await this.prisma.solicitacoes_servico.findFirst({
-      orderBy: { created_at: 'desc' },
-      include: {
-        unidade: true,
-        planta: true,
-        proprietario: true,
-      },
-    });
-
-    if (!lastSolicitacao) {
-      return { message: 'No solicitacoes found' };
-    }
-
-    // Also check the raw unidade
-    let unidadeData = null;
-    if (lastSolicitacao.unidade_id) {
-      unidadeData = await this.prisma.unidades.findUnique({
-        where: { id: lastSolicitacao.unidade_id },
-      });
-    }
-
-    return {
-      numero: lastSolicitacao.numero,
-      unidade_id: lastSolicitacao.unidade_id,
-      unidade_included: lastSolicitacao.unidade,
-      unidade_raw: unidadeData,
-      planta_id: lastSolicitacao.planta_id,
-      planta_included: lastSolicitacao.planta,
-      proprietario_id: lastSolicitacao.proprietario_id,
-      proprietario_included: lastSolicitacao.proprietario,
     };
   }
 

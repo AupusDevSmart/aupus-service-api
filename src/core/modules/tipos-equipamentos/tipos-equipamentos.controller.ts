@@ -1,3 +1,4 @@
+import { Permissions } from '../auth/decorators/permissions.decorator';
 import {
   Controller,
   Get,
@@ -30,6 +31,7 @@ export class TiposEquipamentosController {
   constructor(private readonly tiposEquipamentosService: TiposEquipamentosService) {}
 
   @Post()
+  @Permissions('equipamentos.manage')
   @ApiOperation({
     summary: 'Criar novo tipo de equipamento (modelo)',
     description: 'Cria um novo modelo de equipamento no catálogo',

@@ -10,12 +10,6 @@ import { Public } from '@/core';
 @Controller('uploads')
 export class UploadsController {
 
-  @Get('test')
-  @ApiOperation({ summary: 'Test endpoint' })
-  test() {
-    return { message: 'Uploads controller is working!' };
-  }
-
   @Get('avatars/:filename')
   @ApiOperation({ summary: 'Serve avatar image' })
   @ApiResponse({ status: 200, description: 'Image file' })

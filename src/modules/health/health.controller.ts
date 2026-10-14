@@ -2,8 +2,7 @@ import { Controller, Get, Post } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
 import { HealthService } from './health.service';
 import { AlertService } from './alert.service';
-import { Public } from '@/core';
-import { PrismaService } from '@/core';
+import { Permissions, PrismaService, Public } from '@/core';
 
 @ApiTags('Health Check')
 @Controller('health')
@@ -33,7 +32,7 @@ export class HealthController {
   }
 
   @Get('alerts')
-  @Public()
+  @Permissions('sistema.monitorar')
   @ApiOperation({ summary: 'Retorna historico de alertas' })
   @ApiResponse({ status: 200, description: 'Historico de alertas' })
   async getAlerts() {
@@ -44,7 +43,7 @@ export class HealthController {
   }
 
   @Post('alerts/check')
-  @Public()
+  @Permissions('sistema.monitorar')
   @ApiOperation({ summary: 'Forca verificacao manual do sistema' })
   @ApiResponse({ status: 200, description: 'Verificacao executada' })
   async triggerManualCheck() {
@@ -56,7 +55,7 @@ export class HealthController {
   }
 
   @Get('metrics/database')
-  @Public()
+  @Permissions('sistema.monitorar')
   @ApiOperation({ summary: 'Retorna metricas de queries do banco de dados' })
   @ApiResponse({ status: 200, description: 'Metricas de queries do banco' })
   async getDatabaseMetrics() {

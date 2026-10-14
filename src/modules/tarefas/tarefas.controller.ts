@@ -25,7 +25,8 @@ import {
 
 @ApiTags('Tarefas')
 @Controller('tarefas')
-@Permissions('manutencao.manage')
+// Ler: quem executa e o cliente também leem. Escrever: cada escrita pede manutencao.manage.
+@Permissions('manutencao.view', 'manutencao.manage')
 export class TarefasController {
   constructor(
     private readonly tarefasService: TarefasService,
@@ -35,6 +36,7 @@ export class TarefasController {
   // Geração automática de programações
 
   @Post('gerar-programacoes')
+  @Permissions('manutencao.manage')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Gerar programações OS automaticamente a partir de tarefas próximas do prazo' })
   @ApiResponse({
@@ -48,6 +50,7 @@ export class TarefasController {
   // CRUD Básico de Tarefas
 
   @Post()
+  @Permissions('manutencao.manage')
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({ summary: 'Criar nova tarefa em um plano' })
   @ApiResponse({ 
@@ -148,6 +151,7 @@ export class TarefasController {
   }
 
   @Put(':id')
+  @Permissions('manutencao.manage')
   @ApiOperation({ summary: 'Atualizar tarefa com sub-tarefas e recursos' })
   @ApiParam({ name: 'id', description: 'ID da tarefa' })
   @ApiResponse({ 
@@ -172,6 +176,7 @@ export class TarefasController {
   }
 
   @Put(':id/reordenar')
+  @Permissions('manutencao.manage')
   @ApiOperation({ summary: 'Alterar ordem da tarefa no plano' })
   @ApiParam({ name: 'id', description: 'ID da tarefa' })
   @ApiResponse({ 
@@ -196,6 +201,7 @@ export class TarefasController {
   }
 
   @Delete(':id')
+  @Permissions('manutencao.manage')
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({ summary: 'Remover tarefa (soft delete)' })
   @ApiParam({ name: 'id', description: 'ID da tarefa' })

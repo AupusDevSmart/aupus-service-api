@@ -1,5 +1,4 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { PrismaService } from '@/core';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 
@@ -9,16 +8,7 @@ describe('AppController', () => {
   beforeEach(async () => {
     const app: TestingModule = await Test.createTestingModule({
       controllers: [AppController],
-      providers: [
-        AppService,
-        {
-          // AppService injeta o Prisma para o /health; getHello nao usa o banco.
-          provide: PrismaService,
-          useValue: {
-            $queryRaw: jest.fn().mockResolvedValue([{ 1: 1 }]),
-          },
-        },
-      ],
+      providers: [AppService],
     }).compile();
 
     appController = app.get<AppController>(AppController);

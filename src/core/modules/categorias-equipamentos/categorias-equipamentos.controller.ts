@@ -1,3 +1,4 @@
+import { Permissions } from '../auth/decorators/permissions.decorator';
 import {
   Controller,
   Get,
@@ -21,6 +22,7 @@ export class CategoriasEquipamentosController {
   ) {}
 
   @Post()
+  @Permissions('equipamentos.manage')
   async create(@Body() createCategoriaEquipamentoDto: CreateCategoriaEquipamentoDto) {
     return this.categoriasEquipamentosService.create(
       createCategoriaEquipamentoDto,
@@ -38,6 +40,7 @@ export class CategoriasEquipamentosController {
   }
 
   @Patch(':id')
+  @Permissions('equipamentos.manage')
   update(
     @Param('id') id: string,
     @Body() updateCategoriaEquipamentoDto: UpdateCategoriaEquipamentoDto,
@@ -49,6 +52,7 @@ export class CategoriasEquipamentosController {
   }
 
   @Delete(':id')
+  @Permissions('equipamentos.manage')
   remove(@Param('id') id: string) {
     return this.categoriasEquipamentosService.remove(id);
   }

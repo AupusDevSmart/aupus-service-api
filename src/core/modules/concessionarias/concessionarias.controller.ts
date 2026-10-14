@@ -1,3 +1,4 @@
+import { Permissions } from '../auth/decorators/permissions.decorator';
 import {
   Controller,
   Get,
@@ -37,6 +38,7 @@ export class ConcessionariasController {
   ) {}
 
   @Post()
+  @Permissions('concessionarias.manage')
   @ApiOperation({ summary: 'Criar nova concessionária' })
   @ApiResponse({
     status: HttpStatus.CREATED,
@@ -63,6 +65,7 @@ export class ConcessionariasController {
   }
 
   @Patch(':id')
+  @Permissions('concessionarias.manage')
   @ApiOperation({ summary: 'Atualizar concessionária' })
   @ApiResponse({ status: 200, description: 'Concessionária atualizada' })
   @ApiResponse({ status: 404, description: 'Concessionária não encontrada' })
@@ -71,6 +74,7 @@ export class ConcessionariasController {
   }
 
   @Delete(':id')
+  @Permissions('concessionarias.manage')
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({ summary: 'Remover concessionária (soft delete)' })
   @ApiResponse({ status: 204, description: 'Concessionária removida' })
@@ -82,6 +86,7 @@ export class ConcessionariasController {
   // ==================== ENDPOINTS DE ANEXOS ====================
 
   @Post(':id/anexos')
+  @Permissions('concessionarias.manage')
   @UseInterceptors(FileInterceptor('file'))
   @ApiOperation({ summary: 'Fazer upload de anexo para concessionária' })
   @ApiConsumes('multipart/form-data')
@@ -172,6 +177,7 @@ export class ConcessionariasController {
   }
 
   @Delete('anexos/:anexoId')
+  @Permissions('concessionarias.manage')
   @ApiOperation({ summary: 'Remover anexo' })
   @ApiResponse({
     status: HttpStatus.OK,

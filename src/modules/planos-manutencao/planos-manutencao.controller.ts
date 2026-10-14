@@ -31,13 +31,15 @@ import {
 
 @ApiTags('Planos de Manutenção')
 @Controller('planos-manutencao')
-@Permissions('manutencao.manage')
+// Ler: quem executa e o cliente também leem. Escrever: cada escrita pede manutencao.manage.
+@Permissions('manutencao.view', 'manutencao.manage')
 export class PlanosManutencaoController {
   constructor(
     private readonly planosManutencaoService: PlanosManutencaoService
   ) {}
 
   @Post()
+  @Permissions('manutencao.manage')
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({ summary: 'Criar novo plano de manutenção' })
   @ApiResponse({ 
@@ -258,6 +260,7 @@ export class PlanosManutencaoController {
   }
 
   @Post('vincular')
+  @Permissions('manutencao.manage')
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({
     summary: 'Vincular um plano template a um equipamento, copiando plano e tarefas'
@@ -279,6 +282,7 @@ export class PlanosManutencaoController {
   }
 
   @Post('herdar')
+  @Permissions('manutencao.manage')
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({
     summary: 'Herdar para o equipamento novo o plano que o ocupante anterior da posicao tinha',
@@ -300,6 +304,7 @@ export class PlanosManutencaoController {
   }
 
   @Delete('equipamento/:equipamentoId/vinculo')
+  @Permissions('manutencao.manage')
   @ApiOperation({ summary: 'Desvincular o plano do equipamento, removendo a copia' })
   @ApiParam({ name: 'equipamentoId', description: 'ID do equipamento' })
   @ApiResponse({ status: HttpStatus.OK, type: PreviaDesvinculoDto })
@@ -366,6 +371,7 @@ export class PlanosManutencaoController {
   }
 
   @Put(':id')
+  @Permissions('manutencao.manage')
   @ApiOperation({ summary: 'Atualizar plano de manutenção' })
   @ApiParam({ name: 'id', description: 'ID do plano' })
   @ApiResponse({ 
@@ -390,6 +396,7 @@ export class PlanosManutencaoController {
   }
 
   @Delete(':id')
+  @Permissions('manutencao.manage')
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({ summary: 'Remover plano de manutenção (soft delete)' })
   @ApiParam({ name: 'id', description: 'ID do plano' })

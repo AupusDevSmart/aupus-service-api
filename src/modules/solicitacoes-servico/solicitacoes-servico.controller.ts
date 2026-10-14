@@ -43,7 +43,8 @@ import {
 
 @ApiTags('Solicitações de Serviço')
 @Controller('solicitacoes-servico')
-@Permissions('manutencao.manage')
+// Ler: quem abre também acompanha (no escopo dele). Escrever: solicitacoes.manage.
+@Permissions('solicitacoes.view', 'solicitacoes.manage')
 export class SolicitacoesServicoController {
   constructor(
     private readonly solicitacoesService: SolicitacoesServicoService,
@@ -51,7 +52,7 @@ export class SolicitacoesServicoController {
   ) {}
 
   @Post()
-  @Permissions('manutencao.manage', 'solicitacoes.create')
+  @Permissions('solicitacoes.manage', 'solicitacoes.create')
   @ApiOperation({ summary: 'Criar nova solicitação de serviço' })
   @ApiResponse({
     status: HttpStatus.CREATED,
@@ -80,14 +81,6 @@ export class SolicitacoesServicoController {
     return this.solicitacoesService.findAll(filters, req?.user);
   }
 
-  @Get('debug-unidade')
-  @ApiOperation({ summary: 'DEBUG - Check last solicitacao unidade data' })
-  async debugUnidade(): Promise<any> {
-    // Temporary debug endpoint - remove after fixing issue
-    const solicitacao = await this.solicitacoesService.debugCheckUnidade();
-    return solicitacao;
-  }
-
   @Get('stats')
   @ApiOperation({ summary: 'Obter estatísticas das solicitações' })
   @ApiResponse({
@@ -95,8 +88,8 @@ export class SolicitacoesServicoController {
     description: 'Estatísticas das solicitações',
     type: SolicitacaoStatsDto,
   })
-  async getStats(): Promise<SolicitacaoStatsDto> {
-    return this.solicitacoesService.getStats();
+  async getStats(@Request() req?: any): Promise<SolicitacaoStatsDto> {
+    return this.solicitacoesService.getStats(req?.user);
   }
 
   @Get(':id')
@@ -123,6 +116,7 @@ export class SolicitacoesServicoController {
   }
 
   @Patch(':id')
+  @Permissions('solicitacoes.manage')
   @ApiOperation({ summary: 'Atualizar solicitação' })
   @ApiParam({ name: 'id', description: 'ID da solicitação' })
   @ApiResponse({
@@ -148,6 +142,7 @@ export class SolicitacoesServicoController {
   }
 
   @Delete(':id')
+  @Permissions('solicitacoes.manage')
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({ summary: 'Remover solicitação (soft delete)' })
   @ApiParam({ name: 'id', description: 'ID da solicitação' })
@@ -170,6 +165,8 @@ export class SolicitacoesServicoController {
   // =================== COMENTÁRIOS ===================
 
   @Post(':id/comentarios')
+  // Quem abriu a solicitação também comenta (no escopo dele)
+  @Permissions('solicitacoes.manage', 'solicitacoes.create')
   @ApiOperation({ summary: 'Adicionar comentário à solicitação' })
   @ApiParam({ name: 'id', description: 'ID da solicitação' })
   @ApiResponse({
@@ -197,6 +194,7 @@ export class SolicitacoesServicoController {
   // =================== GERAÇÃO DE OS ===================
 
   @Post(':id/gerar-programacao-os')
+  @Permissions('solicitacoes.manage')
   @ApiOperation({ summary: 'Gerar programação de OS a partir da solicitação' })
   @ApiParam({ name: 'id', description: 'ID da solicitação' })
   @ApiResponse({
@@ -263,6 +261,7 @@ export class SolicitacoesServicoController {
   // =================== ANEXOS ===================
 
   @Post(':id/anexos')
+  @Permissions('solicitacoes.manage', 'solicitacoes.create')
   @UseInterceptors(FileInterceptor('file'))
   @ApiOperation({ summary: 'Upload de anexo para a solicitação' })
   @ApiConsumes('multipart/form-data')
@@ -363,6 +362,7 @@ export class SolicitacoesServicoController {
   }
 
   @Delete(':id/anexos/:anexoId')
+  @Permissions('solicitacoes.manage')
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({ summary: 'Remover anexo' })
   @ApiParam({ name: 'id', description: 'ID da solicitação' })
@@ -397,6 +397,7 @@ export class SolicitacoesServicoController {
   }
 
   @Put(':id/proposta/itens')
+  @Permissions('solicitacoes.manage')
   @ApiOperation({
     summary: 'Substitui a lista de itens — uma linha por instrucao vinculada',
     description:
@@ -407,12 +408,14 @@ export class SolicitacoesServicoController {
   }
 
   @Put(':id/proposta/outros-custos')
+  @Permissions('solicitacoes.manage')
   @ApiOperation({ summary: 'Substitui a lista de outros custos' })
   async salvarOutrosCustos(@Param('id') id: string, @Body() body: { custos: any[] }) {
     return this.propostaService.salvarOutrosCustos(id, body?.custos ?? []);
   }
 
   @Put(':id/proposta/condicoes')
+  @Permissions('solicitacoes.manage')
   @ApiOperation({
     summary: 'Componentes do BDI',
     description:
@@ -423,6 +426,7 @@ export class SolicitacoesServicoController {
   }
 
   @Post(':id/proposta/recarregar')
+  @Permissions('solicitacoes.manage')
   @ApiOperation({
     summary: 'Refaz a copia a partir das instrucoes vinculadas',
     description:

@@ -1,3 +1,4 @@
+import { Permissions } from '../auth/decorators/permissions.decorator';
 import {
   Body,
   Controller,
@@ -27,6 +28,7 @@ import {
  */
 @ApiTags('Ativos Funcionais')
 @Controller('ativos-funcionais')
+@Permissions('equipamentos.view', 'equipamentos.manage')
 export class AtivosFuncionaisController {
   constructor(private readonly service: AtivosFuncionaisService) {}
 
@@ -76,12 +78,14 @@ export class AtivosFuncionaisController {
   }
 
   @Post()
+  @Permissions('equipamentos.manage')
   @ApiOperation({ summary: 'Criar posicao' })
   async criar(@Body() dto: CriarAtivoFuncionalDto) {
     return this.service.criar(dto);
   }
 
   @Post(':id/instalar')
+  @Permissions('equipamentos.manage')
   @ApiOperation({ summary: 'Instalar um equipamento na posicao' })
   @ApiResponse({ status: 409, description: 'A posicao ja tem equipamento ativo' })
   async instalar(
@@ -95,6 +99,7 @@ export class AtivosFuncionaisController {
   }
 
   @Post(':id/remover')
+  @Permissions('equipamentos.manage')
   @ApiOperation({ summary: 'Remover o equipamento ativo, liberando a posicao' })
   @ApiResponse({ status: 404, description: 'A posicao nao tem equipamento ativo' })
   async remover(
@@ -106,6 +111,7 @@ export class AtivosFuncionaisController {
   }
 
   @Post('equipamentos/:equipamentoId/transferir')
+  @Permissions('equipamentos.manage')
   @ApiOperation({
     summary: 'Mover um equipamento para outra posicao',
     description:

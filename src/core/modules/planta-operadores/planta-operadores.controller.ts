@@ -10,17 +10,17 @@ export class PlantaOperadoresController {
   constructor(private readonly service: PlantaOperadoresService) {}
 
   /**
-   * Mirror: lista plantas onde o usuario figura como operador.
-   * Admin-like le qualquer um; outros so leem o proprio.
+   * Plantas em que o usuario atua como tecnico de campo. O proprio le as suas;
+   * os demais, so com permissao de ver usuarios ou de vincular tecnicos.
    */
   @Get('usuarios/:usuarioId/plantas-operadas')
   @ApiOperation({ summary: 'Listar plantas onde o usuario eh operador' })
   @ApiParam({ name: 'usuarioId', description: 'ID do usuario' })
   async listByOperador(@Param('usuarioId') usuarioId: string, @CurrentUser() user?: any) {
-    const role = user?.role;
-    const isAdminLike = ['analista', 'gerente', 'admin', 'super_admin'].includes(role ?? '');
+    const permissoes: string[] = user?.permissions ?? [];
+    const podeVerOutros = permissoes.includes('usuarios.view') || permissoes.includes('plantas.manage_operadores');
     const isSelf = user?.id?.trim() === usuarioId.trim();
-    if (!isAdminLike && !isSelf) {
+    if (!podeVerOutros && !isSelf) {
       throw new ForbiddenException('Voce so pode consultar suas proprias plantas');
     }
     return this.service.listByOperador(usuarioId);

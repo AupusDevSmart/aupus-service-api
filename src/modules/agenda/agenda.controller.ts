@@ -39,7 +39,8 @@ import {
 
 @ApiTags('agenda')
 @Controller('agenda')
-@Permissions('agenda.manage')
+// Ler (calendário, feriados): todos. Escrever: cada escrita pede agenda.manage.
+@Permissions('agenda.view', 'agenda.manage')
 export class AgendaController {
   private readonly logger = new Logger(AgendaController.name);
 
@@ -52,6 +53,7 @@ export class AgendaController {
   // ==================== FERIADOS ====================
 
   @Post('feriados')
+  @Permissions('agenda.manage')
   @ApiOperation({
     summary: 'Criar novo feriado',
     description: 'Cadastra um novo feriado no sistema que pode ser geral ou específico para plantas'
@@ -147,6 +149,7 @@ export class AgendaController {
   }
 
   @Put('feriados/:id')
+  @Permissions('agenda.manage')
   @ApiOperation({
     summary: 'Atualizar feriado',
     description: 'Atualiza os dados de um feriado existente'
@@ -183,6 +186,7 @@ export class AgendaController {
   }
 
   @Delete('feriados/:id')
+  @Permissions('agenda.manage')
   @ApiOperation({
     summary: 'Remover feriado',
     description: 'Remove um feriado do sistema (soft delete)'
@@ -213,6 +217,7 @@ export class AgendaController {
   }
 
   @Post('feriados/:id/plantas')
+  @Permissions('agenda.manage')
   @ApiOperation({
     summary: 'Associar feriado a plantas',
     description: 'Associa um feriado específico a uma ou mais plantas'
@@ -245,6 +250,7 @@ export class AgendaController {
   }
 
   @Delete('feriados/:id/plantas/:plantaId')
+  @Permissions('agenda.manage')
   @ApiOperation({
     summary: 'Desassociar planta de feriado',
     description: 'Remove a associação entre um feriado e uma planta específica'
@@ -281,6 +287,7 @@ export class AgendaController {
   // ==================== CONFIGURAÇÕES DE DIAS ÚTEIS ====================
 
   @Post('configuracoes-dias-uteis')
+  @Permissions('agenda.manage')
   @ApiOperation({
     summary: 'Criar configuração de dias úteis',
     description: 'Cadastra uma nova configuração de dias úteis'
@@ -354,6 +361,7 @@ export class AgendaController {
   }
 
   @Put('configuracoes-dias-uteis/:id')
+  @Permissions('agenda.manage')
   @ApiOperation({
     summary: 'Atualizar configuração',
     description: 'Atualiza uma configuração de dias úteis existente'
@@ -381,6 +389,7 @@ export class AgendaController {
   }
 
   @Delete('configuracoes-dias-uteis/:id')
+  @Permissions('agenda.manage')
   @ApiOperation({
     summary: 'Remover configuração',
     description: 'Remove uma configuração do sistema (soft delete)'
@@ -402,6 +411,7 @@ export class AgendaController {
   }
 
   @Post('configuracoes-dias-uteis/:id/plantas')
+  @Permissions('agenda.manage')
   @ApiOperation({
     summary: 'Associar configuração a plantas',
     description: 'Associa uma configuração de dias úteis a uma ou mais plantas'

@@ -1,3 +1,4 @@
+import { CurrentUser, PermissionScopeService, Permissions, ScopedUser } from '@/core';
 import { Controller, Get, Param } from '@nestjs/common';
 import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { HistoricoEquipamentoService } from './historico-equipamento.service';
@@ -13,15 +14,21 @@ import { HistoricoEquipamentoService } from './historico-equipamento.service';
  */
 @ApiTags('Equipamentos')
 @Controller('equipamentos')
+@Permissions('equipamentos.view')
 export class HistoricoEquipamentoController {
-  constructor(private readonly historicoService: HistoricoEquipamentoService) {}
+  constructor(
+    private readonly historicoService: HistoricoEquipamentoService,
+    private readonly scopeService: PermissionScopeService,
+  ) {}
 
   @Get(':id/historico-os')
   @ApiOperation({
     summary: 'Ordens de serviço e programações que tocaram este equipamento',
   })
   @ApiResponse({ status: 200, description: 'Histórico do equipamento' })
-  async listar(@Param('id') id: string) {
+  async listar(@Param('id') id: string, @CurrentUser() user?: ScopedUser) {
+    // Equipamento de planta fora do escopo e recusado, como no resto do sistema
+    if (user) await this.scopeService.assertEntityInScope('equipamento', id.trim(), user);
     // As duas visoes numa chamada so: a situacao de cada tarefa (o que falta) e
     // as ordens que passaram pelo equipamento (o que ja foi feito).
     const [tarefas, ordens] = await Promise.all([

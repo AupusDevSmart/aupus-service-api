@@ -33,7 +33,8 @@ import {
 
 @ApiTags('Instrucoes')
 @Controller('instrucoes')
-@Permissions('manutencao.manage')
+// Ler: quem executa e o cliente também leem. Escrever: cada escrita pede manutencao.manage.
+@Permissions('manutencao.view', 'manutencao.manage')
 // Quem pode editar anomalias tambem le/associa instrucoes via selector.
 // Endpoints GET e a associacao com anomalias aceitam 'anomalias.manage' tambem.
 export class InstrucoesController {
@@ -47,6 +48,7 @@ export class InstrucoesController {
   // ==========================================
 
   @Post()
+  @Permissions('manutencao.manage')
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({ summary: 'Criar nova instrução' })
   @ApiResponse({ status: HttpStatus.CREATED, description: 'Instrução criada com sucesso', type: InstrucaoResponseDto })
@@ -56,7 +58,7 @@ export class InstrucoesController {
   }
 
   @Get()
-  @Permissions('manutencao.manage', 'anomalias.manage')
+  @Permissions('manutencao.view', 'manutencao.manage', 'anomalias.manage')
   @ApiOperation({ summary: 'Listar instruções com filtros e paginação' })
   @ApiResponse({ status: HttpStatus.OK, description: 'Lista de instruções encontrada' })
   async listar(@Query() queryDto: QueryInstrucoesDto) {
@@ -71,7 +73,7 @@ export class InstrucoesController {
   }
 
   @Get(':id')
-  @Permissions('manutencao.manage', 'anomalias.manage')
+  @Permissions('manutencao.view', 'manutencao.manage', 'anomalias.manage')
   @ApiOperation({ summary: 'Buscar instrução por ID com detalhes completos' })
   @ApiParam({ name: 'id', description: 'ID da instrução' })
   @ApiResponse({ status: HttpStatus.OK, description: 'Instrução encontrada', type: InstrucaoResponseDto })
@@ -81,6 +83,7 @@ export class InstrucoesController {
   }
 
   @Put(':id')
+  @Permissions('manutencao.manage')
   @ApiOperation({ summary: 'Atualizar instrução com sub-instruções e recursos' })
   @ApiParam({ name: 'id', description: 'ID da instrução' })
   @ApiResponse({ status: HttpStatus.OK, description: 'Instrução atualizada com sucesso', type: InstrucaoResponseDto })
@@ -94,6 +97,7 @@ export class InstrucoesController {
   }
 
   @Put(':id/status')
+  @Permissions('manutencao.manage')
   @ApiOperation({ summary: 'Atualizar apenas status da instrução' })
   @ApiParam({ name: 'id', description: 'ID da instrução' })
   @ApiResponse({ status: HttpStatus.OK, description: 'Status atualizado com sucesso', type: InstrucaoResponseDto })
@@ -106,6 +110,7 @@ export class InstrucoesController {
   }
 
   @Delete(':id')
+  @Permissions('manutencao.manage')
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({ summary: 'Remover instrução (soft delete)' })
   @ApiParam({ name: 'id', description: 'ID da instrução' })
@@ -133,7 +138,7 @@ export class InstrucoesController {
   // ==========================================
 
   @Post(':id/anomalias')
-  @Permissions('manutencao.manage', 'anomalias.manage')
+  @Permissions('manutencao.view', 'manutencao.manage', 'anomalias.manage')
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({ summary: 'Associar anomalia à instrução' })
   @ApiParam({ name: 'id', description: 'ID da instrução' })
@@ -147,7 +152,7 @@ export class InstrucoesController {
   }
 
   @Get(':id/anomalias')
-  @Permissions('manutencao.manage', 'anomalias.manage')
+  @Permissions('manutencao.view', 'manutencao.manage', 'anomalias.manage')
   @ApiOperation({ summary: 'Listar anomalias associadas à instrução' })
   @ApiParam({ name: 'id', description: 'ID da instrução' })
   @ApiResponse({ status: HttpStatus.OK, description: 'Anomalias encontradas' })
@@ -156,7 +161,7 @@ export class InstrucoesController {
   }
 
   @Delete(':id/anomalias/:anomaliaId')
-  @Permissions('manutencao.manage', 'anomalias.manage')
+  @Permissions('manutencao.view', 'manutencao.manage', 'anomalias.manage')
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({ summary: 'Remover associação com anomalia' })
   @ApiParam({ name: 'id', description: 'ID da instrução' })
@@ -174,6 +179,7 @@ export class InstrucoesController {
   // ==========================================
 
   @Post(':id/solicitacoes')
+  @Permissions('manutencao.manage')
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({ summary: 'Associar solicitação de serviço à instrução' })
   @ApiParam({ name: 'id', description: 'ID da instrução' })
@@ -195,6 +201,7 @@ export class InstrucoesController {
   }
 
   @Delete(':id/solicitacoes/:solicitacaoId')
+  @Permissions('manutencao.manage')
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({ summary: 'Remover associação com solicitação' })
   @ApiParam({ name: 'id', description: 'ID da instrução' })
@@ -220,6 +227,7 @@ export class InstrucoesController {
   }
 
   @Post(':instrucaoId/anexos/upload')
+  @Permissions('manutencao.manage')
   @HttpCode(HttpStatus.CREATED)
   @UseInterceptors(FileInterceptor('file'))
   @ApiConsumes('multipart/form-data')
@@ -261,6 +269,7 @@ export class InstrucoesController {
   }
 
   @Delete(':instrucaoId/anexos/:anexoId')
+  @Permissions('manutencao.manage')
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({ summary: 'Remover anexo da instrução' })
   @ApiParam({ name: 'instrucaoId', description: 'ID da instrução' })
