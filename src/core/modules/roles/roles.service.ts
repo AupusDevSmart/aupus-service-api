@@ -1,6 +1,14 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { RoleResponseDto } from './dto';
+import { PAPEIS, PAPEL_POR_NOME } from '../permissions/matriz-de-permissoes';
+
+/** Nome exibido, descrição, escopo e posição na hierarquia, da matriz de permissões. */
+function comoATelaMostra(nome: string) {
+  const papel = PAPEL_POR_NOME[nome];
+  if (!papel) return {};
+  return { nome_exibido: papel.nome_exibido, descricao: papel.descricao, escopo: papel.escopo, ordem: PAPEIS.indexOf(papel) };
+}
 
 @Injectable()
 export class RolesService {
@@ -24,6 +32,7 @@ export class RolesService {
       id: Number(role.id),
       name: role.name,
       guard_name: role.guard_name,
+      ...comoATelaMostra(role.name),
       created_at: role.created_at,
       updated_at: role.updated_at,
       permissions: role.role_has_permissions.map(rhp => ({
@@ -54,6 +63,7 @@ export class RolesService {
       id: Number(role.id),
       name: role.name,
       guard_name: role.guard_name,
+      ...comoATelaMostra(role.name),
       created_at: role.created_at,
       updated_at: role.updated_at,
       permissions: role.role_has_permissions.map(rhp => ({
