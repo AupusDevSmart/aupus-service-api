@@ -191,6 +191,8 @@ const JORNADAS: [string, string, string[]][] = [
   ['criar categoria de equipamento', 'POST /categorias-equipamentos', PLANEJAM],
   ['excluir concessionária', 'DELETE /concessionarias/:id', PLANEJAM],
   ['ver o histórico de OS do equipamento', 'GET /equipamentos/:id/historico-os', TODOS],
+  ['ver os componentes do equipamento', 'GET /equipamentos/:ucId/componentes/gerenciar', TODOS],
+  ['salvar os componentes do equipamento', 'PUT /equipamentos/:ucId/componentes/batch', PLANEJAM],
   ['reservar viatura', 'POST /reservas', PLANEJAM],
   ['criar usuário', 'POST /usuarios', PLANEJAM],
   ['editar usuário', 'PATCH /usuarios/:id', GERENCIAM],

@@ -934,6 +934,11 @@ export class EquipamentosService {
     };
   }
 
+  /** Equipamento de planta fora do escopo de quem pede: 403, como no findOne. */
+  async garantirNoEscopo(id: string, user?: ScopedUser): Promise<void> {
+    if (user) await this.scopeService.assertEntityInScope('equipamento', id.trim(), user);
+  }
+
   async findOne(id: string, user?: ScopedUser) {
     const equipamento = await this.prisma.equipamentos.findFirst({
       where: { id, deleted_at: null },

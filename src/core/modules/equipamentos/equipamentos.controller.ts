@@ -228,7 +228,8 @@ export class EquipamentosController {
   @ApiOperation({ summary: 'Listar componentes UAR de um equipamento UC' })
   @ApiResponse({ status: 200, description: 'Lista de componentes' })
   @ApiResponse({ status: 404, description: 'Equipamento não encontrado' })
-  findComponentes(@Param('id') id: string) {
+  async findComponentes(@Param('id') id: string, @CurrentUser() user: any) {
+    await this.equipamentosService.garantirNoEscopo(id, user);
     return this.equipamentosService.findComponentesByEquipamento(id);
   }
 
@@ -261,11 +262,13 @@ export class EquipamentosController {
   }
 
   @Get(':ucId/componentes/gerenciar')
-  @Permissions('equipamentos.manage')
+  // Só lê (a tela usa para listar os componentes, também em modo leitura)
+  @Permissions('equipamentos.view')
   @ApiOperation({ summary: 'Listar componentes UAR para gerenciamento de uma UC' })
   @ApiResponse({ status: 200, description: 'Lista de componentes com dados completos' })
   @ApiResponse({ status: 404, description: 'Equipamento UC não encontrado' })
-  findComponentesParaGerenciar(@Param('ucId') ucId: string) {
+  async findComponentesParaGerenciar(@Param('ucId') ucId: string, @CurrentUser() user: any) {
+    await this.equipamentosService.garantirNoEscopo(ucId, user);
     return this.equipamentosService.findComponentesParaGerenciar(ucId);
   }
 
