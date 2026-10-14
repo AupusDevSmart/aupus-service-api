@@ -125,8 +125,18 @@ export class ExecucaoOSService {
     // Scope RBAC
     const scope = await this.scopeService.getScope(user);
     if (this.scopeService.isScoped(scope)) {
+      // Pela planta da OS e, na OS antiga sem planta (SN-33), pelo equipamento
+      // (o componente pela unidade do UC pai), como a programação já fazia.
       const scopeFragment: Prisma.ordens_servicoWhereInput =
-        scope.length === 0 ? { id: '__NEVER__' } : { planta_id: { in: scope } };
+        scope.length === 0
+          ? { id: '__NEVER__' }
+          : {
+              OR: [
+                { planta_id: { in: scope } },
+                { planta_id: null, equipamento: { unidade: { planta_id: { in: scope } } } },
+                { planta_id: null, equipamento: { equipamento_pai: { unidade: { planta_id: { in: scope } } } } },
+              ],
+            };
       where.AND = where.AND ? [...(where.AND as any[]), scopeFragment] : [scopeFragment];
     }
 

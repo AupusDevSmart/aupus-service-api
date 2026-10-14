@@ -1,5 +1,6 @@
 import { ConflictException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { Prisma, StatusProgramacaoOS } from '@/core';
+import { plantasDosEquipamentos } from '@/core/modules/auth/planta-dos-equipamentos';
 import { PrismaService, PermissionScopeService, ScopedUser } from '@/core';
 import { variantesDeId, variantesDeIds } from '../tarefas/ids';
 import {
@@ -947,8 +948,10 @@ export class ProgramacaoOSService {
     }
 
 
-    // Determinar planta e equipamento principal
-    const plantas = [...new Set(tarefas.map(t => t.equipamento?.unidade?.planta?.id).filter(Boolean))];
+    // Planta e equipamento principal. A planta vai gravada (SN-33): sem ela o
+    // técnico e o cliente, que enxergam pela planta, não viam a preventiva. O
+    // componente (UAR) não tem unidade: a planta vem do UC pai.
+    const plantas = await plantasDosEquipamentos(this.prisma, tarefas.map((t) => t.equipamento_id));
     const equipamentos = [...new Set(tarefas.map(t => t.equipamento_id).filter(Boolean))];
 
     const createDto: CreateProgramacaoDto = {
@@ -963,6 +966,7 @@ export class ProgramacaoOSService {
       tipo: 'PREVENTIVA',
       prioridade: dto.prioridade as any || 'MEDIA',
       origem: 'TAREFA',
+      planta_id: plantas.length === 1 ? plantas[0] : undefined,
       equipamento_id: equipamentos.length === 1 ? equipamentos[0] : null,
       data_hora_programada: dto.data_hora_programada
         ? dto.data_hora_programada

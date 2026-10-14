@@ -1,5 +1,6 @@
 import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
+import { plantaDasTarefas } from './planta-dos-equipamentos';
 
 export type PlantaScope = string[] | null;
 
@@ -278,11 +279,12 @@ export class PermissionScopeService {
           },
         });
         if (!row) return null;
+        // OS de tarefa antiga, sem planta gravada (SN-33): vale a planta das tarefas
         return (
           row.planta_id?.trim() ||
           row.equipamento?.planta_id?.trim() ||
           row.equipamento?.unidade?.planta_id?.trim() ||
-          null
+          (await plantaDasTarefas(this.prisma, { osId: id }))
         );
       }
       case 'solicitacao_servico': {
@@ -310,7 +312,7 @@ export class PermissionScopeService {
           row.planta_id?.trim() ||
           row.equipamento?.planta_id?.trim() ||
           row.equipamento?.unidade?.planta_id?.trim() ||
-          null
+          (await plantaDasTarefas(this.prisma, { programacaoId: id }))
         );
       }
       case 'regra_log_mqtt': {
