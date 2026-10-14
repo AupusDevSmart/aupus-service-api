@@ -247,7 +247,7 @@ export class PermissionScopeService {
       }
       case 'tarefa': {
         // tarefas.planta_id e nullable; equipamento_id eh non-nullable.
-        const row = await (this.prisma as any).tarefas?.findFirst?.({
+        const row = await this.prisma.tarefas.findFirst({
           where: { id, deleted_at: null },
           select: {
             planta_id: true,
@@ -266,8 +266,10 @@ export class PermissionScopeService {
       }
       case 'ordem_servico': {
         // ordens_servico.planta_id e nullable; fallback via equipamento.unidade.planta_id.
-        const row = await (this.prisma as any).ordens_servico?.findFirst?.({
-          where: { id, deleted_at: null },
+        // A OS marca exclusao em deletado_em (nao deleted_at): com o nome errado o
+        // Prisma recusava a consulta e toda acao do tecnico numa OS dava erro.
+        const row = await this.prisma.ordens_servico.findFirst({
+          where: { id, deletado_em: null },
           select: {
             planta_id: true,
             equipamento: {
@@ -285,7 +287,7 @@ export class PermissionScopeService {
       }
       case 'solicitacao_servico': {
         // solicitacoes_servico.planta_id eh non-nullable; sem fallback necessario.
-        const row = await (this.prisma as any).solicitacoes_servico?.findFirst?.({
+        const row = await this.prisma.solicitacoes_servico.findFirst({
           where: { id, deleted_at: null },
           select: { planta_id: true },
         });
@@ -293,8 +295,9 @@ export class PermissionScopeService {
       }
       case 'programacao_os': {
         // programacoes_os.planta_id e nullable; fallback via equipamento.unidade.planta_id.
-        const row = await (this.prisma as any).programacoes_os?.findFirst?.({
-          where: { id, deleted_at: null },
+        // Exclusao em deletado_em, como na OS.
+        const row = await this.prisma.programacoes_os.findFirst({
+          where: { id, deletado_em: null },
           select: {
             planta_id: true,
             equipamento: {
@@ -311,36 +314,36 @@ export class PermissionScopeService {
         );
       }
       case 'regra_log_mqtt': {
-        // Resolvida via equipamento. equipamentos.planta_id e nullable;
+        // Resolvida via equipamento. equipamento.planta_id e nullable;
         // fallback via equipamentos.unidade.planta_id.
-        const row = await (this.prisma as any).regras_logs_mqtt?.findFirst?.({
+        const row = await this.prisma.regras_logs_mqtt.findFirst({
           where: { id },
           select: {
-            equipamentos: {
+            equipamento: {
               select: { planta_id: true, unidade: { select: { planta_id: true } } },
             },
           },
         });
         return (
-          row?.equipamentos?.planta_id?.trim() ||
-          row?.equipamentos?.unidade?.planta_id?.trim() ||
+          row?.equipamento?.planta_id?.trim() ||
+          row?.equipamento?.unidade?.planta_id?.trim() ||
           null
         );
       }
       case 'log_mqtt': {
-        // Resolvida via equipamento. equipamentos.planta_id e nullable;
+        // Resolvida via equipamento. equipamento.planta_id e nullable;
         // fallback via equipamentos.unidade.planta_id.
-        const row = await (this.prisma as any).logs_mqtt?.findFirst?.({
+        const row = await this.prisma.logs_mqtt.findFirst({
           where: { id },
           select: {
-            equipamentos: {
+            equipamento: {
               select: { planta_id: true, unidade: { select: { planta_id: true } } },
             },
           },
         });
         return (
-          row?.equipamentos?.planta_id?.trim() ||
-          row?.equipamentos?.unidade?.planta_id?.trim() ||
+          row?.equipamento?.planta_id?.trim() ||
+          row?.equipamento?.unidade?.planta_id?.trim() ||
           null
         );
       }
