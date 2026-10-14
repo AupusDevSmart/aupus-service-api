@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { PermissionResponseDto } from './dto';
+import { PERMISSOES } from './matriz-de-permissoes';
 
 @Injectable()
 export class PermissionsService {
@@ -54,95 +55,20 @@ export class PermissionsService {
   }
 
   /**
-   * Retorna permissões modernas agrupadas por categoria
-   * Categorização baseada no recurso (parte antes do ponto)
+   * As permissões da tela de usuário, agrupadas pela categoria da matriz
+   * (matriz-de-permissoes.ts), com o nome exibido e a descrição dela, na ordem
+   * dela. Uma vez por nome (a mesma permissão pode existir em dois guards; vale
+   * a de menor id, a mesma que o seed usa). A que saiu da matriz não aparece:
+   * marcá-la não daria acesso a nada.
    */
   async findGrouped(): Promise<{ [category: string]: PermissionResponseDto[] }> {
-    const permissions = await this.findAll();
-
-    // Mapeamento de recursos para categorias
-    const resourceToCategory: { [resource: string]: string } = {
-      // Dashboard
-      'dashboard': 'Dashboard',
-
-      // Gestão
-      'usuarios': 'Gestão',
-      'organizacoes': 'Gestão',
-      'equipe': 'Gestão',
-
-      // Gestão de Energia
-      'plantas': 'Gestão de Energia',
-      'unidades': 'Gestão de Energia',
-      'equipamentos': 'Gestão de Energia',
-      'ugs': 'Gestão de Energia',
-
-      // Monitoramento
-      'monitoramento': 'Monitoramento',
-
-      // Supervisório
-      'scada': 'Supervisório',
-      'supervisorio': 'Supervisório',
-      'controle': 'Supervisório',
-
-      // Comercial
-      'prospeccao': 'Comercial',
-      'prospec': 'Comercial',
-      'oportunidades': 'Comercial',
-
-      // Financeiro
-      'financeiro': 'Financeiro',
-
-      // Clube
-      'clube': 'Clube',
-
-      // Sistema
-      'concessionarias': 'Sistema',
-      'configuracoes': 'Sistema',
-      'documentos': 'Sistema',
-      'relatorios': 'Sistema',
-
-      // Administração
-      'admin': 'Administração',
-    };
-
-    const grouped: { [category: string]: PermissionResponseDto[] } = {};
-
-    permissions.forEach(permission => {
-      // Extrair recurso (parte antes do ponto)
-      const [resource] = permission.name.split('.');
-
-      // Determinar categoria
-      const category = resourceToCategory[resource] || 'Outros';
-
-      // Adicionar à categoria
-      if (!grouped[category]) {
-        grouped[category] = [];
-      }
-      grouped[category].push(permission);
-    });
-
-    // Ordenar categorias (ordem fixa)
-    const categoryOrder = [
-      'Dashboard',
-      'Gestão',
-      'Gestão de Energia',
-      'Monitoramento',
-      'Supervisório',
-      'Comercial',
-      'Financeiro',
-      'Clube',
-      'Sistema',
-      'Administração',
-      'Outros'
-    ];
-
-    const orderedGrouped: { [category: string]: PermissionResponseDto[] } = {};
-    categoryOrder.forEach(category => {
-      if (grouped[category] && grouped[category].length > 0) {
-        orderedGrouped[category] = grouped[category];
-      }
-    });
-
-    return orderedGrouped;
+    const doBanco = [...(await this.findAll())].sort((x, y) => x.id - y.id);
+    const grupos: { [category: string]: PermissionResponseDto[] } = {};
+    for (const def of PERMISSOES) {
+      const permissao = doBanco.find((p) => p.name === def.name);
+      if (!permissao) continue;
+      (grupos[def.category] ??= []).push({ ...permissao, display_name: def.display_name, description: def.description });
+    }
+    return grupos;
   }
 }
