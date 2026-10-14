@@ -130,6 +130,23 @@ describe('TarefasSchedulerService', () => {
     });
   });
 
+  describe('prioridade da programacao gerada', () => {
+    const comCriticidade = (equipamento: string, tarefa: number | null = null) => ({
+      criticidade: tarefa,
+      equipamento: { criticidade: equipamento },
+    });
+    const prioridade = (cluster: unknown[]) => (service as any).determinarPrioridade(cluster);
+
+    it('usa a criticidade 1 a 5 do cadastro de hoje (antes so A/B/C contava e tudo saia MEDIA)', () => {
+      expect(prioridade([comCriticidade('5')])).toBe('ALTA');
+      expect(prioridade([comCriticidade('2'), comCriticidade('1')])).toBe('BAIXA');
+    });
+
+    it('a criticidade da propria tarefa tambem conta', () => {
+      expect(prioridade([comCriticidade('2', 4)])).toBe('ALTA');
+    });
+  });
+
   describe('ultima execucao efetiva', () => {
     it('so considera tarefa CONCLUIDA em OS FINALIZADA', async () => {
       mockPrismaService.tarefas_os.findMany.mockResolvedValue([]);

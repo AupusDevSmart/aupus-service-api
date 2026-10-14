@@ -5,14 +5,7 @@ import { PrismaService } from '@/core';
 import { ProgramacaoOSService } from '../programacao-os/programacao-os.service';
 import { calcularProximaExecucao } from './periodicidade';
 import { variantesDeIds } from './ids';
-
-
-/** Mapa criticidade equipamento (A/B/C) → prioridade OS */
-const CRITICIDADE_PRIORIDADE: Record<string, string> = {
-  A: 'ALTA',
-  B: 'MEDIA',
-  C: 'BAIXA',
-};
+import { prioridadePelaCriticidade } from './prioridade-pela-criticidade';
 
 /** Janela de agrupamento em dias */
 const JANELA_AGRUPAMENTO_DIAS = 14;
@@ -24,7 +17,7 @@ interface TarefaElegivel {
   id: string;
   nome: string;
   tag: string;
-  tipo_manutencao: string;
+  criticidade: number | null;
   frequencia: string | null;
   frequencia_personalizada: number | null;
   data_ultima_execucao: Date | null;
@@ -396,12 +389,12 @@ export class TarefasSchedulerService {
     const dataProgramada = cluster[0].proxima_execucao!;
     const mesAno = `${String(dataProgramada.getMonth() + 1).padStart(2, '0')}/${dataProgramada.getFullYear()}`;
 
-    // Prioridade baseada na criticidade mais alta dos equipamentos
+    // Prioridade pela criticidade mais alta (dos equipamentos e das tarefas)
     const prioridade = this.determinarPrioridade(cluster);
 
-    // Tipo: pega da primeira tarefa ou PREVENTIVA se mistas
-    const tipos = [...new Set(cluster.map((t) => t.tipo_manutencao).filter(Boolean))];
-    const tipo = tipos.length === 1 ? tipos[0] : 'PREVENTIVA';
+    // A tarefa não guarda mais o tipo (saiu no PR6 do plano por categoria):
+    // o que o plano gera é preventiva.
+    const tipo = 'PREVENTIVA';
 
     // Descrição padrão
     const descricao = `Manutenção preventiva programada - ${nomeUnidade} - ${mesAno}`;
@@ -476,17 +469,8 @@ export class TarefasSchedulerService {
     return { id: resultado.id, codigo: resultado.codigo };
   }
 
-  /**
-   * Determina prioridade baseada na criticidade mais alta dos equipamentos do cluster
-   */
-  private determinarPrioridade(cluster: TarefaElegivel[]): string {
-    const criticidades = cluster.map((t) => t.equipamento?.criticidade).filter(Boolean);
-
-    // A = mais crítico, C = menos
-    if (criticidades.includes('A')) return 'ALTA';
-    if (criticidades.includes('B')) return 'MEDIA';
-    if (criticidades.includes('C')) return 'BAIXA';
-
-    return 'MEDIA';
+  /** Prioridade pela criticidade mais alta do grupo — regra em prioridade-pela-criticidade.ts. */
+  private determinarPrioridade(cluster: Pick<TarefaElegivel, 'criticidade' | 'equipamento'>[]): string {
+    return prioridadePelaCriticidade(cluster.flatMap((t) => [t.equipamento?.criticidade, t.criticidade]));
   }
 }
