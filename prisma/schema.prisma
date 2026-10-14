@@ -958,6 +958,10 @@ model usuarios {
   historico_manutencoes_atualizadas                                historico_manutencoes[]  @relation("historico_manutencoes_atualizado_por")
   historico_manutencoes_criadas                                    historico_manutencoes[]  @relation("historico_manutencoes_criado_por")
   notificacoes                                                     notificacoes[]
+  ordens_servico_responsavel                                       ordens_servico[]         @relation("ordens_servico_responsavel")
+  programacoes_os_responsavel                                      programacoes_os[]        @relation("programacoes_os_responsavel")
+  tecnicos_os                                                      tecnicos_os[]            @relation("tecnicos_os_tecnico")
+  tecnicos_programacao_os                                          tecnicos_programacao_os[] @relation("tecnicos_programacao_os_tecnico")
   oportunidades_oportunidades_admin_responsavel_idTousuarios       oportunidades[]          @relation("oportunidades_admin_responsavel_idTousuarios")
   oportunidades_oportunidades_usuario_idTousuarios                 oportunidades[]          @relation("oportunidades_usuario_idTousuarios")
   organizacao_usuario                                              organizacao_usuario[]
@@ -1824,6 +1828,8 @@ model programacoes_os {
   solicitacao_servico      solicitacoes_servico?            @relation(fields: [solicitacao_servico_id], references: [id])
   planta                   plantas?                         @relation(fields: [planta_id], references: [id])
   reserva_veiculo          reserva_veiculo?                 @relation(fields: [reserva_id], references: [id])
+  /// SN-31: o responsável é usuário; `responsavel` guarda o nome dele na época
+  responsavel_usuario      usuarios?                        @relation("programacoes_os_responsavel", fields: [responsavel_id], references: [id], onDelete: SetNull)
   tarefas_programacao      tarefas_programacao_os[]
   tecnicos                 tecnicos_programacao_os[]
 
@@ -1896,6 +1902,8 @@ model tecnicos_programacao_os {
   created_at      DateTime        @default(now()) @map("created_at")
   updated_at      DateTime        @updatedAt @map("updated_at")
   programacao     programacoes_os @relation(fields: [programacao_id], references: [id], onDelete: Cascade)
+  /// SN-31: quem foi escalado (equipe da planta ou apoio); `nome` e o dele na epoca
+  tecnico         usuarios?       @relation("tecnicos_programacao_os_tecnico", fields: [tecnico_id], references: [id], onDelete: SetNull)
 
   @@index([programacao_id])
   @@index([tecnico_id])
@@ -1990,6 +1998,8 @@ model ordens_servico {
   planta                       plantas?                  @relation(fields: [planta_id], references: [id])
   programacao                  programacoes_os           @relation(fields: [programacao_id], references: [id])
   reserva_veiculo              reserva_veiculo?          @relation(fields: [reserva_id], references: [id])
+  /// SN-31: o responsável é usuário; `responsavel` guarda o nome dele na época
+  responsavel_usuario          usuarios?                 @relation("ordens_servico_responsavel", fields: [responsavel_id], references: [id], onDelete: SetNull)
   registros_tempo              registros_tempo_os[]
   tarefas_os                   tarefas_os[]
   tecnicos                     tecnicos_os[]
@@ -2137,6 +2147,8 @@ model tecnicos_os {
   created_at        DateTime       @default(now()) @map("created_at")
   updated_at        DateTime       @updatedAt @map("updated_at")
   ordem_servico     ordens_servico @relation(fields: [os_id], references: [id], onDelete: Cascade)
+  /// SN-31: quem foi escalado; `nome` e o dele na epoca
+  tecnico           usuarios?      @relation("tecnicos_os_tecnico", fields: [tecnico_id], references: [id], onDelete: SetNull)
 
   @@index([os_id])
   @@index([tecnico_id])

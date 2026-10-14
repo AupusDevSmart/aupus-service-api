@@ -34,6 +34,7 @@ import {
   UpdateProgramacaoDto,
 } from './dto';
 import { ProgramacaoOSService } from './programacao-os.service';
+import type { PessoasDaPlanta } from './pessoas-da-os';
 
 @ApiTags('Programação OS')
 @Controller('programacao-os')
@@ -114,6 +115,17 @@ export class ProgramacaoOSController {
     @Query() filters?: Partial<ProgramacaoFiltersDto>,
   ): Promise<ListarProgramacoesResponseDto> {
     return this.programacaoOSService.buscarPorUnidade(unidadeId, filters, user);
+  }
+
+  @Get('pessoas')
+  @Permissions('programacao_os.manage', 'execucao_os.manage')
+  @ApiOperation({
+    summary: 'Quem pode ser responsável ou técnico',
+    description: 'Equipe da planta (técnicos de campo vinculados) e apoio (planejador, gerente, administrador)',
+  })
+  @ApiQuery({ name: 'planta_id', required: false, description: 'Sem planta, só o apoio' })
+  async pessoas(@Query('planta_id') plantaId?: string, @CurrentUser() user?: any): Promise<PessoasDaPlanta> {
+    return this.programacaoOSService.pessoasQuePodemAtuar(plantaId, user);
   }
 
   @Get(':id')

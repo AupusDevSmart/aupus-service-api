@@ -1,6 +1,7 @@
 import { ConflictException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { Prisma, StatusProgramacaoOS } from '@/core';
 import { plantasDosEquipamentos } from '@/core/modules/auth/planta-dos-equipamentos';
+import { garantirPessoasQuePodemAtuar, PessoasDaPlanta, pessoasQuePodemAtuar } from './pessoas-da-os';
 import { PrismaService, PermissionScopeService, ScopedUser } from '@/core';
 import { variantesDeId, variantesDeIds } from '../tarefas/ids';
 import {
@@ -285,6 +286,13 @@ export class ProgramacaoOSService {
     return this.listar(filtersComUnidade, user);
   }
 
+  /** Opções de responsável e técnico da tela (a mesma regra que o gravar confere). */
+  async pessoasQuePodemAtuar(plantaId: string | undefined, user?: ScopedUser): Promise<PessoasDaPlanta> {
+    const planta = plantaId?.trim() || null;
+    if (user && planta) await this.scopeService.assertPlantaInScope(planta, user);
+    return pessoasQuePodemAtuar(this.prisma, planta);
+  }
+
   async criar(createDto: CreateProgramacaoDto, usuarioId?: string, user?: ScopedUser): Promise<ProgramacaoResponseDto> {
     // Scope RBAC: planta_id deve estar no escopo
     if (user && createDto.planta_id) {
@@ -297,6 +305,7 @@ export class ProgramacaoOSService {
 
     // Validar relacionamentos
     await this.validarRelacionamentos(createDto);
+    await this.escalarPessoas(createDto, createDto.planta_id);
 
     // Gerar código único
     const codigo = await this.gerarCodigo();
@@ -452,6 +461,7 @@ export class ProgramacaoOSService {
     if (updateDto.equipamento_id || updateDto.anomalia_id || updateDto.plano_manutencao_id || updateDto.veiculo_id) {
       await this.validarRelacionamentos(updateDto);
     }
+    await this.escalarPessoas(updateDto, updateDto.planta_id !== undefined ? updateDto.planta_id : programacao.planta_id);
 
     // Prepare data without undefined fields to avoid Prisma issues
     // ✅ Separar campos de relacionamentos (materiais, ferramentas, tecnicos)
@@ -906,7 +916,9 @@ export class ProgramacaoOSService {
       duracao_estimada: solicitacao.tempo_estimado ? Number(solicitacao.tempo_estimado) * 1.5 : 3,
       observacoes: solicitacao.descricao,
       justificativa: solicitacao.justificativa,
-      responsavel: dto?.responsavel || solicitacao.solicitante_nome,
+      // Quem pediu não é quem responde pela execução (SN-31): o solicitante fica
+      // em dados_origem; o responsável é escalado depois, entre os usuários
+      responsavel: dto?.responsavel,
       dados_origem: {
         solicitacao_id: solicitacao.id,
         numero: solicitacao.numero,
@@ -1305,6 +1317,33 @@ export class ProgramacaoOSService {
     }));
 
     await prisma.ferramentas_programacao_os.createMany({ data: dados });
+  }
+
+  /**
+   * Responsável e técnicos são usuários que podem atuar na planta (SN-31): a
+   * equipe da planta ou o apoio (planejador, gerente, administrador). O nome
+   * gravado é o do cadastro — o que a tela manda junto é ignorado. Linha de
+   * técnico sem pessoa (o perfil que a instrução pede) continua valendo.
+   */
+  private async escalarPessoas(
+    dto: { responsavel_id?: string | null; responsavel?: string | null; tecnicos?: { tecnico_id?: string; nome?: string }[] },
+    plantaId: string | null | undefined,
+  ): Promise<void> {
+    const responsavelId = dto.responsavel_id?.trim();
+    const tecnicos = dto.tecnicos ?? [];
+    const ids = [responsavelId, ...tecnicos.map((t) => t.tecnico_id?.trim())].filter((id): id is string => !!id);
+    const pessoas = await garantirPessoasQuePodemAtuar(this.prisma, plantaId, ids);
+
+    if (responsavelId) {
+      dto.responsavel_id = responsavelId;
+      dto.responsavel = pessoas.get(responsavelId)!.nome;
+    }
+    for (const tecnico of tecnicos) {
+      const id = tecnico.tecnico_id?.trim();
+      if (!id) continue;
+      tecnico.tecnico_id = id;
+      tecnico.nome = pessoas.get(id)!.nome;
+    }
   }
 
   private async criarTecnicos(prisma: any, programacaoId: string, tecnicos: any[]): Promise<void> {

@@ -171,6 +171,7 @@ const JORNADAS: [string, string, string[]][] = [
   ['cancelar a OS', 'PATCH /execucao-os/:id/cancelar', PLANEJAM],
   ['ver programações', 'GET /programacao-os', TODOS],
   ['programar OS', 'POST /programacao-os', PLANEJAM],
+  ['escolher responsável e técnicos (SN-31)', 'GET /programacao-os/pessoas', PLANEJAM],
   ['aprovar programação', 'PATCH /programacao-os/:id/aprovar', GERENCIAM],
   ['ler instruções', 'GET /instrucoes', TODOS],
   ['criar instrução', 'POST /instrucoes', PLANEJAM],

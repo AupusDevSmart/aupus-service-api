@@ -97,10 +97,10 @@ export class TecnicoProgramacaoDto {
   @Min(0)
   custo_hora?: number;
 
-  @ApiPropertyOptional({ description: 'ID do técnico no sistema', example: 'clrx1234567890123456789012' })
+  @ApiPropertyOptional({ description: 'Usuário escalado (equipe da planta ou apoio); o nome vem do cadastro', example: 'clrx1234567890123456789012' })
   @IsOptional()
   @IsString()
-  @Length(26, 26)
+  @Length(1, 26)
   tecnico_id?: string;
 }
 
@@ -238,10 +238,10 @@ export class CreateProgramacaoDto {
   @Length(1, 255)
   responsavel?: string;
 
-  @ApiPropertyOptional({ description: 'ID do responsável', example: 'clrx1234567890123456789012' })
+  @ApiPropertyOptional({ description: 'Usuário responsável (equipe da planta ou apoio); o nome vem do cadastro', example: 'clrx1234567890123456789012' })
   @IsOptional()
   @IsString()
-  @Length(26, 26)
+  @Length(1, 26)
   responsavel_id?: string;
 
   @ApiPropertyOptional({ description: 'Time/equipe responsável', example: 'Equipe Elétrica' })
