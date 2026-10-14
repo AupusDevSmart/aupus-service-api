@@ -931,6 +931,8 @@ model usuarios {
   cep                                                              String?                  @db.VarChar(255)
   deleted_by                                                       String?                  @db.Char(26)
   senha                                                            String?                  @db.VarChar(255)
+  /// Primeiro acesso ou senha redefinida por outra pessoa: so troca de senha ate trocar (SN-34)
+  deve_trocar_senha                                                Boolean                  @default(false)
   remember_token                                                   String?                  @db.VarChar(100)
   deleted_at                                                       DateTime?                @db.Timestamp(0)
   created_at                                                       DateTime?                @db.Timestamp(0)

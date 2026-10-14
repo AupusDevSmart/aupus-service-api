@@ -44,6 +44,8 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       nome: payload.nome,
       role: usuario.roles?.[0]?.name ?? null,
       permissions: [...new Set((usuario.all_permissions ?? []).map((p) => p.name))],
+      // Primeiro acesso: o TrocaDeSenhaGuard só deixa trocar a senha
+      deve_trocar_senha: !!usuario.deve_trocar_senha,
     };
   }
 }

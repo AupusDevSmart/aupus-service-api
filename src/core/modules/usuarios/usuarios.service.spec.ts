@@ -271,7 +271,9 @@ describe('UsuariosService - Testes Completos com Roles e Permissions', () => {
       const result = await service.create(createDto);
 
       expect(result.nome).toBe('Novo Usuário');
-      expect(result.senhaTemporaria).toBe('Aupus123!');
+      // Senha provisória própria, não mais a fixa Aupus123! (SN-34)
+      expect(result.senhaTemporaria).toMatch(/^[A-Za-z0-9]{12}$/);
+      expect(result.senhaTemporaria).not.toBe('Aupus123!');
       expect(result.primeiroAcesso).toBe(true);
       expect(mockPrismaService.usuarios.create).toHaveBeenCalledWith({
         data: expect.objectContaining({ email: 'novo@teste.com', role: 'admin' }),
@@ -279,7 +281,7 @@ describe('UsuariosService - Testes Completos com Roles e Permissions', () => {
       expect(mockPrismaService.model_has_roles.create).toHaveBeenCalledWith({
         data: { role_id: BigInt(1), model_id: createdUser.id, model_type: 'App\\Models\\User' },
       });
-      expect(mockMailService.sendWelcomeEmail).toHaveBeenCalledWith('novo@teste.com', 'Novo Usuário', 'Aupus123!');
+      expect(mockMailService.sendWelcomeEmail).toHaveBeenCalledWith('novo@teste.com', 'Novo Usuário', result.senhaTemporaria);
     });
 
     it('should throw ConflictException when email already exists', async () => {

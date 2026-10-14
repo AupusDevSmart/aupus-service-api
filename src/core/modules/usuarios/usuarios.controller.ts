@@ -45,6 +45,7 @@ import {
   AtualizarPerfilDto,
 } from './dto';
 import { Solicitante, mesmoUsuario } from './hierarquia-de-papeis';
+import { LiberadoSemTrocarSenha } from '../auth/guards/troca-de-senha.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { Permissions } from '../auth/decorators/permissions.decorator';
 
@@ -177,6 +178,7 @@ export class UsuariosController {
   // ============================================================================
 
   @Patch(':id/change-password')
+  @LiberadoSemTrocarSenha()
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Alterar senha do usuário' })
   @ApiParam({ name: 'id', description: 'ID do usuário' })

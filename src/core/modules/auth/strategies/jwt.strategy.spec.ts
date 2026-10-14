@@ -32,6 +32,7 @@ describe('JwtStrategy.validate', () => {
       nome: 'A',
       role: 'operador',
       permissions: ['execucao_os.view', 'execucao_os.executar'],
+      deve_trocar_senha: false,
     });
   });
 

@@ -25,10 +25,13 @@ export class HttpExceptionFilter implements ExceptionFilter {
     // Extrair mensagem e detalhes do erro
     let message = exception.message;
     let details: any = undefined;
+    // A exceção pode trazer um código próprio (ex.: TROCAR_SENHA), que a tela usa
+    let codigoProprio: string | undefined;
 
     if (typeof exceptionResponse === 'object') {
       const responseObj = exceptionResponse as any;
       message = responseObj.message || message;
+      if (typeof responseObj.code === 'string') codigoProprio = responseObj.code;
 
       // Se há array de mensagens de validação
       if (Array.isArray(responseObj.message)) {
@@ -44,7 +47,7 @@ export class HttpExceptionFilter implements ExceptionFilter {
     response.status(status).json({
       success: false,
       error: {
-        code: this.getErrorCode(status),
+        code: codigoProprio ?? this.getErrorCode(status),
         message,
         details,
       },

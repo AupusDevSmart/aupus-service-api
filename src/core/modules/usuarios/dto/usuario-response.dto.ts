@@ -102,4 +102,7 @@ export class UsuarioResponseDto {
 
   @ApiPropertyOptional({ description: 'Indica se é primeiro acesso (apenas na criação)' })
   primeiroAcesso?: boolean;
+
+  @ApiPropertyOptional({ description: 'Precisa trocar a senha provisória antes de usar o sistema (SN-34)' })
+  deve_trocar_senha?: boolean;
 }

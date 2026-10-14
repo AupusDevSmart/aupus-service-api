@@ -59,7 +59,7 @@ export function getWelcomeEmailHtml(
               </table>
 
               <p style="margin: 0 0 24px; font-size: 15px; line-height: 1.6; color: #374151;">
-                Após o primeiro acesso, recomendamos que altere sua senha imediatamente através da página de perfil do sistema.
+                No primeiro acesso, o sistema pede que você troque essa senha provisória por uma que só você saiba.
               </p>
 
               <!-- CTA Button -->

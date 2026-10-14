@@ -21,6 +21,8 @@ const NUNCA_VIAJAM: Record<Recurso, string[]> = {
     // Credencial nao se replica. Nunca.
     'senha',
     'remember_token',
+    // Estado da senha provisoria (SN-34): e da credencial, fica com ela.
+    'deve_trocar_senha',
     // `role` e a coluna legada que espelha o Spatie. Privilegio nao viaja junto
     // com cadastro: os dois bancos tem 6 roles e 39 permissions com guards
     // `web`/`api` misturados, e propagar isso transformaria um botao de

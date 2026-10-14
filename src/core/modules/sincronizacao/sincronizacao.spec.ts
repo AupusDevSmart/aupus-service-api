@@ -211,12 +211,13 @@ describe('sincronizacao (banco real)', () => {
   });
 
   describe('o que nunca viaja', () => {
-    it('senha, remember_token e role ficam fora do payload de saida', async () => {
+    it('senha, remember_token, deve_trocar_senha e role ficam fora do payload de saida', async () => {
       const usuario = await prisma.usuarios.findUnique({ where: { id: ID_PROP } });
       const payload = montarPayload('usuarios', usuario as any);
 
       expect(payload).not.toHaveProperty('senha');
       expect(payload).not.toHaveProperty('remember_token');
+      expect(payload).not.toHaveProperty('deve_trocar_senha');
       expect(payload).not.toHaveProperty('role');
       expect(payload.email).toBe('sync.teste@exemplo.local');
     });

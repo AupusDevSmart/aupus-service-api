@@ -10,6 +10,7 @@ import { JwtStrategy } from './strategies/jwt.strategy';
 import { UsuariosModule } from '../usuarios/usuarios.module';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { PermissionsGuard } from './guards/permissions.guard';
+import { TrocaDeSenhaGuard } from './guards/troca-de-senha.guard';
 import { PermissionScopeModule } from './permission-scope.module';
 
 /**
@@ -39,6 +40,10 @@ import { PermissionScopeModule } from './permission-scope.module';
     {
       provide: APP_GUARD,
       useClass: JwtAuthGuard, // Aplicar JwtAuthGuard globalmente
+    },
+    {
+      provide: APP_GUARD,
+      useClass: TrocaDeSenhaGuard, // Senha provisória: só troca de senha até trocar (SN-34)
     },
     {
       provide: APP_GUARD,

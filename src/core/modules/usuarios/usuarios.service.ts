@@ -36,6 +36,7 @@ import * as bcrypt from 'bcryptjs';
 import { customAlphabet } from 'nanoid';
 import { MailService } from '../../mail/mail.service';
 import { AtualizarPerfilDto } from './dto/atualizar-perfil.dto';
+import { gerarSenhaProvisoria } from './senha-provisoria';
 import {
   PAPEL_TOPO,
   Solicitante,
@@ -331,8 +332,8 @@ export class UsuariosService {
       const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 26);
       const userId = nanoid();
 
-      // Senha padrão
-      const senhaTemporaria = 'Aupus123!';
+      // Senha provisória própria; a pessoa troca no primeiro acesso (SN-34)
+      const senhaTemporaria = gerarSenhaProvisoria();
       const hashedPassword = await bcrypt.hash(senhaTemporaria, 12);
 
       const novoUsuario = await this.prisma.usuarios.create({
@@ -356,6 +357,7 @@ export class UsuariosService {
           created_by: data.createdBy,
           is_active: true,
           senha: hashedPassword,
+          deve_trocar_senha: true,
         }
       });
 
@@ -589,6 +591,14 @@ export class UsuariosService {
         throw new BadRequestException('Senha atual incorreta');
       }
 
+      // A senha provisória tem de virar outra; e a padrão antiga todo mundo conhecia (SN-34)
+      if (data.novaSenha === data.senhaAtual) {
+        throw new BadRequestException('A nova senha precisa ser diferente da atual.');
+      }
+      if (data.novaSenha === 'Aupus123!') {
+        throw new BadRequestException('Essa era a senha padrão de todos os usuários: escolha outra.');
+      }
+
       // Hash da nova senha
       const novaSenhaHash = await bcrypt.hash(data.novaSenha, 12);
 
@@ -596,6 +606,8 @@ export class UsuariosService {
         where: { id },
         data: {
           senha: novaSenhaHash,
+          // Trocou a própria senha: acabou o primeiro acesso
+          deve_trocar_senha: false,
           updated_at: new Date(),
         },
       });
@@ -630,6 +642,8 @@ export class UsuariosService {
         where: { id },
         data: {
           senha: novaSenhaHash,
+          // Outra pessoa definiu a senha: quem é dono dela troca no próximo acesso
+          deve_trocar_senha: true,
           updated_at: new Date(),
         },
       });
@@ -1575,6 +1589,7 @@ export class UsuariosService {
         cep: usuario.cep,
         manager_id: usuario.manager_id,
         avatar_url: usuario.avatar_url, // ← ADICIONADO
+        deve_trocar_senha: !!usuario.deve_trocar_senha,
         all_permissions: allPermissions, // Array de objetos com id, name, guard_name, source
         roles: userPermissions.role ? [userPermissions.role] : [], // ✅ CORRIGIDO: retornar objeto completo
         role_details: userPermissions.role || undefined,

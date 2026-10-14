@@ -7,6 +7,7 @@ import {
   HttpCode,
   HttpStatus,
 } from '@nestjs/common';
+import { LiberadoSemTrocarSenha } from './guards/troca-de-senha.guard';
 import {
   ApiTags,
   ApiOperation,
@@ -97,6 +98,7 @@ export class AuthController {
    */
   @UseGuards(JwtAuthGuard)
   @Post('logout')
+  @LiberadoSemTrocarSenha()
   @HttpCode(HttpStatus.OK)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Realiza logout' })
@@ -111,6 +113,7 @@ export class AuthController {
    */
   @UseGuards(JwtAuthGuard)
   @Get('me')
+  @LiberadoSemTrocarSenha()
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Retorna dados do usuário autenticado' })
   @ApiResponse({ status: 200, description: 'Dados do usuário' })
