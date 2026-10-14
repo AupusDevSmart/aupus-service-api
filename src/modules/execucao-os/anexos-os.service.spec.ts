@@ -1,7 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { AnexosOSService } from './anexos-os.service';
-import { PrismaService } from '@/core';
-import { NotFoundException, BadRequestException } from '@nestjs/common';
+import { PermissionScopeService, PrismaService } from '@/core';
+import { NotFoundException, BadRequestException, ConflictException } from '@nestjs/common';
 import { TipoAnexoOS } from '@/core';
 import * as fs from 'fs';
 
@@ -17,6 +17,7 @@ describe('AnexosOSService', () => {
   const mockOSData = {
     id: 'clrx1234567890123456789012',
     numero_os: 'OS-2025-001',
+    status: 'EM_EXECUCAO',
     deletado_em: null,
   };
 
@@ -49,6 +50,9 @@ describe('AnexosOSService', () => {
     ordens_servico: {
       findFirst: jest.fn(),
     },
+    usuarios: {
+      findUnique: jest.fn(),
+    },
     anexos_os: {
       findMany: jest.fn(),
       findFirst: jest.fn(),
@@ -65,6 +69,10 @@ describe('AnexosOSService', () => {
           provide: PrismaService,
           useValue: mockPrismaService,
         },
+        {
+          provide: PermissionScopeService,
+          useValue: { assertEntityInScope: jest.fn() },
+        },
       ],
     }).compile();
 
@@ -76,6 +84,9 @@ describe('AnexosOSService', () => {
 
     // Mock padrão para fs.existsSync
     mockFsModule.existsSync.mockReturnValue(true);
+    // Toda operação começa achando a OS (e o escopo dela)
+    mockPrismaService.ordens_servico.findFirst.mockResolvedValue(mockOSData);
+    mockPrismaService.usuarios.findUnique.mockResolvedValue({ nome: 'João Silva' });
   });
 
   afterEach(() => {
@@ -102,15 +113,12 @@ describe('AnexosOSService', () => {
         TipoAnexoOS.FOTO_ANTES,
         'Foto do motor antes da manutenção',
         'antes',
-        'user123'
+        { id: 'user123' }
       );
 
-      expect(mockPrismaService.ordens_servico.findFirst).toHaveBeenCalledWith({
-        where: {
-          id: 'clrx1234567890123456789012',
-          deletado_em: null,
-        },
-      });
+      expect(mockPrismaService.ordens_servico.findFirst).toHaveBeenCalledWith(
+        expect.objectContaining({ where: { id: 'clrx1234567890123456789012', deletado_em: null } }),
+      );
 
       expect(mockPrismaService.anexos_os.create).toHaveBeenCalledWith({
         data: expect.objectContaining({
@@ -121,6 +129,7 @@ describe('AnexosOSService', () => {
           tamanho: 1024000,
           descricao: 'Foto do motor antes da manutenção',
           fase_execucao: 'antes',
+          uploaded_by: 'João Silva',
           uploaded_by_id: 'user123',
         }),
       });
@@ -147,7 +156,7 @@ describe('AnexosOSService', () => {
         TipoAnexoOS.FOTO_ANTES,
         'Foto do motor',
         'antes',
-        'user123'
+        { id: 'user123' }
       );
 
       expect(mockFsModule.mkdirSync).toHaveBeenCalledWith(
@@ -220,7 +229,7 @@ describe('AnexosOSService', () => {
       mockFsModule.mkdirSync.mockReturnValue(undefined);
       mockFsModule.writeFileSync.mockReturnValue(undefined);
 
-      const tiposPermitidos = ['png', 'pdf', 'jpg', 'jpeg', 'doc', 'docx', 'xls', 'xlsx'];
+      const tiposPermitidos = ['png', 'pdf', 'jpg', 'jpeg', 'webp', 'heic', 'heif', 'doc', 'docx', 'xls', 'xlsx'];
 
       for (const tipo of tiposPermitidos) {
         const arquivo = {
@@ -275,11 +284,13 @@ describe('AnexosOSService', () => {
     it('deve retornar anexo por ID', async () => {
       mockPrismaService.anexos_os.findFirst.mockResolvedValue(mockAnexoData);
 
-      const result = await service.buscarAnexo('clrx1234567890123456789012');
+      const result = await service.buscarAnexo('clrx1234567890123456789012', 'clrx1234567890123456789012');
 
+      // Preso à OS: o anexo de outra OS não é achado por esta
       expect(mockPrismaService.anexos_os.findFirst).toHaveBeenCalledWith({
         where: {
           id: 'clrx1234567890123456789012',
+          os_id: 'clrx1234567890123456789012',
           deletado_em: null,
         },
       });
@@ -294,70 +305,31 @@ describe('AnexosOSService', () => {
     it('deve lançar NotFoundException quando anexo não encontrado', async () => {
       mockPrismaService.anexos_os.findFirst.mockResolvedValue(null);
 
-      await expect(service.buscarAnexo('clrx1234567890123456789012'))
+      await expect(service.buscarAnexo('clrx1234567890123456789012', 'clrx1234567890123456789012'))
         .rejects.toThrow(NotFoundException);
     });
   });
 
   describe('removerAnexo', () => {
-    it('deve remover anexo (soft delete) e arquivo físico', async () => {
+    it('exclui só no registro (soft delete): o arquivo, que é a prova, fica no disco', async () => {
       mockPrismaService.anexos_os.findFirst.mockResolvedValue(mockAnexoData);
       mockPrismaService.anexos_os.update.mockResolvedValue({});
 
-      // Mock para fs.existsSync e fs.unlinkSync
-      mockFsModule.existsSync.mockReturnValue(true);
-      mockFsModule.unlinkSync.mockReturnValue(undefined);
-
-      // Mock do console.error para evitar logs durante o teste
-      const consoleSpy = jest.spyOn(console, 'error').mockImplementation();
-
-      await service.removerAnexo('clrx1234567890123456789012', 'user123');
+      await service.removerAnexo('clrx1234567890123456789012', 'clrx1234567890123456789012', { id: 'user123' });
 
       expect(mockPrismaService.anexos_os.update).toHaveBeenCalledWith({
         where: { id: 'clrx1234567890123456789012' },
         data: { deletado_em: expect.any(Date) },
       });
-
-      expect(mockFsModule.unlinkSync).toHaveBeenCalledWith(mockAnexoData.caminho_s3);
-
-      consoleSpy.mockRestore();
-    });
-
-    it('deve lidar com erro ao remover arquivo físico', async () => {
-      mockPrismaService.anexos_os.findFirst.mockResolvedValue(mockAnexoData);
-      mockPrismaService.anexos_os.update.mockResolvedValue({});
-
-      // Mock para simular erro ao remover arquivo
-      mockFsModule.existsSync.mockReturnValue(true);
-      mockFsModule.unlinkSync.mockImplementation(() => {
-        throw new Error('Erro ao remover arquivo');
-      });
-
-      const consoleSpy = jest.spyOn(console, 'error').mockImplementation();
-
-      // Não deve lançar erro, apenas logar
-      await expect(service.removerAnexo('clrx1234567890123456789012', 'user123'))
-        .resolves.not.toThrow();
-
-      expect(consoleSpy).toHaveBeenCalledWith(
-        'Erro ao remover arquivo físico:',
-        expect.any(Error)
-      );
-
-      consoleSpy.mockRestore();
-    });
-
-    it('deve continuar se arquivo físico não existir', async () => {
-      mockPrismaService.anexos_os.findFirst.mockResolvedValue(mockAnexoData);
-      mockPrismaService.anexos_os.update.mockResolvedValue({});
-
-      // Mock para simular que arquivo não existe
-      mockFsModule.existsSync.mockReturnValue(false);
-
-      await expect(service.removerAnexo('clrx1234567890123456789012', 'user123'))
-        .resolves.not.toThrow();
-
       expect(mockFsModule.unlinkSync).not.toHaveBeenCalled();
+    });
+
+    it('OS finalizada não deixa excluir', async () => {
+      mockPrismaService.ordens_servico.findFirst.mockResolvedValue({ ...mockOSData, status: 'FINALIZADA' });
+      mockPrismaService.anexos_os.findFirst.mockResolvedValue(mockAnexoData);
+
+      await expect(service.removerAnexo('clrx1234567890123456789012', 'clrx1234567890123456789012', { id: 'user123' })).rejects.toThrow(ConflictException);
+      expect(mockPrismaService.anexos_os.update).not.toHaveBeenCalled();
     });
   });
 
@@ -366,7 +338,7 @@ describe('AnexosOSService', () => {
       mockPrismaService.anexos_os.findFirst.mockResolvedValue(mockAnexoData);
       mockFsModule.existsSync.mockReturnValue(true);
 
-      const result = await service.obterCaminhoArquivo('clrx1234567890123456789012');
+      const result = await service.obterCaminhoArquivo('clrx1234567890123456789012', 'clrx1234567890123456789012');
 
       expect(result).toBe(mockAnexoData.caminho_s3);
       expect(mockFsModule.existsSync).toHaveBeenCalledWith(mockAnexoData.caminho_s3);
@@ -376,7 +348,7 @@ describe('AnexosOSService', () => {
       mockPrismaService.anexos_os.findFirst.mockResolvedValue(mockAnexoData);
       mockFsModule.existsSync.mockReturnValue(false);
 
-      await expect(service.obterCaminhoArquivo('clrx1234567890123456789012'))
+      await expect(service.obterCaminhoArquivo('clrx1234567890123456789012', 'clrx1234567890123456789012'))
         .rejects.toThrow(NotFoundException);
     });
   });
@@ -449,7 +421,7 @@ describe('AnexosOSService', () => {
     });
 
     describe('validarArquivo', () => {
-      const tiposPermitidos = ['png', 'pdf', 'jpg', 'jpeg', 'doc', 'docx', 'xls', 'xlsx'];
+      const tiposPermitidos = ['png', 'pdf', 'jpg', 'jpeg', 'webp', 'heic', 'heif', 'doc', 'docx', 'xls', 'xlsx'];
       const tiposNaoPermitidos = ['txt', 'exe', 'bat', 'sh', 'zip'];
 
       it('deve aceitar tipos permitidos', async () => {
@@ -530,7 +502,7 @@ describe('AnexosOSService', () => {
     it('deve mapear dados corretamente', async () => {
       mockPrismaService.anexos_os.findFirst.mockResolvedValue(mockAnexoData);
 
-      const result = await service.buscarAnexo('clrx1234567890123456789012');
+      const result = await service.buscarAnexo('clrx1234567890123456789012', 'clrx1234567890123456789012');
 
       expect(result).toEqual({
         id: mockAnexoData.id,

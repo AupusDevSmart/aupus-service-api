@@ -103,6 +103,7 @@ export class ExecucaoOSController {
   }
 
   @Patch(':id/iniciar')
+  @Permissions('execucao_os.manage', 'execucao_os.executar')
   @ApiOperation({
     summary: 'Iniciar execução da OS',
     description: 'Inicia a execução (PENDENTE → EM_EXECUCAO)',
@@ -120,6 +121,7 @@ export class ExecucaoOSController {
   }
 
   @Patch(':id/pausar')
+  @Permissions('execucao_os.manage', 'execucao_os.executar')
   @ApiOperation({
     summary: 'Pausar execução da OS',
     description: 'Pausa temporariamente a execução da OS',
@@ -143,6 +145,7 @@ export class ExecucaoOSController {
   }
 
   @Patch(':id/retomar')
+  @Permissions('execucao_os.manage', 'execucao_os.executar')
   @ApiOperation({
     summary: 'Retomar execução da OS',
     description: 'Retoma a execução de uma OS pausada',
@@ -166,6 +169,7 @@ export class ExecucaoOSController {
   }
 
   @Patch(':id/checklist')
+  @Permissions('execucao_os.manage', 'execucao_os.executar')
   @ApiOperation({
     summary: 'Atualizar checklist da OS',
     description: 'Atualiza o status das atividades do checklist',
@@ -180,11 +184,12 @@ export class ExecucaoOSController {
     @Body() dto: AtualizarChecklistDto,
     @CurrentUser() user?: any,
   ): Promise<{ message: string }> {
-    await this.execucaoOSService.atualizarChecklist(id.trim(), dto, user?.id);
+    await this.execucaoOSService.atualizarChecklist(id.trim(), dto, user?.id, user);
     return { message: 'Checklist atualizado com sucesso' };
   }
 
   @Patch(':id/materiais')
+  @Permissions('execucao_os.manage', 'execucao_os.executar')
   @ApiOperation({
     summary: 'Registrar consumo de materiais',
     description: 'Registra a quantidade consumida de materiais',
@@ -199,11 +204,12 @@ export class ExecucaoOSController {
     @Body() dto: RegistrarMateriaisDto,
     @CurrentUser() user?: any,
   ): Promise<{ message: string }> {
-    await this.execucaoOSService.registrarMateriais(id.trim(), dto, user?.id);
+    await this.execucaoOSService.registrarMateriais(id.trim(), dto, user?.id, user);
     return { message: 'Consumo de materiais registrado' };
   }
 
   @Patch(':id/ferramentas')
+  @Permissions('execucao_os.manage', 'execucao_os.executar')
   @ApiOperation({
     summary: 'Registrar uso de ferramentas',
     description: 'Registra o uso e condição das ferramentas',
@@ -218,7 +224,7 @@ export class ExecucaoOSController {
     @Body() dto: RegistrarFerramentasDto,
     @CurrentUser() user?: any,
   ): Promise<{ message: string }> {
-    await this.execucaoOSService.registrarFerramentas(id.trim(), dto, user?.id);
+    await this.execucaoOSService.registrarFerramentas(id.trim(), dto, user?.id, user);
     return { message: 'Uso de ferramentas registrado' };
   }
 
@@ -232,12 +238,13 @@ export class ExecucaoOSController {
     status: HttpStatus.OK,
     description: 'Lista de tarefas da OS',
   })
-  async listarTarefas(@Param('id') id: string) {
-    const os = await this.execucaoOSService.buscarPorId(id.trim());
+  async listarTarefas(@Param('id') id: string, @CurrentUser() user?: any) {
+    const os = await this.execucaoOSService.buscarPorId(id.trim(), user);
     return { tarefas: os.tarefas_os };
   }
 
   @Patch(':id/tarefas/:tarefaId/concluir')
+  @Permissions('execucao_os.manage', 'execucao_os.executar')
   @ApiOperation({
     summary: 'Concluir tarefa da OS',
     description: 'Marca uma tarefa específica como concluída',
@@ -254,11 +261,12 @@ export class ExecucaoOSController {
     @Body() dto: ConcluirTarefaDto,
     @CurrentUser() user?: any,
   ): Promise<{ message: string }> {
-    await this.execucaoOSService.concluirTarefa(id.trim(), tarefaId.trim(), dto, user?.id);
+    await this.execucaoOSService.concluirTarefa(id.trim(), tarefaId.trim(), dto, user?.id, user);
     return { message: 'Tarefa concluída com sucesso' };
   }
 
   @Patch(':id/tarefas/:tarefaId/cancelar')
+  @Permissions('execucao_os.manage', 'execucao_os.executar')
   @ApiOperation({
     summary: 'Cancelar tarefa da OS',
     description: 'Cancela uma tarefa específica da OS',
@@ -275,11 +283,12 @@ export class ExecucaoOSController {
     @Body() dto: CancelarTarefaDto,
     @CurrentUser() user?: any,
   ): Promise<{ message: string }> {
-    await this.execucaoOSService.cancelarTarefa(id.trim(), tarefaId.trim(), dto, user?.id);
+    await this.execucaoOSService.cancelarTarefa(id.trim(), tarefaId.trim(), dto, user?.id, user);
     return { message: 'Tarefa cancelada' };
   }
 
   @Patch(':id/tarefas/:tarefaId/reabrir')
+  @Permissions('execucao_os.manage', 'execucao_os.executar')
   @ApiOperation({
     summary: 'Reabrir tarefa da OS',
     description: 'Desfaz "feita" ou "não feita" enquanto a OS está em execução',
@@ -291,11 +300,12 @@ export class ExecucaoOSController {
     @Param('tarefaId') tarefaId: string,
     @CurrentUser() user?: any,
   ): Promise<{ message: string }> {
-    await this.execucaoOSService.reabrirTarefa(id.trim(), tarefaId.trim(), user?.id);
+    await this.execucaoOSService.reabrirTarefa(id.trim(), tarefaId.trim(), user?.id, user);
     return { message: 'Tarefa reaberta' };
   }
 
   @Post(':id/anexos')
+  @Permissions('execucao_os.manage', 'execucao_os.executar')
   @ApiOperation({
     summary: 'Adicionar anexo à OS',
     description: 'Faz upload de um arquivo anexo à OS',
@@ -315,14 +325,7 @@ export class ExecucaoOSController {
     @Query('tipo') tipo: TipoAnexoOS,
     @CurrentUser() user?: any,
   ): Promise<AnexoOSResponseDto> {
-    return this.anexosOSService.uploadAnexo(
-      id.trim(),
-      file,
-      tipo,
-      dto.descricao,
-      dto.fase_execucao,
-      user?.id,
-    );
+    return this.anexosOSService.uploadAnexo(id.trim(), file, tipo, dto.descricao, dto.fase_execucao, user);
   }
 
   @Get(':id/anexos')
@@ -336,8 +339,8 @@ export class ExecucaoOSController {
     description: 'Lista de anexos da OS',
     type: [AnexoOSResponseDto],
   })
-  async listarAnexos(@Param('id') id: string): Promise<AnexoOSResponseDto[]> {
-    return this.anexosOSService.listarAnexosOS(id.trim());
+  async listarAnexos(@Param('id') id: string, @CurrentUser() user?: any): Promise<AnexoOSResponseDto[]> {
+    return this.anexosOSService.listarAnexosOS(id.trim(), user);
   }
 
   @Get(':id/anexos/:anexoId')
@@ -355,8 +358,9 @@ export class ExecucaoOSController {
   async obterAnexo(
     @Param('id') id: string,
     @Param('anexoId') anexoId: string,
+    @CurrentUser() user?: any,
   ): Promise<AnexoOSResponseDto> {
-    return this.anexosOSService.buscarAnexo(anexoId.trim());
+    return this.anexosOSService.buscarAnexo(id.trim(), anexoId.trim(), user);
   }
 
   @Get(':id/anexos/:anexoId/download')
@@ -374,9 +378,10 @@ export class ExecucaoOSController {
     @Param('id') id: string,
     @Param('anexoId') anexoId: string,
     @Res({ passthrough: true }) res: Response,
+    @CurrentUser() user?: any,
   ): Promise<StreamableFile> {
-    const anexo = await this.anexosOSService.buscarAnexo(anexoId.trim());
-    const caminhoArquivo = await this.anexosOSService.obterCaminhoArquivo(anexoId.trim());
+    const anexo = await this.anexosOSService.buscarAnexo(id.trim(), anexoId.trim(), user);
+    const caminhoArquivo = await this.anexosOSService.obterCaminhoArquivo(id.trim(), anexoId.trim(), user);
 
     const file = fs.createReadStream(caminhoArquivo);
 
@@ -389,6 +394,7 @@ export class ExecucaoOSController {
   }
 
   @Delete(':id/anexos/:anexoId')
+  @Permissions('execucao_os.manage', 'execucao_os.executar')
   @ApiOperation({
     summary: 'Remover anexo',
     description: 'Remove um anexo da OS',
@@ -404,7 +410,7 @@ export class ExecucaoOSController {
     @Param('anexoId') anexoId: string,
     @CurrentUser() user?: any,
   ): Promise<{ message: string }> {
-    await this.anexosOSService.removerAnexo(anexoId.trim(), user?.id);
+    await this.anexosOSService.removerAnexo(id.trim(), anexoId.trim(), user);
     return { message: 'Anexo removido com sucesso' };
   }
 

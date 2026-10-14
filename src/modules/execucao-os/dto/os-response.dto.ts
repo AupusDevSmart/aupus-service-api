@@ -266,16 +266,16 @@ export class AnexoOSResponseDto {
   fase_execucao?: string;
 
   @ApiProperty({ description: 'Data de upload' })
-  uploaded_at: string;
+  uploaded_at: Date;
 
   @ApiPropertyOptional({ description: 'Quem fez upload' })
-  uploaded_by?: string;
+  uploaded_by?: string | null;
 
   @ApiPropertyOptional({ description: 'ID de quem fez upload' })
-  uploaded_by_id?: string;
+  uploaded_by_id?: string | null;
 
   @ApiPropertyOptional({ description: 'Data de exclusão' })
-  deletado_em?: string;
+  deletado_em?: Date | null;
 }
 
 export class RegistroTempoOSResponseDto {

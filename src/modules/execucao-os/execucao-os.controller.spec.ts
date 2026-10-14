@@ -249,7 +249,7 @@ describe('ExecucaoOSController', () => {
 
       const result = await controller.atualizarChecklist(id, dto);
 
-      expect(execucaoService.atualizarChecklist).toHaveBeenCalledWith(id, dto, undefined);
+      expect(execucaoService.atualizarChecklist).toHaveBeenCalledWith(id, dto, undefined, undefined);
       expect(result).toEqual({ message: 'Checklist atualizado com sucesso' });
     });
   });
@@ -271,7 +271,7 @@ describe('ExecucaoOSController', () => {
 
       const result = await controller.registrarMateriais(id, dto);
 
-      expect(execucaoService.registrarMateriais).toHaveBeenCalledWith(id, dto, undefined);
+      expect(execucaoService.registrarMateriais).toHaveBeenCalledWith(id, dto, undefined, undefined);
       expect(result).toEqual({ message: 'Consumo de materiais registrado' });
     });
   });
@@ -295,7 +295,7 @@ describe('ExecucaoOSController', () => {
 
       const result = await controller.registrarFerramentas(id, dto);
 
-      expect(execucaoService.registrarFerramentas).toHaveBeenCalledWith(id, dto, undefined);
+      expect(execucaoService.registrarFerramentas).toHaveBeenCalledWith(id, dto, undefined, undefined);
       expect(result).toEqual({ message: 'Uso de ferramentas registrado' });
     });
   });
@@ -326,7 +326,7 @@ describe('ExecucaoOSController', () => {
 
       const result = await controller.listarTarefas(id);
 
-      expect(execucaoService.buscarPorId).toHaveBeenCalledWith(id);
+      expect(execucaoService.buscarPorId).toHaveBeenCalledWith(id, undefined);
       expect(result).toEqual({ tarefas: mockTarefas });
     });
   });
@@ -345,7 +345,7 @@ describe('ExecucaoOSController', () => {
 
       const result = await controller.concluirTarefa(id, tarefaId, dto);
 
-      expect(execucaoService.concluirTarefa).toHaveBeenCalledWith(id, tarefaId, dto, undefined);
+      expect(execucaoService.concluirTarefa).toHaveBeenCalledWith(id, tarefaId, dto, undefined, undefined);
       expect(result).toEqual({ message: 'Tarefa concluída com sucesso' });
     });
   });
@@ -363,7 +363,7 @@ describe('ExecucaoOSController', () => {
 
       const result = await controller.cancelarTarefa(id, tarefaId, dto);
 
-      expect(execucaoService.cancelarTarefa).toHaveBeenCalledWith(id, tarefaId, dto, undefined);
+      expect(execucaoService.cancelarTarefa).toHaveBeenCalledWith(id, tarefaId, dto, undefined, undefined);
       expect(result).toEqual({ message: 'Tarefa cancelada' });
     });
   });
@@ -409,7 +409,7 @@ describe('ExecucaoOSController', () => {
 
         const result = await controller.listarAnexos(id);
 
-        expect(anexosService.listarAnexosOS).toHaveBeenCalledWith(id);
+        expect(anexosService.listarAnexosOS).toHaveBeenCalledWith(id, undefined);
         expect(result).toEqual(mockAnexos);
       });
     });
@@ -423,7 +423,7 @@ describe('ExecucaoOSController', () => {
 
         const result = await controller.obterAnexo(id, anexoId);
 
-        expect(anexosService.buscarAnexo).toHaveBeenCalledWith(anexoId);
+        expect(anexosService.buscarAnexo).toHaveBeenCalledWith(id, anexoId, undefined);
         expect(result).toEqual(mockAnexoResponse);
       });
     });
@@ -447,8 +447,8 @@ describe('ExecucaoOSController', () => {
 
         const result = await controller.downloadAnexo(id, anexoId, mockResponse);
 
-        expect(anexosService.buscarAnexo).toHaveBeenCalledWith(anexoId);
-        expect(anexosService.obterCaminhoArquivo).toHaveBeenCalledWith(anexoId);
+        expect(anexosService.buscarAnexo).toHaveBeenCalledWith(id, anexoId, undefined);
+        expect(anexosService.obterCaminhoArquivo).toHaveBeenCalledWith(id, anexoId, undefined);
         expect(mockResponse.set).toHaveBeenCalledWith({
           'Content-Type': mockAnexoResponse.mime_type,
           'Content-Disposition': `attachment; filename="${mockAnexoResponse.nome_original}"`,
@@ -466,7 +466,7 @@ describe('ExecucaoOSController', () => {
 
         const result = await controller.removerAnexo(id, anexoId);
 
-        expect(anexosService.removerAnexo).toHaveBeenCalledWith(anexoId, undefined);
+        expect(anexosService.removerAnexo).toHaveBeenCalledWith(id, anexoId, undefined);
         expect(result).toEqual({ message: 'Anexo removido com sucesso' });
       });
     });

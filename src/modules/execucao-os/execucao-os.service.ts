@@ -24,6 +24,7 @@ import { gerarNumeroOS } from '../../common/helpers/numeracao-os';
 import { Instalacao, instalacoesDasOrdens } from '../../common/helpers/instalacao-da-os';
 import { finalizarOrigem, origemDaProgramacao } from '../../common/helpers/status-da-origem';
 import { cancelarOS } from './cancelar-os';
+import { exigirOSAlteravel } from './os-alteravel';
 import { variantesDeId, variantesDeIds } from '../tarefas/ids';
 import { devolverViatura } from '../reservas/ocupacao-da-viatura';
 
@@ -747,7 +748,8 @@ export class ExecucaoOSService {
     });
   }
 
-  async atualizarChecklist(id: string, dto: AtualizarChecklistDto, usuarioId?: string): Promise<void> {
+  async atualizarChecklist(id: string, dto: AtualizarChecklistDto, usuarioId?: string, user?: ScopedUser): Promise<void> {
+    if (user) await this.scopeService.assertEntityInScope('ordem_servico', id, user);
     const os = await this.buscarPorId(id);
     this.exigirEmExecucao(os.status);
     const autor = await this.nomeDoUsuario(usuarioId);
@@ -771,18 +773,22 @@ export class ExecucaoOSService {
     });
   }
 
-  async registrarMateriais(id: string, dto: RegistrarMateriaisDto, usuarioId?: string): Promise<void> {
-    await this.buscarPorId(id); // Verificar se existe
+  async registrarMateriais(id: string, dto: RegistrarMateriaisDto, usuarioId?: string, user?: ScopedUser): Promise<void> {
+    if (user) await this.scopeService.assertEntityInScope('ordem_servico', id, user);
+    const os = await this.buscarPorId(id);
+    exigirOSAlteravel(os.status);
 
     await this.prisma.$transaction(async (prisma) => {
       for (const material of dto.materiais) {
-        await prisma.materiais_os.update({
-          where: { id: material.id },
+        // updateMany com os_id: o id de um material de outra OS não altera aquela OS
+        const { count } = await prisma.materiais_os.updateMany({
+          where: { id: material.id, os_id: id },
           data: {
             quantidade_consumida: material.quantidade_consumida,
             observacoes: material.observacoes,
           },
         });
+        if (count === 0) throw new NotFoundException(`Material ${material.id} não pertence a esta OS`);
       }
 
       // Registrar histórico
@@ -797,13 +803,15 @@ export class ExecucaoOSService {
     });
   }
 
-  async registrarFerramentas(id: string, dto: RegistrarFerramentasDto, usuarioId?: string): Promise<void> {
-    await this.buscarPorId(id); // Verificar se existe
+  async registrarFerramentas(id: string, dto: RegistrarFerramentasDto, usuarioId?: string, user?: ScopedUser): Promise<void> {
+    if (user) await this.scopeService.assertEntityInScope('ordem_servico', id, user);
+    const os = await this.buscarPorId(id);
+    exigirOSAlteravel(os.status);
 
     await this.prisma.$transaction(async (prisma) => {
       for (const ferramenta of dto.ferramentas) {
-        await prisma.ferramentas_os.update({
-          where: { id: ferramenta.id },
+        const { count } = await prisma.ferramentas_os.updateMany({
+          where: { id: ferramenta.id, os_id: id },
           data: {
             utilizada: ferramenta.utilizada,
             condicao_antes: ferramenta.condicao_antes,
@@ -811,6 +819,7 @@ export class ExecucaoOSService {
             observacoes: ferramenta.observacoes,
           },
         });
+        if (count === 0) throw new NotFoundException(`Ferramenta ${ferramenta.id} não pertence a esta OS`);
       }
 
       // Registrar histórico
@@ -825,7 +834,8 @@ export class ExecucaoOSService {
     });
   }
 
-  async concluirTarefa(id: string, tarefaId: string, dto: ConcluirTarefaDto, usuarioId?: string): Promise<void> {
+  async concluirTarefa(id: string, tarefaId: string, dto: ConcluirTarefaDto, usuarioId?: string, user?: ScopedUser): Promise<void> {
+    if (user) await this.scopeService.assertEntityInScope('ordem_servico', id, user);
     const os = await this.buscarPorId(id);
     this.exigirEmExecucao(os.status);
     const tarefa = await this.vinculoDaTarefa(id, tarefaId);
@@ -880,7 +890,8 @@ export class ExecucaoOSService {
     });
   }
 
-  async cancelarTarefa(id: string, tarefaId: string, dto: CancelarTarefaDto, usuarioId?: string): Promise<void> {
+  async cancelarTarefa(id: string, tarefaId: string, dto: CancelarTarefaDto, usuarioId?: string, user?: ScopedUser): Promise<void> {
+    if (user) await this.scopeService.assertEntityInScope('ordem_servico', id, user);
     const os = await this.buscarPorId(id);
     this.exigirEmExecucao(os.status);
     const tarefa = await this.vinculoDaTarefa(id, tarefaId);
@@ -911,7 +922,8 @@ export class ExecucaoOSService {
   }
 
   /** Desfaz "feita" ou "não feita" enquanto a OS está em execução (clique errado) */
-  async reabrirTarefa(id: string, tarefaId: string, usuarioId?: string): Promise<void> {
+  async reabrirTarefa(id: string, tarefaId: string, usuarioId?: string, user?: ScopedUser): Promise<void> {
+    if (user) await this.scopeService.assertEntityInScope('ordem_servico', id, user);
     const os = await this.buscarPorId(id);
     this.exigirEmExecucao(os.status);
     const tarefa = await this.vinculoDaTarefa(id, tarefaId);

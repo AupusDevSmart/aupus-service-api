@@ -529,13 +529,13 @@ describe('ExecucaoOSService', () => {
 
       mockPrismaService.$transaction.mockImplementation(mockTransaction);
       mockPrismaService.ordens_servico.findFirst.mockResolvedValue(mockOSData);
-      mockPrismaService.materiais_os.update.mockResolvedValue({});
+      mockPrismaService.materiais_os.updateMany.mockResolvedValue({ count: 1 });
       mockPrismaService.historico_os.create.mockResolvedValue({});
 
       await service.registrarMateriais('clrx1234567890123456789012', materiaisDto, 'user123');
 
-      expect(mockPrismaService.materiais_os.update).toHaveBeenCalledWith({
-        where: { id: materiaisDto.materiais[0].id },
+      expect(mockPrismaService.materiais_os.updateMany).toHaveBeenCalledWith({
+        where: { id: materiaisDto.materiais[0].id, os_id: 'clrx1234567890123456789012' },
         data: {
           quantidade_consumida: 5.5,
           observacoes: 'Consumo total',
@@ -564,13 +564,13 @@ describe('ExecucaoOSService', () => {
 
       mockPrismaService.$transaction.mockImplementation(mockTransaction);
       mockPrismaService.ordens_servico.findFirst.mockResolvedValue(mockOSData);
-      mockPrismaService.ferramentas_os.update.mockResolvedValue({});
+      mockPrismaService.ferramentas_os.updateMany.mockResolvedValue({ count: 1 });
       mockPrismaService.historico_os.create.mockResolvedValue({});
 
       await service.registrarFerramentas('clrx1234567890123456789012', ferramentasDto, 'user123');
 
-      expect(mockPrismaService.ferramentas_os.update).toHaveBeenCalledWith({
-        where: { id: ferramentasDto.ferramentas[0].id },
+      expect(mockPrismaService.ferramentas_os.updateMany).toHaveBeenCalledWith({
+        where: { id: ferramentasDto.ferramentas[0].id, os_id: 'clrx1234567890123456789012' },
         data: {
           utilizada: true,
           condicao_antes: 'Boa',
