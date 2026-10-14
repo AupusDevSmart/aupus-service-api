@@ -4,14 +4,14 @@ import { RolesService } from '../roles/roles.service';
 import { PermissionsService } from '../permissions/permissions.service';
 import { MailService } from '../../mail/mail.service';
 import { PrismaService } from '../../prisma/prisma.service';
-import { 
-  NotFoundException, 
-  ConflictException, 
-  BadRequestException 
+import {
+  NotFoundException,
+  ConflictException,
+  BadRequestException
 } from '@nestjs/common';
-import { 
-  CreateUsuarioDto, 
-  UpdateUsuarioDto, 
+import {
+  CreateUsuarioDto,
+  UpdateUsuarioDto,
   UsuarioQueryDto,
   ChangePasswordDto,
   ResetPasswordDto,
@@ -20,6 +20,7 @@ import {
   BulkAssignPermissionsDto
 } from './dto';
 import * as bcrypt from 'bcryptjs';
+import { customAlphabet } from 'nanoid';
 
 // Mock do bcrypt
 jest.mock('bcryptjs', () => ({
@@ -33,6 +34,8 @@ jest.mock('nanoid', () => ({
 }));
 
 describe('UsuariosService - Testes Completos com Roles e Permissions', () => {
+  // As operações em lote seguem a hierarquia de papéis; o topo passa por todas.
+  const chefe = { id: 'super-admin-id', role: 'super_admin', permissions: [] as string[] };
   let service: UsuariosService;
   let prisma: PrismaService;
   let rolesService: RolesService;
@@ -50,6 +53,7 @@ describe('UsuariosService - Testes Completos com Roles e Permissions', () => {
     },
     roles: {
       findMany: jest.fn(),
+      findFirst: jest.fn(),
       findUnique: jest.fn(),
     },
     permissions: {
@@ -73,6 +77,8 @@ describe('UsuariosService - Testes Completos com Roles e Permissions', () => {
     $transaction: jest.fn(),
     $queryRaw: jest.fn(),
   };
+
+  const mockMailService = { sendWelcomeEmail: jest.fn() };
 
   // Mock dos serviços
   const mockRolesService = {
@@ -138,10 +144,8 @@ describe('UsuariosService - Testes Completos com Roles e Permissions', () => {
           useValue: mockPermissionsService,
         },
         {
-          // UsuariosService injeta MailService no construtor mas nao chama nenhum
-          // metodo dele hoje — mock vazio basta para o Nest resolver a dependencia.
           provide: MailService,
-          useValue: {},
+          useValue: mockMailService,
         },
       ],
     }).compile();
@@ -152,7 +156,12 @@ describe('UsuariosService - Testes Completos com Roles e Permissions', () => {
     permissionsService = module.get<PermissionsService>(PermissionsService);
 
     // Reset mocks
-    jest.clearAllMocks();
+    // resetAllMocks, e não clearAllMocks: o clear deixa as respostas "Once" que
+    // um teste não consumiu para o próximo, e um teste quebrava o outro (SN-7).
+    jest.resetAllMocks();
+    (customAlphabet as jest.Mock).mockImplementation(() => () => 'mock-user-id-123456789012345678');
+    mockPrismaService.$transaction.mockImplementation(async (fn: (tx: unknown) => unknown) => fn(mockPrismaService));
+    mockMailService.sendWelcomeEmail.mockResolvedValue(undefined);
     (bcrypt.hash as jest.Mock).mockResolvedValue('hashed-password');
     (bcrypt.compare as jest.Mock).mockResolvedValue(true);
   });
@@ -178,7 +187,7 @@ describe('UsuariosService - Testes Completos com Roles e Permissions', () => {
 
       mockPrismaService.usuarios.findMany.mockResolvedValue([usuarioMock]);
       mockPrismaService.usuarios.count.mockResolvedValue(1);
-      
+
       // Mock para mapToUsuarioResponseDto
       mockPrismaService.model_has_roles.findFirst.mockResolvedValue({
         roles: {
@@ -201,10 +210,10 @@ describe('UsuariosService - Testes Completos com Roles e Permissions', () => {
           deleted_at: null,
           is_active: true,
           status: UsuarioStatus.ATIVO,
-          role: 'admin',
-          OR: expect.any(Array)
+          role: { equals: 'admin', mode: 'insensitive' },
+          AND: expect.any(Array)
         }),
-        orderBy: { created_at: 'desc' },
+        orderBy: [{ created_at: 'desc' }, { id: 'asc' }],
         skip: 0,
         take: 10,
       });
@@ -214,7 +223,7 @@ describe('UsuariosService - Testes Completos com Roles e Permissions', () => {
   describe('findOne', () => {
     it('should return user by id with permissions and roles', async () => {
       mockPrismaService.usuarios.findFirst.mockResolvedValue(usuarioMock);
-      
+
       // Mock para getUserPermissions
       mockPrismaService.model_has_roles.findFirst.mockResolvedValue({
         roles: {
@@ -243,56 +252,45 @@ describe('UsuariosService - Testes Completos com Roles e Permissions', () => {
   });
 
   describe('create', () => {
-    it('should create user with discovery of valid roles', async () => {
+    it('cria com o papel pedido, devolve a senha temporária e manda as boas-vindas', async () => {
       const createDto: CreateUsuarioDto = {
         nome: 'Novo Usuário',
         email: 'novo@teste.com',
-        status: UsuarioStatus.ATIVO
-      };
-
-      const createdUser = {
-        id: 'novo-usuario-id',
-        nome: 'Novo Usuário',
-        email: 'novo@teste.com',
         status: UsuarioStatus.ATIVO,
-        role: 'user',
-        created_at: new Date(),
-        updated_at: new Date(),
-        is_active: true,
-        senha: 'hashed-password'
+        roleNames: ['admin'],
       };
+      const createdUser = { ...usuarioMock, id: 'mock-user-id-123456789012345678', nome: 'Novo Usuário', email: 'novo@teste.com' };
 
-      // Mock das verificações
-      mockPrismaService.usuarios.findFirst.mockResolvedValueOnce(null); // Email não existe
-      mockPrismaService.$queryRaw.mockResolvedValue([]); // discoverValidRoles
-
-      // Mock do teste de roles
-      mockPrismaService.usuarios.create
-        .mockRejectedValueOnce(new Error('Invalid role')) // Falha com 'admin'
-        .mockResolvedValueOnce({ id: 'test-user-1', role: 'user' }) // Sucesso com 'user'
-        .mockResolvedValueOnce(createdUser); // Usuário real criado
-
-      mockPrismaService.usuarios.delete.mockResolvedValue({});
-
-      // Mock para mapToUsuarioResponseDto - usar dados do usuário criado
-      mockPrismaService.model_has_roles.findFirst.mockResolvedValue(null);
-      mockPrismaService.model_has_permissions.findMany.mockResolvedValue([]);
+      mockPrismaService.roles.findFirst.mockResolvedValue(rolesMock[0]);
+      mockPrismaService.usuarios.findFirst.mockImplementation(async ({ where }: { where: { id?: string } }) =>
+        where.id ? createdUser : null,
+      );
+      mockPrismaService.usuarios.create.mockResolvedValue(createdUser);
+      mockPrismaService.roles.findUnique.mockResolvedValue({ ...rolesMock[0], role_has_permissions: [] });
 
       const result = await service.create(createDto);
 
       expect(result.nome).toBe('Novo Usuário');
       expect(result.senhaTemporaria).toBe('Aupus123!');
       expect(result.primeiroAcesso).toBe(true);
-      expect(mockPrismaService.usuarios.create).toHaveBeenCalledTimes(3); // 2 testes + 1 real
+      expect(mockPrismaService.usuarios.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({ email: 'novo@teste.com', role: 'admin' }),
+      });
+      expect(mockPrismaService.model_has_roles.create).toHaveBeenCalledWith({
+        data: { role_id: BigInt(1), model_id: createdUser.id, model_type: 'App\\Models\\User' },
+      });
+      expect(mockMailService.sendWelcomeEmail).toHaveBeenCalledWith('novo@teste.com', 'Novo Usuário', 'Aupus123!');
     });
 
     it('should throw ConflictException when email already exists', async () => {
       const createDto: CreateUsuarioDto = {
         nome: 'Usuário Duplicado',
         email: 'existente@teste.com',
-        status: UsuarioStatus.ATIVO
+        status: UsuarioStatus.ATIVO,
+        roleNames: ['admin'],
       };
 
+      mockPrismaService.roles.findFirst.mockResolvedValue(rolesMock[0]);
       mockPrismaService.usuarios.findFirst.mockResolvedValue(usuarioMock);
 
       await expect(service.create(createDto)).rejects.toThrow(ConflictException);
@@ -410,7 +408,7 @@ describe('UsuariosService - Testes Completos com Roles e Permissions', () => {
   describe('getUserPermissions', () => {
     it('should return user permissions from role and direct', async () => {
       mockPrismaService.usuarios.findFirst.mockResolvedValue(usuarioMock);
-      
+
       // Mock role com permissions
       mockPrismaService.model_has_roles.findFirst.mockResolvedValue({
         roles: {
@@ -567,8 +565,8 @@ describe('UsuariosService - Testes Completos com Roles e Permissions', () => {
       mockPrismaService.model_has_permissions.findMany.mockResolvedValue([]);
 
       const result = await service.checkUserPermissions(
-        'usr_2024_test_12345', 
-        ['Dashboard', 'NonExistent'], 
+        'usr_2024_test_12345',
+        ['Dashboard', 'NonExistent'],
         'any'
       );
 
@@ -592,8 +590,8 @@ describe('UsuariosService - Testes Completos com Roles e Permissions', () => {
       mockPrismaService.model_has_permissions.findMany.mockResolvedValue([]);
 
       const result = await service.checkUserPermissions(
-        'usr_2024_test_12345', 
-        ['Dashboard', 'NonExistent'], 
+        'usr_2024_test_12345',
+        ['Dashboard', 'NonExistent'],
         'all'
       );
 
@@ -731,29 +729,21 @@ describe('UsuariosService - Testes Completos com Roles e Permissions', () => {
         ]
       };
 
-      // Mock successful assignments para ambos usuários
-      mockPrismaService.usuarios.findFirst
-        .mockResolvedValueOnce(usuarioMock) // user1 encontrado
-        .mockResolvedValueOnce({...usuarioMock, id: 'user2'}); // user2 encontrado
-
-      mockPrismaService.roles.findUnique
-        .mockResolvedValueOnce({
-          id: BigInt(1),
-          name: 'admin',
-          guard_name: 'web',
-          role_has_permissions: []
-        })
-        .mockResolvedValueOnce({
-          id: BigInt(2),
-          name: 'manager',
-          guard_name: 'web', 
-          role_has_permissions: []
-        });
+      mockPrismaService.usuarios.findFirst.mockImplementation(async ({ where }: { where: { id: string } }) => ({
+        ...usuarioMock,
+        id: where.id,
+      }));
+      mockPrismaService.roles.findUnique.mockImplementation(async ({ where }: { where: { id: bigint } }) => ({
+        id: where.id,
+        name: where.id === BigInt(1) ? 'admin' : 'manager',
+        guard_name: 'web',
+        role_has_permissions: [],
+      }));
 
       mockPrismaService.model_has_roles.deleteMany.mockResolvedValue({});
       mockPrismaService.model_has_roles.create.mockResolvedValue({});
 
-      const result = await service.bulkAssignRoles(bulkData);
+      const result = await service.bulkAssignRoles(bulkData, chefe);
 
       expect(result.success).toBe(2);
       expect(result.failures).toHaveLength(0);
@@ -767,15 +757,14 @@ describe('UsuariosService - Testes Completos com Roles e Permissions', () => {
         ]
       };
 
-      // Mock failures
-      mockPrismaService.usuarios.findFirst
-        .mockResolvedValueOnce(null) // User not found
-        .mockResolvedValueOnce(usuarioMock); // User found
-      mockPrismaService.roles.findUnique
-        .mockResolvedValueOnce(rolesMock[0]) // Won't be called for first
-        .mockResolvedValueOnce(null); // Role not found
+      mockPrismaService.usuarios.findFirst.mockImplementation(async ({ where }: { where: { id: string } }) =>
+        where.id === 'invalid-user' ? null : usuarioMock,
+      );
+      mockPrismaService.roles.findUnique.mockImplementation(async ({ where }: { where: { id: bigint } }) =>
+        where.id === BigInt(1) ? { ...rolesMock[0], role_has_permissions: [] } : null,
+      );
 
-      const result = await service.bulkAssignRoles(bulkData);
+      const result = await service.bulkAssignRoles(bulkData, chefe);
 
       expect(result.success).toBe(0);
       expect(result.failures).toHaveLength(2);
@@ -792,13 +781,14 @@ describe('UsuariosService - Testes Completos com Roles e Permissions', () => {
       };
 
       mockPrismaService.usuarios.findFirst.mockResolvedValue(usuarioMock);
-      mockPrismaService.permissions.findMany.mockResolvedValue([
-        permissionsMock[0], permissionsMock[1]
-      ]);
+      mockPrismaService.permissions.findMany.mockImplementation(async ({ where }: { where: { id: { in: bigint[] } } }) =>
+        permissionsMock.filter((p) => where.id.in.includes(p.id)),
+      );
+      mockPrismaService.model_has_permissions.findMany.mockResolvedValue([]);
       mockPrismaService.model_has_permissions.deleteMany.mockResolvedValue({});
       mockPrismaService.model_has_permissions.createMany.mockResolvedValue({});
 
-      const result = await service.bulkAssignPermissions(bulkData);
+      const result = await service.bulkAssignPermissions(bulkData, chefe);
 
       expect(result.success).toBe(2);
       expect(result.failures).toHaveLength(0);
@@ -919,8 +909,8 @@ describe('UsuariosService - Testes Completos com Roles e Permissions', () => {
       const emptyBulkRoles: BulkAssignRolesDto = { assignments: [] };
       const emptyBulkPermissions: BulkAssignPermissionsDto = { assignments: [] };
 
-      const rolesResult = await service.bulkAssignRoles(emptyBulkRoles);
-      const permissionsResult = await service.bulkAssignPermissions(emptyBulkPermissions);
+      const rolesResult = await service.bulkAssignRoles(emptyBulkRoles, chefe);
+      const permissionsResult = await service.bulkAssignPermissions(emptyBulkPermissions, chefe);
 
       expect(rolesResult.success).toBe(0);
       expect(rolesResult.failures).toHaveLength(0);

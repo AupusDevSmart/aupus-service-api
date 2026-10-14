@@ -40,6 +40,14 @@ describe('Importação de usuários (banco real)', () => {
       });
     operadorId = (await papel('operador')).id;
     await papel('admin');
+    // A hierarquia só cobra usuarios.create_<papel> se ela existe no catálogo.
+    for (const name of ['usuarios.create_operador', 'usuarios.create_admin']) {
+      await prisma.permissions.upsert({
+        where: { name_guard_name: { name, guard_name: 'api' } },
+        update: {},
+        create: { name, guard_name: 'api' },
+      });
+    }
     permissaoDoOperador = (
       await prisma.permissions.upsert({
         where: { name_guard_name: { name: 'teste_importacao.ver', guard_name: 'api' } },
@@ -113,7 +121,7 @@ describe('Importação de usuários (banco real)', () => {
     expect(correio.sendWelcomeEmail).not.toHaveBeenCalled();
   });
 
-  it('confirmar cria com o papel e as permissões do papel, e só então manda o e-mail', async () => {
+  it('confirmar cria com o papel (as permissões vêm dele, sem cópia direta), e só então manda o e-mail', async () => {
     const r = await importacao.importar(usuarios, [linha()], true, admin);
 
     expect(r).toMatchObject({ confirmado: true, novos: 1 });
@@ -121,7 +129,7 @@ describe('Importação de usuários (banco real)', () => {
     const papel = await prisma.model_has_roles.findFirst({ where: { model_id: u.id } });
     const diretas = await prisma.model_has_permissions.findMany({ where: { model_id: u.id } });
     expect(papel?.role_id).toBe(operadorId);
-    expect(diretas.map((d) => d.permission_id)).toEqual([permissaoDoOperador]);
+    expect(diretas).toEqual([]);
     expect(correio.sendWelcomeEmail).toHaveBeenCalledWith(`fulano${DOMINIO}`, 'Fulano de Teste', expect.any(String));
   });
 
@@ -138,6 +146,9 @@ describe('Importação de usuários (banco real)', () => {
   it('trocar o tipo de quem existe avisa e não mexe nas permissões diretas', async () => {
     await importacao.importar(usuarios, [linha()], true, admin);
     const id = (await doBanco())!.id.trim();
+    await prisma.model_has_permissions.create({
+      data: { model_id: id, model_type: 'App\\Models\\User', permission_id: permissaoDoOperador },
+    });
 
     const r = await importacao.importar(usuarios, [linha({ tipo: 'admin' }, id)], true, admin);
 

@@ -30,9 +30,9 @@ const COLUNAS: Record<string, keyof usuarios> = {
  *
  * - O TIPO (papel) entra pelo nome do papel. Trocar exige poder criar usuário
  *   daquele papel (`usuarios.create_<papel>`) — a mesma hierarquia da criação.
- * - Permissões diretas NÃO passam pela planilha. Usuário novo recebe as do
- *   papel, como o formulário marca sozinho; trocar o TIPO de quem já existe
- *   não mexe nelas, e a prévia avisa.
+ * - Permissões diretas NÃO passam pela planilha. Usuário novo fica só com as
+ *   do papel (que vêm do papel e não viram diretas); trocar o TIPO de quem já
+ *   existe não mexe nas diretas dele, e a prévia avisa.
  * - Senha nunca passa pela planilha: o usuário novo segue o fluxo da tela
  *   (senha provisória e e-mail de boas-vindas, que só sai depois de confirmar).
  * - Plantas que um operador opera ficam na tela de operadores.
@@ -64,7 +64,7 @@ export class UsuariosImportacao implements CadastroImportavel<usuarios> {
     return alvo;
   }
 
-  /** O TIPO (nome do papel) → `roleId`; e, no usuário novo, as permissões do papel. */
+  /** O TIPO (nome do papel) → `roleId`. */
   async prepararDados(dados: Record<string, unknown>, _usuario: UsuarioDaImportacao, atual: usuarios | null) {
     const { tipo, ...lidos } = dados;
     const resto = semOQueNaoMudou(lidos, atual, COLUNAS);
@@ -83,9 +83,7 @@ export class UsuariosImportacao implements CadastroImportavel<usuarios> {
     });
     if (!papel) throw ErrosDaLinha.em('tipo', `Não existe o tipo de usuário "${texto}".`);
 
-    const comPapel: Record<string, unknown> = { ...resto, roleId: Number(papel.id) };
-    if (!atual) comPapel.permissionIds = await this.permissoesDoPapel(papel.id);
-    return comPapel;
+    return { ...resto, roleId: Number(papel.id) };
   }
 
   async autorizar(usuario: UsuarioDaImportacao, dto: object, atual: usuarios | null) {
@@ -96,11 +94,10 @@ export class UsuariosImportacao implements CadastroImportavel<usuarios> {
     const { roleId } = dto as UpdateUsuarioDto;
     if (!roleId) return;
 
+    // A mesma hierarquia do formulário (hierarquia-de-papeis.ts), com o motivo na coluna TIPO.
     const papel = await this.prisma.roles.findUniqueOrThrow({ where: { id: BigInt(roleId) } });
-    const exigida = `usuarios.create_${papel.name}`;
-    if (!usuario.permissions.includes(exigida)) {
-      throw ErrosDaLinha.em('tipo', `Você não tem permissão para dar o tipo "${papel.name}" a um usuário. Requer: ${exigida}.`);
-    }
+    const motivo = await this.usuarios.motivoParaNaoLidarComPapel(usuario, papel.name, 'dar o tipo');
+    if (motivo) throw ErrosDaLinha.em('tipo', motivo);
   }
 
   async criar(dto: object, usuario: UsuarioDaImportacao) {
@@ -158,27 +155,6 @@ export class UsuariosImportacao implements CadastroImportavel<usuarios> {
     });
     if (vinculo) return vinculo.roles.name;
     return (await this.prisma.usuarios.findUnique({ where: { id }, select: { role: true } }))?.role ?? null;
-  }
-
-  /**
-   * As permissões que o formulário marca sozinho ao escolher o papel: as do
-   * papel, pelo nome, cada uma no primeiro id que tem esse nome (é o que a
-   * tela faz ao converter nome em id).
-   */
-  private async permissoesDoPapel(papelId: bigint): Promise<number[]> {
-    const doPapel = await this.prisma.role_has_permissions.findMany({
-      where: { role_id: papelId },
-      include: { permissions: { select: { name: true } } },
-    });
-    const nomes = [...new Set(doPapel.map((p) => p.permissions.name))];
-    const permissoes = await this.prisma.permissions.findMany({
-      where: { name: { in: nomes } },
-      orderBy: { id: 'asc' },
-      select: { id: true, name: true },
-    });
-    const primeiraPorNome = new Map<string, number>();
-    for (const p of permissoes) if (!primeiraPorNome.has(p.name)) primeiraPorNome.set(p.name, Number(p.id));
-    return [...primeiraPorNome.values()];
   }
 
   /** Como a listagem decide: pela coluna legada `role`. */

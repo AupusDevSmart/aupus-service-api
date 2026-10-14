@@ -10,4 +10,4 @@ export * from './assign-permission.dto';
 export * from './sync-permissions.dto';
 export * from './bulk-operations.dto';
 export * from './check-permissions.dto';
-export * from './user-permissions-response.dto';
+export * from './user-permissions-response.dto';export * from './atualizar-perfil.dto';

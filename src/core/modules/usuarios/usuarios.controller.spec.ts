@@ -12,6 +12,7 @@ import {
 } from './dto';
 
 describe('UsuariosController', () => {
+  const quem = { id: '1', role: 'admin', permissions: ['usuarios.manage'] };
   let controller: UsuariosController;
   let service: UsuariosService;
 
@@ -84,9 +85,9 @@ describe('UsuariosController', () => {
 
       mockUsuariosService.findAll.mockResolvedValue(expectedResult);
 
-      const result = await controller.findAll(query);
+      const result = await controller.findAll(query, quem);
 
-      expect(service.findAll).toHaveBeenCalledWith(query);
+      expect(service.findAll).toHaveBeenCalledWith(query, quem.id);
       expect(result).toEqual(expectedResult);
     });
 
@@ -102,9 +103,9 @@ describe('UsuariosController', () => {
 
       mockUsuariosService.findAll.mockResolvedValue(expectedResult);
 
-      const result = await controller.findAll(query);
+      const result = await controller.findAll(query, quem);
 
-      expect(service.findAll).toHaveBeenCalledWith(query);
+      expect(service.findAll).toHaveBeenCalledWith(query, quem.id);
       expect(result).toEqual(expectedResult);
     });
   });
@@ -165,9 +166,9 @@ describe('UsuariosController', () => {
 
       mockUsuariosService.create.mockResolvedValue(expectedUser);
 
-      const result = await controller.create(createUserDto);
+      const result = await controller.create(createUserDto, quem);
 
-      expect(service.create).toHaveBeenCalledWith(createUserDto);
+      expect(service.create).toHaveBeenCalledWith(createUserDto, quem);
       expect(result).toEqual(expectedUser);
     });
 
@@ -182,8 +183,8 @@ describe('UsuariosController', () => {
 
       mockUsuariosService.create.mockRejectedValue(new Error('Email já está em uso'));
 
-      await expect(controller.create(createUserDto)).rejects.toThrow('Email já está em uso');
-      expect(service.create).toHaveBeenCalledWith(createUserDto);
+      await expect(controller.create(createUserDto, quem)).rejects.toThrow('Email já está em uso');
+      expect(service.create).toHaveBeenCalledWith(createUserDto, quem);
     });
   });
 
@@ -207,9 +208,9 @@ describe('UsuariosController', () => {
 
       mockUsuariosService.update.mockResolvedValue(expectedUser);
 
-      const result = await controller.update(userId, updateUserDto);
+      const result = await controller.update(userId, updateUserDto, quem);
 
-      expect(service.update).toHaveBeenCalledWith(userId, updateUserDto);
+      expect(service.update).toHaveBeenCalledWith(userId, updateUserDto, quem);
       expect(result).toEqual(expectedUser);
     });
 
@@ -221,8 +222,8 @@ describe('UsuariosController', () => {
 
       mockUsuariosService.update.mockRejectedValue(new Error('Usuário não encontrado'));
 
-      await expect(controller.update(userId, updateUserDto)).rejects.toThrow('Usuário não encontrado');
-      expect(service.update).toHaveBeenCalledWith(userId, updateUserDto);
+      await expect(controller.update(userId, updateUserDto, quem)).rejects.toThrow('Usuário não encontrado');
+      expect(service.update).toHaveBeenCalledWith(userId, updateUserDto, quem);
     });
   });
 
@@ -236,9 +237,9 @@ describe('UsuariosController', () => {
 
       mockUsuariosService.remove.mockResolvedValue(expectedResult);
 
-      const result = await controller.remove(userId);
+      const result = await controller.remove(userId, quem);
 
-      expect(service.remove).toHaveBeenCalledWith(userId);
+      expect(service.remove).toHaveBeenCalledWith(userId, quem);
       expect(result).toEqual(expectedResult);
     });
 
@@ -246,8 +247,8 @@ describe('UsuariosController', () => {
       const userId = 'non-existent';
       mockUsuariosService.remove.mockRejectedValue(new Error('Usuário não encontrado'));
 
-      await expect(controller.remove(userId)).rejects.toThrow('Usuário não encontrado');
-      expect(service.remove).toHaveBeenCalledWith(userId);
+      await expect(controller.remove(userId, quem)).rejects.toThrow('Usuário não encontrado');
+      expect(service.remove).toHaveBeenCalledWith(userId, quem);
     });
   });
 
@@ -265,9 +266,9 @@ describe('UsuariosController', () => {
 
       mockUsuariosService.changePassword.mockResolvedValue(expectedResult);
 
-      const result = await controller.changePassword(userId, changePasswordDto);
+      const result = await controller.changePassword(userId, changePasswordDto, quem);
 
-      expect(service.changePassword).toHaveBeenCalledWith(userId, changePasswordDto);
+      expect(service.changePassword).toHaveBeenCalledWith(userId, changePasswordDto, quem);
       expect(result).toEqual(expectedResult);
     });
 
@@ -280,8 +281,8 @@ describe('UsuariosController', () => {
 
       mockUsuariosService.changePassword.mockRejectedValue(new Error('Senha atual incorreta'));
 
-      await expect(controller.changePassword(userId, changePasswordDto)).rejects.toThrow('Senha atual incorreta');
-      expect(service.changePassword).toHaveBeenCalledWith(userId, changePasswordDto);
+      await expect(controller.changePassword(userId, changePasswordDto, quem)).rejects.toThrow('Senha atual incorreta');
+      expect(service.changePassword).toHaveBeenCalledWith(userId, changePasswordDto, quem);
     });
   });
 
@@ -299,9 +300,9 @@ describe('UsuariosController', () => {
 
       mockUsuariosService.resetPassword.mockResolvedValue(expectedResult);
 
-      const result = await controller.resetPassword(userId, resetPasswordDto);
+      const result = await controller.resetPassword(userId, resetPasswordDto, quem);
 
-      expect(service.resetPassword).toHaveBeenCalledWith(userId, resetPasswordDto);
+      expect(service.resetPassword).toHaveBeenCalledWith(userId, resetPasswordDto, quem);
       expect(result).toEqual(expectedResult);
     });
 
@@ -314,8 +315,8 @@ describe('UsuariosController', () => {
 
       mockUsuariosService.resetPassword.mockRejectedValue(new Error('Senhas não coincidem'));
 
-      await expect(controller.resetPassword(userId, resetPasswordDto)).rejects.toThrow('Senhas não coincidem');
-      expect(service.resetPassword).toHaveBeenCalledWith(userId, resetPasswordDto);
+      await expect(controller.resetPassword(userId, resetPasswordDto, quem)).rejects.toThrow('Senhas não coincidem');
+      expect(service.resetPassword).toHaveBeenCalledWith(userId, resetPasswordDto, quem);
     });
   });
 });

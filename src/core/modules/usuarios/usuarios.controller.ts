@@ -12,6 +12,7 @@ import {
   HttpStatus,
   UploadedFile,
   UseInterceptors,
+  ForbiddenException,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -40,8 +41,10 @@ import {
   BulkAssignRolesDto,
   BulkAssignPermissionsDto,
   CheckPermissionDto,
-  CheckMultiplePermissionsDto
+  CheckMultiplePermissionsDto,
+  AtualizarPerfilDto,
 } from './dto';
+import { Solicitante, mesmoUsuario } from './hierarquia-de-papeis';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { Permissions } from '../auth/decorators/permissions.decorator';
 
@@ -99,64 +102,6 @@ export class UsuariosController {
     return this.usuariosService.getAvailablePermissionsGrouped();
   }
 
-  @Get('debug/constraint-values')
-  @ApiOperation({ summary: 'Descobrir valores válidos do constraint role' })
-  @ApiResponse({
-    status: 200,
-    description: 'Valores válidos do constraint role',
-    schema: {
-      type: 'object',
-      properties: {
-        validValues: {
-          type: 'array',
-          items: { type: 'string' }
-        }
-      }
-    }
-  })
-  async getValidRoleConstraintValues() {
-    const validValues = await this.usuariosService.getValidRoleConstraintValues();
-    return { validValues };
-  }
-
-  @Get('debug/user-permissions/:userId')
-  @ApiOperation({
-    summary: 'Debug - Verificar estado das permissões do usuário',
-    description: 'Endpoint para debugging - mostra dados brutos de roles e permissions'
-  })
-  @ApiParam({ name: 'userId', description: 'ID do usuário' })
-  @ApiResponse({
-    status: 200,
-    description: 'Dados de debug das permissões'
-  })
-  debugUserPermissionsNew(@Param('userId') userId: string) {
-    return this.usuariosService.debugUserPermissions(userId);
-  }
-
-  @Get('debug-permissions/:id')
-  @ApiOperation({
-    summary: 'Debug - Verificar estado das permissões do usuário',
-    description: 'Endpoint para debugging - mostra dados brutos de roles e permissions'
-  })
-  @ApiParam({ name: 'id', description: 'ID do usuário' })
-  @ApiResponse({
-    status: 200,
-    description: 'Dados de debug das permissões',
-    schema: {
-      type: 'object',
-      properties: {
-        userId: { type: 'string' },
-        basicData: { type: 'object' },
-        spatieData: { type: 'object' },
-        processedResult: { type: 'object' },
-        counts: { type: 'object' }
-      }
-    }
-  })
-  debugUserPermissions(@Param('id') id: string) {
-    return this.usuariosService.debugUserPermissions(id);
-  }
-
   // ============================================================================
   // ENDPOINTS BÁSICOS DE USUÁRIO
   // ============================================================================
@@ -172,18 +117,14 @@ export class UsuariosController {
   async findAll(@Query() query: UsuarioQueryDto, @CurrentUser() currentUser?: any) {
     const requestingUserId = currentUser?.id;
 
-    const result = await this.usuariosService.findAll(query, requestingUserId);
+    return this.usuariosService.findAll(query, requestingUserId);
+  }
 
-    // Adicionar debug na response
-    return {
-      ...result,
-      _debug: {
-        currentUserExists: !!currentUser,
-        currentUserId: requestingUserId,
-        currentUserEmail: currentUser?.email,
-        currentUserRole: currentUser?.role
-      }
-    };
+  @Patch('me')
+  @ApiOperation({ summary: 'O próprio usuário atualiza o perfil (sem tipo, permissões nem status)' })
+  @ApiResponse({ status: 200, description: 'Perfil atualizado' })
+  atualizarPerfil(@Body() dto: AtualizarPerfilDto, @CurrentUser() currentUser: Solicitante) {
+    return this.usuariosService.atualizarPerfil(currentUser.id, dto);
   }
 
   @Get(':id')
@@ -203,19 +144,7 @@ export class UsuariosController {
   @ApiResponse({ status: 201, description: 'Usuário criado com sucesso' })
   @ApiResponse({ status: 400, description: 'Dados inválidos' })
   @ApiResponse({ status: 409, description: 'Email já está em uso' })
-  create(@Body() createUsuarioDto: CreateUsuarioDto, @CurrentUser() currentUser?: any) {
-    console.log('🔍 [CONTROLLER] Body recebido (RAW):', JSON.stringify(createUsuarioDto, null, 2));
-    console.log('🔍 [CONTROLLER] Tipo do body:', typeof createUsuarioDto);
-    console.log('🔍 [CONTROLLER] Keys do body:', Object.keys(createUsuarioDto || {}));
-    console.log('🔍 [CONTROLLER] Valores:', {
-      nome: createUsuarioDto?.nome,
-      email: createUsuarioDto?.email,
-      telefone: createUsuarioDto?.telefone
-    });
-
-    console.log('👤 [CONTROLLER] Current User completo:', currentUser);
-    console.log('🔑 [CONTROLLER] Creating User ID:', currentUser?.id);
-
+  create(@Body() createUsuarioDto: CreateUsuarioDto, @CurrentUser() currentUser: Solicitante) {
     return this.usuariosService.create(createUsuarioDto, currentUser);
   }
 
@@ -255,11 +184,13 @@ export class UsuariosController {
   changePassword(
     @Param('id') id: string,
     @Body() changePasswordDto: ChangePasswordDto,
+    @CurrentUser() currentUser: Solicitante,
   ) {
-    return this.usuariosService.changePassword(id, changePasswordDto);
+    return this.usuariosService.changePassword(id, changePasswordDto, currentUser);
   }
 
   @Patch(':id/reset-password')
+  @Permissions('usuarios.manage')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Resetar senha do usuário' })
   @ApiParam({ name: 'id', description: 'ID do usuário' })
@@ -267,8 +198,9 @@ export class UsuariosController {
   resetPassword(
     @Param('id') id: string,
     @Body() resetPasswordDto: ResetPasswordDto,
+    @CurrentUser() currentUser: Solicitante,
   ) {
-    return this.usuariosService.resetPassword(id, resetPasswordDto);
+    return this.usuariosService.resetPassword(id, resetPasswordDto, currentUser);
   }
 
   @Post(':id/upload-avatar')
@@ -312,8 +244,9 @@ export class UsuariosController {
   uploadAvatar(
     @Param('id') id: string,
     @UploadedFile() file: Express.Multer.File,
+    @CurrentUser() currentUser: Solicitante,
   ) {
-    return this.usuariosService.updateAvatar(id, file.filename);
+    return this.usuariosService.updateAvatar(id, file.filename, currentUser);
   }
 
   // ============================================================================
@@ -329,7 +262,8 @@ export class UsuariosController {
     type: UserPermissionsResponseDto
   })
   @ApiResponse({ status: 404, description: 'Usuário não encontrado' })
-  getUserPermissions(@Param('id') id: string) {
+  getUserPermissions(@Param('id') id: string, @CurrentUser() currentUser: Solicitante) {
+    this.exigirProprioOuVer(currentUser, id);
     return this.usuariosService.getUserPermissions(id);
   }
 
@@ -342,7 +276,8 @@ export class UsuariosController {
     type: UserPermissionsResponseDto 
   })
   @ApiResponse({ status: 404, description: 'Usuário não encontrado' })
-  getUserPermissionsDetailed(@Param('id') id: string) {
+  getUserPermissionsDetailed(@Param('id') id: string, @CurrentUser() currentUser: Solicitante) {
+    this.exigirProprioOuVer(currentUser, id);
     return this.usuariosService.getUserPermissionsDetailed(id);
   }
 
@@ -355,7 +290,8 @@ export class UsuariosController {
     type: UserPermissionsSummaryDto 
   })
   @ApiResponse({ status: 404, description: 'Usuário não encontrado' })
-  getUserPermissionsSummary(@Param('id') id: string) {
+  getUserPermissionsSummary(@Param('id') id: string, @CurrentUser() currentUser: Solicitante) {
+    this.exigirProprioOuVer(currentUser, id);
     return this.usuariosService.getUserPermissionsSummary(id);
   }
 
@@ -368,7 +304,8 @@ export class UsuariosController {
     type: CategorizedPermissionsDto 
   })
   @ApiResponse({ status: 404, description: 'Usuário não encontrado' })
-  getUserPermissionsCategorized(@Param('id') id: string) {
+  getUserPermissionsCategorized(@Param('id') id: string, @CurrentUser() currentUser: Solicitante) {
+    this.exigirProprioOuVer(currentUser, id);
     return this.usuariosService.getUserPermissionsCategorized(id);
   }
 
@@ -390,7 +327,9 @@ export class UsuariosController {
   checkUserPermission(
     @Param('id') id: string,
     @Body() checkPermissionDto: CheckPermissionDto,
+    @CurrentUser() currentUser: Solicitante,
   ) {
+    this.exigirProprioOuVer(currentUser, id);
     return this.usuariosService.checkUserPermission(id, checkPermissionDto.permissionName);
   }
 
@@ -416,7 +355,9 @@ export class UsuariosController {
   checkUserPermissions(
     @Param('id') id: string,
     @Body() checkMultipleDto: CheckMultiplePermissionsDto,
+    @CurrentUser() currentUser: Solicitante,
   ) {
+    this.exigirProprioOuVer(currentUser, id);
     return this.usuariosService.checkUserPermissions(
       id, 
       checkMultipleDto.permissionNames, 
@@ -444,8 +385,9 @@ export class UsuariosController {
   assignRole(
     @Param('id') id: string,
     @Body() assignRoleDto: AssignRoleDto,
+    @CurrentUser() currentUser: Solicitante,
   ) {
-    return this.usuariosService.assignRole(id, assignRoleDto.roleId);
+    return this.usuariosService.atribuirPapel(id, assignRoleDto.roleId, currentUser);
   }
 
   @Post(':id/assign-permission')
@@ -469,8 +411,9 @@ export class UsuariosController {
   assignPermission(
     @Param('id') id: string,
     @Body() assignPermissionDto: AssignPermissionDto,
+    @CurrentUser() currentUser: Solicitante,
   ) {
-    return this.usuariosService.assignPermission(id, assignPermissionDto.permissionId);
+    return this.usuariosService.atribuirPermissao(id, assignPermissionDto.permissionId, currentUser);
   }
 
   @Delete(':id/remove-permission/:permissionId')
@@ -493,8 +436,9 @@ export class UsuariosController {
   removePermission(
     @Param('id') id: string,
     @Param('permissionId') permissionId: string,
+    @CurrentUser() currentUser: Solicitante,
   ) {
-    return this.usuariosService.removePermission(id, parseInt(permissionId));
+    return this.usuariosService.removerPermissao(id, parseInt(permissionId), currentUser);
   }
 
   @Post(':id/sync-permissions')
@@ -521,8 +465,9 @@ export class UsuariosController {
   syncUserPermissions(
     @Param('id') id: string,
     @Body() syncPermissionsDto: SyncPermissionsDto,
+    @CurrentUser() currentUser: Solicitante,
   ) {
-    return this.usuariosService.syncUserPermissions(id, syncPermissionsDto.permissionIds);
+    return this.usuariosService.sincronizarPermissoesDiretas(id, syncPermissionsDto.permissionIds, currentUser);
   }
 
   // ============================================================================
@@ -547,8 +492,8 @@ export class UsuariosController {
       }
     }
   })
-  bulkAssignRoles(@Body() bulkData: BulkAssignRolesDto) {
-    return this.usuariosService.bulkAssignRoles(bulkData);
+  bulkAssignRoles(@Body() bulkData: BulkAssignRolesDto, @CurrentUser() currentUser: Solicitante) {
+    return this.usuariosService.bulkAssignRoles(bulkData, currentUser);
   }
 
   @Post('bulk/assign-permissions')
@@ -569,8 +514,8 @@ export class UsuariosController {
       }
     }
   })
-  bulkAssignPermissions(@Body() bulkData: BulkAssignPermissionsDto) {
-    return this.usuariosService.bulkAssignPermissions(bulkData);
+  bulkAssignPermissions(@Body() bulkData: BulkAssignPermissionsDto, @CurrentUser() currentUser: Solicitante) {
+    return this.usuariosService.bulkAssignPermissions(bulkData, currentUser);
   }
 
   @Post('sync/legacy-roles')
@@ -594,57 +539,17 @@ export class UsuariosController {
       }
     }
   })
-  syncLegacyRoles() {
+  syncLegacyRoles(@CurrentUser() currentUser: Solicitante) {
+    // A coluna legada pode trazer qualquer papel (até super_admin): só o topo migra.
+    if (currentUser.role !== 'super_admin') {
+      throw new ForbiddenException('Só super_admin migra os papéis legados.');
+    }
     return this.usuariosService.syncLegacyRolesToSpatie();
   }
 
-  // ============================================================================
-  // ENDPOINT DE TESTE (pode remover em produção)
-  // ============================================================================
-
-  @Post('test-simple')
-  @ApiOperation({ summary: 'Endpoint de teste simples' })
-  @ApiResponse({
-    status: 200,
-    description: 'Teste realizado com sucesso'
-  })
-  testSimple(@Body() body: any) {
-    console.log('🔥 TESTE SIMPLES - Chegou no controller!');
-    console.log('📝 Body recebido:', JSON.stringify(body, null, 2));
-    console.log('📝 Tipo:', typeof body);
-    console.log('📝 Keys:', Object.keys(body || {}));
-    return {
-      message: 'Controller funcionando!',
-      receivedData: body,
-      keys: Object.keys(body || {}),
-      tipo: typeof body
-    };
-  }
-
-  @Post('test-create-user')
-  @ApiOperation({ summary: 'Endpoint de teste para criar usuário SEM validação' })
-  @ApiResponse({
-    status: 200,
-    description: 'Teste realizado com sucesso'
-  })
-  testCreateUser(@Body() body: any, @CurrentUser() currentUser?: any) {
-    console.log('🔥 TESTE CREATE USER - Chegou no controller!');
-    console.log('📝 Body recebido (RAW):', JSON.stringify(body, null, 2));
-    console.log('📝 Current User:', currentUser);
-    console.log('📝 Keys do body:', Object.keys(body || {}));
-
-    return {
-      message: 'Dados recebidos com sucesso!',
-      receivedBody: body,
-      bodyKeys: Object.keys(body || {}),
-      currentUser: currentUser,
-      analysis: {
-        hasNome: 'nome' in (body || {}),
-        hasEmail: 'email' in (body || {}),
-        hasTelefone: 'telefone' in (body || {}),
-        nomeValue: body?.nome,
-        emailValue: body?.email
-      }
-    };
+  /** As permissões de alguém: o próprio, ou quem pode ver usuários. */
+  private exigirProprioOuVer(currentUser: Solicitante, id: string) {
+    if (mesmoUsuario(currentUser.id, id) || currentUser.permissions.includes('usuarios.view')) return;
+    throw new ForbiddenException('Você não pode ver as permissões de outro usuário.');
   }
 }

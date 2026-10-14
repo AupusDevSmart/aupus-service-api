@@ -4,8 +4,11 @@ import {
   NotFoundException,
   ConflictException,
   BadRequestException,
+  ForbiddenException,
+  HttpException,
   Logger
 } from '@nestjs/common';
+import { Prisma, roles } from '@prisma/client';
 // Builtins do Node, sem efeito colateral na carga: nao ha por que adia-los com
 // require() dentro da funcao, que alem de esconder a dependencia obriga o TS a
 // tratar o modulo como `any`.
@@ -32,6 +35,19 @@ import {
 import * as bcrypt from 'bcryptjs';
 import { customAlphabet } from 'nanoid';
 import { MailService } from '../../mail/mail.service';
+import { AtualizarPerfilDto } from './dto/atualizar-perfil.dto';
+import {
+  PAPEL_TOPO,
+  Solicitante,
+  extrasQueNaoPodeDar,
+  mesmoUsuario,
+  permissaoDoPapel,
+  podeLidarComPapel,
+} from './hierarquia-de-papeis';
+
+const MODEL_TYPE = 'App\\Models\\User';
+
+type PermissaoMinima = { id: bigint; name: string };
 
 @Injectable()
 export class UsuariosService {
@@ -267,34 +283,30 @@ export class UsuariosService {
     }
   }
 
+  /**
+   * Cria o usuário com o papel e as permissões diretas pedidos. A hierarquia
+   * (hierarquia-de-papeis.ts) é conferida ANTES de gravar qualquer coisa, por
+   * qualquer caminho do payload (`roleId` ou `roleNames`, `permissionIds` ou
+   * `permissions`). Sem `solicitante` (chamada interna) a hierarquia não se
+   * aplica.
+   */
   async create(
     data: CreateUsuarioDto,
-    creatingUser?: { id?: string; role?: string | null; permissions?: string[] } | string,
+    creatingUser?: Solicitante | string,
   ): Promise<UsuarioResponseDto> {
     try {
-      console.log('🚀 [CREATE USER] Iniciando criação de usuário');
-
-      // Compat: aceita string (id) ou objeto (user completo)
+      const solicitante = typeof creatingUser === 'object' ? creatingUser : undefined;
       const creatingUserId = typeof creatingUser === 'string' ? creatingUser : creatingUser?.id;
-      const creatingUserPermissions = typeof creatingUser === 'object' && creatingUser
-        ? creatingUser.permissions || []
-        : [];
 
-      // Validar hierarquia de criacao pela permissao do requester.
-      // Se o roleId alvo for informado, confere se requester tem usuarios.create_<role>.
-      if (data.roleId && creatingUserPermissions.length > 0) {
-        const targetRole = await this.prisma.roles.findFirst({ where: { id: BigInt(data.roleId) } });
-        if (targetRole) {
-          const requiredPerm = `usuarios.create_${targetRole.name}`;
-          if (!creatingUserPermissions.includes(requiredPerm)) {
-            throw new BadRequestException(
-              `Voce nao tem permissao para criar usuarios com role "${targetRole.name}". Requer: ${requiredPerm}`,
-            );
-          }
-        }
-      }
-      console.log('📝 [CREATE USER] Dados recebidos:', JSON.stringify(data, null, 2));
-      console.log('👤 [CREATE USER] Creating User ID recebido:', creatingUserId);
+      let papel = await this.papelPedido(data);
+      // Proprietário que não escolhe o tipo cria operador: é o único que ele pode criar.
+      if (!papel && solicitante?.role === 'proprietario') papel = await this.papelPorNome('operador');
+      if (!papel) throw new BadRequestException('Informe o tipo do usuário.');
+      if (solicitante) await this.exigirPodeLidarComPapel(solicitante, papel.name, 'criar usuário do tipo');
+
+      const pedidas = await this.permissoesPedidas(data);
+      const extras = pedidas ? await this.semAsDoPapel(pedidas, papel.id) : [];
+      if (solicitante) this.exigirPodeDarExtras(solicitante, extras.map((p) => p.name));
 
       // Verificar se email já existe
       const existingUser = await this.prisma.usuarios.findFirst({
@@ -308,67 +320,12 @@ export class UsuariosService {
             where: { id: existingUser.id },
             data: { email: `deleted_${existingUser.id}_${existingUser.email}` },
           });
-          console.log(`♻️ [CREATE USER] Email liberado do usuário soft-deleted ${existingUser.id}`);
         } else {
           throw new ConflictException('Email já está em uso');
         }
       }
 
-      // ============================================================================
-      // VALIDAÇÃO PARA PROPRIETÁRIOS
-      // Se o usuário criador é proprietário, só pode criar operadores
-      // ============================================================================
-      if (creatingUserId) {
-        // SEMPRE definir created_by quando houver creatingUserId
-        data.createdBy = creatingUserId;
-        console.log(`✅ [CREATE USER] Definindo data.createdBy como ${creatingUserId}`);
-
-        const creatingUser = await this.prisma.usuarios.findFirst({
-          where: { id: creatingUserId, deleted_at: null }
-        });
-
-        // Buscar role do usuário criador no sistema Spatie
-        const creatorRoleData = await this.prisma.model_has_roles.findFirst({
-          where: {
-            model_id: creatingUserId,
-            model_type: 'App\\Models\\User'
-          },
-          include: {
-            roles: true
-          }
-        });
-
-        // Verificar se o criador é proprietário (em qualquer um dos sistemas)
-        const isProprietario =
-          creatorRoleData?.roles?.name === 'propietario' ||
-          creatingUser?.role === 'proprietario';
-
-        if (isProprietario) {
-          console.log(`🔒 [CREATE USER] Proprietário ${creatingUserId} criando usuário`);
-
-          // Buscar role operador
-          const operadorRole = await this.prisma.roles.findFirst({
-            where: { name: 'operador' }
-          });
-
-          if (!operadorRole) {
-            throw new BadRequestException('Role operador não encontrada no sistema');
-          }
-
-          // Validar que está criando um operador
-          if (data.roleId && data.roleId !== Number(operadorRole.id)) {
-            throw new BadRequestException('Proprietários só podem criar usuários do tipo OPERADOR');
-          }
-
-          // Forçar roleId como operador se não foi especificado
-          if (!data.roleId) {
-            data.roleId = Number(operadorRole.id);
-            console.log(`✅ [CREATE USER] Definindo roleId automaticamente como operador (${operadorRole.id})`);
-          }
-        }
-      }
-
-      console.log('🔍 [CREATE USER] Antes de criar - data.createdBy:', data.createdBy);
+      if (creatingUserId) data.createdBy = creatingUserId;
 
       // Gerar ID
       const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 26);
@@ -378,18 +335,6 @@ export class UsuariosService {
       const senhaTemporaria = 'Aupus123!';
       const hashedPassword = await bcrypt.hash(senhaTemporaria, 12);
 
-      // Buscar role padrão para compatibilidade com outra aplicação
-      const defaultRole = await this.prisma.roles.findFirst({
-        where: { name: 'user' }
-      }) || await this.prisma.roles.findFirst(); // Primeira role disponível como fallback
-
-      if (!defaultRole) {
-        throw new BadRequestException('Nenhuma role encontrada no sistema');
-      }
-
-      console.log(`🎯 [CREATE USER] Usando role padrão: ${defaultRole.name}`);
-
-      // Criar usuário com role padrão para compatibilidade
       const novoUsuario = await this.prisma.usuarios.create({
         data: {
           id: userId,
@@ -403,20 +348,26 @@ export class UsuariosService {
           estado: data.estado,
           endereco: data.endereco,
           cep: data.cep,
-          role: this.mapSpatieRoleToValidDbRole(defaultRole.name), // Para compatibilidade com outra aplicação
+          // Coluna legada, lida pelo AupusNexOn e pela listagem: o mesmo papel do Spatie.
+          role: this.mapSpatieRoleToValidDbRole(papel.name),
           manager_id: data.managerId,
           concessionaria_atual_id: data.concessionariaAtualId,
           organizacao_atual_id: data.organizacaoAtualId,
-          created_by: data.createdBy, // ← NOVO: rastrear quem criou
+          created_by: data.createdBy,
           is_active: true,
           senha: hashedPassword,
         }
       });
 
-      // Processar atribuição de roles e permissions via sistema híbrido
-      await this.processInitialRoleAndPermissionAssignment(userId, data);
-
-      console.log('✅ [CREATE USER] Usuário criado com sucesso');
+      try {
+        await this.assignRole(userId, Number(papel.id));
+        if (extras.length > 0) await this.syncUserPermissions(userId, extras.map((p) => Number(p.id)));
+      } catch (error) {
+        // Usuário sem o papel pedido não pode ficar: desfaz e devolve o erro.
+        await this.prisma.model_has_roles.deleteMany({ where: { model_id: userId, model_type: MODEL_TYPE } });
+        await this.prisma.usuarios.delete({ where: { id: userId } });
+        throw error;
+      }
 
       // Enviar email de boas-vindas (fire-and-forget). Dentro de uma importação
       // de planilha, só depois de confirmada: a prévia desfaz o usuário.
@@ -435,53 +386,21 @@ export class UsuariosService {
         primeiroAcesso: true,
       } as any;
     } catch (error) {
-      if (error instanceof ConflictException || error instanceof BadRequestException) {
-        throw error;
-      }
-      console.error('Erro ao criar usuário:', error);
+      if (error instanceof HttpException) throw error;
+      this.logger.error(`Erro ao criar usuário: ${error.message}`);
       throw new BadRequestException('Erro ao criar usuário: ' + error.message);
     }
   }
 
-  private async discoverValidRoles() {
-    try {
-      console.log('🔍 [DISCOVER ROLES] Descobrindo roles válidas...');
-      
-      // Tentar descobrir o constraint
-      const constraints = await this.prisma.$queryRaw`
-        SELECT 
-          conname, 
-          pg_get_constraintdef(oid) as constraint_def
-        FROM pg_constraint 
-        WHERE conrelid = 'usuarios'::regclass 
-        AND contype = 'c'
-      ` as any[];
-
-      console.log('📋 [DISCOVER ROLES] Constraints encontrados:');
-      constraints.forEach((constraint, index) => {
-        console.log(`${index + 1}. ${constraint.conname}: ${constraint.constraint_def}`);
-      });
-
-      // Tentar buscar alguns usuários existentes para ver que roles eles têm
-      const existingUsers = await this.prisma.usuarios.findMany({
-        select: { role: true },
-        take: 10,
-        distinct: ['role']
-      });
-
-      console.log('👥 [DISCOVER ROLES] Roles existentes nos usuários:');
-      const existingRoles = existingUsers.map(u => u.role).filter(r => r);
-      console.log(existingRoles);
-
-    } catch (error) {
-      console.log('⚠️ [DISCOVER ROLES] Erro ao descobrir roles:', error.message);
-    }
-  }
-
+  /**
+   * Edita o usuário. Mexer em outra pessoa exige poder lidar com o papel que
+   * ela tem hoje; trocar o tipo exige poder lidar com o papel novo; a lista de
+   * permissões, quando vem (mesmo vazia), é a lista completa das diretas.
+   */
   async update(
     id: string,
     data: UpdateUsuarioDto,
-    requester?: { id?: string; role?: string | null; permissions?: string[] },
+    requester?: Solicitante,
   ): Promise<UsuarioResponseDto> {
     try {
       const usuario = await this.prisma.usuarios.findFirst({
@@ -495,16 +414,35 @@ export class UsuariosService {
         throw new NotFoundException('Usuário não encontrado');
       }
 
-      // Regra: admin nao pode editar outro admin (apenas super_admin pode).
-      // Self-edit sempre permitido.
-      if (requester && requester.id !== id && usuario.role === 'admin' && requester.role !== 'super_admin') {
-        throw new BadRequestException('Apenas super_admin pode editar outro admin');
+      const ehOProprio = mesmoUsuario(requester?.id, id);
+      if (requester && !ehOProprio) await this.exigirPodeGerenciar(requester, id);
+
+      const papelAtual = await this.vinculoDePapel(id);
+      const papelNovo = await this.papelPedido(data);
+      const trocaPapel = !!papelNovo && papelNovo.name !== papelAtual?.name;
+      const tiraPapel = !!data.clearRole && !!papelAtual;
+      if (requester && (trocaPapel || tiraPapel)) {
+        if (ehOProprio) throw new ForbiddenException('Você não pode mudar o próprio tipo de usuário.');
+        if (papelNovo) await this.exigirPodeLidarComPapel(requester, papelNovo.name, 'dar o tipo');
+      }
+
+      const papelFinal = trocaPapel ? papelNovo : tiraPapel ? null : papelAtual;
+      const pedidas = data.clearDirectPermissions ? [] : await this.permissoesPedidas(data);
+      const extras = pedidas ? await this.semAsDoPapel(pedidas, papelFinal?.id ?? null) : undefined;
+      if (requester && extras) {
+        // As diretas de hoje que o papel não cobre (as redundantes, de cadastro antigo, não contam).
+        const doPapel = await this.semAsDoPapel(await this.diretasDe(id), papelFinal?.id ?? null);
+        const atuais = new Set(doPapel.map((p) => p.name));
+        const novas = extras.filter((p) => !atuais.has(p.name)).map((p) => p.name);
+        const mudou = novas.length > 0 || atuais.size !== new Set(extras.map((p) => p.name)).size;
+        if (ehOProprio && mudou) throw new ForbiddenException('Você não pode mudar as próprias permissões.');
+        this.exigirPodeDarExtras(requester, novas);
       }
 
       // Verificar email duplicado
       if (data.email && data.email !== usuario.email) {
         const existingUser = await this.prisma.usuarios.findFirst({
-          where: { 
+          where: {
             email: data.email,
             deleted_at: null,
             id: { not: id },
@@ -517,7 +455,7 @@ export class UsuariosService {
       }
 
       // Preparar dados para atualização
-      const updateData: any = {};
+      const updateData: Prisma.usuariosUncheckedUpdateInput = {};
       if (data.nome !== undefined) updateData.nome = data.nome;
       if (data.email !== undefined) updateData.email = data.email;
       if (data.telefone !== undefined) updateData.telefone = data.telefone;
@@ -531,7 +469,7 @@ export class UsuariosService {
       if (data.managerId !== undefined) updateData.manager_id = data.managerId;
       if (data.concessionariaAtualId !== undefined) updateData.concessionaria_atual_id = data.concessionariaAtualId;
       if (data.organizacaoAtualId !== undefined) updateData.organizacao_atual_id = data.organizacaoAtualId;
-      
+
       updateData.updated_at = new Date();
 
       // Atualizar usuário base
@@ -540,20 +478,55 @@ export class UsuariosService {
         data: updateData
       });
 
-      // Processar atualizações do sistema híbrido de roles/permissions
-      await this.processRoleAndPermissionUpdates(id, data);
+      if (trocaPapel) await this.assignRole(id, Number(papelNovo!.id));
+      if (tiraPapel && !trocaPapel) {
+        await this.prisma.model_has_roles.deleteMany({ where: { model_id: id, model_type: MODEL_TYPE } });
+        await this.prisma.usuarios.update({ where: { id }, data: { role: null } });
+      }
+      if (extras) await this.syncUserPermissions(id, extras.map((p) => Number(p.id)));
 
       return await this.mapToUsuarioResponseDto(usuarioAtualizado);
     } catch (error) {
-      if (error instanceof NotFoundException || error instanceof ConflictException) {
-        throw error;
-      }
-      console.error('Erro ao atualizar usuário:', error);
+      if (error instanceof HttpException) throw error;
+      this.logger.error(`Erro ao atualizar usuário: ${error.message}`);
       throw new BadRequestException('Erro ao atualizar usuário');
     }
   }
 
-  async remove(id: string, requester?: { id?: string; role?: string | null }) {
+  /**
+   * O próprio usuário edita os dados dele (tela "Meu perfil"). Não passa pela
+   * permissão `usuarios.manage` e não toca em tipo, permissões nem status.
+   */
+  async atualizarPerfil(id: string, data: AtualizarPerfilDto): Promise<UsuarioResponseDto> {
+    const usuario = await this.prisma.usuarios.findFirst({ where: { id, deleted_at: null } });
+    if (!usuario) throw new NotFoundException('Usuário não encontrado');
+
+    if (data.email && data.email !== usuario.email) {
+      const outro = await this.prisma.usuarios.findFirst({
+        where: { email: data.email, deleted_at: null, id: { not: id } },
+      });
+      if (outro) throw new ConflictException('Email já está em uso');
+    }
+
+    const atualizado = await this.prisma.usuarios.update({
+      where: { id },
+      data: {
+        nome: data.nome,
+        email: data.email,
+        telefone: data.telefone,
+        instagram: data.instagram,
+        cpf_cnpj: data.cpfCnpj,
+        cidade: data.cidade,
+        estado: data.estado,
+        endereco: data.endereco,
+        cep: data.cep,
+        updated_at: new Date(),
+      },
+    });
+    return this.mapToUsuarioResponseDto(atualizado);
+  }
+
+  async remove(id: string, requester?: Solicitante) {
     try {
       const usuario = await this.prisma.usuarios.findFirst({
         where: {
@@ -566,9 +539,9 @@ export class UsuariosService {
         throw new NotFoundException('Usuário não encontrado');
       }
 
-      // Regra: admin nao pode deletar outro admin (apenas super_admin).
-      if (requester && requester.id !== id && usuario.role === 'admin' && requester.role !== 'super_admin') {
-        throw new BadRequestException('Apenas super_admin pode deletar outro admin');
+      if (requester) {
+        if (mesmoUsuario(requester.id, id)) throw new ForbiddenException('Você não pode excluir o próprio usuário.');
+        await this.exigirPodeGerenciar(requester, id);
       }
 
       await this.prisma.usuarios.update({
@@ -582,20 +555,23 @@ export class UsuariosService {
 
       return { message: 'Usuário excluído com sucesso' };
     } catch (error) {
-      if (error instanceof NotFoundException) {
-        throw error;
-      }
-      console.error('Erro ao excluir usuário:', error);
+      if (error instanceof HttpException) throw error;
+      this.logger.error(`Erro ao excluir usuário: ${error.message}`);
       throw new BadRequestException('Erro ao excluir usuário');
     }
   }
 
-  async changePassword(id: string, data: ChangePasswordDto) {
+  /** Troca a senha sabendo a atual: só a própria. */
+  async changePassword(id: string, data: ChangePasswordDto, requester?: Solicitante) {
     try {
+      if (requester && !mesmoUsuario(requester.id, id)) {
+        throw new ForbiddenException('Só é possível trocar a própria senha.');
+      }
+
       const usuario = await this.prisma.usuarios.findFirst({
-        where: { 
-          id, 
-          deleted_at: null 
+        where: {
+          id,
+          deleted_at: null
         },
       });
 
@@ -626,15 +602,14 @@ export class UsuariosService {
 
       return { message: 'Senha alterada com sucesso' };
     } catch (error) {
-      if (error instanceof NotFoundException || error instanceof BadRequestException) {
-        throw error;
-      }
-      console.error('Erro ao alterar senha:', error);
+      if (error instanceof HttpException) throw error;
+      this.logger.error(`Erro ao alterar senha: ${error.message}`);
       throw new BadRequestException('Erro ao alterar senha');
     }
   }
 
-  async resetPassword(id: string, data: ResetPasswordDto) {
+  /** Define a senha de outra pessoa sem saber a atual: exige poder gerenciar o tipo dela. */
+  async resetPassword(id: string, data: ResetPasswordDto, requester?: Solicitante) {
     try {
       const usuario = await this.prisma.usuarios.findFirst({
         where: {
@@ -646,6 +621,8 @@ export class UsuariosService {
       if (!usuario) {
         throw new NotFoundException('Usuário não encontrado');
       }
+
+      if (requester) await this.exigirPodeGerenciar(requester, id);
 
       const novaSenhaHash = await bcrypt.hash(data.novaSenha, 12);
 
@@ -662,15 +639,14 @@ export class UsuariosService {
         senhaTemporaria: data.novaSenha
       };
     } catch (error) {
-      if (error instanceof NotFoundException) {
-        throw error;
-      }
-      console.error('Erro ao resetar senha:', error);
+      if (error instanceof HttpException) throw error;
+      this.logger.error(`Erro ao resetar senha: ${error.message}`);
       throw new BadRequestException('Erro ao resetar senha');
     }
   }
 
-  async updateAvatar(userId: string, filename: string) {
+  /** A própria foto, ou a de quem o solicitante pode gerenciar. */
+  async updateAvatar(userId: string, filename: string, requester?: Solicitante) {
     try {
       const usuario = await this.prisma.usuarios.findFirst({
         where: {
@@ -683,17 +659,17 @@ export class UsuariosService {
         throw new NotFoundException('Usuário não encontrado');
       }
 
+      if (requester && !mesmoUsuario(requester.id, userId)) {
+        if (!requester.permissions.includes('usuarios.manage') && requester.role !== PAPEL_TOPO) {
+          throw new ForbiddenException('Só é possível trocar a própria foto.');
+        }
+        await this.exigirPodeGerenciar(requester, userId);
+      }
+
       // Se o usuário já tem um avatar, deletar o arquivo antigo
       if (usuario.avatar_url) {
-        try {
-          const oldFilePath = caminho.join(__dirname, '../../..', usuario.avatar_url);
-          await arquivos.unlink(oldFilePath).catch(err => {
-            console.log('Arquivo antigo não encontrado ou já removido:', err.message);
-          });
-        } catch (error) {
-          console.log('Erro ao deletar avatar antigo:', error);
-          // Continua mesmo se falhar ao deletar o arquivo antigo
-        }
+        const oldFilePath = caminho.join(__dirname, '../../..', usuario.avatar_url);
+        await arquivos.unlink(oldFilePath).catch(() => undefined);
       }
 
       const imageUrl = `/uploads/avatars/${filename}`;
@@ -706,13 +682,10 @@ export class UsuariosService {
         },
       });
 
-      console.log(`✅ Avatar atualizado para usuário ${userId}: ${imageUrl}`);
       return { imageUrl };
     } catch (error) {
-      if (error instanceof NotFoundException) {
-        throw error;
-      }
-      console.error('Erro ao atualizar avatar:', error);
+      if (error instanceof HttpException) throw error;
+      this.logger.error(`Erro ao atualizar avatar: ${error.message}`);
       throw new BadRequestException('Erro ao atualizar avatar');
     }
   }
@@ -1216,13 +1189,13 @@ export class UsuariosService {
     }
   }
 
-  async bulkAssignRoles(bulkData: BulkAssignRolesDto): Promise<{ success: number; failures: any[] }> {
+  async bulkAssignRoles(bulkData: BulkAssignRolesDto, solicitante: Solicitante): Promise<{ success: number; failures: any[] }> {
     let success = 0;
     const failures: any[] = [];
 
     for (const assignment of bulkData.assignments) {
       try {
-        await this.assignRole(assignment.userId, assignment.roleId);
+        await this.atribuirPapel(assignment.userId, assignment.roleId, solicitante);
         success++;
       } catch (error) {
         failures.push({
@@ -1236,13 +1209,13 @@ export class UsuariosService {
     return { success, failures };
   }
 
-  async bulkAssignPermissions(bulkData: BulkAssignPermissionsDto): Promise<{ success: number; failures: any[] }> {
+  async bulkAssignPermissions(bulkData: BulkAssignPermissionsDto, solicitante: Solicitante): Promise<{ success: number; failures: any[] }> {
     let success = 0;
     const failures: any[] = [];
 
     for (const assignment of bulkData.assignments) {
       try {
-        await this.syncUserPermissions(assignment.userId, assignment.permissionIds);
+        await this.sincronizarPermissoesDiretas(assignment.userId, assignment.permissionIds, solicitante);
         success++;
       } catch (error) {
         failures.push({
@@ -1254,6 +1227,180 @@ export class UsuariosService {
     }
 
     return { success, failures };
+  }
+
+  // ============================================================================
+  // ROTAS PRÓPRIAS DE PAPEL E PERMISSÃO DIRETA — com a hierarquia
+  // ============================================================================
+
+  /** POST :id/assign-role. */
+  async atribuirPapel(userId: string, roleId: number, solicitante: Solicitante) {
+    if (mesmoUsuario(solicitante.id, userId)) {
+      throw new ForbiddenException('Você não pode mudar o próprio tipo de usuário.');
+    }
+    await this.exigirPodeGerenciar(solicitante, userId);
+    const papel = await this.prisma.roles.findUnique({ where: { id: BigInt(roleId) } });
+    if (!papel) throw new NotFoundException('Role não encontrado');
+    await this.exigirPodeLidarComPapel(solicitante, papel.name, 'dar o tipo');
+    return this.assignRole(userId, roleId);
+  }
+
+  /** POST :id/sync-permissions: a lista completa das diretas (só o que o papel não dá é gravado). */
+  async sincronizarPermissoesDiretas(userId: string, permissionIds: number[], solicitante: Solicitante) {
+    await this.exigirPodeMexerNasDiretas(solicitante, userId);
+    const papel = await this.vinculoDePapel(userId);
+    const extras = await this.semAsDoPapel(await this.permissoesPorId(permissionIds), papel?.id ?? null);
+    const atuais = new Set((await this.diretasDe(userId)).map((p) => p.name));
+    this.exigirPodeDarExtras(solicitante, extras.filter((p) => !atuais.has(p.name)).map((p) => p.name));
+    return this.syncUserPermissions(userId, extras.map((p) => Number(p.id)));
+  }
+
+  /** POST :id/assign-permission. */
+  async atribuirPermissao(userId: string, permissionId: number, solicitante: Solicitante) {
+    await this.exigirPodeMexerNasDiretas(solicitante, userId);
+    const [permissao] = await this.permissoesPorId([permissionId]);
+    this.exigirPodeDarExtras(solicitante, [permissao.name]);
+    return this.assignPermission(userId, permissionId);
+  }
+
+  /** DELETE :id/remove-permission/:permissionId — tirar não exige ter a permissão. */
+  async removerPermissao(userId: string, permissionId: number, solicitante: Solicitante) {
+    await this.exigirPodeMexerNasDiretas(solicitante, userId);
+    return this.removePermission(userId, permissionId);
+  }
+
+  // ============================================================================
+  // HIERARQUIA DE PAPÉIS — a regra está em hierarquia-de-papeis.ts
+  // ============================================================================
+
+  private papelPorNome(nome: string) {
+    return this.prisma.roles.findFirst({ where: { name: nome }, orderBy: { id: 'asc' } });
+  }
+
+  /** O papel pedido no payload, pelo id ou pelo nome (legado). `null` = não pediu. */
+  private async papelPedido(data: { roleId?: number; roleNames?: string[] }): Promise<roles | null> {
+    if (data.roleId) {
+      const papel = await this.prisma.roles.findUnique({ where: { id: BigInt(data.roleId) } });
+      if (!papel) throw new BadRequestException('Tipo de usuário não encontrado.');
+      return papel;
+    }
+    const nome = data.roleNames?.[0]?.trim();
+    if (!nome) return null;
+    const papel = await this.papelPorNome(nome);
+    if (!papel) throw new BadRequestException(`Não existe o tipo de usuário "${nome}".`);
+    return papel;
+  }
+
+  /** O papel do Spatie de quem já existe. */
+  private async vinculoDePapel(userId: string): Promise<roles | null> {
+    const vinculo = await this.prisma.model_has_roles.findFirst({
+      where: { model_id: userId, model_type: MODEL_TYPE },
+      include: { roles: true },
+    });
+    return vinculo?.roles ?? null;
+  }
+
+  /** O papel que vale para a hierarquia: o do Spatie e, sem ele, a coluna legada. */
+  private async papelParaHierarquia(userId: string): Promise<string | null> {
+    const vinculo = await this.vinculoDePapel(userId);
+    if (vinculo) return vinculo.name;
+    const usuario = await this.prisma.usuarios.findUnique({ where: { id: userId }, select: { role: true } });
+    return usuario?.role?.trim() || null;
+  }
+
+  /**
+   * Por que o solicitante não pode lidar com o papel, ou `null` se pode. Pública
+   * para a importação por planilha dar o mesmo motivo, na coluna TIPO.
+   */
+  async motivoParaNaoLidarComPapel(solicitante: Solicitante, papel: string | null, acao: string): Promise<string | null> {
+    if (solicitante.role === PAPEL_TOPO) return null;
+    const temPropria = papel
+      ? !!(await this.prisma.permissions.findFirst({ where: { name: permissaoDoPapel(papel) }, select: { id: true } }))
+      : false;
+    if (podeLidarComPapel(solicitante, papel, temPropria)) return null;
+
+    const requer = papel === PAPEL_TOPO ? 'ser super_admin' : papel && temPropria ? permissaoDoPapel(papel) : 'usuarios.manage';
+    return `Você não pode ${acao} "${papel ?? 'sem tipo'}". Requer: ${requer}.`;
+  }
+
+  private async exigirPodeLidarComPapel(solicitante: Solicitante, papel: string | null, acao: string) {
+    const motivo = await this.motivoParaNaoLidarComPapel(solicitante, papel, acao);
+    if (motivo) throw new ForbiddenException(motivo);
+  }
+
+  /** Mexer em outra pessoa exige poder lidar com o papel que ela tem hoje. */
+  private async exigirPodeGerenciar(solicitante: Solicitante, alvoId: string) {
+    if (solicitante.role === PAPEL_TOPO) return;
+    await this.exigirPodeLidarComPapel(solicitante, await this.papelParaHierarquia(alvoId), 'alterar usuário do tipo');
+  }
+
+  private async exigirPodeMexerNasDiretas(solicitante: Solicitante, userId: string) {
+    if (mesmoUsuario(solicitante.id, userId)) {
+      throw new ForbiddenException('Você não pode mudar as próprias permissões.');
+    }
+    await this.exigirPodeGerenciar(solicitante, userId);
+  }
+
+  private exigirPodeDarExtras(solicitante: Solicitante, novas: string[]) {
+    const negadas = extrasQueNaoPodeDar(solicitante, novas);
+    if (negadas.length > 0) {
+      throw new ForbiddenException(`Você não pode dar estas permissões diretas: ${negadas.join(', ')}.`);
+    }
+  }
+
+  /** As permissões pedidas no payload, por id ou por nome. `null` = não pediu. */
+  private async permissoesPedidas(data: { permissionIds?: number[]; permissions?: string[] }) {
+    if (Array.isArray(data.permissionIds)) return this.permissoesPorId(data.permissionIds);
+    if (Array.isArray(data.permissions)) return this.permissoesPorNome(data.permissions);
+    return null;
+  }
+
+  private async permissoesPorId(ids: number[]): Promise<PermissaoMinima[]> {
+    const achadas = await this.prisma.permissions.findMany({
+      where: { id: { in: ids.map((id) => BigInt(id)) } },
+      select: { id: true, name: true },
+    });
+    const faltam = ids.filter((id) => !achadas.some((p) => Number(p.id) === id));
+    if (faltam.length > 0) throw new BadRequestException(`Permissões não encontradas: ${faltam.join(', ')}`);
+    return achadas;
+  }
+
+  /** Cada nome no primeiro id que tem esse nome (há nomes repetidos entre guards). */
+  private async permissoesPorNome(nomes: string[]): Promise<PermissaoMinima[]> {
+    const achadas = await this.prisma.permissions.findMany({
+      where: { name: { in: nomes } },
+      orderBy: { id: 'asc' },
+      select: { id: true, name: true },
+    });
+    const primeira = new Map<string, PermissaoMinima>();
+    for (const p of achadas) if (!primeira.has(p.name)) primeira.set(p.name, p);
+    const faltam = nomes.filter((n) => !primeira.has(n));
+    if (faltam.length > 0) throw new BadRequestException(`Permissões não encontradas: ${faltam.join(', ')}`);
+    return [...primeira.values()];
+  }
+
+  /** Só o que o papel não dá, uma vez por nome. */
+  private async semAsDoPapel(permissoes: PermissaoMinima[], papelId: bigint | null): Promise<PermissaoMinima[]> {
+    const doPapel = papelId
+      ? await this.prisma.role_has_permissions.findMany({
+          where: { role_id: papelId },
+          select: { permissions: { select: { name: true } } },
+        })
+      : [];
+    const vistas = new Set(doPapel.map((p) => p.permissions.name));
+    return permissoes.filter((p) => {
+      if (vistas.has(p.name)) return false;
+      vistas.add(p.name);
+      return true;
+    });
+  }
+
+  private async diretasDe(userId: string): Promise<PermissaoMinima[]> {
+    const diretas = await this.prisma.model_has_permissions.findMany({
+      where: { model_id: userId, model_type: MODEL_TYPE },
+      select: { permissions: { select: { id: true, name: true } } },
+    });
+    return diretas.map((d) => d.permissions);
   }
 
   async getAllAvailableRoles() {
@@ -1349,225 +1496,6 @@ export class UsuariosService {
     }
   }
 
-  /**
-   * Método de debug para verificar o estado atual de roles e permissions de um usuário
-   */
-  async debugUserPermissions(userId: string): Promise<any> {
-    try {
-      console.log(`🔍 [DEBUG] Verificando permissões para usuário: ${userId}`);
-
-      // 1. Dados básicos do usuário
-      const usuario = await this.prisma.usuarios.findFirst({
-        where: { id: userId, deleted_at: null }
-      });
-
-      if (!usuario) {
-        return { error: 'Usuário não encontrado' };
-      }
-
-      // 2. Role no sistema Spatie
-      const spatieRole = await this.prisma.model_has_roles.findFirst({
-        where: {
-          model_id: userId,
-          model_type: 'App\\Models\\User'
-        },
-        include: {
-          roles: {
-            include: {
-              role_has_permissions: {
-                include: {
-                  permissions: true
-                }
-              }
-            }
-          }
-        }
-      });
-
-      // 3. Permissions diretas no sistema Spatie
-      const spatieDirectPermissions = await this.prisma.model_has_permissions.findMany({
-        where: {
-          model_id: userId,
-          model_type: 'App\\Models\\User'
-        },
-        include: {
-          permissions: true
-        }
-      });
-
-      // 4. Resultado do getUserPermissions
-      const processedPermissions = await this.getUserPermissions(userId).catch(error => ({
-        error: error.message,
-        role: null,
-        permissions: []
-      }));
-
-      return {
-        userId,
-        basicData: {
-          nome: usuario.nome,
-          email: usuario.email,
-          roleLegacy: usuario.role, // Coluna role da tabela usuarios
-          status: usuario.status,
-          is_active: usuario.is_active
-        },
-        spatieData: {
-          role: spatieRole ? {
-            id: Number(spatieRole.roles.id),
-            name: spatieRole.roles.name,
-            guard_name: spatieRole.roles.guard_name,
-            rolePermissions: spatieRole.roles.role_has_permissions.map(rhp => ({
-              id: Number(rhp.permissions.id),
-              name: rhp.permissions.name,
-              guard_name: rhp.permissions.guard_name
-            }))
-          } : null,
-          directPermissions: spatieDirectPermissions.map(mhp => ({
-            id: Number(mhp.permissions.id),
-            name: mhp.permissions.name,
-            guard_name: mhp.permissions.guard_name
-          }))
-        },
-        processedResult: processedPermissions,
-        counts: {
-          rolePermissions: spatieRole?.roles.role_has_permissions.length || 0,
-          directPermissions: spatieDirectPermissions.length,
-          totalProcessed: processedPermissions.permissions?.length || 0
-        }
-      };
-
-    } catch (error) {
-      console.error('Erro no debug de permissões:', error);
-      return { 
-        userId, 
-        error: error.message,
-        stack: error.stack 
-      };
-    }
-  }
-
-  /**
-   * Processa atribuição inicial de roles e permissions durante a criação
-   */
-  private async processInitialRoleAndPermissionAssignment(userId: string, data: CreateUsuarioDto): Promise<void> {
-    try {
-      // 1. Atribuir role específica se fornecida (sobrescreve a role padrão)
-      if (data.roleId) {
-        await this.assignRole(userId, data.roleId);
-      }
-
-      // 2. Atribuir permissions diretas se fornecidas
-      if (data.permissionIds && data.permissionIds.length > 0) {
-        await this.syncUserPermissions(userId, data.permissionIds);
-      }
-
-      // 3. Suporte legacy para roleNames (deprecated)
-      if (data.roleNames && data.roleNames.length > 0) {
-        // Atribuir primeira role da lista
-        const role = await this.prisma.roles.findFirst({
-          where: { name: data.roleNames[0] }
-        });
-        
-        if (role) {
-          await this.assignRole(userId, Number(role.id));
-        }
-      }
-
-      // 4. Suporte legacy para permissions por nome (deprecated)
-      if (data.permissions && data.permissions.length > 0) {
-        // Converter nomes de permissions para IDs
-        const permissions = await this.prisma.permissions.findMany({
-          where: { 
-            name: { in: data.permissions } 
-          }
-        });
-
-        const permissionIds = permissions.map(p => Number(p.id));
-        if (permissionIds.length > 0) {
-          await this.syncUserPermissions(userId, permissionIds);
-        }
-      }
-
-    } catch (error) {
-      console.error('Erro ao processar atribuição inicial de roles/permissions:', error);
-      // Não fazer throw aqui para não quebrar a criação do usuário
-      // O usuário será criado com role padrão
-    }
-  }
-
-  /**
-   * Processa atualizações de roles e permissions durante o update
-   */
-  private async processRoleAndPermissionUpdates(userId: string, data: UpdateUsuarioDto): Promise<void> {
-    try {
-      // 1. Limpar role se solicitado
-      if (data.clearRole) {
-        await this.prisma.model_has_roles.deleteMany({
-          where: {
-            model_id: userId,
-            model_type: 'App\\Models\\User'
-          }
-        });
-
-        // Atualizar coluna legacy para null
-        await this.prisma.usuarios.update({
-          where: { id: userId },
-          data: { role: null }
-        });
-      }
-
-      // 2. Atribuir nova role se fornecida
-      if (data.roleId) {
-        await this.assignRole(userId, data.roleId);
-      }
-
-      // 3. Limpar permissions diretas se solicitado
-      if (data.clearDirectPermissions) {
-        await this.prisma.model_has_permissions.deleteMany({
-          where: {
-            model_id: userId,
-            model_type: 'App\\Models\\User'
-          }
-        });
-      }
-
-      // 4. Sincronizar permissions se fornecidas
-      if (data.permissionIds && Array.isArray(data.permissionIds)) {
-        await this.syncUserPermissions(userId, data.permissionIds);
-      }
-
-      // 5. Suporte legacy para roleNames e permissions (deprecated)
-      if (data.roleNames && data.roleNames.length > 0) {
-        // Buscar primeira role pelo nome e atribuir
-        const role = await this.prisma.roles.findFirst({
-          where: { name: data.roleNames[0] }
-        });
-        
-        if (role) {
-          await this.assignRole(userId, Number(role.id));
-        }
-      }
-
-      if (data.permissions && data.permissions.length > 0) {
-        // Converter nomes de permissions para IDs
-        const permissions = await this.prisma.permissions.findMany({
-          where: { 
-            name: { in: data.permissions } 
-          }
-        });
-
-        const permissionIds = permissions.map(p => Number(p.id));
-        if (permissionIds.length > 0) {
-          await this.syncUserPermissions(userId, permissionIds);
-        }
-      }
-
-    } catch (error) {
-      console.error('Erro ao processar atualizações de roles/permissions:', error);
-      throw new BadRequestException('Erro ao atualizar roles e permissions');
-    }
-  }
-
   // ============================================================================
   // MÉTODOS AUXILIARES PARA CONSTRAINT DE ROLE
   // ============================================================================
@@ -1581,84 +1509,7 @@ export class UsuariosService {
     if (!spatieRoleName) return 'vendedor'; // fallback seguro apenas se NULL
 
     // ✅ ATUALIZADO: Constraint CHECK foi removida, retornar o valor original
-    console.log(`✅ [ROLE SYNC] Sincronizando role '${spatieRoleName}' na coluna legacy`);
     return spatieRoleName;
-  }
-
-  /**
-   * Descobre quais valores são permitidos no constraint da coluna role
-   */
-  async discoverValidRoleConstraint(): Promise<{ constraintName: string; allowedValues: string[] }> {
-    try {
-      console.log('🔍 [CONSTRAINT DISCOVERY] Descobrindo constraint da coluna role...');
-      
-      const constraints = await this.prisma.$queryRaw`
-        SELECT 
-          conname, 
-          pg_get_constraintdef(oid) as constraint_def
-        FROM pg_constraint 
-        WHERE conrelid = 'usuarios'::regclass 
-        AND contype = 'c'
-        AND conname LIKE '%role%'
-      ` as any[];
-
-      console.log('📋 [CONSTRAINT DISCOVERY] Constraints encontrados:', constraints);
-
-      for (const constraint of constraints) {
-        const { conname, constraint_def } = constraint;
-        
-        // Extrair valores do constraint (ex: "CHECK (role IN ('admin', 'vendedor', ...))")
-        const match = constraint_def.match(/\(role\s*IN\s*\((.*?)\)\)/i);
-        if (match) {
-          const valuesString = match[1];
-          const allowedValues = valuesString
-            .split(',')
-            .map((v: string) => v.trim().replace(/['"]/g, ''))
-            .filter((v: string) => v.length > 0);
-
-          console.log(`✅ [CONSTRAINT DISCOVERY] Constraint '${conname}' permite: [${allowedValues.join(', ')}]`);
-          
-          return {
-            constraintName: conname,
-            allowedValues
-          };
-        }
-      }
-
-      console.log('⚠️ [CONSTRAINT DISCOVERY] Nenhum constraint de role encontrado, usando valores padrão');
-      return {
-        constraintName: 'unknown',
-        allowedValues: ['admin', 'gerente', 'vendedor', 'consultor'] // valores assumidos
-      };
-
-    } catch (error) {
-      console.error('❌ [CONSTRAINT DISCOVERY] Erro ao descobrir constraint:', error);
-      return {
-        constraintName: 'error',
-        allowedValues: ['admin', 'gerente', 'vendedor', 'consultor'] // fallback seguro
-      };
-    }
-  }
-
-  /**
-   * Valida se um valor de role é aceito pelo constraint do banco
-   */
-  private async validateRoleConstraint(roleValue: string): Promise<boolean> {
-    try {
-      const { allowedValues } = await this.discoverValidRoleConstraint();
-      const isValid = allowedValues.includes(roleValue);
-      
-      if (!isValid) {
-        console.log(`❌ [ROLE VALIDATION] Role '${roleValue}' não é válida. Valores permitidos: [${allowedValues.join(', ')}]`);
-      } else {
-        console.log(`✅ [ROLE VALIDATION] Role '${roleValue}' é válida`);
-      }
-      
-      return isValid;
-    } catch (error) {
-      console.error('❌ [ROLE VALIDATION] Erro na validação:', error);
-      return false; // em caso de erro, assumir inválido para ser seguro
-    }
   }
 
   // ============================================================================
@@ -1755,38 +1606,6 @@ export class UsuariosService {
         created_at: usuario.created_at,
         updated_at: usuario.updated_at,
       };
-    }
-  }
-
-  /**
-   * Método para descobrir valores válidos no constraint da coluna role
-   * Útil para debugging e administração
-   */
-  async getValidRoleConstraintValues(): Promise<string[]> {
-    try {
-      const result = await this.prisma.$queryRaw`
-        SELECT conname, consrc 
-        FROM pg_constraint 
-        WHERE conrelid = 'usuarios'::regclass 
-        AND contype = 'c'
-        AND conname LIKE '%role%'
-      ` as any[];
-
-      if (result && result.length > 0) {
-        // Extrair valores do constraint check
-        const constraintSrc = result[0].consrc;
-        // Regex para extrair valores entre aspas simples
-        const matches = constraintSrc.match(/'[^']+'/g);
-        if (matches) {
-          return matches.map((match: string) => match.replace(/'/g, ''));
-        }
-      }
-
-      // Fallback se não conseguir descobrir via query
-      return ['gerente', 'vendedor', 'admin'];
-    } catch (error) {
-      console.error('Erro ao descobrir valores do constraint:', error);
-      return ['gerente', 'vendedor', 'admin']; // valores conhecidos
     }
   }
 }
