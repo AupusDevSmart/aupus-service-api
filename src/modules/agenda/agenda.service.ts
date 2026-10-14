@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
-import { FeriadosService } from './feriados.service';
-import { ConfiguracoesDiasUteisService } from './configuracoes-dias-uteis.service';
+import { PrismaService } from '@/core';
 import { VerificarDiaUtilDto, ProximosDiasUteisDto } from './dto';
+import { diaEmBrasilia, feriadoDoDia, regraDeDiasUteis, type RegraDeDiasUteis } from './dias-uteis';
 
 export interface DiaUtilResponse {
   data: Date;
@@ -25,178 +25,90 @@ export interface ProximosDiasUteisResponse {
   };
 }
 
+const DIA_MS = 24 * 60 * 60 * 1000;
+const DIAS_DA_SEMANA = ['Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado'];
+
+/**
+ * Data só de calendário ("2026-10-19") chega como meia-noite UTC, que em
+ * Brasília ainda é o dia anterior. Lida como meio-dia de Brasília, o dia é o
+ * que a pessoa escolheu.
+ */
+function comoDiaDoCalendario(data: Date): Date {
+  const meiaNoiteUtc =
+    data.getUTCHours() === 0 && data.getUTCMinutes() === 0 && data.getUTCSeconds() === 0 && data.getUTCMilliseconds() === 0;
+  return meiaNoiteUtc ? new Date(data.getTime() + 15 * 60 * 60 * 1000) : data;
+}
+
+/**
+ * Consultas de dia útil da agenda. A regra é a de dias-uteis.ts — a mesma que
+ * o gerador automático de programações usa —, carregada uma vez por consulta
+ * (antes cada dia do calendário fazia duas idas ao banco).
+ */
 @Injectable()
 export class AgendaService {
-  private readonly diasSemana = [
-    'Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado'
-  ];
-
-  constructor(
-    private readonly feriadosService: FeriadosService,
-    private readonly configuracoesService: ConfiguracoesDiasUteisService
-  ) {}
+  constructor(private readonly prisma: PrismaService) {}
 
   async verificarDiaUtil(dto: VerificarDiaUtilDto): Promise<DiaUtilResponse> {
-    const { data, plantaId } = dto;
-
-    // Verificar se é feriado
-    const ehFeriado = await this.feriadosService.verificarFeriado(data, plantaId);
-
-    // Obter configuração de dias úteis
-    const configuracao = await this.configuracoesService.obterConfiguracaoPorPlanta(plantaId);
-
-    // Verificar se o dia da semana é útil pela configuração
-    const diaSemana = data.getDay(); // 0 = Domingo, 1 = Segunda, etc.
-    let ehDiaUtilPorConfiguracao = true;
-
-    if (configuracao) {
-      switch (diaSemana) {
-        case 0: // Domingo
-          ehDiaUtilPorConfiguracao = configuracao.domingo;
-          break;
-        case 1: // Segunda
-          ehDiaUtilPorConfiguracao = configuracao.segunda;
-          break;
-        case 2: // Terça
-          ehDiaUtilPorConfiguracao = configuracao.terca;
-          break;
-        case 3: // Quarta
-          ehDiaUtilPorConfiguracao = configuracao.quarta;
-          break;
-        case 4: // Quinta
-          ehDiaUtilPorConfiguracao = configuracao.quinta;
-          break;
-        case 5: // Sexta
-          ehDiaUtilPorConfiguracao = configuracao.sexta;
-          break;
-        case 6: // Sábado
-          ehDiaUtilPorConfiguracao = configuracao.sabado;
-          break;
-      }
-    } else {
-      // Configuração padrão: Segunda a Sexta
-      ehDiaUtilPorConfiguracao = diaSemana >= 1 && diaSemana <= 5;
-    }
-
-    // É dia útil se não for feriado E se for dia útil pela configuração
-    const ehDiaUtil = !ehFeriado && ehDiaUtilPorConfiguracao;
-
-    return {
-      data,
-      ehDiaUtil,
-      ehFeriado,
-      diaSemana: this.diasSemana[diaSemana],
-      configuracao: configuracao ? {
-        id: configuracao.id,
-        nome: configuracao.nome
-      } : undefined
-    };
+    return this.avaliar(comoDiaDoCalendario(new Date(dto.data)), await regraDeDiasUteis(this.prisma, dto.plantaId));
   }
 
   async obterProximosDiasUteis(dto: ProximosDiasUteisDto): Promise<ProximosDiasUteisResponse> {
     const { quantidade, dataInicio = new Date(), plantaId } = dto;
+    const regra = await regraDeDiasUteis(this.prisma, plantaId);
 
     const diasUteis: Date[] = [];
-    const dataAtual = new Date(dataInicio);
-    let tentativas = 0;
-    const maxTentativas = quantidade * 10; // Evitar loop infinito
-
-    // Obter configuração uma vez
-    const configuracao = await this.configuracoesService.obterConfiguracaoPorPlanta(plantaId);
-
-    while (diasUteis.length < quantidade && tentativas < maxTentativas) {
-      const resultado = await this.verificarDiaUtil({
-        data: new Date(dataAtual),
-        plantaId
-      });
-
-      if (resultado.ehDiaUtil) {
-        diasUteis.push(new Date(dataAtual));
-      }
-
-      // Avançar para o próximo dia
-      dataAtual.setDate(dataAtual.getDate() + 1);
-      tentativas++;
+    const inicio = comoDiaDoCalendario(new Date(dataInicio));
+    for (let i = 0; diasUteis.length < quantidade && i < quantidade * 10; i++) {
+      const dia = new Date(inicio.getTime() + i * DIA_MS);
+      if (this.avaliar(dia, regra).ehDiaUtil) diasUteis.push(dia);
     }
 
     return {
       diasUteis,
       diasEncontrados: diasUteis.length,
       dataInicio: new Date(dataInicio),
-      configuracaoUsada: configuracao ? {
-        id: configuracao.id,
-        nome: configuracao.nome
-      } : undefined
+      configuracaoUsada: regra.configuracao,
     };
   }
 
-  async calcularDiasUteisEntreDatas(
-    dataInicio: Date,
-    dataFim: Date,
-    plantaId?: string
-  ): Promise<number> {
+  async calcularDiasUteisEntreDatas(dataInicio: Date, dataFim: Date, plantaId?: string): Promise<number> {
+    const regra = await regraDeDiasUteis(this.prisma, plantaId);
+    const fim = comoDiaDoCalendario(new Date(dataFim)).getTime();
     let contador = 0;
-    const dataAtual = new Date(dataInicio);
-
-    while (dataAtual <= dataFim) {
-      const resultado = await this.verificarDiaUtil({
-        data: new Date(dataAtual),
-        plantaId
-      });
-
-      if (resultado.ehDiaUtil) {
-        contador++;
-      }
-
-      dataAtual.setDate(dataAtual.getDate() + 1);
+    for (let dia = comoDiaDoCalendario(new Date(dataInicio)); dia.getTime() <= fim; dia = new Date(dia.getTime() + DIA_MS)) {
+      if (this.avaliar(dia, regra).ehDiaUtil) contador++;
     }
-
     return contador;
   }
 
-  async adicionarDiasUteis(
-    dataBase: Date,
-    diasUteis: number,
-    plantaId?: string
-  ): Promise<Date> {
-    const dataAtual = new Date(dataBase);
-    let diasAdicionados = 0;
-    let tentativas = 0;
-    const maxTentativas = diasUteis * 10;
-
-    while (diasAdicionados < diasUteis && tentativas < maxTentativas) {
-      dataAtual.setDate(dataAtual.getDate() + 1);
-
-      const resultado = await this.verificarDiaUtil({
-        data: new Date(dataAtual),
-        plantaId
-      });
-
-      if (resultado.ehDiaUtil) {
-        diasAdicionados++;
-      }
-
-      tentativas++;
+  async adicionarDiasUteis(dataBase: Date, diasUteis: number, plantaId?: string): Promise<Date> {
+    const regra = await regraDeDiasUteis(this.prisma, plantaId);
+    let dia = comoDiaDoCalendario(new Date(dataBase));
+    let adicionados = 0;
+    for (let tentativas = 0; adicionados < diasUteis && tentativas < diasUteis * 10; tentativas++) {
+      dia = new Date(dia.getTime() + DIA_MS);
+      if (this.avaliar(dia, regra).ehDiaUtil) adicionados++;
     }
-
-    return new Date(dataAtual);
+    return dia;
   }
 
-  async obterCalendarioMes(
-    ano: number,
-    mes: number,
-    plantaId?: string
-  ): Promise<DiaUtilResponse[]> {
-    const calendario: DiaUtilResponse[] = [];
-    const primeiroDia = new Date(ano, mes - 1, 1);
-    const ultimoDia = new Date(ano, mes, 0);
+  /** Um item por dia do mês, ao meio-dia de Brasília (o dia certo em qualquer fuso do navegador). */
+  async obterCalendarioMes(ano: number, mes: number, plantaId?: string): Promise<DiaUtilResponse[]> {
+    const regra = await regraDeDiasUteis(this.prisma, plantaId);
+    const diasNoMes = new Date(Date.UTC(ano, mes, 0)).getUTCDate();
+    return Array.from({ length: diasNoMes }, (_, i) => this.avaliar(new Date(Date.UTC(ano, mes - 1, i + 1, 15)), regra));
+  }
 
-    for (let dia = 1; dia <= ultimoDia.getDate(); dia++) {
-      const data = new Date(ano, mes - 1, dia);
-      const resultado = await this.verificarDiaUtil({ data, plantaId });
-      calendario.push(resultado);
-    }
-
-    return calendario;
+  private avaliar(data: Date, regra: RegraDeDiasUteis): DiaUtilResponse {
+    const dia = diaEmBrasilia(data);
+    const feriado = feriadoDoDia(dia, regra.feriados);
+    return {
+      data,
+      ehDiaUtil: !!regra.diasDaSemana[dia.diaDaSemana] && !feriado,
+      ehFeriado: !!feriado,
+      nomeFeriado: feriado?.nome,
+      diaSemana: DIAS_DA_SEMANA[dia.diaDaSemana],
+      configuracao: regra.configuracao,
+    };
   }
 }

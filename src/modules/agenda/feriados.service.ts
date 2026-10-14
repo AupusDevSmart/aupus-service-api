@@ -335,25 +335,6 @@ export class FeriadosService {
     });
   }
 
-  async verificarFeriado(data: Date, plantaId?: string): Promise<boolean> {
-    const where: Prisma.feriadosWhereInput = {
-      data: data,
-      ativo: true,
-      OR: [
-        { geral: true },
-        ...(plantaId ? [{
-          geral: false,
-          feriado_plantas: {
-            some: { planta_id: plantaId }
-          }
-        }] : [])
-      ]
-    };
-
-    const feriado = await this.prisma.feriados.findFirst({ where });
-    return !!feriado;
-  }
-
   private buildOrderBy(orderBy?: string, orderDirection?: 'asc' | 'desc') {
     const direction = orderDirection || 'asc';
 

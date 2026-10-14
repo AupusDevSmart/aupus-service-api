@@ -19,6 +19,8 @@ describe('TarefasSchedulerService', () => {
     tarefas_os: { findMany: jest.fn() },
     tarefas_programacao_os: { findMany: jest.fn(), updateMany: jest.fn() },
     programacoes_os: { update: jest.fn() },
+    configuracoes_dias_uteis: { findFirst: jest.fn() },
+    feriados: { findMany: jest.fn() },
   };
 
   const mockProgramacaoService: any = { criarDeTarefas: jest.fn() };
@@ -37,6 +39,8 @@ describe('TarefasSchedulerService', () => {
     mockPrismaService.tarefas_os.findMany.mockResolvedValue([]);
     mockPrismaService.tarefas_programacao_os.findMany.mockResolvedValue([]);
     mockProgramacaoService.criarDeTarefas.mockResolvedValue({ id: 'prog_1', codigo: 'PRG-001' });
+    mockPrismaService.configuracoes_dias_uteis.findFirst.mockResolvedValue(null);
+    mockPrismaService.feriados.findMany.mockResolvedValue([]);
   });
 
   afterEach(() => jest.clearAllMocks());
@@ -144,6 +148,42 @@ describe('TarefasSchedulerService', () => {
 
     it('a criticidade da propria tarefa tambem conta', () => {
       expect(prioridade([comCriticidade('2', 4)])).toBe('ALTA');
+    });
+  });
+
+  describe('dia util da planta', () => {
+    // Outubro de 2026: 18 e domingo, 19 segunda (feriado no teste), 20 terca.
+    const tarefaDoDomingo = {
+      id: 'tarefa_1',
+      tag: 'TRF-001',
+      criticidade: 3,
+      equipamento_id: 'eq_1',
+      proxima_execucao: new Date('2026-10-18T13:00:00Z'),
+      equipamento: { id: 'eq_1', nome: 'Motor', criticidade: '3', unidade_id: 'un_1', unidade: { id: 'un_1', nome: 'Unidade 1', planta_id: 'pl_1' } },
+    };
+    const gerar = () => (service as any).criarProgramacaoParaCluster([tarefaDoDomingo], 'Unidade 1', 'un_1');
+
+    it('a programacao gerada cai no proximo dia util da planta (antes saia no domingo e no feriado)', async () => {
+      mockPrismaService.feriados.findMany.mockResolvedValue([{ data: new Date('2026-10-19T00:00:00Z'), recorrente: false, nome: 'Feriado' }]);
+
+      await gerar();
+
+      expect(mockProgramacaoService.criarDeTarefas).toHaveBeenCalledWith(
+        expect.objectContaining({ data_hora_programada: '2026-10-20T13:00:00.000Z' }),
+        undefined,
+      );
+      const where = mockPrismaService.feriados.findMany.mock.calls[0][0].where;
+      expect(where.OR).toContainEqual({ feriado_plantas: { some: { planta_id: 'pl_1' } } });
+    });
+
+    it('o ciclo de referencia continua sendo a data prevista, e a ajustada fica registrada na origem', async () => {
+      await gerar();
+
+      expect(mockPrismaService.tarefas_programacao_os.updateMany).toHaveBeenCalledWith(
+        expect.objectContaining({ data: { ciclo_referencia: tarefaDoDomingo.proxima_execucao } }),
+      );
+      const dados = mockPrismaService.programacoes_os.update.mock.calls[0][0].data.dados_origem;
+      expect(dados).toMatchObject({ data_prevista: '2026-10-18T13:00:00.000Z', ajustada_para_dia_util: true });
     });
   });
 

@@ -6,6 +6,7 @@ import { ProgramacaoOSService } from '../programacao-os/programacao-os.service';
 import { calcularProximaExecucao } from './periodicidade';
 import { variantesDeIds } from './ids';
 import { prioridadePelaCriticidade } from './prioridade-pela-criticidade';
+import { proximoDiaUtil, regraDeDiasUteis } from '../agenda/dias-uteis';
 
 /** Janela de agrupamento em dias */
 const JANELA_AGRUPAMENTO_DIAS = 14;
@@ -34,6 +35,7 @@ interface TarefaElegivel {
     unidade: {
       id: string;
       nome: string;
+      planta_id: string | null;
     } | null;
   };
   proxima_execucao?: Date;
@@ -179,6 +181,7 @@ export class TarefasSchedulerService {
               select: {
                 id: true,
                 nome: true,
+                planta_id: true,
               },
             },
           },
@@ -385,8 +388,12 @@ export class TarefasSchedulerService {
   ): Promise<{ id: string; codigo: string } | null> {
     if (cluster.length === 0) return null;
 
-    // Data programada = data mais próxima do cluster
-    const dataProgramada = cluster[0].proxima_execucao!;
+    // Data programada = data mais próxima do cluster, levada ao próximo dia útil
+    // da planta (feriados e dias da semana da agenda). O ciclo de referência de
+    // cada tarefa continua sendo a data prevista: é ele que o cron compara.
+    const dataPrevista = cluster[0].proxima_execucao!;
+    const plantaId = cluster[0].equipamento?.unidade?.planta_id ?? null;
+    const dataProgramada = proximoDiaUtil(dataPrevista, await regraDeDiasUteis(this.prisma, plantaId));
     const mesAno = `${String(dataProgramada.getMonth() + 1).padStart(2, '0')}/${dataProgramada.getFullYear()}`;
 
     // Prioridade pela criticidade mais alta (dos equipamentos e das tarefas)
@@ -454,6 +461,8 @@ export class TarefasSchedulerService {
               unidade_nome: nomeUnidade,
               janela_inicio: cluster[0].proxima_execucao?.toISOString(),
               janela_fim: cluster[cluster.length - 1].proxima_execucao?.toISOString(),
+              data_prevista: dataPrevista.toISOString(),
+              ajustada_para_dia_util: dataProgramada.getTime() !== dataPrevista.getTime(),
             },
           },
         });
