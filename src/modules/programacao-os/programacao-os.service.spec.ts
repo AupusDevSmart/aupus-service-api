@@ -116,6 +116,7 @@ describe('ProgramacaoOSService', () => {
       findMany: jest.fn(),
       findFirst: jest.fn(),
       findUnique: jest.fn(),
+      findUniqueOrThrow: jest.fn(),
       create: jest.fn(),
       update: jest.fn(),
       delete: jest.fn(),
@@ -1002,10 +1003,14 @@ describe('ProgramacaoOSService', () => {
       mockPrismaService.tarefas_programacao_os.findMany.mockResolvedValue([]);
       mockPrismaService.tarefas_programacao_os.createMany.mockResolvedValue({ count: 1 });
       mockPrismaService.historico_programacao_os.create.mockResolvedValue({});
+      // A regra "uma programação, uma planta" lê a planta gravada (SN-40)
+      mockPrismaService.programacoes_os.findUniqueOrThrow.mockResolvedValue({
+        planta_id: 'planta_1', anomalia_id: null, solicitacao_servico_id: null, dados_origem: null, equipamento_id: null,
+      });
 
       await service.adicionarTarefasProgramacao('clrx1234567890123456789012', adicionarTarefasDto, 'user123');
 
-      expect(service.buscarPorId).toHaveBeenCalledWith('clrx1234567890123456789012');
+      expect(service.buscarPorId).toHaveBeenCalledWith('clrx1234567890123456789012', undefined);
       expect(mockPrismaService.tarefas_programacao_os.createMany).toHaveBeenCalled();
     });
   });

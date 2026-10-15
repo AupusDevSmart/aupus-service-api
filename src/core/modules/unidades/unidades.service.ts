@@ -35,6 +35,11 @@ export class UnidadesService {
     private scopeService: PermissionScopeService,
   ) {}
 
+  /** 404/403 do escopo da unidade, nas rotas por id que não passam pelo findOne (SN-40). */
+  async garantirNoEscopo(id: string, user?: ScopedUser): Promise<void> {
+    if (user) await this.scopeService.assertEntityInScope('unidade', id?.trim(), user);
+  }
+
   async create(createDto: CreateUnidadeDto): Promise<UnidadeResponse> {
     const { planta_id, pontos_medicao, concessionaria_id, ...unidadeData } = createDto;
 

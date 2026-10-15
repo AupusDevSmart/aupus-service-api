@@ -1,4 +1,4 @@
-import { PrismaService } from '@/core';
+import { PermissionScopeService, PrismaService } from '@/core';
 import { InstrucoesService } from '@/modules/instrucoes/instrucoes.service';
 import { PropagacaoPlanosService } from '@/modules/planos-manutencao/propagacao-planos.service';
 import { ImportacaoService } from '../importacao.service';
@@ -14,7 +14,7 @@ describe('Importação de instruções (banco real)', () => {
   const prisma = new PrismaService();
   const importacao = new ImportacaoService(prisma);
   const instrucoes = new InstrucoesImportacao(
-    new InstrucoesService(prisma, {} as PropagacaoPlanosService),
+    new InstrucoesService(prisma, {} as PropagacaoPlanosService, new PermissionScopeService(prisma)),
     prisma,
   );
   const usuario: UsuarioDaImportacao = { id: 'TESTEIMPINSTRUCAOUSUARIO1', role: 'admin', permissions: ['manutencao.manage'] };

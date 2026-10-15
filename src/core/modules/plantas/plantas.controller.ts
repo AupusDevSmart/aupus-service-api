@@ -49,11 +49,15 @@ export class PlantasController {
     description: 'Lista de proprietários retornada com sucesso',
     type: [ProprietarioBasico]
   })
-  async findProprietarios(@Query('comUnidades') comUnidades?: string): Promise<ProprietarioBasico[]> {
+  async findProprietarios(
+    @CurrentUser() user: ScopedUser,
+    @Query('comUnidades') comUnidades?: string,
+  ): Promise<ProprietarioBasico[]> {
     this.logger.log(`👥 [LIST PROPRIETARIOS] Buscando proprietários disponíveis (comUnidades: ${comUnidades})`);
 
     try {
-      const proprietarios = await this.plantasService.findProprietarios(comUnidades === 'true');
+      // No escopo de quem pede: técnico e cliente só recebem os donos das plantas deles
+      const proprietarios = await this.plantasService.findProprietarios(comUnidades === 'true', user);
       
       this.logger.log(`✅ [LIST PROPRIETARIOS] Encontrados ${proprietarios.length} proprietários`);
       return proprietarios;

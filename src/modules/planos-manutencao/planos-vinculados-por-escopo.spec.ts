@@ -1,3 +1,4 @@
+import { ForbiddenException } from '@nestjs/common';
 import { PermissionScopeService, PrismaService } from '@/core';
 import { PlanosManutencaoService } from './planos-manutencao.service';
 import { PropagacaoPlanosService } from './propagacao-planos.service';
@@ -23,13 +24,22 @@ describe('planos vinculados pelo escopo da planta (banco real)', () => {
   const UC_A = ID('uca');
   const UAR_A = ID('uara');
   const UC_B = ID('ucb');
+  // 25 caracteres, como os ids cuid antigos, para provar o trim (SN-40)
+  const ANTIGO_A = `testeplanoescopo${'antigoa'}`.padEnd(25, '0').slice(0, 25);
   const PREFIXO = 'TESTE-PLANO-ESCOPO';
+  // Nome à parte: o plano antigo também é de equipamento e entraria na lista
+  // de vinculados das buscas acima
+  const ANTIGO = 'TESTE-PLANOANTIGO-ESCOPO';
+  let templateId: string;
+  let copiaAId: string;
+  let antigoAId: string;
 
   const apagar = async () => {
     await prisma.planos_manutencao.deleteMany({ where: { nome: { startsWith: PREFIXO }, equipamento_id: { not: null } } });
     await prisma.planos_manutencao.deleteMany({ where: { nome: { startsWith: PREFIXO } } });
+    await prisma.planos_manutencao.deleteMany({ where: { nome: { startsWith: ANTIGO } } });
     await prisma.equipamentos.deleteMany({ where: { id: { in: [UAR_A] } } });
-    await prisma.equipamentos.deleteMany({ where: { id: { in: [UC_A, UC_B] } } });
+    await prisma.equipamentos.deleteMany({ where: { id: { in: [UC_A, UC_B, ANTIGO_A] } } });
     await prisma.unidades.deleteMany({ where: { id: { in: [UNIDADE_A, UNIDADE_B] } } });
     await prisma.planta_operadores.deleteMany({ where: { usuario_id: TECNICO_B } });
     await prisma.plantas.deleteMany({ where: { id: { in: [PLANTA_A, PLANTA_B] } } });
@@ -56,9 +66,16 @@ describe('planos vinculados pelo escopo da planta (banco real)', () => {
     await prisma.equipamentos.create({ data: { id: UC_B, nome: 'Inversor B', classificacao: 'UC', criticidade: '3', unidade_id: UNIDADE_B } });
 
     const template = await prisma.planos_manutencao.create({ data: { nome: `${PREFIXO} template` } });
+    templateId = template.id;
     for (const [equipamento, nome] of [[UC_A, 'A'], [UAR_A, 'componente A'], [UC_B, 'B']]) {
-      await prisma.planos_manutencao.create({ data: { nome: `${PREFIXO} ${nome}`, equipamento_id: equipamento, plano_origem_id: template.id } });
+      const copia = await prisma.planos_manutencao.create({ data: { nome: `${PREFIXO} ${nome}`, equipamento_id: equipamento, plano_origem_id: template.id } });
+      if (equipamento === UC_A) copiaAId = copia.id;
     }
+
+    // Plano de equipamento antigo, de antes do template por categoria: não tem
+    // origem, então cai na lista de templates — mas é de uma planta (SN-40)
+    await prisma.equipamentos.create({ data: { id: ANTIGO_A, nome: 'Inversor antigo A', classificacao: 'UC', criticidade: '3', unidade_id: UNIDADE_A } });
+    antigoAId = (await prisma.planos_manutencao.create({ data: { nome: `${ANTIGO} A`, equipamento_id: ANTIGO_A } })).id;
   });
 
   afterAll(async () => {
@@ -87,8 +104,50 @@ describe('planos vinculados pelo escopo da planta (banco real)', () => {
     expect(await vinculados({ id: DONO_A, role: 'admin' })).toHaveLength(3);
   });
 
+  const templates = async (user?: { id: string; role: string }, extra: Record<string, unknown> = {}) =>
+    (await planos.listar({ page: 1, limit: 100, search: PREFIXO, ...extra } as never, user)).data.map((p) => p.nome).sort();
+  const antigos = async (user?: { id: string; role: string }, extra: Record<string, unknown> = {}) =>
+    (await planos.listar({ page: 1, limit: 100, search: ANTIGO, ...extra } as never, user)).data.map((p) => p.nome);
+
   it('a lista de templates continua sem escopo (template não tem planta)', async () => {
-    const templates = (await planos.listar({ page: 1, limit: 100, search: PREFIXO } as never, { id: TECNICO_B, role: 'operador' })).data;
-    expect(templates.map((p) => p.nome)).toEqual([`${PREFIXO} template`]);
+    expect(await templates({ id: TECNICO_B, role: 'operador' })).toEqual([`${PREFIXO} template`]);
+  });
+
+  describe('plano de equipamento antigo, sem origem (SN-40)', () => {
+    it('na lista de templates, só para quem tem a planta dele (o template segue para todos)', async () => {
+      expect(await antigos({ id: DONO_A, role: 'proprietario' })).toEqual([`${ANTIGO} A`]);
+      expect(await antigos({ id: DONO_B, role: 'proprietario' })).toEqual([]);
+      expect(await antigos({ id: TECNICO_B, role: 'operador' })).toEqual([]);
+      expect(await templates({ id: DONO_B, role: 'proprietario' })).toEqual([`${PREFIXO} template`]);
+    });
+
+    it('quem vê todas as plantas segue vendo tudo, como antes', async () => {
+      expect(await antigos({ id: DONO_A, role: 'admin' })).toEqual([`${ANTIGO} A`]);
+      expect(await antigos()).toEqual([`${ANTIGO} A`]);
+    });
+
+    it('filtrando pelo equipamento: o de outra planta não aparece', async () => {
+      expect(await antigos({ id: TECNICO_B, role: 'operador' }, { equipamento_id: ANTIGO_A })).toEqual([]);
+      expect(await antigos({ id: DONO_A, role: 'proprietario' }, { equipamento_id: ANTIGO_A })).toEqual([`${ANTIGO} A`]);
+    });
+  });
+
+  describe('por id: resumo, propagação e o próprio plano (SN-40)', () => {
+    it('resumo do plano de outra planta: 403; o da planta e o do template passam', async () => {
+      await expect(planos.obterResumo(copiaAId, { id: TECNICO_B, role: 'operador' })).rejects.toBeInstanceOf(ForbiddenException);
+      await expect(planos.obterResumo(antigoAId, { id: TECNICO_B, role: 'operador' })).rejects.toBeInstanceOf(ForbiddenException);
+      expect((await planos.obterResumo(copiaAId, { id: DONO_A, role: 'proprietario' })).nome).toBe(`${PREFIXO} A`);
+      expect((await planos.obterResumo(templateId, { id: TECNICO_B, role: 'operador' })).nome).toBe(`${PREFIXO} template`);
+    });
+
+    it('propagação do plano de outra planta: 403; a do template passa', async () => {
+      await expect(planos.consultarPropagacoes(copiaAId, { id: TECNICO_B, role: 'operador' })).rejects.toBeInstanceOf(ForbiddenException);
+      await expect(planos.consultarPropagacoes(templateId, { id: TECNICO_B, role: 'operador' })).resolves.toEqual([]);
+    });
+
+    it('o template se abre para o técnico (antes dava 404: o escopo procurava o equipamento que ele não tem)', async () => {
+      expect((await planos.buscarPorId(templateId, false, { id: TECNICO_B, role: 'operador' })).nome).toBe(`${PREFIXO} template`);
+      await expect(planos.buscarPorId(copiaAId, false, { id: TECNICO_B, role: 'operador' })).rejects.toBeInstanceOf(ForbiddenException);
+    });
   });
 });

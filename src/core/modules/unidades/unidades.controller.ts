@@ -62,8 +62,10 @@ export class UnidadesController {
   @Permissions('unidades.view')
   @ApiOperation({ summary: 'Baixar anexo da instalação' })
   @ApiParam({ name: 'anexoId' })
-  async baixarAnexo(@Param('anexoId') anexoId: string, @Res() res: Response) {
+  async baixarAnexo(@Param('anexoId') anexoId: string, @Res() res: Response, @CurrentUser() user: ScopedUser) {
     const anexo = await this.anexosService.buscarAnexo(anexoId);
+    // O escopo é o da unidade do anexo: antes baixava o de qualquer planta (SN-40)
+    await this.unidadesService.garantirNoEscopo(anexo.unidade_id, user);
     const caminho = await this.anexosService.obterCaminhoArquivo(anexoId);
 
     res.setHeader('Content-Type', anexo.mime_type);
@@ -100,7 +102,8 @@ export class UnidadesController {
   @Permissions('unidades.view')
   @ApiOperation({ summary: 'Listar anexos da instalação' })
   @ApiParam({ name: 'id' })
-  listarAnexos(@Param('id') id: string) {
+  async listarAnexos(@Param('id') id: string, @CurrentUser() user: ScopedUser) {
+    await this.unidadesService.garantirNoEscopo(id, user);
     return this.anexosService.listarAnexos(id);
   }
 
@@ -277,7 +280,8 @@ export class UnidadesController {
     status: HttpStatus.NOT_FOUND,
     description: 'Unidade não encontrada',
   })
-  async getEstatisticas(@Param('id') id: string) {
+  async getEstatisticas(@Param('id') id: string, @CurrentUser() user: ScopedUser) {
+    await this.unidadesService.garantirNoEscopo(id, user);
     this.logger.log(`📊 [ESTATISTICAS UNIDADE] Unidade: ${id}`);
 
     try {
@@ -437,11 +441,11 @@ export class UnidadesController {
     status: HttpStatus.NOT_FOUND,
     description: 'Unidade não encontrada',
   })
-  async getEstatisticasEquipamentos(@Param('id') id: string) {
+  async getEstatisticasEquipamentos(@Param('id') id: string, @CurrentUser() user: ScopedUser) {
     this.logger.log(`📊 [ESTATISTICAS EQUIPAMENTOS UNIDADE] Unidade: ${id}`);
 
     try {
-      const stats = await this.equipamentosService.getEstatisticasUnidade(id);
+      const stats = await this.equipamentosService.getEstatisticasUnidade(id, user);
       this.logger.log(`✅ [ESTATISTICAS EQUIPAMENTOS UNIDADE] Estatísticas geradas`);
       return stats;
     } catch (error) {

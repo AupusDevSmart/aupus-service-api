@@ -1,6 +1,6 @@
 import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
-import { plantaDasTarefas } from './planta-dos-equipamentos';
+import { plantaDasTarefas, plantaDeCadaEquipamento } from './planta-dos-equipamentos';
 
 export type PlantaScope = string[] | null;
 
@@ -20,6 +20,7 @@ export interface ScopedUser {
 export type ScopedEntityType =
   | 'planta'
   | 'unidade'
+  | 'ativo_funcional'
   | 'equipamento'
   | 'anomalia'
   | 'tarefa'
@@ -195,6 +196,19 @@ export class PermissionScopeService {
   }
 
   /**
+   * A planta de um equipamento pela regra única de `plantaDeCadaEquipamento`:
+   * a dele, senão a da unidade, senão — componente (UAR), que não tem unidade —
+   * a da unidade do UC pai. Antes cada caso abaixo parava na unidade, e o
+   * componente (e a anomalia, a tarefa, a OS e a programação dele) dava "não
+   * encontrado" para o técnico e o cliente (SN-40).
+   */
+  private async plantaDoEquipamento(equipamentoId: string | null | undefined): Promise<string | null> {
+    const id = equipamentoId?.trim();
+    if (!id) return null;
+    return (await plantaDeCadaEquipamento(this.prisma, [id])).get(id) ?? null;
+  }
+
+  /**
    * Busca o planta_id "efetivo" de uma entidade do dominio.
    * Retorna null se a entidade nao existe (ou foi soft-deleted).
    */
@@ -214,78 +228,59 @@ export class PermissionScopeService {
         });
         return row?.planta_id?.trim() ?? null;
       }
+      case 'ativo_funcional': {
+        // A posição é de uma unidade (coluna obrigatória); a planta é a dela.
+        const row = await this.prisma.ativos_funcionais.findFirst({
+          where: { id, deleted_at: null },
+          select: { unidade_id: true },
+        });
+        if (!row) return null;
+        const unidade = await this.prisma.unidades.findFirst({
+          where: { id: row.unidade_id.trim(), deleted_at: null },
+          select: { planta_id: true },
+        });
+        return unidade?.planta_id?.trim() ?? null;
+      }
       case 'equipamento': {
-        // equipamentos.planta_id eh nullable; fallback para unidade.planta_id
-        // quando a coluna direta esta vazia.
+        // equipamentos.planta_id é nullable: vale a regra de plantaDoEquipamento.
         const row = await this.prisma.equipamentos.findFirst({
           where: { id, deleted_at: null },
-          select: {
-            planta_id: true,
-            unidade: { select: { planta_id: true } },
-          },
+          select: { id: true },
         });
         if (!row) return null;
-        const direct = row.planta_id?.trim();
-        if (direct) return direct;
-        return row.unidade?.planta_id?.trim() ?? null;
+        return this.plantaDoEquipamento(row.id);
       }
       case 'anomalia': {
-        // anomalias.planta_id e nullable; fallback via equipamento.unidade.planta_id.
+        // anomalias.planta_id é nullable; senão, a planta do equipamento.
         const row = await this.prisma.anomalias.findFirst({
           where: { id, deleted_at: null },
-          select: {
-            planta_id: true,
-            equipamento: {
-              select: { planta_id: true, unidade: { select: { planta_id: true } } },
-            },
-          },
+          select: { planta_id: true, equipamento_id: true },
         });
         if (!row) return null;
-        return (
-          row.planta_id?.trim() ||
-          row.equipamento?.planta_id?.trim() ||
-          row.equipamento?.unidade?.planta_id?.trim() ||
-          null
-        );
+        return row.planta_id?.trim() || (await this.plantaDoEquipamento(row.equipamento_id));
       }
       case 'tarefa': {
-        // tarefas.planta_id e nullable; equipamento_id eh non-nullable.
+        // tarefas.planta_id é nullable; senão, a planta do equipamento.
         const row = await this.prisma.tarefas.findFirst({
           where: { id, deleted_at: null },
-          select: {
-            planta_id: true,
-            equipamento: {
-              select: { planta_id: true, unidade: { select: { planta_id: true } } },
-            },
-          },
+          select: { planta_id: true, equipamento_id: true },
         });
         if (!row) return null;
-        return (
-          row.planta_id?.trim() ||
-          row.equipamento?.planta_id?.trim() ||
-          row.equipamento?.unidade?.planta_id?.trim() ||
-          null
-        );
+        return row.planta_id?.trim() || (await this.plantaDoEquipamento(row.equipamento_id));
       }
       case 'ordem_servico': {
-        // ordens_servico.planta_id e nullable; fallback via equipamento.unidade.planta_id.
+        // ordens_servico.planta_id é nullable; senão, a planta do equipamento.
         // A OS marca exclusao em deletado_em (nao deleted_at): com o nome errado o
         // Prisma recusava a consulta e toda acao do tecnico numa OS dava erro.
         const row = await this.prisma.ordens_servico.findFirst({
           where: { id, deletado_em: null },
-          select: {
-            planta_id: true,
-            equipamento: {
-              select: { planta_id: true, unidade: { select: { planta_id: true } } },
-            },
-          },
+          select: { planta_id: true, equipamento_id: true },
         });
         if (!row) return null;
         // OS de tarefa antiga, sem planta gravada (SN-33): vale a planta das tarefas
         return (
           row.planta_id?.trim() ||
-          row.equipamento?.planta_id?.trim() ||
-          row.equipamento?.unidade?.planta_id?.trim() ||
+          (await this.plantaDoEquipamento(row.equipamento_id)) ||
           (await plantaDasTarefas(this.prisma, { osId: id }))
         );
       }
@@ -298,58 +293,34 @@ export class PermissionScopeService {
         return row?.planta_id?.trim() ?? null;
       }
       case 'programacao_os': {
-        // programacoes_os.planta_id e nullable; fallback via equipamento.unidade.planta_id.
+        // programacoes_os.planta_id é nullable; senão, a planta do equipamento.
         // Exclusao em deletado_em, como na OS.
         const row = await this.prisma.programacoes_os.findFirst({
           where: { id, deletado_em: null },
-          select: {
-            planta_id: true,
-            equipamento: {
-              select: { planta_id: true, unidade: { select: { planta_id: true } } },
-            },
-          },
+          select: { planta_id: true, equipamento_id: true },
         });
         if (!row) return null;
         return (
           row.planta_id?.trim() ||
-          row.equipamento?.planta_id?.trim() ||
-          row.equipamento?.unidade?.planta_id?.trim() ||
+          (await this.plantaDoEquipamento(row.equipamento_id)) ||
           (await plantaDasTarefas(this.prisma, { programacaoId: id }))
         );
       }
       case 'regra_log_mqtt': {
-        // Resolvida via equipamento. equipamento.planta_id e nullable;
-        // fallback via equipamentos.unidade.planta_id.
+        // Resolvida pela planta do equipamento.
         const row = await this.prisma.regras_logs_mqtt.findFirst({
           where: { id },
-          select: {
-            equipamento: {
-              select: { planta_id: true, unidade: { select: { planta_id: true } } },
-            },
-          },
+          select: { equipamento_id: true },
         });
-        return (
-          row?.equipamento?.planta_id?.trim() ||
-          row?.equipamento?.unidade?.planta_id?.trim() ||
-          null
-        );
+        return this.plantaDoEquipamento(row?.equipamento_id);
       }
       case 'log_mqtt': {
-        // Resolvida via equipamento. equipamento.planta_id e nullable;
-        // fallback via equipamentos.unidade.planta_id.
+        // Resolvida pela planta do equipamento.
         const row = await this.prisma.logs_mqtt.findFirst({
           where: { id },
-          select: {
-            equipamento: {
-              select: { planta_id: true, unidade: { select: { planta_id: true } } },
-            },
-          },
+          select: { equipamento_id: true },
         });
-        return (
-          row?.equipamento?.planta_id?.trim() ||
-          row?.equipamento?.unidade?.planta_id?.trim() ||
-          null
-        );
+        return this.plantaDoEquipamento(row?.equipamento_id);
       }
     }
   }

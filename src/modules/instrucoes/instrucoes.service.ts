@@ -1,6 +1,6 @@
 // src/modules/instrucoes/instrucoes.service.ts
 import { Injectable, NotFoundException, ConflictException, BadRequestException } from '@nestjs/common';
-import { PrismaService } from '@/core';
+import { PermissionScopeService, PrismaService, ScopedUser } from '@/core';
 import { PropagacaoPlanosService } from '../planos-manutencao/propagacao-planos.service';
 import {
   CreateInstrucaoDto,
@@ -33,7 +33,22 @@ export class InstrucoesService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly propagacaoService: PropagacaoPlanosService,
+    private readonly scopeService: PermissionScopeService,
   ) {}
+
+  /**
+   * Equipamento numa das plantas: a dele, a da unidade ou — componente (UAR),
+   * que não tem unidade — a da unidade do UC pai.
+   */
+  private equipamentoNasPlantas(plantas: string[]): Prisma.equipamentosWhereInput {
+    return {
+      OR: [
+        { planta_id: { in: plantas } },
+        { unidade: { planta_id: { in: plantas } } },
+        { equipamento_pai: { unidade: { planta_id: { in: plantas } } } },
+      ],
+    };
+  }
 
   async criar(createDto: CreateInstrucaoDto): Promise<InstrucaoResponseDto> {
     // Se não foi fornecida TAG, gerar automaticamente
@@ -324,14 +339,24 @@ export class InstrucoesService {
   // Tarefas derivadas
   // ==========================================
 
-  async listarTarefasDerivadas(instrucaoId: string) {
+  async listarTarefasDerivadas(instrucaoId: string, user?: ScopedUser) {
     await this.verificarInstrucaoExiste(instrucaoId);
 
+    // A tarefa da cópia é de um equipamento, e o equipamento é de uma planta:
+    // quem tem escopo vê as do escopo e as dos templates (sem equipamento nem
+    // planta). Antes a lista vinha de todas as plantas (SN-40).
+    const scope = await this.scopeService.getScope(user);
+    const where: Prisma.tarefasWhereInput = { instrucao_id: instrucaoId, deleted_at: null };
+    if (this.scopeService.isScoped(scope)) {
+      where.OR = [
+        { equipamento_id: null, planta_id: null },
+        { planta_id: { in: scope } },
+        { planta_id: null, equipamento: this.equipamentoNasPlantas(scope) },
+      ];
+    }
+
     const tarefas = await this.prisma.tarefas.findMany({
-      where: {
-        instrucao_id: instrucaoId,
-        deleted_at: null
-      },
+      where,
       include: {
         plano_manutencao: {
           select: { id: true, nome: true, versao: true }
@@ -350,8 +375,11 @@ export class InstrucoesService {
   // Associações com anomalias
   // ==========================================
 
-  async associarAnomalia(instrucaoId: string, anomaliaId: string, observacoes?: string, createdBy?: string): Promise<anomalias_instrucoes> {
+  // O autor sai do token (`user`), não do corpo: antes quem chamava escolhia em
+  // nome de quem a associação ficava gravada (SN-40).
+  async associarAnomalia(instrucaoId: string, anomaliaId: string, observacoes?: string, user?: ScopedUser): Promise<anomalias_instrucoes> {
     await this.verificarInstrucaoExiste(instrucaoId);
+    await this.scopeService.assertEntityInScope('anomalia', anomaliaId, user);
 
     const anomalia = await this.prisma.anomalias.findFirst({
       where: { id: anomaliaId, deleted_at: null }
@@ -365,16 +393,26 @@ export class InstrucoesService {
         anomalia_id: anomaliaId,
         instrucao_id: instrucaoId,
         observacoes,
-        created_by: createdBy
+        created_by: user?.id?.trim() ?? null
       }
     });
   }
 
-  async listarAnomalias(instrucaoId: string) {
+  async listarAnomalias(instrucaoId: string, user?: ScopedUser) {
     await this.verificarInstrucaoExiste(instrucaoId);
 
+    // Só as anomalias do escopo: a planta gravada nela ou, na antiga sem
+    // planta, a do equipamento. Antes vinham as de todas as plantas (SN-40).
+    const scope = await this.scopeService.getScope(user);
+    const where: Prisma.anomalias_instrucoesWhereInput = { instrucao_id: instrucaoId };
+    if (this.scopeService.isScoped(scope)) {
+      where.anomalia = {
+        OR: [{ planta_id: { in: scope } }, { planta_id: null, equipamento: this.equipamentoNasPlantas(scope) }],
+      };
+    }
+
     const associacoes = await this.prisma.anomalias_instrucoes.findMany({
-      where: { instrucao_id: instrucaoId },
+      where,
       include: {
         anomalia: {
           select: {
@@ -394,7 +432,8 @@ export class InstrucoesService {
     return associacoes;
   }
 
-  async desassociarAnomalia(instrucaoId: string, anomaliaId: string): Promise<void> {
+  async desassociarAnomalia(instrucaoId: string, anomaliaId: string, user?: ScopedUser): Promise<void> {
+    await this.scopeService.assertEntityInScope('anomalia', anomaliaId, user);
     const associacao = await this.prisma.anomalias_instrucoes.findFirst({
       where: { instrucao_id: instrucaoId, anomalia_id: anomaliaId }
     });
@@ -412,7 +451,8 @@ export class InstrucoesService {
   // Associações com solicitações de serviço
   // ==========================================
 
-  async associarSolicitacao(instrucaoId: string, solicitacaoId: string, observacoes?: string, createdBy?: string): Promise<solicitacoes_instrucoes> {
+  // O autor sai do token, como na associação com anomalia (SN-40).
+  async associarSolicitacao(instrucaoId: string, solicitacaoId: string, observacoes?: string, user?: ScopedUser): Promise<solicitacoes_instrucoes> {
     await this.verificarInstrucaoExiste(instrucaoId);
 
     const solicitacao = await this.prisma.solicitacoes_servico.findFirst({
@@ -427,16 +467,21 @@ export class InstrucoesService {
         solicitacao_id: solicitacaoId,
         instrucao_id: instrucaoId,
         observacoes,
-        created_by: createdBy
+        created_by: user?.id?.trim() ?? null
       }
     });
   }
 
-  async listarSolicitacoes(instrucaoId: string) {
+  async listarSolicitacoes(instrucaoId: string, user?: ScopedUser) {
     await this.verificarInstrucaoExiste(instrucaoId);
 
+    // Só as solicitações do escopo (a solicitação sempre tem planta) — SN-40.
+    const scope = await this.scopeService.getScope(user);
+    const where: Prisma.solicitacoes_instrucoesWhereInput = { instrucao_id: instrucaoId };
+    if (this.scopeService.isScoped(scope)) where.solicitacao = { planta_id: { in: scope } };
+
     const associacoes = await this.prisma.solicitacoes_instrucoes.findMany({
-      where: { instrucao_id: instrucaoId },
+      where,
       include: {
         solicitacao: {
           select: {

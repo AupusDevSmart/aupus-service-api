@@ -1,7 +1,8 @@
 import { IsString, IsOptional, IsNumber, IsDateString, IsArray, IsNotEmpty, Length, IsEnum, ValidateNested } from 'class-validator';
 import { Type } from 'class-transformer';
-import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional, PartialType, PickType } from '@nestjs/swagger';
 import { PrioridadeOS } from '@/core';
+import { CreateProgramacaoDto } from './create-programacao.dto';
 
 export class AprovarProgramacaoDto {
   @ApiPropertyOptional({ description: 'Observações da aprovação' })
@@ -65,6 +66,31 @@ export class CreateProgramacaoAnomaliaDto {
   @Type(() => AjustesDaProgramacaoDaAnomaliaDto)
   ajustes?: AjustesDaProgramacaoDaAnomaliaDto;
 }
+
+/**
+ * O que se ajusta na programação gerada da solicitação. Antes o corpo era
+ * `Partial<CreateProgramacaoDto>` — tipo sem classe, que o ValidationPipe não
+ * valida —, e o `...dto` no service sobrescrevia qualquer campo, inclusive a
+ * solicitação, a planta e a origem (SN-40). O que vem da solicitação (origem,
+ * planta, equipamento, tipo) não se ajusta aqui.
+ */
+export const AJUSTES_DA_PROGRAMACAO_DA_SOLICITACAO = [
+  'descricao',
+  'prioridade',
+  'tempo_estimado',
+  'duracao_estimada',
+  'data_previsao_inicio',
+  'data_previsao_fim',
+  'data_hora_programada',
+  'responsavel',
+  'observacoes',
+  'observacoes_programacao',
+  'justificativa',
+] as const;
+
+export class AjustesDaProgramacaoDaSolicitacaoDto extends PartialType(
+  PickType(CreateProgramacaoDto, AJUSTES_DA_PROGRAMACAO_DA_SOLICITACAO),
+) {}
 
 export class CreateProgramacaoTarefasDto {
   @ApiProperty({ description: 'IDs das tarefas selecionadas', example: ['clrx1234567890123456789012'] })

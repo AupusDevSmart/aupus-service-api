@@ -11,6 +11,8 @@ import {
 import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import type { Request } from 'express';
 import type { UsuarioAutenticado } from '../auth/strategies/jwt.strategy';
+import { CurrentUser } from '../auth/decorators/current-user.decorator';
+import { PermissionScopeService, type ScopedUser } from '../auth/permission-scope.service';
 import { AtivosFuncionaisService } from './ativos-funcionais.service';
 import {
   CriarAtivoFuncionalDto,
@@ -32,7 +34,10 @@ import {
 @Controller('ativos-funcionais')
 @Permissions('equipamentos.view', 'equipamentos.manage')
 export class AtivosFuncionaisController {
-  constructor(private readonly service: AtivosFuncionaisService) {}
+  constructor(
+    private readonly service: AtivosFuncionaisService,
+    private readonly escopo: PermissionScopeService,
+  ) {}
 
   private usuarioDe(req: Request): string | undefined {
     // `sub` e o nome do id no payload do token; o JwtStrategy entrega `id`
@@ -48,8 +53,11 @@ export class AtivosFuncionaisController {
       'que a posicao ja tem equipamento no momento da escolha, e nao depois do submit.',
   })
   @ApiResponse({ status: 200, description: 'Posicoes com o estado de ocupacao' })
-  async listar(@Query() query: ListarAtivosFuncionaisDto) {
-    return this.service.listar({ unidade_id: query.unidade_id });
+  async listar(@Query() query: ListarAtivosFuncionaisDto, @CurrentUser() user: ScopedUser) {
+    // No escopo de quem pede: antes o técnico e o cliente listavam as posições
+    // (e os equipamentos instalados) de todas as plantas (SN-40)
+    const scope = await this.escopo.getScope(user);
+    return this.service.listar({ unidade_id: query.unidade_id, ...(this.escopo.isScoped(scope) && { plantas: scope }) });
   }
 
   @Get(':id')
@@ -58,7 +66,8 @@ export class AtivosFuncionaisController {
     description: 'Traz o equipamento ativo e os anteriores separados — a tela trata os dois de forma diferente.',
   })
   @ApiResponse({ status: 404, description: 'Posicao nao encontrada' })
-  async buscarPorId(@Param('id') id: string) {
+  async buscarPorId(@Param('id') id: string, @CurrentUser() user: ScopedUser) {
+    await this.escopo.assertEntityInScope('ativo_funcional', id, user);
     return this.service.buscarPorId(id);
   }
 
@@ -71,13 +80,15 @@ export class AtivosFuncionaisController {
       "equipamento antigo pode ter sido feita ha 5 no novo.",
   })
   @ApiResponse({ status: 200, description: "Nulo quando nao houve ocupante anterior ou ele nao tinha plano" })
-  async planoAHerdar(@Param("id") id: string) {
+  async planoAHerdar(@Param("id") id: string, @CurrentUser() user: ScopedUser) {
+    await this.escopo.assertEntityInScope('ativo_funcional', id, user);
     return this.service.planoAHerdar(id);
   }
 
   @Get(':id/historico')
   @ApiOperation({ summary: 'Tudo que ja passou pela posicao, do mais recente para o mais antigo' })
-  async historico(@Param('id') id: string) {
+  async historico(@Param('id') id: string, @CurrentUser() user: ScopedUser) {
+    await this.escopo.assertEntityInScope('ativo_funcional', id, user);
     return this.service.historico(id);
   }
 

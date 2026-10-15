@@ -46,8 +46,24 @@ export class PlanosManutencaoService {
   ) {}
 
   /** Andamento das propagacoes de um template. */
-  async consultarPropagacoes(planoId: string) {
+  async consultarPropagacoes(planoId: string, user?: ScopedUser) {
+    await this.garantirPlanoNoEscopo(planoId, user);
     return this.propagacaoService.consultar(planoId);
+  }
+
+  /**
+   * O plano de um equipamento é da planta dele; o template (sem equipamento)
+   * vale para toda a base e não tem escopo. Para as rotas por id que liam o
+   * plano de qualquer planta (resumo, propagação) — SN-40.
+   */
+  private async garantirPlanoNoEscopo(id: string, user?: ScopedUser): Promise<void> {
+    if (!user) return;
+    const plano = await this.prisma.planos_manutencao.findFirst({
+      where: { id: id?.trim(), deleted_at: null },
+      select: { equipamento_id: true },
+    });
+    if (!plano) throw new NotFoundException('Plano de manutenção não encontrado');
+    if (plano.equipamento_id) await this.scopeService.assertEntityInScope('equipamento', plano.equipamento_id, user);
   }
 
   /**
@@ -115,12 +131,16 @@ export class PlanosManutencaoService {
     // A cópia é de um equipamento, e o equipamento é de uma planta: com
     // `vinculados` vale o escopo. Antes não valia, e o técnico e o cliente viam
     // os planos (e os nomes dos equipamentos) das plantas dos outros.
-    const escopo = vinculados ? await this.scopeFragment(user) : undefined;
+    //
+    // Na lista de templates também: "sem origem" traz o plano de equipamento
+    // antigo, que nunca teve template, e ele é de uma planta (SN-40). Template
+    // de verdade (sem equipamento) segue para todos; sem escopo, nada muda.
+    const escopo = await this.scopeFragment(user);
     const where: Prisma.planos_manutencaoWhereInput = {
       deleted_at: null,
       ...(vinculados ? { equipamento_id: { not: null } } : this.SOMENTE_TEMPLATES),
       ...this.construirFiltros(filters, search),
-      ...(escopo && { AND: [escopo] }),
+      ...(escopo && { AND: [vinculados ? escopo : { OR: [{ equipamento_id: null }, escopo] }] }),
     };
 
     // Construir ordenação
@@ -192,8 +212,10 @@ export class PlanosManutencaoService {
       throw new NotFoundException('Plano de manutenção não encontrado');
     }
 
-    // Scope RBAC: 403 se planta do equipamento nao esta no escopo
-    if (user) await this.scopeService.assertEntityInScope('equipamento', plano.equipamento_id, user);
+    // Scope RBAC: 403 se planta do equipamento nao esta no escopo. O template
+    // (sem equipamento) é livre: antes dava 404 para o técnico e o cliente, que
+    // leem os planos (SN-40).
+    if (user && plano.equipamento_id) await this.scopeService.assertEntityInScope('equipamento', plano.equipamento_id, user);
 
     return this.mapearParaResponse(plano);
   }
@@ -456,7 +478,8 @@ export class PlanosManutencaoService {
     });
   }
 
-  async obterResumo(id: string): Promise<PlanoResumoDto> {
+  async obterResumo(id: string, user?: ScopedUser): Promise<PlanoResumoDto> {
+    await this.garantirPlanoNoEscopo(id, user);
     const plano = await this.prisma.planos_manutencao.findFirst({
       where: { 
         id,

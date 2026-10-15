@@ -179,8 +179,9 @@ export class SolicitacoesServicoController {
   async adicionarComentario(
     @Param('id') id: string,
     @Body() dto: AdicionarComentarioDto,
+    @Request() req?: RequisicaoAutenticada,
   ): Promise<comentarios_solicitacao_servico> {
-    return this.solicitacoesService.adicionarComentario(id, dto);
+    return this.solicitacoesService.adicionarComentario(id, dto, req?.user);
   }
 
   @Get(':id/comentarios')
@@ -190,8 +191,8 @@ export class SolicitacoesServicoController {
     status: HttpStatus.OK,
     description: 'Lista de comentários',
   })
-  async listarComentarios(@Param('id') id: string): Promise<comentarios_solicitacao_servico[]> {
-    return this.solicitacoesService.listarComentarios(id);
+  async listarComentarios(@Param('id') id: string, @Request() req?: RequisicaoAutenticada): Promise<comentarios_solicitacao_servico[]> {
+    return this.solicitacoesService.listarComentarios(id, req?.user);
   }
 
   // =================== GERAÇÃO DE OS ===================
@@ -216,7 +217,7 @@ export class SolicitacoesServicoController {
     { message: string; solicitacao_id: string; solicitacao_numero: string; status: StatusSolicitacaoServico } & GerarProgramacaoOSDto
   > {
     // Verificar se a solicitação está aprovada
-    const solicitacao = await this.solicitacoesService.findOne(id);
+    const solicitacao = await this.solicitacoesService.findOne(id, req?.user);
 
     if (solicitacao.status !== 'REGISTRADA') {
       throw new ConflictException('Apenas solicitações registradas podem gerar OS');
@@ -250,8 +251,10 @@ export class SolicitacoesServicoController {
   })
   async getProgramacaoOS(
     @Param('id') id: string,
+    @Request() req?: RequisicaoAutenticada,
   ): Promise<{ message: string } | { programacao_os_id: string; ordem_servico_id: string }> {
-    const solicitacao = await this.solicitacoesService.findOne(id);
+    // No escopo de quem pede: sem o user, devolvia a programação e a OS de qualquer planta (SN-40)
+    const solicitacao = await this.solicitacoesService.findOne(id, req?.user);
 
     if (!solicitacao.programacao_os_id) {
       return {
@@ -405,7 +408,8 @@ export class SolicitacoesServicoController {
 
   @Get(':id/proposta')
   @ApiOperation({ summary: 'Itens, custos e totais da proposta' })
-  async obterProposta(@Param('id') id: string) {
+  async obterProposta(@Param('id') id: string, @Request() req?: RequisicaoAutenticada) {
+    await this.solicitacoesService.garantirNoEscopo(id, req?.user);
     return this.propostaService.obter(id);
   }
 

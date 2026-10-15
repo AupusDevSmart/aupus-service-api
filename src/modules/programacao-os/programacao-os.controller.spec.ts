@@ -311,7 +311,7 @@ describe('ProgramacaoOSController', () => {
 
       const result = await controller.adicionarTarefas(id, dto);
 
-      expect(service.adicionarTarefasProgramacao).toHaveBeenCalledWith(id, dto, undefined);
+      expect(service.adicionarTarefasProgramacao).toHaveBeenCalledWith(id, dto, undefined, undefined);
       expect(result).toEqual({ message: 'Tarefas adicionadas com sucesso' });
     });
   });
@@ -334,7 +334,7 @@ describe('ProgramacaoOSController', () => {
 
       const result = await controller.atualizarTarefas(id, dto);
 
-      expect(service.atualizarTarefasProgramacao).toHaveBeenCalledWith(id, dto, undefined);
+      expect(service.atualizarTarefasProgramacao).toHaveBeenCalledWith(id, dto, undefined, undefined);
       expect(result).toEqual({ message: 'Tarefas atualizadas com sucesso' });
     });
   });
@@ -348,7 +348,7 @@ describe('ProgramacaoOSController', () => {
 
       const result = await controller.removerTarefa(id, tarefaId);
 
-      expect(service.removerTarefaProgramacao).toHaveBeenCalledWith(id, tarefaId, undefined);
+      expect(service.removerTarefaProgramacao).toHaveBeenCalledWith(id, tarefaId, undefined, undefined);
       expect(result).toEqual({ message: 'Tarefa removida com sucesso' });
     });
   });
@@ -361,7 +361,7 @@ describe('ProgramacaoOSController', () => {
 
       const result = await controller.deletar(id);
 
-      expect(service.deletar).toHaveBeenCalledWith(id, undefined);
+      expect(service.deletar).toHaveBeenCalledWith(id, undefined, undefined);
       expect(result).toEqual({ message: 'Programação deletada com sucesso' });
     });
   });

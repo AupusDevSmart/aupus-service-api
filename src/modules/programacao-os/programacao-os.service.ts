@@ -1,4 +1,4 @@
-import { ConflictException, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { Prisma, StatusProgramacaoOS, PrioridadeOS, type TipoOS, type programacoes_os, type tarefas_programacao_os } from '@/core';
 import { plantasDosEquipamentos } from '@/core/modules/auth/planta-dos-equipamentos';
 import { garantirPessoasQuePodemAtuar, PessoasDaPlanta, pessoasQuePodemAtuar } from './pessoas-da-os';
@@ -25,6 +25,8 @@ import {
 import { avancarAncoraDosCiclos, cancelarOS } from '../execucao-os/cancelar-os';
 import {
   AdicionarTarefasDto,
+  AJUSTES_DA_PROGRAMACAO_DA_SOLICITACAO,
+  AjustesDaProgramacaoDaSolicitacaoDto,
   AprovarProgramacaoDto,
   AtualizarTarefasDto,
   CancelarProgramacaoDto,
@@ -227,8 +229,8 @@ export class ProgramacaoOSService {
       take: limit,
     });
 
-    // Buscar estatísticas
-    const stats = await this.obterEstatisticas();
+    // Estatísticas no escopo da listagem: antes contavam as de todas as plantas (SN-40)
+    const stats = await this.obterEstatisticas(scopeFragment);
 
     // A instalação não é coluna da programação: sai de equipamento, anomalia ou
     // solicitação, conforme a origem. Uma consulta para a página inteira.
@@ -918,7 +920,7 @@ export class ProgramacaoOSService {
 
   async criarDeSolicitacao(
     solicitacaoId: string,
-    dto: Partial<CreateProgramacaoDto>,
+    dto: AjustesDaProgramacaoDaSolicitacaoDto = {},
     usuarioId?: string,
     user?: ScopedUser,
   ): Promise<ProgramacaoResponseDto> {
@@ -956,6 +958,12 @@ export class ProgramacaoOSService {
       return mapeamento[tipo] || 'CORRETIVA';
     };
 
+    // Só os ajustes da lista: o que vem da solicitação (ela mesma, a planta, a
+    // origem) não se sobrescreve, nem chamando o service direto (SN-40)
+    const ajustes = Object.fromEntries(
+      AJUSTES_DA_PROGRAMACAO_DA_SOLICITACAO.filter((campo) => dto?.[campo] !== undefined).map((campo) => [campo, dto[campo]]),
+    ) as AjustesDaProgramacaoDaSolicitacaoDto;
+
     // Criar programação baseada na solicitação
     const createDto: CreateProgramacaoDto = {
       descricao: solicitacao.titulo,
@@ -983,7 +991,7 @@ export class ProgramacaoOSService {
         tipo: solicitacao.tipo,
         solicitante: solicitacao.solicitante_nome,
       },
-      ...dto, // Permitir sobrescrever campos via DTO
+      ...ajustes,
     };
 
     // criar() ja passa a solicitacao para PROGRAMADA, com vinculo e historico
@@ -1054,8 +1062,11 @@ export class ProgramacaoOSService {
     return this.criar(createDto, usuarioId, user);
   }
 
-  async adicionarTarefasProgramacao(id: string, dto: AdicionarTarefasDto, usuarioId?: string): Promise<void> {
-    await this.buscarPorId(id); // Verificar se existe
+  // `user` em todas as rotas de tarefas e na exclusão: antes buscavam a
+  // programação sem ele e não conferiam o escopo (SN-40).
+  async adicionarTarefasProgramacao(id: string, dto: AdicionarTarefasDto, usuarioId?: string, user?: ScopedUser): Promise<void> {
+    await this.buscarPorId(id, user); // Verificar se existe (e o escopo)
+    await this.conferirPlantaDasNovasTarefas(id, dto.tarefas_ids, user);
 
     await this.prisma.$transaction(async (prisma) => {
       await this.adicionarTarefas(prisma, id, dto.tarefas_ids);
@@ -1073,8 +1084,8 @@ export class ProgramacaoOSService {
     });
   }
 
-  async atualizarTarefasProgramacao(id: string, dto: AtualizarTarefasDto, usuarioId?: string): Promise<void> {
-    await this.buscarPorId(id); // Verificar se existe
+  async atualizarTarefasProgramacao(id: string, dto: AtualizarTarefasDto, usuarioId?: string, user?: ScopedUser): Promise<void> {
+    await this.buscarPorId(id, user); // Verificar se existe (e o escopo)
 
     await this.prisma.$transaction(async (prisma) => {
       for (const tarefa of dto.tarefas) {
@@ -1104,15 +1115,14 @@ export class ProgramacaoOSService {
     });
   }
 
-  async removerTarefaProgramacao(id: string, tarefaId: string, usuarioId?: string): Promise<void> {
-    await this.buscarPorId(id); // Verificar se existe
+  async removerTarefaProgramacao(id: string, tarefaId: string, usuarioId?: string, user?: ScopedUser): Promise<void> {
+    await this.buscarPorId(id, user); // Verificar se existe (e o escopo)
 
     const tarefaRemovida = await this.prisma.tarefas_programacao_os.findFirst({
       where: {
         programacao_id: id,
         tarefa_id: tarefaId,
       },
-      include: { tarefa: true },
     });
 
     if (!tarefaRemovida) {
@@ -1130,15 +1140,17 @@ export class ProgramacaoOSService {
         'REMOCAO_TAREFA',
         'Sistema',
         usuarioId,
-        `Removida tarefa: ${tarefaRemovida.tarefa.nome}`,
+        // O nome congelado no vínculo: o include da tarefa viva volta null com id de
+        // 25 chars (Char x VarChar) e a remoção dava 500 (achado no SN-40)
+        `Removida tarefa: ${tarefaRemovida.nome_snapshot ?? tarefaRemovida.tarefa_id?.trim()}`,
       );
     }, {
       timeout: 5000, // 5 seconds timeout for removing task
     });
   }
 
-  async deletar(id: string, usuarioId?: string): Promise<void> {
-    const programacao = await this.buscarPorId(id);
+  async deletar(id: string, usuarioId?: string, user?: ScopedUser): Promise<void> {
+    const programacao = await this.buscarPorId(id, user);
 
     // Aprovada ou finalizada ja tem OS: excluir a programacao deixaria a OS sem
     // pai. O caminho ali e cancelar.
@@ -1379,6 +1391,35 @@ export class ProgramacaoOSService {
     }));
 
     await prisma.ferramentas_programacao_os.createMany({ data: dados });
+  }
+
+  /**
+   * Uma programação atende uma planta só (SN-35), também ao ganhar tarefas
+   * depois de criada: as novas entram na conta com as que já estão nela (o
+   * equipamento congelado no vínculo) e com a origem. Tarefa de outra planta é
+   * recusada; antes entrava calada e a OS passava a misturar plantas (SN-40).
+   */
+  private async conferirPlantaDasNovasTarefas(id: string, tarefasIds: string[], user?: ScopedUser): Promise<void> {
+    const atual = await this.prisma.programacoes_os.findUniqueOrThrow({
+      where: { id },
+      select: { planta_id: true, anomalia_id: true, solicitacao_servico_id: true, dados_origem: true, equipamento_id: true },
+    });
+    const vinculadas = await this.prisma.tarefas_programacao_os.findMany({ where: { programacao_id: id }, select: { equipamento_id: true } });
+    const planta = await plantaDaProgramacao(this.prisma, {
+      planta_gravada: atual.planta_id,
+      anomalia_id: atual.anomalia_id,
+      solicitacao_servico_id: atual.solicitacao_servico_id,
+      dados_origem: atual.dados_origem,
+      equipamento_id: atual.equipamento_id,
+      equipamentos_das_tarefas: [...vinculadas.map((v) => v.equipamento_id), ...(await equipamentosDasTarefas(this.prisma, tarefasIds))],
+    });
+    const gravada = atual.planta_id?.trim();
+    if (gravada && planta !== gravada) {
+      throw new BadRequestException(
+        'As tarefas escolhidas são de outra planta. Uma programação atende uma planta só: programe cada planta separadamente.',
+      );
+    }
+    if (user) await this.scopeService.assertPlantaInScope(planta, user);
   }
 
   /**
@@ -1840,10 +1881,10 @@ export class ProgramacaoOSService {
     await prisma.programacoes_os.update({ where: { id: programacao.id }, data: { reserva_id: reservaId } });
   }
 
-  private async obterEstatisticas(): Promise<ProgramacaoStatsDto> {
+  private async obterEstatisticas(escopo?: Prisma.programacoes_osWhereInput): Promise<ProgramacaoStatsDto> {
     const stats = await this.prisma.programacoes_os.groupBy({
       by: ['status'],
-      where: { deletado_em: null },
+      where: { deletado_em: null, ...(escopo && { AND: [escopo] }) },
       _count: true,
     });
 

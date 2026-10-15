@@ -16,7 +16,7 @@ import {
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { ApiTags, ApiOperation, ApiResponse, ApiParam, ApiConsumes } from '@nestjs/swagger';
-import { Permissions } from '@/core';
+import { CurrentUser, Permissions, ScopedUser } from '@/core';
 import { Response } from 'express';
 import * as path from 'path';
 import { InstrucoesService } from './instrucoes.service';
@@ -129,8 +129,8 @@ export class InstrucoesController {
   @ApiParam({ name: 'id', description: 'ID da instrução' })
   @ApiResponse({ status: HttpStatus.OK, description: 'Tarefas derivadas encontradas' })
   @ApiResponse({ status: HttpStatus.NOT_FOUND, description: 'Instrução não encontrada' })
-  async listarTarefasDerivadas(@Param('id') id: string) {
-    return this.instrucoesService.listarTarefasDerivadas(id);
+  async listarTarefasDerivadas(@Param('id') id: string, @CurrentUser() user?: ScopedUser) {
+    return this.instrucoesService.listarTarefasDerivadas(id, user);
   }
 
   // ==========================================
@@ -138,7 +138,9 @@ export class InstrucoesController {
   // ==========================================
 
   @Post(':id/anomalias')
-  @Permissions('manutencao.view', 'manutencao.manage', 'anomalias.manage')
+  // Escrita: a de quem cuida de instruções ou de anomalias. Aceitava
+  // manutencao.view, que o técnico e o cliente têm (SN-40).
+  @Permissions('manutencao.manage', 'anomalias.manage')
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({ summary: 'Associar anomalia à instrução' })
   @ApiParam({ name: 'id', description: 'ID da instrução' })
@@ -146,9 +148,11 @@ export class InstrucoesController {
   @ApiResponse({ status: HttpStatus.NOT_FOUND, description: 'Instrução ou anomalia não encontrada' })
   async associarAnomalia(
     @Param('id') id: string,
-    @Body() body: { anomalia_id: string; observacoes?: string; created_by?: string }
+    @Body() body: { anomalia_id: string; observacoes?: string },
+    @CurrentUser() user?: ScopedUser,
   ) {
-    return this.instrucoesService.associarAnomalia(id, body.anomalia_id, body.observacoes, body.created_by);
+    // O autor é quem está logado: o created_by do corpo não vale mais
+    return this.instrucoesService.associarAnomalia(id, body.anomalia_id, body.observacoes, user);
   }
 
   @Get(':id/anomalias')
@@ -156,12 +160,12 @@ export class InstrucoesController {
   @ApiOperation({ summary: 'Listar anomalias associadas à instrução' })
   @ApiParam({ name: 'id', description: 'ID da instrução' })
   @ApiResponse({ status: HttpStatus.OK, description: 'Anomalias encontradas' })
-  async listarAnomalias(@Param('id') id: string) {
-    return this.instrucoesService.listarAnomalias(id);
+  async listarAnomalias(@Param('id') id: string, @CurrentUser() user?: ScopedUser) {
+    return this.instrucoesService.listarAnomalias(id, user);
   }
 
   @Delete(':id/anomalias/:anomaliaId')
-  @Permissions('manutencao.view', 'manutencao.manage', 'anomalias.manage')
+  @Permissions('manutencao.manage', 'anomalias.manage')
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({ summary: 'Remover associação com anomalia' })
   @ApiParam({ name: 'id', description: 'ID da instrução' })
@@ -169,9 +173,10 @@ export class InstrucoesController {
   @ApiResponse({ status: HttpStatus.NO_CONTENT, description: 'Associação removida' })
   async desassociarAnomalia(
     @Param('id') id: string,
-    @Param('anomaliaId') anomaliaId: string
+    @Param('anomaliaId') anomaliaId: string,
+    @CurrentUser() user?: ScopedUser,
   ): Promise<void> {
-    return this.instrucoesService.desassociarAnomalia(id, anomaliaId);
+    return this.instrucoesService.desassociarAnomalia(id, anomaliaId, user);
   }
 
   // ==========================================
@@ -187,17 +192,18 @@ export class InstrucoesController {
   @ApiResponse({ status: HttpStatus.NOT_FOUND, description: 'Instrução ou solicitação não encontrada' })
   async associarSolicitacao(
     @Param('id') id: string,
-    @Body() body: { solicitacao_id: string; observacoes?: string; created_by?: string }
+    @Body() body: { solicitacao_id: string; observacoes?: string },
+    @CurrentUser() user?: ScopedUser,
   ) {
-    return this.instrucoesService.associarSolicitacao(id, body.solicitacao_id, body.observacoes, body.created_by);
+    return this.instrucoesService.associarSolicitacao(id, body.solicitacao_id, body.observacoes, user);
   }
 
   @Get(':id/solicitacoes')
   @ApiOperation({ summary: 'Listar solicitações associadas à instrução' })
   @ApiParam({ name: 'id', description: 'ID da instrução' })
   @ApiResponse({ status: HttpStatus.OK, description: 'Solicitações encontradas' })
-  async listarSolicitacoes(@Param('id') id: string) {
-    return this.instrucoesService.listarSolicitacoes(id);
+  async listarSolicitacoes(@Param('id') id: string, @CurrentUser() user?: ScopedUser) {
+    return this.instrucoesService.listarSolicitacoes(id, user);
   }
 
   @Delete(':id/solicitacoes/:solicitacaoId')

@@ -252,6 +252,15 @@ export class AnomaliasService {
     };
   }
 
+  /**
+   * 404/403 do escopo para o que pende da anomalia (os anexos). Os anexos eram
+   * listados e baixados por qualquer um com `anomalias.view`, de qualquer
+   * planta (SN-40).
+   */
+  async garantirNoEscopo(id: string, user?: UserCtx): Promise<void> {
+    await this.scopeService.assertEntityInScope('anomalia', id, user);
+  }
+
   async findOne(id: string, user?: UserCtx) {
     const scope = await this.getScope(user);
     const scopeFilter = this.scopeWhere(scope);

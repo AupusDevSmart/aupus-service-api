@@ -141,8 +141,8 @@ export class EquipamentosController {
   @Permissions('equipamentos.view')
   @ApiOperation({ summary: 'Listar equipamentos UC disponíveis para serem pais de UAR' })
   @ApiResponse({ status: 200, description: 'Lista de equipamentos UC' })
-  findEquipamentosUC() {
-    return this.equipamentosService.findEquipamentosUC();
+  findEquipamentosUC(@CurrentUser() user: ScopedUser) {
+    return this.equipamentosService.findEquipamentosUC(user);
   }
 
   // ==================== ANEXOS ====================
@@ -158,8 +158,11 @@ export class EquipamentosController {
   async downloadAnexo(
     @Param('anexoId') anexoId: string,
     @Res({ passthrough: true }) res: Response,
+    @CurrentUser() user: ScopedUser,
   ) {
     const anexo = await this.anexosService.buscarAnexo(anexoId);
+    // O escopo é o do equipamento do anexo: antes baixava o de qualquer planta (SN-40)
+    await this.equipamentosService.garantirNoEscopo(anexo.equipamento_id, user);
     const caminho = await this.anexosService.obterCaminhoArquivo(anexoId);
 
     res.set({
@@ -211,7 +214,8 @@ export class EquipamentosController {
   @Permissions('equipamentos.view')
   @ApiOperation({ summary: 'Listar anexos do equipamento' })
   @ApiResponse({ status: 200, description: 'Lista de anexos' })
-  listarAnexos(@Param('id') id: string) {
+  async listarAnexos(@Param('id') id: string, @CurrentUser() user: ScopedUser) {
+    await this.equipamentosService.garantirNoEscopo(id, user);
     return this.anexosService.listarAnexos(id);
   }
 
@@ -258,7 +262,8 @@ export class EquipamentosController {
   @ApiOperation({ summary: 'Buscar detalhes completos de um componente UAR' })
   @ApiResponse({ status: 200, description: 'Detalhes do componente UAR' })
   @ApiResponse({ status: 404, description: 'Componente UAR não encontrado' })
-  findUARDetalhes(@Param('id') uarId: string) {
+  async findUARDetalhes(@Param('id') uarId: string, @CurrentUser() user: ScopedUser) {
+    await this.equipamentosService.garantirNoEscopo(uarId, user);
     return this.equipamentosService.findUARDetalhes(uarId);
   }
 
@@ -300,8 +305,8 @@ export class EquipamentosController {
   @Permissions('equipamentos.view')
   @ApiOperation({ summary: 'Estatísticas dos equipamentos de uma unidade' })
   @ApiResponse({ status: 200, description: 'Estatísticas da unidade' })
-  getEstatisticasUnidade(@Param('unidadeId') unidadeId: string) {
-    return this.equipamentosService.getEstatisticasUnidade(unidadeId);
+  getEstatisticasUnidade(@Param('unidadeId') unidadeId: string, @CurrentUser() user: ScopedUser) {
+    return this.equipamentosService.getEstatisticasUnidade(unidadeId, user);
   }
 
   // ==========================================
@@ -338,7 +343,8 @@ export class EquipamentosController {
   @ApiOperation({ summary: 'Obter último dado recebido do equipamento' })
   @ApiResponse({ status: 200, description: 'Dado atual do equipamento' })
   @ApiResponse({ status: 404, description: 'Equipamento ou dado não encontrado' })
-  obterDadoAtual(@Param('id') id: string) {
+  async obterDadoAtual(@Param('id') id: string, @CurrentUser() user: ScopedUser) {
+    await this.equipamentosService.garantirNoEscopo(id, user);
     return this.equipamentosDataService.obterDadoAtual(id);
   }
 
@@ -351,13 +357,15 @@ export class EquipamentosController {
   @ApiQuery({ name: 'intervalo', required: false, description: 'Agrupamento: raw, 1min, 5min, 1hour, 1day' })
   @ApiResponse({ status: 200, description: 'Histórico de dados' })
   @ApiResponse({ status: 404, description: 'Equipamento não encontrado' })
-  obterHistorico(
+  async obterHistorico(
     @Param('id') id: string,
+    @CurrentUser() user: ScopedUser,
     @Query('inicio') inicio?: string,
     @Query('fim') fim?: string,
     @Query('limite') limite?: string,
     @Query('intervalo') intervalo?: 'raw' | '1min' | '5min' | '1hour' | '1day',
   ) {
+    await this.equipamentosService.garantirNoEscopo(id, user);
     return this.equipamentosDataService.obterHistorico(id, {
       inicio: inicio ? new Date(inicio) : undefined,
       fim: fim ? new Date(fim) : undefined,

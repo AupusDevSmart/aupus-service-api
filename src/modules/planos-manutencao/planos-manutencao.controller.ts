@@ -321,8 +321,8 @@ export class PlanosManutencaoController {
     summary: 'Andamento das propagacoes do template para as copias (10 mais recentes)'
   })
   @ApiParam({ name: 'id', description: 'ID do plano template' })
-  async consultarPropagacoes(@Param('id') id: string) {
-    return this.planosManutencaoService.consultarPropagacoes(id);
+  async consultarPropagacoes(@Param('id') id: string, @CurrentUser() user?: ScopedUser) {
+    return this.planosManutencaoService.consultarPropagacoes(id, user);
   }
 
   @Get(':id')
@@ -365,9 +365,10 @@ export class PlanosManutencaoController {
     description: 'Plano não encontrado' 
   })
   async obterResumo(
-    @Param('id') id: string
+    @Param('id') id: string,
+    @CurrentUser() user?: ScopedUser,
   ): Promise<PlanoResumoDto> {
-    return this.planosManutencaoService.obterResumo(id);
+    return this.planosManutencaoService.obterResumo(id, user);
   }
 
   @Put(':id')

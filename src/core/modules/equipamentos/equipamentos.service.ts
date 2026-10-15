@@ -1268,11 +1268,17 @@ export class EquipamentosService {
     });
   }
 
-  async findEquipamentosUC() {
+  async findEquipamentosUC(user?: ScopedUser) {
+    // No escopo de quem pede: antes vinham as UCs (com unidade e planta) de
+    // todas as plantas para o técnico e o cliente (SN-40).
+    const scope = await this.scopeService.getScope(user);
     return await this.prisma.equipamentos.findMany({
       where: {
         classificacao: 'UC',
         deleted_at: null,
+        ...(this.scopeService.isScoped(scope) && {
+          OR: [{ planta_id: { in: scope } }, { unidade: { planta_id: { in: scope } } }],
+        }),
       },
       select: {
         id: true,
@@ -1646,7 +1652,9 @@ export class EquipamentosService {
     };
   }
 
-  async getEstatisticasUnidade(unidadeId: string) {
+  async getEstatisticasUnidade(unidadeId: string, user?: ScopedUser) {
+    // Unidade de outra planta: 403, como no GET /unidades/:id (SN-40)
+    if (user) await this.scopeService.assertEntityInScope('unidade', unidadeId, user);
     // Verificar se unidade existe
     const unidade = await this.prisma.unidades.findFirst({
       where: { id: unidadeId, deleted_at: null },

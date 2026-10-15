@@ -220,7 +220,9 @@ export class AnomaliasController {
   }
 
   @Get('selects/usuarios')
-  @Permissions('anomalias.view')
+  // Nome e e-mail de todos os usuários: só para quem gerencia anomalias. Pedia
+  // anomalias.view, que o técnico e o cliente têm, e nenhuma tela usa (SN-40).
+  @Permissions('anomalias.manage')
   @ApiOperation({ summary: 'Listar usuários para select' })
   @ApiResponse({ 
     status: HttpStatus.OK, 
@@ -291,7 +293,8 @@ export class AnomaliasController {
     description: 'Lista de anexos da anomalia',
     type: [AnexoAnomaliaResponseDto]
   })
-  async listarAnexosAnomalia(@Param('id') anomaliaId: string) {
+  async listarAnexosAnomalia(@Param('id') anomaliaId: string, @CurrentUser() user: UserCtx) {
+    await this.anomaliasService.garantirNoEscopo(anomaliaId, user);
     return this.anexosService.listarAnexosAnomalia(anomaliaId);
   }
 
@@ -307,8 +310,11 @@ export class AnomaliasController {
     status: HttpStatus.NOT_FOUND, 
     description: 'Anexo não encontrado' 
   })
-  async buscarAnexo(@Param('anexoId') anexoId: string) {
-    return this.anexosService.buscarAnexo(anexoId);
+  async buscarAnexo(@Param('anexoId') anexoId: string, @CurrentUser() user: UserCtx) {
+    const anexo = await this.anexosService.buscarAnexo(anexoId);
+    // O escopo é o da anomalia do anexo
+    await this.anomaliasService.garantirNoEscopo(anexo.anomalia_id, user);
+    return anexo;
   }
 
   @Get('anexos/:anexoId/download')
@@ -324,9 +330,12 @@ export class AnomaliasController {
   })
   async downloadAnexo(
     @Param('anexoId') anexoId: string,
-    @Res({ passthrough: true }) res: Response
+    @Res({ passthrough: true }) res: Response,
+    @CurrentUser() user: UserCtx,
   ) {
     const anexo = await this.anexosService.buscarAnexo(anexoId);
+    // O escopo é o da anomalia do anexo: antes baixava o de qualquer planta
+    await this.anomaliasService.garantirNoEscopo(anexo.anomalia_id, user);
     const caminhoArquivo = await this.anexosService.obterCaminhoArquivo(anexoId);
 
     // Configurar headers para download

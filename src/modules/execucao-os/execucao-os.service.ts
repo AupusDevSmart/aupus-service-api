@@ -159,6 +159,24 @@ export class ExecucaoOSService {
     private readonly scopeService: PermissionScopeService,
   ) {}
 
+  /**
+   * Fragmento `where` do escopo de plantas: a planta da OS e, na OS antiga sem
+   * planta (SN-33), o equipamento (o componente pela unidade do UC pai), como a
+   * programação já fazia. Sem escopo, undefined.
+   */
+  private async scopeFragment(user?: ScopedUser): Promise<Prisma.ordens_servicoWhereInput | undefined> {
+    const scope = await this.scopeService.getScope(user);
+    if (!this.scopeService.isScoped(scope)) return undefined;
+    if (scope.length === 0) return { id: '__NEVER__' };
+    return {
+      OR: [
+        { planta_id: { in: scope } },
+        { planta_id: null, equipamento: { unidade: { planta_id: { in: scope } } } },
+        { planta_id: null, equipamento: { equipamento_pai: { unidade: { planta_id: { in: scope } } } } },
+      ],
+    };
+  }
+
   async listar(filters: OSFiltersDto, user?: ScopedUser): Promise<ListarOSResponseDto> {
     const {
       page = 1,
@@ -230,20 +248,8 @@ export class ExecucaoOSService {
     }
 
     // Scope RBAC
-    const scope = await this.scopeService.getScope(user);
-    if (this.scopeService.isScoped(scope)) {
-      // Pela planta da OS e, na OS antiga sem planta (SN-33), pelo equipamento
-      // (o componente pela unidade do UC pai), como a programação já fazia.
-      const scopeFragment: Prisma.ordens_servicoWhereInput =
-        scope.length === 0
-          ? { id: '__NEVER__' }
-          : {
-              OR: [
-                { planta_id: { in: scope } },
-                { planta_id: null, equipamento: { unidade: { planta_id: { in: scope } } } },
-                { planta_id: null, equipamento: { equipamento_pai: { unidade: { planta_id: { in: scope } } } } },
-              ],
-            };
+    const scopeFragment = await this.scopeFragment(user);
+    if (scopeFragment) {
       where.AND = where.AND ? [...(where.AND as Prisma.ordens_servicoWhereInput[]), scopeFragment] : [scopeFragment];
     }
 
@@ -362,8 +368,8 @@ export class ExecucaoOSService {
       }
     }
 
-    // Buscar estatísticas
-    const stats = await this.obterEstatisticas();
+    // Estatísticas no escopo da listagem: antes contavam as OS de todas as plantas (SN-40)
+    const stats = await this.obterEstatisticas(scopeFragment);
 
     // A instalação não é coluna da OS: sai do equipamento congelado na tarefa,
     // da anomalia ou da solicitação, conforme a origem. Uma consulta para a
@@ -1642,10 +1648,11 @@ export class ExecucaoOSService {
     });
   }
 
-  private async obterEstatisticas(): Promise<OSStatsDto> {
+  private async obterEstatisticas(escopo?: Prisma.ordens_servicoWhereInput): Promise<OSStatsDto> {
+    const base: Prisma.ordens_servicoWhereInput = { deletado_em: null, ...(escopo && { AND: [escopo] }) };
     const stats = await this.prisma.ordens_servico.groupBy({
       by: ['status'],
-      where: { deletado_em: null },
+      where: base,
       _count: true,
     });
 
@@ -1692,7 +1699,7 @@ export class ExecucaoOSService {
     hoje.setHours(0, 0, 0, 0);
     resultado.atrasadas = await this.prisma.ordens_servico.count({
       where: {
-        deletado_em: null,
+        ...base,
         data_hora_programada: { lt: hoje },
         status: { notIn: [StatusOS.FINALIZADA, StatusOS.CANCELADA] },
       },
@@ -1701,7 +1708,7 @@ export class ExecucaoOSService {
     // Contar críticas
     resultado.criticas = await this.prisma.ordens_servico.count({
       where: {
-        deletado_em: null,
+        ...base,
         prioridade: PrioridadeOS.CRITICA,
         status: { notIn: [StatusOS.FINALIZADA, StatusOS.CANCELADA] },
       },

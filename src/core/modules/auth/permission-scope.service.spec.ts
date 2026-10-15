@@ -23,6 +23,14 @@ describe('PermissionScopeService (banco real)', () => {
   const UNIDADE_A = ID('unidadea');
   const EQUIP_A = ID('equipa');
   const EQUIP_B = ID('equipb');
+  // 25 caracteres, como os ids cuid antigos, para provar o trim (SN-40)
+  const ID25 = (s: string) => `testeescopo${s}`.padEnd(25, '0').slice(0, 25);
+  const UNIDADE_B = ID25('unidadeb');
+  const UAR_A = ID25('uara');
+  const CATEGORIA = ID25('categoria');
+  const POSICAO_A = ID25('posicaoa');
+  const POSICAO_B = ID25('posicaob');
+  const doComponente: Partial<Record<ScopedEntityType, string>> = {};
 
   const tecnico = { id: TECNICO, role: 'operador' };
   const cliente = { id: DONO, role: 'proprietario' };
@@ -36,8 +44,11 @@ describe('PermissionScopeService (banco real)', () => {
     await prisma.anomalias.deleteMany({ where: { descricao: { startsWith: 'TESTE-ESCOPO' } } });
     await prisma.solicitacoes_servico.deleteMany({ where: { numero: { startsWith: 'TESTE-ESCOPO' } } });
     await prisma.tarefas.deleteMany({ where: { tag: { startsWith: 'TESTE-ESCOPO' } } });
+    await prisma.ativos_funcionais.deleteMany({ where: { id: { in: [POSICAO_A, POSICAO_B] } } });
+    await prisma.categorias_equipamentos.deleteMany({ where: { id: CATEGORIA } });
+    await prisma.equipamentos.deleteMany({ where: { id: UAR_A } });
     await prisma.equipamentos.deleteMany({ where: { id: { in: [EQUIP_A, EQUIP_B] } } });
-    await prisma.unidades.deleteMany({ where: { id: UNIDADE_A } });
+    await prisma.unidades.deleteMany({ where: { id: { in: [UNIDADE_A, UNIDADE_B] } } });
     await prisma.planta_operadores.deleteMany({ where: { usuario_id: TECNICO } });
     await prisma.plantas.deleteMany({ where: { id: { in: [PLANTA_A, PLANTA_B] } } });
     await prisma.usuarios.deleteMany({ where: { id: { in: [DONO, OUTRO_DONO, TECNICO, SEM_VINCULO] } } });
@@ -145,6 +156,44 @@ describe('PermissionScopeService (banco real)', () => {
       prisma.tarefas.create({ data: { tag: `TESTE-ESCOPO-${lado}`, nome: 'x', criticidade: 3, ordem: 1, equipamento_id: equipamentoId } });
     ids.tarefa = { a: (await tarefa('A', EQUIP_A)).id, b: (await tarefa('B', EQUIP_B)).id };
 
+    // Componente (UAR) não tem unidade: a planta vem da unidade do UC pai. O
+    // que é dele (anomalia, tarefa, programação, OS) sem planta gravada também.
+    await prisma.equipamentos.create({ data: { id: UAR_A, nome: 'Ventoinha A', classificacao: 'UAR', criticidade: '3', equipamento_pai_id: EQUIP_A } });
+    doComponente.equipamento = UAR_A;
+    doComponente.anomalia = (
+      await prisma.anomalias.create({ data: { descricao: 'TESTE-ESCOPO UAR', local: 'x', ativo: 'x', origem: 'OPERADOR', equipamento_id: UAR_A } })
+    ).id;
+    doComponente.tarefa = (await tarefa('UAR', UAR_A)).id;
+    const progUar = await prisma.programacoes_os.create({
+      data: { codigo: 'TESTE-ESCOPO-UAR', descricao: 'x', condicoes: 'FUNCIONANDO', tipo: 'CORRETIVA', origem: 'MANUAL', tempo_estimado: 1, duracao_estimada: 1, equipamento_id: UAR_A },
+    });
+    doComponente.programacao_os = progUar.id;
+    doComponente.ordem_servico = (
+      await prisma.ordens_servico.create({
+        data: {
+          programacao_id: progUar.id,
+          numero_os: 'TESTE-ESCOPO-UAR',
+          descricao: 'x',
+          condicoes: 'FUNCIONANDO',
+          tipo: 'CORRETIVA',
+          prioridade: 'MEDIA',
+          origem: 'MANUAL',
+          tempo_estimado: 1,
+          duracao_estimada: 1,
+          equipamento_id: UAR_A,
+        },
+      })
+    ).id;
+
+    // Posição (ativo funcional): a planta é a da unidade dela
+    await prisma.unidades.create({
+      data: { id: UNIDADE_B, planta_id: PLANTA_B, nome: 'TESTE-ESCOPO unidade B', tipo: 'UFV', estado: 'GO', cidade: 'Goiânia', latitude: 0, longitude: 0, potencia: 1 },
+    });
+    await prisma.categorias_equipamentos.create({ data: { id: CATEGORIA, nome: 'TESTE-ESCOPO categoria' } });
+    await prisma.ativos_funcionais.create({ data: { id: POSICAO_A, nome: 'Inversor 1', categoria_id: CATEGORIA, unidade_id: UNIDADE_A } });
+    await prisma.ativos_funcionais.create({ data: { id: POSICAO_B, nome: 'Inversor 1', categoria_id: CATEGORIA, unidade_id: UNIDADE_B } });
+    ids.ativo_funcional = { a: POSICAO_A, b: POSICAO_B };
+
     ids.planta = { a: PLANTA_A, b: PLANTA_B };
     ids.unidade = { a: UNIDADE_A, b: UNIDADE_A };
     ids.equipamento = { a: EQUIP_A, b: EQUIP_B };
@@ -167,7 +216,7 @@ describe('PermissionScopeService (banco real)', () => {
     });
   });
 
-  const tipos: ScopedEntityType[] = ['planta', 'equipamento', 'anomalia', 'tarefa', 'ordem_servico', 'programacao_os', 'solicitacao_servico'];
+  const tipos: ScopedEntityType[] = ['planta', 'equipamento', 'anomalia', 'tarefa', 'ordem_servico', 'programacao_os', 'solicitacao_servico', 'ativo_funcional'];
 
   describe.each(tipos)('assertEntityInScope(%s)', (tipo) => {
     it('dentro da planta do técnico e do cliente passa', async () => {
@@ -184,6 +233,24 @@ describe('PermissionScopeService (banco real)', () => {
       await expect(escopo.assertEntityInScope(tipo, `${ids[tipo]!.a.trim()}  `, tecnico)).resolves.toBeUndefined();
     });
   });
+
+  // SN-40: o escopo parava na unidade, e o componente (UAR) não tem unidade —
+  // dava "não encontrado" para quem tem escopo, e o que é dele também.
+  describe.each(['equipamento', 'anomalia', 'tarefa', 'programacao_os', 'ordem_servico'] as ScopedEntityType[])(
+    'componente (UAR) sem unidade: %s vale pela planta do UC pai',
+    (tipo) => {
+      it('o técnico e o cliente da planta passam', async () => {
+        await expect(escopo.assertEntityInScope(tipo, doComponente[tipo]!, tecnico)).resolves.toBeUndefined();
+        await expect(escopo.assertEntityInScope(tipo, doComponente[tipo]!, cliente)).resolves.toBeUndefined();
+      });
+
+      it('o cliente de outra planta é recusado (403, não 404)', async () => {
+        await expect(escopo.assertEntityInScope(tipo, doComponente[tipo]!, { id: OUTRO_DONO, role: 'proprietario' })).rejects.toBeInstanceOf(
+          ForbiddenException,
+        );
+      });
+    },
+  );
 
   it('o equipamento sem planta direta vale pela planta da unidade', async () => {
     await expect(escopo.assertEntityInScope('unidade', UNIDADE_A, tecnico)).resolves.toBeUndefined();

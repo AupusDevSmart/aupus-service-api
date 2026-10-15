@@ -439,6 +439,15 @@ export class SolicitacoesServicoService {
   /**
    * Buscar solicitação por ID
    */
+  /**
+   * 404/403 do escopo para o que pende da solicitação sem passar pelo findOne
+   * (a proposta). A proposta era lida por qualquer um com `solicitacoes.view`,
+   * de qualquer planta (SN-40).
+   */
+  async garantirNoEscopo(id: string, user?: ScopedUser): Promise<void> {
+    if (user) await this.scopeService.assertEntityInScope('solicitacao_servico', id, user);
+  }
+
   async findOne(id: string, user?: ScopedUser): Promise<SolicitacaoResponseDto> {
     if (user) await this.scopeService.assertEntityInScope('solicitacao_servico', id, user);
     const solicitacao = await this.prisma.solicitacoes_servico.findUnique({
@@ -655,15 +664,25 @@ export class SolicitacoesServicoService {
   async adicionarComentario(
     id: string,
     dto: AdicionarComentarioDto,
+    user?: ScopedUser,
   ): Promise<comentarios_solicitacao_servico> {
-    const solicitacao = await this.findOne(id);
+    // No escopo de quem comenta: antes comentava na solicitação de qualquer planta (SN-40)
+    const solicitacao = await this.findOne(id, user);
+
+    // O autor é quem está logado, com o nome do cadastro: o que vem no corpo
+    // só vale sem usuário (chamada interna). Antes qualquer um comentava em
+    // nome de outro.
+    const autorId = user?.id?.trim();
+    const autor = autorId
+      ? (await this.prisma.usuarios.findUnique({ where: { id: autorId }, select: { nome: true } }))?.nome
+      : undefined;
 
     const comentario = await this.prisma.comentarios_solicitacao_servico.create({
       data: {
         solicitacao_id: id,
         comentario: dto.comentario,
-        autor: dto.usuario_nome,
-        autor_id: dto.usuario_id,
+        autor: autor ?? dto.usuario_nome,
+        autor_id: autorId ?? dto.usuario_id,
       },
     });
 
@@ -674,8 +693,9 @@ export class SolicitacoesServicoService {
   /**
    * Listar comentários
    */
-  async listarComentarios(id: string): Promise<comentarios_solicitacao_servico[]> {
-    const solicitacao = await this.findOne(id);
+  async listarComentarios(id: string, user?: ScopedUser): Promise<comentarios_solicitacao_servico[]> {
+    // No escopo de quem lê (SN-40)
+    await this.findOne(id, user);
 
     return await this.prisma.comentarios_solicitacao_servico.findMany({
       where: { solicitacao_id: id },

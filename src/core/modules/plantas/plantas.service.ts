@@ -380,7 +380,16 @@ export class PlantasService {
     }
   }
 
-  async findProprietarios(comUnidades?: boolean) {
+  /**
+   * Os donos que o formulário de planta oferece. Quem tem escopo (técnico e
+   * cliente) recebe só os donos das plantas do escopo — o cliente, ele mesmo;
+   * o técnico, os das plantas em que atua, que ele já vê na ficha da planta.
+   * Antes a lista ia inteira, com nome e CPF/CNPJ de todos os clientes,
+   * gerentes e administradores, para qualquer um com `plantas.view` (SN-40).
+   * A rota segue em `plantas.view` porque a exportação da planilha de plantas,
+   * aberta a quem vê plantas, monta a aba de referências com ela.
+   */
+  async findProprietarios(comUnidades?: boolean, user?: ScopedUser) {
     const where: Prisma.usuariosWhereInput = {
       is_active: true,
       deleted_at: null,
@@ -391,18 +400,13 @@ export class PlantasService {
       ]
     };
 
+    const scope = await this.scopeService.getScope(user);
+    const plantaDoDono: Prisma.plantasWhereInput = { deleted_at: null };
+    if (this.scopeService.isScoped(scope)) plantaDoDono.id = { in: scope };
     // Filtrar apenas proprietários que possuem plantas com unidades
-    if (comUnidades) {
-      where.plantas_proprietario = {
-        some: {
-          deleted_at: null,
-          unidades: {
-            some: {
-              deleted_at: null,
-            }
-          }
-        }
-      };
+    if (comUnidades) plantaDoDono.unidades = { some: { deleted_at: null } };
+    if (comUnidades || this.scopeService.isScoped(scope)) {
+      where.plantas_proprietario = { some: plantaDoDono };
     }
 
     const proprietarios = await this.prisma.usuarios.findMany({

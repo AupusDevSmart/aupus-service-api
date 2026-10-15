@@ -197,11 +197,13 @@ export class AtivosFuncionaisService {
    * equipamento" aparecer no momento da escolha, e nao como erro depois do
    * submit — que e quando o usuario ja preencheu o formulario inteiro.
    */
-  async listar(filtros: { unidade_id?: string } = {}) {
+  async listar(filtros: { unidade_id?: string; plantas?: string[] } = {}) {
     const posicoes = await this.prisma.ativos_funcionais.findMany({
       where: {
         deleted_at: null,
         ...(filtros.unidade_id ? { unidade_id: filtros.unidade_id.trim() } : {}),
+        // O escopo de quem pede (o controller resolve): as posições das unidades das plantas dele
+        ...(filtros.plantas ? { unidade: { planta_id: { in: filtros.plantas } } } : {}),
       },
       orderBy: { nome: "asc" },
       include: {

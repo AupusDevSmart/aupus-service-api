@@ -21,6 +21,7 @@ import {
 } from '@nestjs/swagger';
 import {
   AdicionarTarefasDto,
+  AjustesDaProgramacaoDaSolicitacaoDto,
   AprovarProgramacaoDto,
   AtualizarTarefasDto,
   CancelarProgramacaoDto,
@@ -280,7 +281,8 @@ export class ProgramacaoOSController {
   })
   async criarDeSolicitacao(
     @Param('solicitacaoId', ParseULIDPipe) solicitacaoId: string,
-    @Body() dto?: Partial<CreateProgramacaoDto>,
+    // Classe (não `Partial<...>`): só assim o ValidationPipe valida e recusa campo de fora
+    @Body() dto: AjustesDaProgramacaoDaSolicitacaoDto,
     @CurrentUser() user?: ScopedUser,
   ): Promise<ProgramacaoResponseDto> {
     return this.programacaoOSService.criarDeSolicitacao(solicitacaoId, dto, user?.id, user);
@@ -306,7 +308,7 @@ export class ProgramacaoOSController {
     @Body() dto: AdicionarTarefasDto,
     @CurrentUser() user?: ScopedUser,
   ): Promise<{ message: string }> {
-    await this.programacaoOSService.adicionarTarefasProgramacao(id, dto, user?.id);
+    await this.programacaoOSService.adicionarTarefasProgramacao(id, dto, user?.id, user);
     return { message: 'Tarefas adicionadas com sucesso' };
   }
 
@@ -326,7 +328,7 @@ export class ProgramacaoOSController {
     @Body() dto: AtualizarTarefasDto,
     @CurrentUser() user?: ScopedUser,
   ): Promise<{ message: string }> {
-    await this.programacaoOSService.atualizarTarefasProgramacao(id, dto, user?.id);
+    await this.programacaoOSService.atualizarTarefasProgramacao(id, dto, user?.id, user);
     return { message: 'Tarefas atualizadas com sucesso' };
   }
 
@@ -351,7 +353,7 @@ export class ProgramacaoOSController {
     @Param('tarefaId', ParseULIDPipe) tarefaId: string,
     @CurrentUser() user?: ScopedUser,
   ): Promise<{ message: string }> {
-    await this.programacaoOSService.removerTarefaProgramacao(id, tarefaId, user?.id);
+    await this.programacaoOSService.removerTarefaProgramacao(id, tarefaId, user?.id, user);
     return { message: 'Tarefa removida com sucesso' };
   }
 
@@ -371,7 +373,7 @@ export class ProgramacaoOSController {
     description: 'Programações aprovadas não podem ser deletadas',
   })
   async deletar(@Param('id', ParseULIDPipe) id: string, @CurrentUser() user?: ScopedUser): Promise<{ message: string }> {
-    await this.programacaoOSService.deletar(id, user?.id);
+    await this.programacaoOSService.deletar(id, user?.id, user);
     return { message: 'Programação deletada com sucesso' };
   }
 }
