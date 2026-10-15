@@ -20,7 +20,7 @@ pids
 *.pid.lock
 
 # Uploads (runtime data servida em /uploads)
-uploads/
+/uploads/
 
 # Coverage directory used by tools like istanbul
 coverage/
@@ -77,10 +77,10 @@ temp/
 *.bak
 *.backup
 
-# Backup SQL files (geralmente muito grandes para Git)
-backups/*.sql
-backups/*.dump
-backups/*.gz
+# Backups do banco: NUNCA no git (repo público). A pasta inteira, em qualquer
+# formato — o backup-database.ts grava JSON aqui, e um dump com senha, CPF e PIX
+# de todos os usuários entrou no commit aaab4aa assim (SN-40).
+backups/
 
 # Testing
 test-results/

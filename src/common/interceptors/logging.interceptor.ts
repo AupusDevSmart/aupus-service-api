@@ -9,6 +9,23 @@ import { tap, catchError } from 'rxjs/operators';
 import { loggers } from '../../config/logger.config';
 import { Sentry } from '../../config/sentry.config';
 
+/**
+ * Chave que carrega segredo, em qualquer grafia: senha, senhaAtual, novaSenha,
+ * confirmarSenha, password, refresh_token, accessToken, secret, authorization.
+ * Antes só os nomes exatos eram mascarados, e a troca de senha com erro mandava
+ * a senha atual e a nova abertas para o Sentry (achado na revisão do SN-36).
+ */
+const CHAVE_SECRETA = /senha|password|token|secret|authorization/i;
+
+/** O corpo sem segredo, em qualquer profundidade (objeto e lista). */
+export function semSegredos(valor: unknown): unknown {
+  if (Array.isArray(valor)) return valor.map(semSegredos);
+  if (!valor || typeof valor !== 'object') return valor;
+  return Object.fromEntries(
+    Object.entries(valor).map(([chave, v]) => [chave, CHAVE_SECRETA.test(chave) ? '***REDACTED***' : semSegredos(v)]),
+  );
+}
+
 @Injectable()
 export class LoggingInterceptor implements NestInterceptor {
   intercept(context: ExecutionContext, next: CallHandler): Observable<unknown> {
@@ -122,19 +139,6 @@ export class LoggingInterceptor implements NestInterceptor {
 
   // Remover informações sensíveis do body antes de logar
   private sanitizeBody(body: unknown): unknown {
-    if (!body || typeof body !== 'object') {
-      return body;
-    }
-
-    const sanitized: Record<string, unknown> = { ...body };
-    const sensitiveFields = ['password', 'senha', 'token', 'secret', 'authorization'];
-
-    sensitiveFields.forEach((field) => {
-      if (sanitized[field]) {
-        sanitized[field] = '***REDACTED***';
-      }
-    });
-
-    return sanitized;
+    return semSegredos(body);
   }
 }
