@@ -71,11 +71,11 @@ export class CreateInstrucaoDto {
 
   @IsEnum(StatusTarefa)
   @IsOptional()
-  status?: StatusTarefa = StatusTarefa.ATIVA;
+  status?: StatusTarefa;
 
   @IsBoolean()
   @IsOptional()
-  ativo?: boolean = true;
+  ativo?: boolean;
 
   @IsString()
   @IsOptional()
@@ -86,11 +86,11 @@ export class CreateInstrucaoDto {
   @ValidateNested({ each: true })
   @Type(() => CreateSubInstrucaoDto)
   @IsOptional()
-  sub_instrucoes?: CreateSubInstrucaoDto[] = [];
+  sub_instrucoes?: CreateSubInstrucaoDto[];
 
   @IsArray()
   @ValidateNested({ each: true })
   @Type(() => CreateRecursoInstrucaoDto)
   @IsOptional()
-  recursos?: CreateRecursoInstrucaoDto[] = [];
+  recursos?: CreateRecursoInstrucaoDto[];
 }

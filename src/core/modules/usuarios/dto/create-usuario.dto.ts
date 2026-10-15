@@ -89,13 +89,19 @@ export class CreateUsuarioDto {
   @Length(1, 255)
   instagram?: string;
 
-  @ApiProperty({ 
+  /**
+   * Sem inicializador: o PartialType do Update o copiaria, e um PATCH sem
+   * `status` reativaria o usuario inativo (SN-12). O padrao fica no create.
+   */
+  @ApiProperty({
     description: 'Status do usuário',
     enum: UsuarioStatus,
-    default: UsuarioStatus.ATIVO
+    default: UsuarioStatus.ATIVO,
+    required: false,
   })
+  @IsOptional()
   @IsEnum(UsuarioStatus)
-  status: UsuarioStatus = UsuarioStatus.ATIVO;
+  status?: UsuarioStatus;
 
   @ApiPropertyOptional({ 
     description: 'CPF ou CNPJ do usuário',

@@ -52,7 +52,7 @@ export class CreateFeriadoDto {
   })
   @IsBoolean({ message: 'Geral deve ser verdadeiro ou falso' })
   @IsOptional()
-  geral?: boolean = false;
+  geral?: boolean;
 
   @ApiPropertyOptional({
     description: 'Indica se o feriado se repete anualmente',
@@ -61,7 +61,7 @@ export class CreateFeriadoDto {
   })
   @IsBoolean({ message: 'Recorrente deve ser verdadeiro ou falso' })
   @IsOptional()
-  recorrente?: boolean = false;
+  recorrente?: boolean;
 
   @ApiPropertyOptional({
     description: 'Descrição adicional do feriado',

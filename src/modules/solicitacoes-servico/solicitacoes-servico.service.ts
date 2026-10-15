@@ -217,6 +217,8 @@ export class SolicitacoesServicoService {
       const solicitacao = await prisma.solicitacoes_servico.create({
         data: {
           ...createData,
+          // A coluna e NOT NULL: "nao informado" e vazio
+          local: createData.local ?? '',
           planta_id, // Usar o planta_id determinado
           numero,
           status: StatusSolicitacaoServico.REGISTRADA,

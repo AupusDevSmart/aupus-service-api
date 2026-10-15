@@ -77,15 +77,15 @@ export class CreateSolicitacaoDto {
   equipamento_id?: string;
 
   /**
-   * Opcional. A coluna e NOT NULL no banco, entao o default vazio entra aqui:
-   * "nao informado" vira string vazia, sem exigir migracao numa base
-   * compartilhada com o iot_nexon so para permitir nulo.
+   * Opcional. A coluna e NOT NULL no banco: "nao informado" vira string vazia
+   * no create do service. Nao como inicializador aqui: o PartialType do
+   * Update o copiaria e um PUT sem `local` apagaria o local (SN-12).
    */
   @ApiPropertyOptional({ description: 'Local onde o serviço será realizado', maxLength: 255 })
   @IsOptional()
   @IsString()
   @MaxLength(255)
-  local?: string = '';
+  local?: string;
 
   @ApiPropertyOptional({ description: 'Área específica', maxLength: 255 })
   @IsOptional()

@@ -53,15 +53,16 @@ BEGIN;
 CREATE TEMP TABLE opcoes ON COMMIT DROP AS
 SELECT :'apagar_executadas'::boolean AS apagar_executadas, :'apagar_anomalias'::boolean AS apagar_anomalias;
 
--- Planta efetiva de cada equipamento: a dele, a da unidade, ou a da unidade do UC pai
+-- Planta efetiva de cada equipamento: a da unidade, a da unidade do UC pai, ou
+-- (estrutura antiga, sem unidade) a coluna do proprio equipamento, que pode estar velha
 CREATE TEMP TABLE planta_do_equipamento ON COMMIT DROP AS
 SELECT trim(e.id) AS equipamento_id,
-       COALESCE(NULLIF(trim(e.planta_id), ''), NULLIF(trim(u.planta_id), ''), NULLIF(trim(up.planta_id), '')) AS planta_id
+       COALESCE(NULLIF(trim(u.planta_id), ''), NULLIF(trim(up.planta_id), ''), NULLIF(trim(e.planta_id), '')) AS planta_id
 FROM equipamentos e
 LEFT JOIN unidades u ON trim(u.id) = trim(e.unidade_id)
 LEFT JOIN equipamentos pai ON trim(pai.id) = trim(e.equipamento_pai_id)
 LEFT JOIN unidades up ON trim(up.id) = trim(pai.unidade_id)
-WHERE COALESCE(NULLIF(trim(e.planta_id), ''), NULLIF(trim(u.planta_id), ''), NULLIF(trim(up.planta_id), '')) IS NOT NULL;
+WHERE COALESCE(NULLIF(trim(u.planta_id), ''), NULLIF(trim(up.planta_id), ''), NULLIF(trim(e.planta_id), '')) IS NOT NULL;
 
 \echo '== 1a. anomalias que recebem a planta do equipamento'
 UPDATE anomalias a SET planta_id = pe.planta_id

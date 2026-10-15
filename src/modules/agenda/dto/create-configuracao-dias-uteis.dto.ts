@@ -35,7 +35,7 @@ export class CreateConfiguracaoDiasUteisDto {
   })
   @IsBoolean({ message: 'Segunda deve ser verdadeiro ou falso' })
   @IsOptional()
-  segunda?: boolean = true;
+  segunda?: boolean;
 
   @ApiPropertyOptional({
     description: 'Terça-feira é dia útil',
@@ -44,7 +44,7 @@ export class CreateConfiguracaoDiasUteisDto {
   })
   @IsBoolean({ message: 'Terça deve ser verdadeiro ou falso' })
   @IsOptional()
-  terca?: boolean = true;
+  terca?: boolean;
 
   @ApiPropertyOptional({
     description: 'Quarta-feira é dia útil',
@@ -53,7 +53,7 @@ export class CreateConfiguracaoDiasUteisDto {
   })
   @IsBoolean({ message: 'Quarta deve ser verdadeiro ou falso' })
   @IsOptional()
-  quarta?: boolean = true;
+  quarta?: boolean;
 
   @ApiPropertyOptional({
     description: 'Quinta-feira é dia útil',
@@ -62,7 +62,7 @@ export class CreateConfiguracaoDiasUteisDto {
   })
   @IsBoolean({ message: 'Quinta deve ser verdadeiro ou falso' })
   @IsOptional()
-  quinta?: boolean = true;
+  quinta?: boolean;
 
   @ApiPropertyOptional({
     description: 'Sexta-feira é dia útil',
@@ -71,7 +71,7 @@ export class CreateConfiguracaoDiasUteisDto {
   })
   @IsBoolean({ message: 'Sexta deve ser verdadeiro ou falso' })
   @IsOptional()
-  sexta?: boolean = true;
+  sexta?: boolean;
 
   @ApiPropertyOptional({
     description: 'Sábado é dia útil',
@@ -80,7 +80,7 @@ export class CreateConfiguracaoDiasUteisDto {
   })
   @IsBoolean({ message: 'Sábado deve ser verdadeiro ou falso' })
   @IsOptional()
-  sabado?: boolean = false;
+  sabado?: boolean;
 
   @ApiPropertyOptional({
     description: 'Domingo é dia útil',
@@ -89,7 +89,7 @@ export class CreateConfiguracaoDiasUteisDto {
   })
   @IsBoolean({ message: 'Domingo deve ser verdadeiro ou falso' })
   @IsOptional()
-  domingo?: boolean = false;
+  domingo?: boolean;
 
   @ApiPropertyOptional({
     description: 'Indica se a configuração se aplica a todas as plantas (geral) ou apenas às plantas especificadas',
@@ -98,7 +98,7 @@ export class CreateConfiguracaoDiasUteisDto {
   })
   @IsBoolean({ message: 'Geral deve ser verdadeiro ou falso' })
   @IsOptional()
-  geral?: boolean = false;
+  geral?: boolean;
 
   @ApiPropertyOptional({
     description: 'IDs das plantas associadas à configuração (obrigatório quando geral = false)',

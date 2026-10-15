@@ -2,8 +2,10 @@ import { Prisma } from '@prisma/client';
 import type { PrismaService } from '../../prisma/prisma.service';
 
 /**
- * A planta de cada equipamento: a do próprio equipamento, senão a da unidade
- * dele, senão — componente (UAR), que não tem unidade — a da unidade do UC pai.
+ * A planta de cada equipamento: a da unidade dele, senão — componente (UAR),
+ * que não tem unidade — a da unidade do UC pai, senão a coluna `planta_id` do
+ * próprio equipamento. Essa coluna é da estrutura antiga e fica velha quando o
+ * UC muda de planta, por isso vem por último (SN-12).
  * SQL cru com trim() dos dois lados: os ids são Char(26) com espaço e os ids
  * congelados nas tarefas da OS não têm relação no Prisma. Planta só de espaços
  * conta como sem planta.
@@ -16,7 +18,7 @@ export async function plantaDeCadaEquipamento(
   if (ids.length === 0) return new Map();
   const linhas = await prisma.$queryRaw<{ equipamento_id: string; planta_id: string | null }[]>`
     SELECT trim(e.id) AS equipamento_id,
-           COALESCE(NULLIF(trim(e.planta_id), ''), NULLIF(trim(u.planta_id), ''), NULLIF(trim(up.planta_id), '')) AS planta_id
+           COALESCE(NULLIF(trim(u.planta_id), ''), NULLIF(trim(up.planta_id), ''), NULLIF(trim(e.planta_id), '')) AS planta_id
     FROM equipamentos e
     LEFT JOIN unidades u ON trim(u.id) = trim(e.unidade_id)
     LEFT JOIN equipamentos pai ON trim(pai.id) = trim(e.equipamento_pai_id)
