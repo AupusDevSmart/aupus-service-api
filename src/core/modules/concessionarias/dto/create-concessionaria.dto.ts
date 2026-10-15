@@ -5,7 +5,8 @@ import {
   IsDateString,
   IsOptional,
   IsNumber,
-  IsPositive,
+  ValidateNested,
+  IsObject,
   Length,
   MaxLength,
   Matches,
@@ -14,41 +15,50 @@ import {
 } from 'class-validator';
 import { Type } from 'class-transformer';
 
+/** O maior valor que a coluna Decimal(10,6) guarda: acima disso o banco recusaria com 500. */
+const TARIFA_MAXIMA = 9999.999999;
+
 export class TarifasA4VerdeDto {
   @ApiProperty({ description: 'TUSD Demanda', required: false, example: 0.123456 })
   @IsOptional()
   @IsNumber()
-  @IsPositive()
+  @Min(0)
+  @Max(TARIFA_MAXIMA)
   tusd_d?: number;
 
   @ApiProperty({ description: 'TUSD Ponta', required: false, example: 0.654321 })
   @IsOptional()
   @IsNumber()
-  @IsPositive()
+  @Min(0)
+  @Max(TARIFA_MAXIMA)
   tusd_p?: number;
 
   @ApiProperty({ description: 'TUSD Fora Ponta', required: false, example: 0.234567 })
   @IsOptional()
   @IsNumber()
-  @IsPositive()
+  @Min(0)
+  @Max(TARIFA_MAXIMA)
   tusd_fp?: number;
 
   @ApiProperty({ description: 'TE Demanda', required: false, example: 0.345678 })
   @IsOptional()
   @IsNumber()
-  @IsPositive()
+  @Min(0)
+  @Max(TARIFA_MAXIMA)
   te_d?: number;
 
   @ApiProperty({ description: 'TE Ponta', required: false, example: 0.456789 })
   @IsOptional()
   @IsNumber()
-  @IsPositive()
+  @Min(0)
+  @Max(TARIFA_MAXIMA)
   te_p?: number;
 
   @ApiProperty({ description: 'TE Fora Ponta', required: false, example: 0.567890 })
   @IsOptional()
   @IsNumber()
-  @IsPositive()
+  @Min(0)
+  @Max(TARIFA_MAXIMA)
   te_fp?: number;
 }
 
@@ -56,37 +66,43 @@ export class TarifasA3aVerdeDto {
   @ApiProperty({ description: 'TUSD Demanda', required: false, example: 0.123456 })
   @IsOptional()
   @IsNumber()
-  @IsPositive()
+  @Min(0)
+  @Max(TARIFA_MAXIMA)
   tusd_d?: number;
 
   @ApiProperty({ description: 'TUSD Ponta', required: false, example: 0.654321 })
   @IsOptional()
   @IsNumber()
-  @IsPositive()
+  @Min(0)
+  @Max(TARIFA_MAXIMA)
   tusd_p?: number;
 
   @ApiProperty({ description: 'TUSD Fora Ponta', required: false, example: 0.234567 })
   @IsOptional()
   @IsNumber()
-  @IsPositive()
+  @Min(0)
+  @Max(TARIFA_MAXIMA)
   tusd_fp?: number;
 
   @ApiProperty({ description: 'TE Demanda', required: false, example: 0.345678 })
   @IsOptional()
   @IsNumber()
-  @IsPositive()
+  @Min(0)
+  @Max(TARIFA_MAXIMA)
   te_d?: number;
 
   @ApiProperty({ description: 'TE Ponta', required: false, example: 0.456789 })
   @IsOptional()
   @IsNumber()
-  @IsPositive()
+  @Min(0)
+  @Max(TARIFA_MAXIMA)
   te_p?: number;
 
   @ApiProperty({ description: 'TE Fora Ponta', required: false, example: 0.567890 })
   @IsOptional()
   @IsNumber()
-  @IsPositive()
+  @Min(0)
+  @Max(TARIFA_MAXIMA)
   te_fp?: number;
 }
 
@@ -94,13 +110,15 @@ export class TarifasBDto {
   @ApiProperty({ description: 'TUSD Valor', required: false, example: 0.543210 })
   @IsOptional()
   @IsNumber()
-  @IsPositive()
+  @Min(0)
+  @Max(TARIFA_MAXIMA)
   tusd_valor?: number;
 
   @ApiProperty({ description: 'TE Valor', required: false, example: 0.432109 })
   @IsOptional()
   @IsNumber()
-  @IsPositive()
+  @Min(0)
+  @Max(TARIFA_MAXIMA)
   te_valor?: number;
 }
 
@@ -154,6 +172,9 @@ export class CreateConcessionariaDto {
     required: false,
   })
   @IsOptional()
+  @IsObject()
+  @ValidateNested()
+  @Type(() => TarifasA4VerdeDto)
   a4_verde?: TarifasA4VerdeDto;
 
   @ApiProperty({
@@ -162,6 +183,9 @@ export class CreateConcessionariaDto {
     required: false,
   })
   @IsOptional()
+  @IsObject()
+  @ValidateNested()
+  @Type(() => TarifasA3aVerdeDto)
   a3a_verde?: TarifasA3aVerdeDto;
 
   @ApiProperty({
@@ -170,6 +194,9 @@ export class CreateConcessionariaDto {
     required: false,
   })
   @IsOptional()
+  @IsObject()
+  @ValidateNested()
+  @Type(() => TarifasBDto)
   b?: TarifasBDto;
 
   // ============== Horarios dos postos tarifarios ==============
