@@ -236,7 +236,7 @@ export class ProgramacaoOSController {
     @Body() dto: CreateProgramacaoAnomaliaDto,
     @CurrentUser() user?: ScopedUser,
   ): Promise<ProgramacaoResponseDto> {
-    return this.programacaoOSService.criarDeAnomalia(anomaliaId, dto, user?.id);
+    return this.programacaoOSService.criarDeAnomalia(anomaliaId, dto, user?.id, user);
   }
 
   @Post('from-tarefas')
@@ -255,7 +255,7 @@ export class ProgramacaoOSController {
     description: 'Uma ou mais tarefas não encontradas',
   })
   async criarDeTarefas(@Body() dto: CreateProgramacaoTarefasDto, @CurrentUser() user?: ScopedUser): Promise<ProgramacaoResponseDto> {
-    return this.programacaoOSService.criarDeTarefas(dto, user?.id);
+    return this.programacaoOSService.criarDeTarefas(dto, user?.id, user);
   }
 
   @Post('from-solicitacao/:solicitacaoId')
@@ -283,7 +283,7 @@ export class ProgramacaoOSController {
     @Body() dto?: Partial<CreateProgramacaoDto>,
     @CurrentUser() user?: ScopedUser,
   ): Promise<ProgramacaoResponseDto> {
-    return this.programacaoOSService.criarDeSolicitacao(solicitacaoId, dto, user?.id);
+    return this.programacaoOSService.criarDeSolicitacao(solicitacaoId, dto, user?.id, user);
   }
 
   @Post(':id/tarefas')

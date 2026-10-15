@@ -21,6 +21,8 @@ describe('TarefasSchedulerService', () => {
     programacoes_os: { update: jest.fn() },
     configuracoes_dias_uteis: { findFirst: jest.fn() },
     feriados: { findMany: jest.fn() },
+    // A planta de cada equipamento (plantaDeCadaEquipamento)
+    $queryRaw: jest.fn(),
   };
 
   const mockProgramacaoService = { criarDeTarefas: jest.fn() };
@@ -41,6 +43,7 @@ describe('TarefasSchedulerService', () => {
     mockProgramacaoService.criarDeTarefas.mockResolvedValue({ id: 'prog_1', codigo: 'PRG-001' });
     mockPrismaService.configuracoes_dias_uteis.findFirst.mockResolvedValue(null);
     mockPrismaService.feriados.findMany.mockResolvedValue([]);
+    mockPrismaService.$queryRaw.mockResolvedValue([]);
   });
 
   afterEach(() => jest.clearAllMocks());
@@ -160,6 +163,7 @@ describe('TarefasSchedulerService', () => {
       equipamento_id: 'eq_1',
       proxima_execucao: new Date('2026-10-18T13:00:00Z'),
       equipamento: { id: 'eq_1', nome: 'Motor', criticidade: '3', unidade_id: 'un_1', unidade: { id: 'un_1', nome: 'Unidade 1', planta_id: 'pl_1' } },
+      planta_id: 'pl_1',
     };
     const gerar = () => service['criarProgramacaoParaCluster']([tarefaDoDomingo] as never, 'Unidade 1', 'un_1');
 
@@ -184,6 +188,55 @@ describe('TarefasSchedulerService', () => {
       );
       const dados = mockPrismaService.programacoes_os.update.mock.calls[0][0].data.dados_origem;
       expect(dados).toMatchObject({ data_prevista: '2026-10-18T13:00:00.000Z', ajustada_para_dia_util: true });
+    });
+  });
+
+  /**
+   * Toda programação tem planta (SN-35): o grupo que não sai tem de aparecer.
+   * Antes a recusa ia só para o log e se repetia toda madrugada, calada.
+   */
+  describe('grupos que nao saem', () => {
+    const tarefa = (id: string, equipamento: string) => ({
+      id, nome: id, tag: `TRF-${id}`, criticidade: 3, frequencia: 'MENSAL', frequencia_personalizada: null,
+      data_ultima_execucao: null, data_ancora: null, created_at: new Date('2026-01-01T00:00:00Z'), instrucao: null,
+      equipamento_id: equipamento,
+      equipamento: { id: equipamento, nome: equipamento, criticidade: '3', unidade_id: 'un_1', unidade: { id: 'un_1', nome: 'Unidade 1', planta_id: 'pl_1' }, equipamento_pai: null },
+    });
+
+    it('tarefa de equipamento sem planta fica de fora, nomeada; a da planta sai', async () => {
+      mockPrismaService.tarefas.findMany.mockResolvedValue([tarefa('a', 'eq_com'), tarefa('b', 'eq_sem')]);
+      mockPrismaService.$queryRaw.mockResolvedValue([{ equipamento_id: 'eq_com', planta_id: 'pl_1' }]);
+
+      const resultado = await service.gerarProgramacoesAutomaticas();
+
+      expect(resultado.falhas).toEqual([expect.objectContaining({ tarefas: ['TRF-b'] })]);
+      expect(mockProgramacaoService.criarDeTarefas).toHaveBeenCalledTimes(1);
+      expect(mockProgramacaoService.criarDeTarefas.mock.calls[0][0].tarefas_ids).toEqual(['a']);
+      expect(resultado.programacoesCriadas).toBe(1);
+    });
+
+    it('grupo recusado pela regra da planta entra nas falhas com as tags e o motivo', async () => {
+      mockPrismaService.tarefas.findMany.mockResolvedValue([tarefa('a', 'eq_com')]);
+      mockPrismaService.$queryRaw.mockResolvedValue([{ equipamento_id: 'eq_com', planta_id: 'pl_1' }]);
+      mockProgramacaoService.criarDeTarefas.mockRejectedValueOnce(new Error('As tarefas escolhidas são de 2 plantas'));
+
+      const resultado = await service.gerarProgramacoesAutomaticas();
+
+      expect(resultado.programacoesCriadas).toBe(0);
+      expect(resultado.falhas).toEqual([{ unidade: 'Unidade 1', tarefas: ['TRF-a'], motivo: 'As tarefas escolhidas são de 2 plantas' }]);
+    });
+
+    it('equipamentos da mesma unidade com plantas diferentes vão para programações separadas', async () => {
+      mockPrismaService.tarefas.findMany.mockResolvedValue([tarefa('a', 'eq_1'), tarefa('b', 'eq_2')]);
+      mockPrismaService.$queryRaw.mockResolvedValue([
+        { equipamento_id: 'eq_1', planta_id: 'pl_1' },
+        { equipamento_id: 'eq_2', planta_id: 'pl_2' },
+      ]);
+
+      await service.gerarProgramacoesAutomaticas();
+
+      const grupos = mockProgramacaoService.criarDeTarefas.mock.calls.map((c) => c[0].tarefas_ids);
+      expect(grupos).toEqual(expect.arrayContaining([['a'], ['b']]));
     });
   });
 

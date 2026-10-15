@@ -908,7 +908,8 @@ describe('ProgramacaoOSService', () => {
             anomalia_prioridade: mockAnomaliaData.prioridade,
           }),
         }),
-        'user123'
+        'user123',
+        undefined, // o user (escopo) que a rota repassa
       );
 
       expect(result).toEqual(mockProgramacaoData);
@@ -966,7 +967,8 @@ describe('ProgramacaoOSService', () => {
             tarefas_nomes: ['Troca de óleo', 'Verificação de filtros'],
           }),
         }),
-        'user123'
+        'user123',
+        undefined, // o user (escopo) que a rota repassa
       );
 
       expect(result).toEqual(mockProgramacaoData);

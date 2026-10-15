@@ -7,6 +7,8 @@ import { calcularProximaExecucao } from './periodicidade';
 import { variantesDeIds } from './ids';
 import { PrioridadeDaPreventiva, prioridadePelaCriticidade } from './prioridade-pela-criticidade';
 import { proximoDiaUtil, regraDeDiasUteis } from '../agenda/dias-uteis';
+import { plantaDeCadaEquipamento } from '@/core/modules/auth/planta-dos-equipamentos';
+import { Sentry } from '../../config/sentry.config';
 
 /** `dados_origem` e Json: so um objeto recebe as chaves da geracao automatica. */
 function ehObjetoJson(valor: unknown): valor is Prisma.JsonObject {
@@ -43,7 +45,16 @@ interface TarefaElegivel {
       planta_id: string | null;
     } | null;
   };
+  /** A planta efetiva (equipamento, unidade, ou unidade do UC pai): a da programação. */
+  planta_id: string | null;
   proxima_execucao?: Date;
+}
+
+/** Grupo que o cron não conseguiu programar: aparece no retorno e no resumo. */
+export interface FalhaDaGeracao {
+  unidade: string;
+  tarefas: string[];
+  motivo: string;
 }
 
 @Injectable()
@@ -64,8 +75,16 @@ export class TarefasSchedulerService {
     try {
       const resultado = await this.gerarProgramacoesAutomaticas();
       this.logger.log(
-        `Geração automática concluída: ${resultado.programacoesCriadas} programações criadas, ${resultado.tarefasProcessadas} tarefas processadas, ${resultado.tarefasIgnoradas} tarefas já com programação ativa`,
+        `Geração automática concluída: ${resultado.programacoesCriadas} programações criadas, ${resultado.tarefasProcessadas} tarefas processadas, ${resultado.tarefasIgnoradas} tarefas já com programação ativa, ${resultado.falhas.length} grupo(s) com falha`,
       );
+      // A falha se repete toda madrugada até alguém corrigir o cadastro: tem de
+      // chegar a quem acompanha, não só ao log
+      if (resultado.falhas.length > 0) {
+        Sentry.captureMessage('Cron de preventivas: grupos sem programação', {
+          level: 'warning',
+          extra: { falhas: resultado.falhas },
+        });
+      }
     } catch (error) {
       this.logger.error(`Erro na geração automática de programações: ${error.message}`, error.stack);
     }
@@ -79,6 +98,7 @@ export class TarefasSchedulerService {
     tarefasProcessadas: number;
     tarefasIgnoradas: number;
     detalhes: Array<{ programacaoId: string; codigo: string; unidade: string; tarefas: number }>;
+    falhas: FalhaDaGeracao[];
   }> {
     // 1. Buscar tarefas elegíveis
     const tarefas = await this.buscarTarefasElegiveis();
@@ -108,19 +128,32 @@ export class TarefasSchedulerService {
     );
 
     if (tarefasSemProgramacao.length === 0) {
-      return { programacoesCriadas: 0, tarefasProcessadas: 0, tarefasIgnoradas, detalhes: [] };
+      return { programacoesCriadas: 0, tarefasProcessadas: 0, tarefasIgnoradas, detalhes: [], falhas: [] };
     }
 
-    // 4. Agrupar por unidade
-    const gruposPorUnidade = this.agruparPorUnidade(tarefasSemProgramacao);
-
-    // 5. Dentro de cada unidade, agrupar por janela de data
     const detalhes: Array<{ programacaoId: string; codigo: string; unidade: string; tarefas: number }> = [];
+    const falhas: FalhaDaGeracao[] = [];
     let totalTarefasProcessadas = 0;
 
-    for (const [unidadeId, tarefasUnidade] of gruposPorUnidade.entries()) {
+    // Toda programação tem planta (SN-35): tarefa de equipamento sem planta não
+    // tem como sair. Fica de fora, nomeada, em vez de derrubar o grupo inteiro.
+    const semPlanta = tarefasSemProgramacao.filter((t) => !t.planta_id);
+    if (semPlanta.length > 0) {
+      const falha = { unidade: 'Sem planta', tarefas: semPlanta.map((t) => t.tag), motivo: 'O equipamento da tarefa não está em nenhuma planta' };
+      falhas.push(falha);
+      this.logger.error(`${falha.motivo}: ${falha.tarefas.join(', ')}`);
+    }
+
+    // 4. Agrupar por unidade (e planta: uma programação atende uma planta só)
+    const gruposPorUnidade = this.agruparPorUnidade(tarefasSemProgramacao.filter((t) => t.planta_id));
+
+    // 5. Dentro de cada unidade, agrupar por janela de data
+
+    for (const tarefasUnidade of gruposPorUnidade.values()) {
       const clusters = this.agruparPorJanelaData(tarefasUnidade);
       const nomeUnidade = tarefasUnidade[0]?.equipamento?.unidade?.nome || 'Sem unidade';
+      // A chave do grupo leva a planta; o que se grava é a unidade
+      const unidadeId = tarefasUnidade[0]?.equipamento?.unidade_id || 'sem_unidade';
 
       for (const cluster of clusters) {
         try {
@@ -135,9 +168,13 @@ export class TarefasSchedulerService {
             totalTarefasProcessadas += cluster.length;
           }
         } catch (error) {
-          this.logger.error(
-            `Erro ao criar programação para unidade ${nomeUnidade} com ${cluster.length} tarefas: ${error.message}`,
-          );
+          const falha = {
+            unidade: nomeUnidade,
+            tarefas: cluster.map((t) => t.tag),
+            motivo: error instanceof Error ? error.message : String(error),
+          };
+          falhas.push(falha);
+          this.logger.error(`Erro ao criar programação para unidade ${nomeUnidade} (${falha.tarefas.join(', ')}): ${falha.motivo}`);
         }
       }
     }
@@ -147,6 +184,7 @@ export class TarefasSchedulerService {
       tarefasProcessadas: totalTarefasProcessadas,
       tarefasIgnoradas,
       detalhes,
+      falhas,
     };
   }
 
@@ -210,7 +248,8 @@ export class TarefasSchedulerService {
           : { ...equipamento, unidade_id: pai?.unidade_id ?? null, unidade: pai?.unidade ?? null },
       };
     });
-    return comUnidadeEfetiva;
+    const plantas = await plantaDeCadaEquipamento(this.prisma, comUnidadeEfetiva.map((t) => t.equipamento_id));
+    return comUnidadeEfetiva.map((t) => ({ ...t, planta_id: plantas.get(t.equipamento_id?.trim()) ?? null }));
   }
 
   /**
@@ -346,7 +385,9 @@ export class TarefasSchedulerService {
     const grupos = new Map<string, TarefaElegivel[]>();
 
     for (const tarefa of tarefas) {
-      const unidadeId = tarefa.equipamento?.unidade_id || 'sem_unidade';
+      // A planta entra na chave: equipamento com planta própria diferente da da
+      // unidade (ou sem unidade nenhuma) não se mistura com os outros
+      const unidadeId = `${tarefa.equipamento?.unidade_id || 'sem_unidade'}|${tarefa.planta_id}`;
       if (!grupos.has(unidadeId)) {
         grupos.set(unidadeId, []);
       }
@@ -413,7 +454,7 @@ export class TarefasSchedulerService {
     // da planta (feriados e dias da semana da agenda). O ciclo de referência de
     // cada tarefa continua sendo a data prevista: é ele que o cron compara.
     const dataPrevista = cluster[0].proxima_execucao!;
-    const plantaId = cluster[0].equipamento?.unidade?.planta_id ?? null;
+    const plantaId = cluster[0].planta_id;
     const dataProgramada = proximoDiaUtil(dataPrevista, await regraDeDiasUteis(this.prisma, plantaId));
     const mesAno = `${String(dataProgramada.getMonth() + 1).padStart(2, '0')}/${dataProgramada.getFullYear()}`;
 

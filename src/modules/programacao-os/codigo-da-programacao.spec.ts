@@ -15,6 +15,9 @@ describe('código da programação (banco real)', () => {
 
   const limpar = async () => {
     const progs = (await prisma.programacoes_os.findMany({ where: { descricao: { startsWith: PREFIXO } }, select: { id: true } })).map((p) => p.id);
+    const oss = (await prisma.ordens_servico.findMany({ where: { programacao_id: { in: progs } }, select: { id: true } })).map((o) => o.id);
+    await prisma.historico_os.deleteMany({ where: { os_id: { in: oss } } });
+    await prisma.ordens_servico.deleteMany({ where: { id: { in: oss } } });
     await prisma.historico_programacao_os.deleteMany({ where: { programacao_id: { in: progs } } });
     await prisma.programacoes_os.deleteMany({ where: { id: { in: progs } } });
   };
@@ -56,5 +59,36 @@ describe('código da programação (banco real)', () => {
   it('criações ao mesmo tempo recebem códigos diferentes', async () => {
     const criadas = await Promise.all(['a', 'b', 'c', 'd'].map(nova));
     expect(new Set(criadas.map((p) => p.codigo)).size).toBe(4);
+  });
+
+  /**
+   * O número da OS (OSM-ANO-0000) tinha o mesmo defeito: o maior por ordem
+   * alfabética ("10000" antes de "9999") e sem trava (duas aprovações juntas
+   * batiam no índice único). Achado na revisão do SN-36.
+   */
+  describe('número da OS', () => {
+    const aprovada = async (rotulo: string) => {
+      const prog = await nova(rotulo);
+      await programacoes.aprovar(prog.id, {});
+      return prisma.ordens_servico.findUniqueOrThrow({ where: { programacao_id: prog.id } });
+    };
+    const sequencial = (numero: string) => Number(numero.split('-')[2]);
+
+    it('o próximo é o maior numérico + 1, não o maior como texto', async () => {
+      const primeira = await aprovada('os-1');
+      const prefixo = primeira.numero_os.slice(0, primeira.numero_os.lastIndexOf('-') + 1);
+      await prisma.ordens_servico.update({ where: { id: primeira.id }, data: { numero_os: `${prefixo}10000` } });
+
+      const proxima = await aprovada('os-2');
+
+      expect(proxima.numero_os).toBe(`${prefixo}10001`);
+    });
+
+    it('aprovações ao mesmo tempo recebem números diferentes', async () => {
+      const progs = await Promise.all(['os-a', 'os-b', 'os-c'].map(nova));
+      await Promise.all(progs.map((p) => programacoes.aprovar(p.id, {})));
+      const oss = await prisma.ordens_servico.findMany({ where: { programacao_id: { in: progs.map((p) => p.id) } } });
+      expect(new Set(oss.map((o) => sequencial(o.numero_os))).size).toBe(3);
+    });
   });
 });

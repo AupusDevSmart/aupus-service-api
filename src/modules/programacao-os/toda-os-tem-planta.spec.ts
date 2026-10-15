@@ -165,6 +165,12 @@ describe('toda anomalia e programação tem planta (banco real)', () => {
       expect(await prisma.programacoes_os.count({ where: { descricao: { startsWith: PREFIXO } } })).toBe(0);
     });
 
+    it('pela rota from-anomalia também: o escopo vale (o user chega até o criar)', async () => {
+      const anomalia = await novaAnomalia(UC_A);
+      await expect(programacoes.criarDeAnomalia(anomalia.id, {}, TECNICO_B, tecnicoB)).rejects.toThrow(ForbiddenException);
+      expect(await prisma.programacoes_os.count({ where: { descricao: { startsWith: PREFIXO } } })).toBe(0);
+    });
+
     it('editar com a planta vazia (a tela manda quando a origem não traz) mantém a gravada', async () => {
       const prog = await novaProgramacao({ planta_id: PLANTA_A });
       await programacoes.atualizar(prog.id, { planta_id: '' } as never);

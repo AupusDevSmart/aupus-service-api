@@ -273,7 +273,7 @@ describe('ProgramacaoOSController', () => {
 
       const result = await controller.criarDeAnomalia(anomaliaId, dto);
 
-      expect(service.criarDeAnomalia).toHaveBeenCalledWith(anomaliaId, dto, undefined);
+      expect(service.criarDeAnomalia).toHaveBeenCalledWith(anomaliaId, dto, undefined, undefined);
       expect(result).toEqual(mockProgramacaoResponse);
     });
   });
@@ -294,7 +294,7 @@ describe('ProgramacaoOSController', () => {
 
       const result = await controller.criarDeTarefas(dto);
 
-      expect(service.criarDeTarefas).toHaveBeenCalledWith(dto, undefined);
+      expect(service.criarDeTarefas).toHaveBeenCalledWith(dto, undefined, undefined);
       expect(result).toEqual(mockProgramacaoResponse);
     });
   });

@@ -36,28 +36,20 @@ export function prefixoPorOrigem(origem?: string): string {
  * `prisma` aceita tanto o client quanto o handle de uma transacao — os dois
  * caminhos chamam de dentro de `$transaction`.
  *
- * Le o ULTIMO numero da serie em vez de contar as linhas. Contar erra depois de
- * qualquer exclusao: some uma OS, o proximo numero repete um que ja existiu.
- * A ordenacao alfabetica serve porque o padding deixa todos do mesmo tamanho.
+ * Le o MAIOR numero da serie em vez de contar as linhas: contar erra depois de
+ * qualquer exclusao (some uma OS, o proximo numero repete um que ja existiu). O
+ * maior e numerico, nao alfabetico: como texto, "OSP-2026-10000" viria antes de
+ * "OSP-2026-9999". A trava da transacao impede duas OS simultaneas de lerem o
+ * mesmo numero (antes a segunda caia no indice unico).
  */
-export async function gerarNumeroOS(
-  prisma: Pick<Prisma.TransactionClient, 'ordens_servico'>,
-  origem?: string,
-): Promise<string> {
+export async function gerarNumeroOS(prisma: Prisma.TransactionClient, origem?: string): Promise<string> {
   const ano = new Date().getFullYear();
   const prefixo = `${prefixoPorOrigem(origem)}-${ano}-`;
 
-  const ultima = await prisma.ordens_servico.findFirst({
-    where: { numero_os: { startsWith: prefixo } },
-    orderBy: { numero_os: 'desc' },
-    select: { numero_os: true },
-  });
-
-  let sequencial = 1;
-  if (ultima?.numero_os) {
-    const lido = parseInt(ultima.numero_os.slice(prefixo.length), 10);
-    if (Number.isFinite(lido)) sequencial = lido + 1;
-  }
+  await prisma.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`numero-os:${prefixo}`}))`;
+  const [maior] = await prisma.$queryRaw<{ ultimo: number | null }[]>`
+    SELECT max(substring(numero_os from ${`^${prefixo}([0-9]+)$`})::int) AS ultimo FROM ordens_servico`;
+  const sequencial = (maior?.ultimo ?? 0) + 1;
 
   return `${prefixo}${String(sequencial).padStart(4, '0')}`;
 }

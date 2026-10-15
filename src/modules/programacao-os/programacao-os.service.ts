@@ -873,7 +873,9 @@ export class ProgramacaoOSService {
     });
   }
 
-  async criarDeAnomalia(anomaliaId: string, dto: CreateProgramacaoAnomaliaDto, usuarioId?: string): Promise<ProgramacaoResponseDto> {
+  // `user` vai até o criar: é lá que o escopo confere a planta da origem. Sem
+  // ele, as rotas from-* criavam sem conferir (achado no SN-36).
+  async criarDeAnomalia(anomaliaId: string, dto: CreateProgramacaoAnomaliaDto, usuarioId?: string, user?: ScopedUser): Promise<ProgramacaoResponseDto> {
     // Buscar anomalia
     const anomalia = await this.prisma.anomalias.findFirst({
       where: { id: anomaliaId, deleted_at: null },
@@ -911,13 +913,14 @@ export class ProgramacaoOSService {
     };
 
     // criar() passa a anomalia para PROGRAMADA
-    return this.criar(createDto, usuarioId);
+    return this.criar(createDto, usuarioId, user);
   }
 
   async criarDeSolicitacao(
     solicitacaoId: string,
     dto: Partial<CreateProgramacaoDto>,
-    usuarioId?: string
+    usuarioId?: string,
+    user?: ScopedUser,
   ): Promise<ProgramacaoResponseDto> {
     // Buscar solicitação do serviço de solicitações
     // Por enquanto vamos simular a busca
@@ -984,13 +987,13 @@ export class ProgramacaoOSService {
     };
 
     // criar() ja passa a solicitacao para PROGRAMADA, com vinculo e historico
-    const programacao = await this.criar(createDto, usuarioId);
+    const programacao = await this.criar(createDto, usuarioId, user);
 
     this.logger.log(`Programação ${programacao.codigo} criada a partir da solicitação ${solicitacao.numero}`);
     return programacao;
   }
 
-  async criarDeTarefas(dto: CreateProgramacaoTarefasDto, usuarioId?: string): Promise<ProgramacaoResponseDto> {
+  async criarDeTarefas(dto: CreateProgramacaoTarefasDto, usuarioId?: string, user?: ScopedUser): Promise<ProgramacaoResponseDto> {
     // Buscar tarefas
     const tarefas = await this.prisma.tarefas.findMany({
       where: {
@@ -1048,7 +1051,7 @@ export class ProgramacaoOSService {
       },
     };
 
-    return this.criar(createDto, usuarioId);
+    return this.criar(createDto, usuarioId, user);
   }
 
   async adicionarTarefasProgramacao(id: string, dto: AdicionarTarefasDto, usuarioId?: string): Promise<void> {
