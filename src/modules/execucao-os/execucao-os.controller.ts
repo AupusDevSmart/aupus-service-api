@@ -25,7 +25,7 @@ import {
 import { FileInterceptor } from '@nestjs/platform-express';
 import { Response } from 'express';
 import { ExecucaoOSService } from './execucao-os.service';
-import { AnexosOSService } from './anexos-os.service';
+import { AnexosOSService, type Solicitante } from './anexos-os.service';
 import {
   OSFiltersDto,
   IniciarExecucaoDto,
@@ -79,7 +79,7 @@ export class ExecucaoOSController {
   @ApiQuery({ name: 'data_inicio', required: false, description: 'Data início (YYYY-MM-DD)' })
   @ApiQuery({ name: 'data_fim', required: false, description: 'Data fim (YYYY-MM-DD)' })
   @ApiQuery({ name: 'atrasadas', required: false, description: 'Filtrar apenas OS atrasadas' })
-  async listar(@Query() filters: OSFiltersDto, @CurrentUser() user?: any): Promise<ListarOSResponseDto> {
+  async listar(@Query() filters: OSFiltersDto, @CurrentUser() user?: Solicitante): Promise<ListarOSResponseDto> {
     return this.execucaoOSService.listar(filters, user);
   }
 
@@ -98,7 +98,7 @@ export class ExecucaoOSController {
     status: HttpStatus.NOT_FOUND,
     description: 'OS não encontrada',
   })
-  async buscarPorId(@Param('id') id: string, @CurrentUser() user?: any): Promise<OrdemServicoDetalhesResponseDto> {
+  async buscarPorId(@Param('id') id: string, @CurrentUser() user?: Solicitante): Promise<OrdemServicoDetalhesResponseDto> {
     return this.execucaoOSService.buscarPorId(id.trim(), user);
   }
 
@@ -114,7 +114,7 @@ export class ExecucaoOSController {
   async iniciar(
     @Param('id') id: string,
     @Body() dto: IniciarExecucaoDto,
-    @CurrentUser() user?: any,
+    @CurrentUser() user?: Solicitante,
   ): Promise<{ message: string }> {
     await this.execucaoOSService.iniciar(id.trim(), dto, user?.id, user);
     return { message: 'Execução iniciada com sucesso' };
@@ -138,7 +138,7 @@ export class ExecucaoOSController {
   async pausar(
     @Param('id') id: string,
     @Body() dto: PausarExecucaoDto,
-    @CurrentUser() user?: any,
+    @CurrentUser() user?: Solicitante,
   ): Promise<{ message: string }> {
     await this.execucaoOSService.pausar(id.trim(), dto, user?.id, user);
     return { message: 'Execução pausada' };
@@ -162,7 +162,7 @@ export class ExecucaoOSController {
   async retomar(
     @Param('id') id: string,
     @Body() dto: RetomarExecucaoDto,
-    @CurrentUser() user?: any,
+    @CurrentUser() user?: Solicitante,
   ): Promise<{ message: string }> {
     await this.execucaoOSService.retomar(id.trim(), dto, user?.id, user);
     return { message: 'Execução retomada' };
@@ -182,7 +182,7 @@ export class ExecucaoOSController {
   async atualizarChecklist(
     @Param('id') id: string,
     @Body() dto: AtualizarChecklistDto,
-    @CurrentUser() user?: any,
+    @CurrentUser() user?: Solicitante,
   ): Promise<{ message: string }> {
     await this.execucaoOSService.atualizarChecklist(id.trim(), dto, user?.id, user);
     return { message: 'Checklist atualizado com sucesso' };
@@ -202,7 +202,7 @@ export class ExecucaoOSController {
   async registrarMateriais(
     @Param('id') id: string,
     @Body() dto: RegistrarMateriaisDto,
-    @CurrentUser() user?: any,
+    @CurrentUser() user?: Solicitante,
   ): Promise<{ message: string }> {
     await this.execucaoOSService.registrarMateriais(id.trim(), dto, user?.id, user);
     return { message: 'Consumo de materiais registrado' };
@@ -222,7 +222,7 @@ export class ExecucaoOSController {
   async registrarFerramentas(
     @Param('id') id: string,
     @Body() dto: RegistrarFerramentasDto,
-    @CurrentUser() user?: any,
+    @CurrentUser() user?: Solicitante,
   ): Promise<{ message: string }> {
     await this.execucaoOSService.registrarFerramentas(id.trim(), dto, user?.id, user);
     return { message: 'Uso de ferramentas registrado' };
@@ -238,7 +238,7 @@ export class ExecucaoOSController {
     status: HttpStatus.OK,
     description: 'Lista de tarefas da OS',
   })
-  async listarTarefas(@Param('id') id: string, @CurrentUser() user?: any) {
+  async listarTarefas(@Param('id') id: string, @CurrentUser() user?: Solicitante) {
     const os = await this.execucaoOSService.buscarPorId(id.trim(), user);
     return { tarefas: os.tarefas_os };
   }
@@ -259,7 +259,7 @@ export class ExecucaoOSController {
     @Param('id') id: string,
     @Param('tarefaId') tarefaId: string,
     @Body() dto: ConcluirTarefaDto,
-    @CurrentUser() user?: any,
+    @CurrentUser() user?: Solicitante,
   ): Promise<{ message: string }> {
     await this.execucaoOSService.concluirTarefa(id.trim(), tarefaId.trim(), dto, user?.id, user);
     return { message: 'Tarefa concluída com sucesso' };
@@ -281,7 +281,7 @@ export class ExecucaoOSController {
     @Param('id') id: string,
     @Param('tarefaId') tarefaId: string,
     @Body() dto: CancelarTarefaDto,
-    @CurrentUser() user?: any,
+    @CurrentUser() user?: Solicitante,
   ): Promise<{ message: string }> {
     await this.execucaoOSService.cancelarTarefa(id.trim(), tarefaId.trim(), dto, user?.id, user);
     return { message: 'Tarefa cancelada' };
@@ -298,7 +298,7 @@ export class ExecucaoOSController {
   async reabrirTarefa(
     @Param('id') id: string,
     @Param('tarefaId') tarefaId: string,
-    @CurrentUser() user?: any,
+    @CurrentUser() user?: Solicitante,
   ): Promise<{ message: string }> {
     await this.execucaoOSService.reabrirTarefa(id.trim(), tarefaId.trim(), user?.id, user);
     return { message: 'Tarefa reaberta' };
@@ -320,10 +320,10 @@ export class ExecucaoOSController {
   })
   async adicionarAnexo(
     @Param('id') id: string,
-    @UploadedFile() file: any,
+    @UploadedFile() file: Express.Multer.File,
     @Body() dto: AdicionarAnexoDto,
     @Query('tipo') tipo: TipoAnexoOS,
-    @CurrentUser() user?: any,
+    @CurrentUser() user?: Solicitante,
   ): Promise<AnexoOSResponseDto> {
     return this.anexosOSService.uploadAnexo(id.trim(), file, tipo, dto.descricao, dto.fase_execucao, user);
   }
@@ -339,7 +339,7 @@ export class ExecucaoOSController {
     description: 'Lista de anexos da OS',
     type: [AnexoOSResponseDto],
   })
-  async listarAnexos(@Param('id') id: string, @CurrentUser() user?: any): Promise<AnexoOSResponseDto[]> {
+  async listarAnexos(@Param('id') id: string, @CurrentUser() user?: Solicitante): Promise<AnexoOSResponseDto[]> {
     return this.anexosOSService.listarAnexosOS(id.trim(), user);
   }
 
@@ -358,7 +358,7 @@ export class ExecucaoOSController {
   async obterAnexo(
     @Param('id') id: string,
     @Param('anexoId') anexoId: string,
-    @CurrentUser() user?: any,
+    @CurrentUser() user?: Solicitante,
   ): Promise<AnexoOSResponseDto> {
     return this.anexosOSService.buscarAnexo(id.trim(), anexoId.trim(), user);
   }
@@ -378,7 +378,7 @@ export class ExecucaoOSController {
     @Param('id') id: string,
     @Param('anexoId') anexoId: string,
     @Res({ passthrough: true }) res: Response,
-    @CurrentUser() user?: any,
+    @CurrentUser() user?: Solicitante,
   ): Promise<StreamableFile> {
     const anexo = await this.anexosOSService.buscarAnexo(id.trim(), anexoId.trim(), user);
     const caminhoArquivo = await this.anexosOSService.obterCaminhoArquivo(id.trim(), anexoId.trim(), user);
@@ -408,7 +408,7 @@ export class ExecucaoOSController {
   async removerAnexo(
     @Param('id') id: string,
     @Param('anexoId') anexoId: string,
-    @CurrentUser() user?: any,
+    @CurrentUser() user?: Solicitante,
   ): Promise<{ message: string }> {
     await this.anexosOSService.removerAnexo(id.trim(), anexoId.trim(), user);
     return { message: 'Anexo removido com sucesso' };
@@ -426,7 +426,7 @@ export class ExecucaoOSController {
   async executar(
     @Param('id') id: string,
     @Body() dto: ExecutarOSDto,
-    @CurrentUser() user?: any,
+    @CurrentUser() user?: Solicitante,
   ): Promise<{ message: string }> {
     await this.execucaoOSService.executar(id.trim(), dto, user?.id, user);
     return { message: 'OS marcada como executada' };
@@ -444,7 +444,7 @@ export class ExecucaoOSController {
   async auditar(
     @Param('id') id: string,
     @Body() dto: AuditarOSDto,
-    @CurrentUser() user?: any,
+    @CurrentUser() user?: Solicitante,
   ): Promise<{ message: string }> {
     await this.execucaoOSService.auditar(id.trim(), dto, user?.id, user);
     return { message: 'OS auditada com sucesso' };
@@ -462,7 +462,7 @@ export class ExecucaoOSController {
   async reabrir(
     @Param('id') id: string,
     @Body() dto: ReabrirOSDto,
-    @CurrentUser() user?: any,
+    @CurrentUser() user?: Solicitante,
   ): Promise<{ message: string }> {
     await this.execucaoOSService.reabrir(id.trim(), dto, user?.id, user);
     return { message: 'OS reaberta para execução' };
@@ -480,7 +480,7 @@ export class ExecucaoOSController {
   async finalizar(
     @Param('id') id: string,
     @Body() dto: FinalizarOSDto,
-    @CurrentUser() user?: any,
+    @CurrentUser() user?: Solicitante,
   ): Promise<{ message: string }> {
     await this.execucaoOSService.finalizar(id.trim(), dto, user?.id, user);
     return { message: 'OS finalizada com sucesso' };
@@ -498,7 +498,7 @@ export class ExecucaoOSController {
   async cancelar(
     @Param('id') id: string,
     @Body() dto: CancelarOSDto,
-    @CurrentUser() user?: any,
+    @CurrentUser() user?: Solicitante,
   ): Promise<{ message: string }> {
     await this.execucaoOSService.cancelar(id.trim(), dto, user?.id, user);
     return { message: 'OS cancelada' };

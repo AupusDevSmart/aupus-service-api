@@ -1,6 +1,19 @@
+import type { Prisma } from '@prisma/client';
 import { Recurso } from './recursos';
 
-type Tx = any;
+type Tx = Prisma.TransactionClient;
+
+/**
+ * Os campos do equipamento recebido que a posicao usa. O payload vem do outro
+ * produto como JSON solto; estes chegam como texto (ou nulo), como la saem.
+ */
+type DadosDoEquipamento = Record<string, unknown> & {
+  unidade_id?: string | null;
+  tipo_equipamento_id?: string | null;
+  nome?: string | null;
+  localizacao?: string | null;
+  localizacao_especifica?: string | null;
+};
 
 /**
  * O que este backend faz com um registro que acabou de chegar do outro produto.
@@ -17,10 +30,10 @@ export async function aoReceber(
   tx: Tx,
   recurso: Recurso,
   registroId: string,
-  dados: Record<string, any>,
+  dados: Record<string, unknown>,
 ): Promise<void> {
   if (recurso !== 'equipamentos') return;
-  await garantirPosicao(tx, registroId, dados);
+  await garantirPosicao(tx, registroId, dados as DadosDoEquipamento);
 }
 
 /**
@@ -39,7 +52,7 @@ export async function aoReceber(
  * pode remanejar equipamento de lugar. Se alguem editou o nome no NexOn, isso
  * nao e uma ordem de mudanca de posicao.
  */
-async function garantirPosicao(tx: Tx, equipamentoId: string, dados: Record<string, any>): Promise<void> {
+async function garantirPosicao(tx: Tx, equipamentoId: string, dados: DadosDoEquipamento): Promise<void> {
   const id = equipamentoId.trim();
 
   const atual = await tx.equipamentos.findUnique({

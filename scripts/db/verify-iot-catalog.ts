@@ -23,22 +23,22 @@ const CATALOG_JS_PATH = path.resolve(
 );
 
 function loadOriginal(): {
-  devicePoints: Record<string, any>;
-  deviceModels: Record<string, any>;
+  devicePoints: Record<string, unknown>;
+  deviceModels: Record<string, unknown>;
 } {
   const code = fs.readFileSync(CATALOG_JS_PATH, 'utf-8');
   const sandbox: Record<string, unknown> = {};
   vm.createContext(sandbox);
   vm.runInContext(code, sandbox, { filename: 'iot-device-catalog.v2.js' });
   return {
-    devicePoints: sandbox.DEVICE_POINTS as Record<string, any>,
-    deviceModels: sandbox.DEVICE_MODELS as Record<string, any>,
+    devicePoints: sandbox.DEVICE_POINTS as Record<string, unknown>,
+    deviceModels: sandbox.DEVICE_MODELS as Record<string, unknown>,
   };
 }
 
 async function buildFromDb(): Promise<{
-  devicePoints: Record<string, any>;
-  deviceModels: Record<string, any>;
+  devicePoints: Record<string, unknown>;
+  deviceModels: Record<string, unknown>;
 }> {
   const tipos = await prisma.iot_device_tipos.findMany();
   const modelos = await prisma.iot_device_modelos.findMany();
@@ -46,17 +46,17 @@ async function buildFromDb(): Promise<{
   // DEVICE_POINTS: { codigo: { label, ai, bi, bo, group_order?, publish? } }
   // No seed, gravamos `label` (do JS) como `nome` no DB, e o resto dentro de `pontos`.
   // Aqui reconstruimos invertendo: prefixa `label` a partir de `nome`.
-  const devicePoints: Record<string, any> = {};
+  const devicePoints: Record<string, unknown> = {};
   for (const t of tipos) {
-    const pontos = t.pontos as Record<string, any>;
+    const pontos = t.pontos as Record<string, unknown>;
     devicePoints[t.codigo] = { label: t.nome, ...pontos };
   }
 
   // DEVICE_MODELS: { catalog_id: { fabricante, modelo, tipo, protocolo, connection_note?, ...mapeamento_sem_catalog_id } }
   const tipoCodigoById = new Map(tipos.map((t) => [t.id, t.codigo]));
-  const deviceModels: Record<string, any> = {};
+  const deviceModels: Record<string, unknown> = {};
   for (const m of modelos) {
-    const map = m.mapeamento as Record<string, any>;
+    const map = m.mapeamento as Record<string, unknown>;
     const catalogId = (map.catalog_id as string) ?? `${m.fabricante.toLowerCase()}-${m.modelo.toLowerCase()}`;
     const { catalog_id: _, ...rest } = map;
     deviceModels[catalogId] = {
@@ -72,18 +72,21 @@ async function buildFromDb(): Promise<{
   return { devicePoints, deviceModels };
 }
 
-function deepEqual(a: any, b: any): boolean {
+function deepEqual(a: unknown, b: unknown): boolean {
   if (a === b) return true;
   if (typeof a !== typeof b) return false;
   if (a === null || b === null) return a === b;
   if (typeof a !== 'object') return a === b;
-  const ka = Object.keys(a);
-  const kb = Object.keys(b);
+  // Daqui para baixo os dois sao objetos (ou arrays) vindos de JSON
+  const oa = a as Record<string, unknown>;
+  const ob = b as Record<string, unknown>;
+  const ka = Object.keys(oa);
+  const kb = Object.keys(ob);
   if (ka.length !== kb.length) return false;
-  return ka.every((k) => deepEqual(a[k], b[k]));
+  return ka.every((k) => deepEqual(oa[k], ob[k]));
 }
 
-function diffKeys(a: Record<string, any>, b: Record<string, any>, prefix = ''): string[] {
+function diffKeys(a: Record<string, unknown>, b: Record<string, unknown>, prefix = ''): string[] {
   const out: string[] = [];
   const allKeys = new Set([...Object.keys(a), ...Object.keys(b)]);
   for (const k of allKeys) {
@@ -93,7 +96,7 @@ function diffKeys(a: Record<string, any>, b: Record<string, any>, prefix = ''): 
     else if (!deepEqual(a[k], b[k])) {
       // Se ambos sao objetos, recurse
       if (typeof a[k] === 'object' && typeof b[k] === 'object' && !Array.isArray(a[k])) {
-        out.push(...diffKeys(a[k], b[k], pk));
+        out.push(...diffKeys(a[k] as Record<string, unknown>, b[k] as Record<string, unknown>, pk));
       } else {
         out.push(`~ ${pk} (diferente)`);
       }

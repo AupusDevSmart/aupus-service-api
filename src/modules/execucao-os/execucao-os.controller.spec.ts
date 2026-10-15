@@ -377,7 +377,7 @@ describe('ExecucaoOSController', () => {
           mimetype: 'image/jpeg',
           size: 1024000,
           buffer: Buffer.from('fake file content'),
-        };
+        } as Express.Multer.File;
         const dto: AdicionarAnexoDto = {
           descricao: 'Foto do motor antes da manutenção',
           fase_execucao: 'antes',
@@ -439,7 +439,7 @@ describe('ExecucaoOSController', () => {
         } as unknown as Response;
 
         // Mock do fs.createReadStream
-        const mockFileStream = {} as any;
+        const mockFileStream = {} as fs.ReadStream;
         jest.spyOn(fs, 'createReadStream').mockReturnValue(mockFileStream);
 
         mockAnexosOSService.buscarAnexo.mockResolvedValue(mockAnexoResponse);

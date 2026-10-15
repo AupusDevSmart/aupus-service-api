@@ -11,13 +11,13 @@ import { PropagacaoPlanosService } from './propagacao-planos.service';
 describe('PropagacaoPlanosService', () => {
   let service: PropagacaoPlanosService;
 
-  const mockPrismaService: any = {
+  const mockPrismaService = {
     planos_manutencao: { findFirst: jest.fn(), update: jest.fn() },
     tarefas: { findFirst: jest.fn(), create: jest.fn(), update: jest.fn(), count: jest.fn() },
     propagacoes_plano: { create: jest.fn(), findMany: jest.fn(), update: jest.fn() },
   };
 
-  const tarefaTemplate = (over: any = {}) => ({
+  const tarefaTemplate = (over: Record<string, unknown> = {}) => ({
     id: 'tt_1',
     nome: 'Lubrificar',
     instrucao_id: 'inst_1',
@@ -34,7 +34,7 @@ describe('PropagacaoPlanosService', () => {
     ...over,
   });
 
-  const tarefaCopia = (over: any = {}) => ({
+  const tarefaCopia = (over: Record<string, unknown> = {}) => ({
     id: 'tc_1',
     tarefa_origem_id: 'tt_1',
     origem_status: 'HERDADA',
@@ -47,7 +47,7 @@ describe('PropagacaoPlanosService', () => {
     ...over,
   });
 
-  const montarTemplate = (tarefas: any[], tarefasDaCopia: any[]) => ({
+  const montarTemplate = (tarefas: Record<string, unknown>[], tarefasDaCopia: Record<string, unknown>[]) => ({
     id: 'template_1',
     nome: 'Preventiva de motor',
     descricao: 'desc',

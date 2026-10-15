@@ -1,16 +1,19 @@
 import { Injectable, NestMiddleware } from '@nestjs/common';
 import { Request, Response, NextFunction } from 'express';
 import { Sentry } from '../../config/sentry.config';
+import type { UsuarioAutenticado } from '@/core/modules/auth/strategies/jwt.strategy';
 
 @Injectable()
 export class SentryMiddleware implements NestMiddleware {
   use(req: Request, res: Response, next: NextFunction) {
     // Adicionar contexto do usuário se disponível (após autenticação)
     if (req.user) {
+      // O usuário do JwtStrategy não tem `username`: o nome dele é `nome`
+      const usuario = req.user as UsuarioAutenticado;
       Sentry.setUser({
-        id: (req.user as any).id,
-        username: (req.user as any).username,
-        email: (req.user as any).email,
+        id: usuario.id,
+        username: usuario.nome,
+        email: usuario.email,
       });
     }
 

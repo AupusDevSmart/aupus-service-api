@@ -115,7 +115,7 @@ export class ConcessionariasController {
   })
   async uploadAnexo(
     @Param('id') concessionariaId: string,
-    @UploadedFile() file: any,
+    @UploadedFile() file: Express.Multer.File,
     @Body() uploadDto: UploadAnexoDto,
   ) {
     return this.anexosService.uploadAnexo(concessionariaId, file, uploadDto.descricao);

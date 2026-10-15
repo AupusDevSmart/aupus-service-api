@@ -1,13 +1,13 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
-import { HealthService } from './health.service';
+import { HealthService, HealthStatus } from './health.service';
 
 export interface Alert {
   level: 'INFO' | 'WARNING' | 'CRITICAL';
   service: string;
   message: string;
   timestamp: string;
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
 }
 
 @Injectable()
@@ -44,7 +44,7 @@ export class AlertService {
     }
   }
 
-  private async checkDatabaseStatus(health: any) {
+  private async checkDatabaseStatus(health: HealthStatus) {
     const dbStatus = health.checks.database?.status;
     const currentState = dbStatus === 'connected' ? 'ok' : 'critical';
 

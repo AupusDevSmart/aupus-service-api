@@ -11,7 +11,7 @@ import { Sentry } from '../../config/sentry.config';
 
 @Injectable()
 export class LoggingInterceptor implements NestInterceptor {
-  intercept(context: ExecutionContext, next: CallHandler): Observable<any> {
+  intercept(context: ExecutionContext, next: CallHandler): Observable<unknown> {
     const request = context.switchToHttp().getRequest();
     const response = context.switchToHttp().getResponse();
     const { method, url, body, query, params, ip } = request;
@@ -121,12 +121,12 @@ export class LoggingInterceptor implements NestInterceptor {
   }
 
   // Remover informações sensíveis do body antes de logar
-  private sanitizeBody(body: any): any {
+  private sanitizeBody(body: unknown): unknown {
     if (!body || typeof body !== 'object') {
       return body;
     }
 
-    const sanitized = { ...body };
+    const sanitized: Record<string, unknown> = { ...body };
     const sensitiveFields = ['password', 'senha', 'token', 'secret', 'authorization'];
 
     sensitiveFields.forEach((field) => {

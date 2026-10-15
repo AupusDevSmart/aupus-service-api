@@ -67,9 +67,75 @@ export interface NormalizedElectricalData {
 }
 
 /**
- * Tipo dos dados brutos (formato variável)
+ * Power Meter (M-160, CHINT): grandezas na raiz — potencias em W/VAr/VA,
+ * tensoes em V, correntes em A, energia em kWh.
  */
-export type RawEquipmentData = Record<string, any>;
+export interface DadosPowerMeter {
+  Pt?: number;
+  Qt?: number;
+  St?: number;
+  Pa?: number;
+  Pb?: number;
+  Pc?: number;
+  Va?: number;
+  Vb?: number;
+  Vc?: number;
+  Ia?: number;
+  Ib?: number;
+  Ic?: number;
+  FPa?: number;
+  FPb?: number;
+  FPc?: number;
+  phf?: number;
+  phr?: number;
+  qhfi?: number;
+  qhfr?: number;
+  consumo_phf?: number;
+  consumo_phr?: number;
+  consumo_qhf?: number;
+  consumo_qhr?: number;
+  freq?: number;
+  timestamp?: string;
+}
+
+/** Inversor (Sungrow e afins): grandezas agrupadas por bloco, potencias em W. */
+export interface DadosInversor {
+  power?: {
+    active_total?: number;
+    active?: number;
+    reactive_total?: number;
+    reactive?: number;
+    apparent_total?: number;
+    apparent?: number;
+    power_factor?: number;
+    frequency?: number;
+  };
+  voltage?: {
+    phase_a?: number;
+    phase_b?: number;
+    phase_c?: number;
+    'phase_a-b'?: number;
+    'phase_b-c'?: number;
+    'phase_c-a'?: number;
+    line_average?: number;
+    average?: number;
+  };
+  current?: { phase_a?: number; phase_b?: number; phase_c?: number };
+  energy?: { total_yield?: number; daily_yield?: number };
+  timestamp?: string;
+}
+
+/** Formato legado: a leitura de Power Meter dentro de `Dados`. */
+export interface DadosLegado {
+  Dados?: DadosPowerMeter;
+  timestamp?: string;
+}
+
+/**
+ * Tipo dos dados brutos (formato variável): os campos de qualquer um dos tres
+ * formatos, todos opcionais — quem decide qual e o `detectDataFormat`.
+ */
+export type RawEquipmentData = DadosPowerMeter & DadosInversor & DadosLegado;
 
 /**
  * Detecta o tipo de equipamento baseado na estrutura dos dados
@@ -184,10 +250,10 @@ export class PowerMeterAdapter {
  */
 export class InverterAdapter {
   static normalize(data: RawEquipmentData): NormalizedElectricalData {
-    const power = data.power || {};
-    const voltage = data.voltage || {};
-    const current = data.current || {};
-    const energy = data.energy || {};
+    const power: NonNullable<DadosInversor['power']> = data.power || {};
+    const voltage: NonNullable<DadosInversor['voltage']> = data.voltage || {};
+    const current: NonNullable<DadosInversor['current']> = data.current || {};
+    const energy: NonNullable<DadosInversor['energy']> = data.energy || {};
 
     // Converter W para kW
     const activePowerKw = (power.active_total || power.active || 0) / 1000;

@@ -5,9 +5,17 @@ import {
   UpdateConfiguracaoDiasUteisDto,
   QueryConfiguracoesDto,
   ConfiguracaoDiasUteisResponseDto,
-  AssociarPlantasDto
+  AssociarPlantasDto,
+  PlantaResumoDto
 } from './dto';
 import { Prisma } from '@/core';
+import type { configuracoes_dias_uteis } from '@prisma/client';
+
+/** Configuracao como `listar` e `buscarPorId` a leem: com as plantas e a contagem. */
+type ConfiguracaoLida = configuracoes_dias_uteis & {
+  configuracao_plantas?: { plantas: PlantaResumoDto | null }[];
+  _count?: { configuracao_plantas?: number };
+};
 
 export interface PaginatedResponse<T> {
   data: T[];
@@ -346,7 +354,7 @@ export class ConfiguracoesDiasUteisService {
     }
   }
 
-  private mapearParaResponse(configuracao: any): ConfiguracaoDiasUteisResponseDto {
+  private mapearParaResponse(configuracao: ConfiguracaoLida): ConfiguracaoDiasUteisResponseDto {
     // Calcular dias úteis
     const diasUteis = [];
     const diasUteisCount = [
@@ -374,7 +382,7 @@ export class ConfiguracoesDiasUteisService {
       ativo: configuracao.ativo,
       created_at: configuracao.created_at,
       updated_at: configuracao.updated_at,
-      plantas: configuracao.configuracao_plantas?.map((cp: any) => cp.plantas) || [],
+      plantas: configuracao.configuracao_plantas?.map((cp) => cp.plantas) || [],
       total_plantas: configuracao.geral ? null : configuracao._count?.configuracao_plantas || 0,
       total_dias_uteis: diasUteisCount,
       dias_uteis_semana: diasUteis

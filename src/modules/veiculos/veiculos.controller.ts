@@ -12,7 +12,7 @@ import {
   HttpStatus
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiQuery } from '@nestjs/swagger';
-import { Permissions, CurrentUser } from '@/core';
+import { Permissions, CurrentUser, ScopedUser } from '@/core';
 import { VeiculosService } from './veiculos.service';
 import {
   CreateVeiculoDto,
@@ -47,7 +47,7 @@ export class VeiculosController {
   })
   async criarVeiculo(
     @Body() createDto: CreateVeiculoDto,
-    @CurrentUser() user?: any,
+    @CurrentUser() user?: ScopedUser,
   ): Promise<VeiculoResponseDto> {
     return this.veiculosService.criar(createDto, user);
   }
@@ -73,14 +73,14 @@ export class VeiculosController {
   @ApiQuery({ name: 'apenasDisponiveis', required: false, type: Boolean, description: 'Apenas veículos disponíveis para reserva' })
   @ApiQuery({ name: 'orderBy', required: false, enum: ['nome', 'placa', 'marca', 'modelo', 'anoFabricacao', 'quilometragem', 'criadoEm'] })
   @ApiQuery({ name: 'orderDirection', required: false, enum: ['asc', 'desc'] })
-  async listarVeiculos(@Query() queryDto: QueryVeiculosDto, @CurrentUser() user?: any) {
+  async listarVeiculos(@Query() queryDto: QueryVeiculosDto, @CurrentUser() user?: ScopedUser) {
     return this.veiculosService.buscarTodos(queryDto, user);
   }
 
   @Get('disponibilidade')
   @ApiOperation({ summary: 'Cada viatura com livre/ocupada na janela, e o motivo quando ocupada' })
   @ApiResponse({ status: 200, description: 'Lista de viaturas com disponibilidade' })
-  async disponibilidade(@Query() queryDto: VeiculosDisponiveisDto, @CurrentUser() user?: any) {
+  async disponibilidade(@Query() queryDto: VeiculosDisponiveisDto, @CurrentUser() user?: ScopedUser) {
     return this.veiculosService.disponibilidade(queryDto, user);
   }
 
@@ -94,7 +94,7 @@ export class VeiculosController {
     status: 400,
     description: 'Parâmetros inválidos'
   })
-  async buscarVeiculosDisponiveis(@Query() queryDto: VeiculosDisponiveisDto, @CurrentUser() user?: any) {
+  async buscarVeiculosDisponiveis(@Query() queryDto: VeiculosDisponiveisDto, @CurrentUser() user?: ScopedUser) {
     return this.veiculosService.buscarDisponiveis(queryDto, user);
   }
 
@@ -109,7 +109,7 @@ export class VeiculosController {
     status: 404,
     description: 'Veículo não encontrado'
   })
-  async buscarVeiculoPorId(@Param('id') id: string, @CurrentUser() user?: any): Promise<VeiculoResponseDto> {
+  async buscarVeiculoPorId(@Param('id') id: string, @CurrentUser() user?: ScopedUser): Promise<VeiculoResponseDto> {
     return this.veiculosService.buscarPorId(id, user);
   }
 
@@ -135,7 +135,7 @@ export class VeiculosController {
   async atualizarVeiculo(
     @Param('id') id: string,
     @Body() updateDto: UpdateVeiculoDto,
-    @CurrentUser() user?: any,
+    @CurrentUser() user?: ScopedUser,
   ): Promise<VeiculoResponseDto> {
     return this.veiculosService.atualizar(id, updateDto, user);
   }
@@ -162,7 +162,7 @@ export class VeiculosController {
   async alterarStatus(
     @Param('id') id: string,
     @Body() alterarStatusDto: AlterarStatusVeiculoDto,
-    @CurrentUser() user?: any,
+    @CurrentUser() user?: ScopedUser,
   ): Promise<VeiculoResponseDto> {
     return this.veiculosService.alterarStatus(
       id,
@@ -191,7 +191,7 @@ export class VeiculosController {
   async inativarVeiculo(
     @Param('id') id: string,
     @Body() inativarDto: InativarVeiculoDto,
-    @CurrentUser() user?: any,
+    @CurrentUser() user?: ScopedUser,
   ): Promise<void> {
     return this.veiculosService.inativar(
       id,

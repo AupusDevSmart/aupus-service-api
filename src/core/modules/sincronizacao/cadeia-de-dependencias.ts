@@ -1,4 +1,5 @@
-import { DEPENDENCIAS, Recurso, ehRecurso } from './recursos';
+import type { Prisma } from '@prisma/client';
+import { DEPENDENCIAS, Recurso, delegatePorNome, ehRecurso } from './recursos';
 
 export interface Elo {
   recurso: Recurso;
@@ -25,7 +26,7 @@ export interface Cadeia {
   faltando: Elo[];
 }
 
-type Tx = any;
+type Tx = Prisma.TransactionClient;
 
 /**
  * Descobre tudo que precisa atravessar a fronteira junto com um registro.
@@ -76,11 +77,12 @@ async function subir(
   acc: Elo[],
   vistos: Set<string>,
 ): Promise<void> {
-  const linha = await tx[recurso].findUnique({ where: { id: registroId } });
+  const linha = await delegatePorNome(tx, recurso).findUnique({ where: { id: registroId } });
   if (!linha) return;
 
   for (const dep of DEPENDENCIAS[recurso]) {
-    const alvoId = linha[dep.campo]?.trim?.();
+    const valor = linha[dep.campo];
+    const alvoId = typeof valor === 'string' ? valor.trim() : undefined;
     if (!alvoId) continue;
 
     // Dependencia para tabela que nao e recurso sincronizavel (tipos de
@@ -113,7 +115,7 @@ async function descrever(
   registroId: string,
   comoChamar: string,
 ): Promise<Elo | null> {
-  const linha = await tx[recurso].findUnique({
+  const linha = await delegatePorNome(tx, recurso).findUnique({
     where: { id: registroId },
     select: { id: true, nome: true },
   });
@@ -128,7 +130,7 @@ async function descrever(
     recurso,
     registro_id: registroId,
     comoChamar,
-    nome: linha.nome ?? registroId,
+    nome: typeof linha.nome === 'string' ? linha.nome : registroId,
     ja_compartilhado: vinculo?.ativo === true,
   };
 }

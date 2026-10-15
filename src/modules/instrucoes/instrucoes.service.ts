@@ -11,7 +11,22 @@ import {
   DashboardInstrucoesDto,
   CreateRecursoInstrucaoDto,
 } from './dto';
-import { StatusTarefa, Prisma } from '@/core';
+import { StatusTarefa, TipoManutencao, CategoriaTarefa, Prisma } from '@/core';
+import type { anomalias_instrucoes, instrucoes, solicitacoes_instrucoes } from '@prisma/client';
+
+/**
+ * Instrucao como as consultas deste service a leem. As relacoes e contadores
+ * dependem do include de cada rota, por isso sao opcionais.
+ */
+type InstrucaoLida = instrucoes & {
+  usuario_criador?: InstrucaoResponseDto['usuario_criador'] | null;
+  usuario_atualizador?: InstrucaoResponseDto['usuario_atualizador'] | null;
+  sub_instrucoes?: InstrucaoResponseDto['sub_instrucoes'];
+  recursos?: InstrucaoResponseDto['recursos'];
+  anexos?: InstrucaoResponseDto['anexos'];
+  _count?: { sub_instrucoes?: number; recursos?: number; anexos?: number; tarefas?: number };
+  _tarefas_derivadas?: number;
+};
 
 @Injectable()
 export class InstrucoesService {
@@ -309,7 +324,7 @@ export class InstrucoesService {
   // Tarefas derivadas
   // ==========================================
 
-  async listarTarefasDerivadas(instrucaoId: string): Promise<any[]> {
+  async listarTarefasDerivadas(instrucaoId: string) {
     await this.verificarInstrucaoExiste(instrucaoId);
 
     const tarefas = await this.prisma.tarefas.findMany({
@@ -335,7 +350,7 @@ export class InstrucoesService {
   // Associações com anomalias
   // ==========================================
 
-  async associarAnomalia(instrucaoId: string, anomaliaId: string, observacoes?: string, createdBy?: string): Promise<any> {
+  async associarAnomalia(instrucaoId: string, anomaliaId: string, observacoes?: string, createdBy?: string): Promise<anomalias_instrucoes> {
     await this.verificarInstrucaoExiste(instrucaoId);
 
     const anomalia = await this.prisma.anomalias.findFirst({
@@ -355,7 +370,7 @@ export class InstrucoesService {
     });
   }
 
-  async listarAnomalias(instrucaoId: string): Promise<any[]> {
+  async listarAnomalias(instrucaoId: string) {
     await this.verificarInstrucaoExiste(instrucaoId);
 
     const associacoes = await this.prisma.anomalias_instrucoes.findMany({
@@ -397,7 +412,7 @@ export class InstrucoesService {
   // Associações com solicitações de serviço
   // ==========================================
 
-  async associarSolicitacao(instrucaoId: string, solicitacaoId: string, observacoes?: string, createdBy?: string): Promise<any> {
+  async associarSolicitacao(instrucaoId: string, solicitacaoId: string, observacoes?: string, createdBy?: string): Promise<solicitacoes_instrucoes> {
     await this.verificarInstrucaoExiste(instrucaoId);
 
     const solicitacao = await this.prisma.solicitacoes_servico.findFirst({
@@ -417,7 +432,7 @@ export class InstrucoesService {
     });
   }
 
-  async listarSolicitacoes(instrucaoId: string): Promise<any[]> {
+  async listarSolicitacoes(instrucaoId: string) {
     await this.verificarInstrucaoExiste(instrucaoId);
 
     const associacoes = await this.prisma.solicitacoes_instrucoes.findMany({
@@ -602,8 +617,11 @@ export class InstrucoesService {
   private static readonly MAIOR_SEQUENCIAL = 100000;
 
   private async tagsExistentes(modelo: 'instrucoes' | 'tarefas'): Promise<string[]> {
-    const linhas = await (this.prisma[modelo] as any).findMany({ select: { tag: true } });
-    return linhas.map((l: any) => l.tag).filter(Boolean);
+    const linhas: { tag: string }[] =
+      modelo === 'instrucoes'
+        ? await this.prisma.instrucoes.findMany({ select: { tag: true } })
+        : await this.prisma.tarefas.findMany({ select: { tag: true } });
+    return linhas.map((l) => l.tag).filter(Boolean);
   }
 
   private proximaTagSequencial(prefixo: string, tags: string[]): string {
@@ -706,7 +724,7 @@ export class InstrucoesService {
     return orderBy;
   }
 
-  private mapearParaResponse(instrucao: any): InstrucaoResponseDto {
+  private mapearParaResponse(instrucao: InstrucaoLida): InstrucaoResponseDto {
     return {
       id: instrucao.id?.trim() || instrucao.id,
       tag: instrucao.tag,
@@ -737,19 +755,19 @@ export class InstrucoesService {
     };
   }
 
-  private contarPorStatus(stats: any[], status: StatusTarefa): number {
+  private contarPorStatus(stats: Array<{ status: StatusTarefa; _count: number }>, status: StatusTarefa): number {
     return stats.find(s => s.status === status)?._count || 0;
   }
 
-  private contarPorCriticidade(stats: any[], criticidade: number): number {
+  private contarPorCriticidade(stats: Array<{ criticidade: number; _count: number }>, criticidade: number): number {
     return stats.find(s => s.criticidade === criticidade)?._count || 0;
   }
 
-  private contarPorTipo(stats: any[], tipo: string): number {
+  private contarPorTipo(stats: Array<{ tipo_manutencao: TipoManutencao; _count: number }>, tipo: string): number {
     return stats.find(s => s.tipo_manutencao === tipo)?._count || 0;
   }
 
-  private contarPorCategoria(stats: any[], categoria: string): number {
+  private contarPorCategoria(stats: Array<{ categoria: CategoriaTarefa; _count: number }>, categoria: string): number {
     return stats.find(s => s.categoria === categoria)?._count || 0;
   }
 }

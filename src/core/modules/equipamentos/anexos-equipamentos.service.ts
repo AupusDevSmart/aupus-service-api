@@ -66,7 +66,7 @@ export class AnexosEquipamentosService {
     }
   }
 
-  async uploadAnexo(equipamentoId: string, file: any, descricao?: string) {
+  async uploadAnexo(equipamentoId: string, file: Express.Multer.File, descricao?: string) {
     const id = equipamentoId?.trim();
     await this.assertEquipamentoExiste(id);
 

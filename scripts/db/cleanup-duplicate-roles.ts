@@ -21,7 +21,7 @@ async function cleanup() {
   const allRoles = await prisma.roles.findMany({ orderBy: [{ name: 'asc' }, { guard_name: 'asc' }] });
   const byName = new Map<string, typeof allRoles>();
   for (const r of allRoles) {
-    if (!byName.has(r.name)) byName.set(r.name, [] as any);
+    if (!byName.has(r.name)) byName.set(r.name, []);
     byName.get(r.name)!.push(r);
   }
 

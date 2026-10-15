@@ -58,8 +58,38 @@ const NUNCA_VIAJAM: Record<Recurso, string[]> = {
 export interface Dependencia {
   campo: string;
   /** Tabela onde procurar. Nem toda dependencia e um recurso sincronizavel. */
-  tabela: string;
+  tabela: TabelaPorNome;
   comoChamar: string;
+}
+
+/** As tabelas que a sincronizacao le pelo nome: os recursos e o que eles referenciam. */
+export type TabelaPorNome = Recurso | 'tipos_equipamentos';
+
+/**
+ * O pedaco de um delegate do Prisma que a sincronizacao usa quando a tabela
+ * so se conhece em runtime. A linha e um registro solto — e assim que o modulo
+ * a trata (montarPayload / filtrarParaEsteBanco andam pelo DMMF, nao pelo tipo).
+ */
+export interface DelegatePorNome {
+  findUnique(args: { where: { id: string }; select?: Record<string, true> }): Promise<Record<string, unknown> | null>;
+  findFirst(args: { where: { id: string }; select?: Record<string, true> }): Promise<Record<string, unknown> | null>;
+  updateMany(args: { where: { id: string }; data: Record<string, unknown> }): Promise<{ count: number }>;
+  upsert(args: {
+    where: { id: string };
+    create: Record<string, unknown>;
+    update: Record<string, unknown>;
+  }): Promise<unknown>;
+}
+
+/**
+ * O delegate da tabela pelo nome. Cada model gerado tem a propria assinatura
+ * generica, e a uniao delas nao e chamavel no TypeScript; daqui para fora a
+ * chamada e pela forma comum acima.
+ */
+export function delegatePorNome(tx: Prisma.TransactionClient, tabela: TabelaPorNome): DelegatePorNome {
+  // Via unknown: o `SelectSubset` dos delegates gerados nao e comparavel com
+  // nenhuma forma escrita a mao, e nao ha interface comum exportada pelo Prisma.
+  return tx[tabela] as unknown as DelegatePorNome;
 }
 
 export const DEPENDENCIAS: Record<Recurso, Dependencia[]> = {
@@ -94,8 +124,8 @@ export function camposQueViajam(recurso: Recurso): string[] {
  * o padding pela rede faria o outro lado gravar um id diferente do proprio id.
  * `Date` vira ISO e `Decimal`/`BigInt` viram string porque JSON nao tem os tres.
  */
-export function montarPayload(recurso: Recurso, linha: Record<string, any>): Record<string, any> {
-  const payload: Record<string, any> = {};
+export function montarPayload(recurso: Recurso, linha: Record<string, unknown>): Record<string, unknown> {
+  const payload: Record<string, unknown> = {};
 
   for (const campo of camposQueViajam(recurso)) {
     const v = linha[campo];
@@ -104,7 +134,7 @@ export function montarPayload(recurso: Recurso, linha: Record<string, any>): Rec
     if (v === null) payload[campo] = null;
     else if (v instanceof Date) payload[campo] = v.toISOString();
     else if (typeof v === 'bigint') payload[campo] = v.toString();
-    else if (typeof v === 'object' && typeof (v as any).toFixed === 'function') payload[campo] = (v as any).toString();
+    else if (typeof v === 'object' && 'toFixed' in v && typeof v.toFixed === 'function') payload[campo] = v.toString();
     else if (typeof v === 'string' && campo.endsWith('_id')) payload[campo] = v.trim();
     else payload[campo] = v;
   }
@@ -124,15 +154,15 @@ export function montarPayload(recurso: Recurso, linha: Record<string, any>): Rec
  */
 export function filtrarParaEsteBanco(
   recurso: Recurso,
-  payload: Record<string, any>,
-): { dados: Record<string, any>; ignorados: string[] } {
+  payload: Record<string, unknown>,
+): { dados: Record<string, unknown>; ignorados: string[] } {
   const model = Prisma.dmmf.datamodel.models.find(m => m.name === recurso);
   if (!model) throw new Error(`Recurso sem model no schema: ${recurso}`);
 
   const conhecidos = new Map(model.fields.filter(f => f.kind === 'scalar').map(f => [f.name, f]));
   const proibidos = new Set(NUNCA_VIAJAM[recurso]);
 
-  const dados: Record<string, any> = {};
+  const dados: Record<string, unknown> = {};
   const ignorados: string[] = [];
 
   for (const [campo, valor] of Object.entries(payload)) {
@@ -143,10 +173,11 @@ export function filtrarParaEsteBanco(
 
     if (valor === null) { dados[campo] = null; continue; }
 
+    // DateTime, BigInt e Decimal chegam como texto: e como montarPayload os manda
     switch (f.type) {
-      case 'DateTime': dados[campo] = new Date(valor); break;
-      case 'BigInt':   dados[campo] = BigInt(valor); break;
-      case 'Decimal':  dados[campo] = new Prisma.Decimal(valor); break;
+      case 'DateTime': dados[campo] = new Date(valor as string); break;
+      case 'BigInt':   dados[campo] = BigInt(valor as string); break;
+      case 'Decimal':  dados[campo] = new Prisma.Decimal(valor as string); break;
       case 'Int':      dados[campo] = Number(valor); break;
       default:         dados[campo] = typeof valor === 'string' && campo.endsWith('_id') ? valor.trim() : valor;
     }

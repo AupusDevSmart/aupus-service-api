@@ -5,7 +5,7 @@ import {
   BadRequestException,
   ConflictException,
 } from '@nestjs/common';
-import { PrismaService } from '@/core';
+import { Prisma, PrismaService } from '@/core';
 import {
   CreateRecursoDto,
   UpdateRecursoDto,
@@ -28,7 +28,7 @@ export class RecursosService {
     const page = query.page ?? 1;
     const limit = query.limit ?? 10;
 
-    const where: any = { deleted_at: null };
+    const where: Prisma.recursosWhereInput = { deleted_at: null };
 
     if (query.categoria) where.categoria = query.categoria;
     if (query.apenas_ativos) where.ativo = true;

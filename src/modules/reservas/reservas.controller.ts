@@ -11,7 +11,7 @@ import {
   HttpStatus
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiQuery } from '@nestjs/swagger';
-import { Permissions, CurrentUser } from '@/core';
+import { Permissions, CurrentUser, ScopedUser } from '@/core';
 import { ReservasService } from './reservas.service';
 import { ReservasSchedulerService } from './reservas-scheduler.service';
 import {
@@ -52,7 +52,7 @@ export class ReservasController {
   })
   async criarReserva(
     @Body() createDto: CreateReservaDto,
-    @CurrentUser() user?: any,
+    @CurrentUser() user?: ScopedUser,
   ): Promise<ReservaResponseDto> {
     return this.reservasService.criar(createDto, user);
   }
@@ -74,7 +74,7 @@ export class ReservasController {
   @ApiQuery({ name: 'dataFim', required: false, type: String, description: 'Data de fim máxima (YYYY-MM-DD)' })
   @ApiQuery({ name: 'orderBy', required: false, enum: ['responsavel', 'dataInicio', 'dataFim', 'status', 'finalidade', 'criadoEm'] })
   @ApiQuery({ name: 'orderDirection', required: false, enum: ['asc', 'desc'] })
-  async listarReservas(@Query() queryDto: QueryReservasDto, @CurrentUser() user?: any) {
+  async listarReservas(@Query() queryDto: QueryReservasDto, @CurrentUser() user?: ScopedUser) {
     return this.reservasService.buscarTodos(queryDto, user);
   }
 
@@ -89,7 +89,7 @@ export class ReservasController {
     status: 404,
     description: 'Reserva não encontrada'
   })
-  async buscarReservaPorId(@Param('id') id: string, @CurrentUser() user?: any): Promise<ReservaResponseDto> {
+  async buscarReservaPorId(@Param('id') id: string, @CurrentUser() user?: ScopedUser): Promise<ReservaResponseDto> {
     return this.reservasService.buscarPorId(id, user);
   }
 
@@ -115,7 +115,7 @@ export class ReservasController {
   async atualizarReserva(
     @Param('id') id: string,
     @Body() updateDto: UpdateReservaDto,
-    @CurrentUser() user?: any,
+    @CurrentUser() user?: ScopedUser,
   ): Promise<ReservaResponseDto> {
     return this.reservasService.atualizar(id, updateDto, user);
   }
@@ -138,7 +138,7 @@ export class ReservasController {
   async cancelarReserva(
     @Param('id') id: string,
     @Body() cancelarDto: CancelarReservaDto,
-    @CurrentUser() user?: any,
+    @CurrentUser() user?: ScopedUser,
   ): Promise<void> {
     return this.reservasService.cancelar(
       id,
@@ -164,7 +164,7 @@ export class ReservasController {
     status: 400,
     description: 'Não é possível finalizar reserva não ativa'
   })
-  async finalizarReserva(@Param('id') id: string, @CurrentUser() user?: any): Promise<void> {
+  async finalizarReserva(@Param('id') id: string, @CurrentUser() user?: ScopedUser): Promise<void> {
     return this.reservasService.finalizar(id, user);
   }
 
@@ -190,7 +190,7 @@ export class ReservasController {
   @ApiQuery({ name: 'incluirFinalizadas', required: false, type: Boolean, description: 'Incluir reservas finalizadas' })
   async listarReservasVeiculo(
     @Param('veiculoId') veiculoId: string,
-    @CurrentUser() user?: any,
+    @CurrentUser() user?: ScopedUser,
     @Query('incluirFinalizadas') incluirFinalizadas?: boolean,
   ): Promise<ReservaResponseDto[]> {
     return this.reservasService.buscarReservasVeiculo(veiculoId, incluirFinalizadas, user);

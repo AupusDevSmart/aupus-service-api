@@ -14,9 +14,31 @@ import { LoginDto } from './dto/login.dto';
 import { AuthResponseDto } from './dto/auth-response.dto';
 import { ForgotPasswordDto } from './dto/forgot-password.dto';
 import { ResetPasswordWithTokenDto } from './dto/reset-password.dto';
+import type { usuarios } from '@prisma/client';
+import type { UsuarioResponseDto } from '../usuarios/dto/usuario-response.dto';
+import type { UserRoleDto } from '../usuarios/dto/user-permissions-response.dto';
 
 /** Validade do link de redefinição de senha, em minutos. */
 const RESET_TOKEN_EXP_MINUTES = 60;
+
+/** A linha do usuário sem a senha — o que `validateUser` devolve. */
+type UsuarioSemSenha = Omit<usuarios, 'senha'>;
+
+/**
+ * O `user` do login. Vem do `findOne` (ou, se ele falhar, da linha do banco),
+ * com o papel pelo nome, as permissões pelo NOME em `all_permissions` — e não
+ * os objetos do `UsuarioResponseDto`; o store do front normaliza as duas
+ * formas — e as plantas que ele acessa.
+ */
+export type UsuarioDoLogin = Omit<UsuarioResponseDto | UsuarioSemSenha, 'role' | 'role_details' | 'all_permissions'> & {
+  role: string | null;
+  role_details: UserRoleDto | null;
+  all_permissions: string[];
+  plantas_vinculadas: string[];
+};
+
+/** A resposta do login: o `AuthResponseDto`, com o `user` na forma acima. */
+export type RespostaDoLogin = Omit<AuthResponseDto, 'user'> & { user: UsuarioDoLogin };
 
 /**
  * Serviço de autenticação
@@ -39,7 +61,7 @@ export class AuthService {
    * @throws UnauthorizedException se credenciais inválidas
    * @throws ForbiddenException se usuário inativo
    */
-  async validateUser(email: string, senha: string): Promise<any> {
+  async validateUser(email: string, senha: string): Promise<UsuarioSemSenha> {
     console.log(`🔐 [AUTH] Validando credenciais para: ${email}`);
 
     // Buscar usuário por email
@@ -86,7 +108,7 @@ export class AuthService {
    * @param loginDto Credenciais de login
    * @returns Tokens de acesso e dados do usuário
    */
-  async login(loginDto: LoginDto): Promise<AuthResponseDto> {
+  async login(loginDto: LoginDto): Promise<RespostaDoLogin> {
     console.log(`🚀 [AUTH] Iniciando login para: ${loginDto.email}`);
 
     // Validar credenciais
@@ -147,10 +169,12 @@ export class AuthService {
 
     // Anexar role + permissoes + plantas para o frontend (PermissionsContext)
     const plantas_vinculadas = await this.getPlantasAcessiveis(usuario.id, permissoes.role?.name);
-    (usuarioCompleto as any).role = permissoes.role?.name ?? null;
-    (usuarioCompleto as any).role_details = permissoes.role;
-    (usuarioCompleto as any).all_permissions = permissoes.permissionNames;
-    (usuarioCompleto as any).plantas_vinculadas = plantas_vinculadas;
+    const usuarioDoLogin: UsuarioDoLogin = Object.assign(usuarioCompleto, {
+      role: permissoes.role?.name ?? null,
+      role_details: permissoes.role,
+      all_permissions: permissoes.permissionNames,
+      plantas_vinculadas,
+    });
 
     console.log(`📦 [AUTH] Dados do usuário para retornar:`, {
       id: usuarioCompleto.id,
@@ -165,7 +189,7 @@ export class AuthService {
       refresh_token,
       token_type: 'Bearer',
       expires_in: 3600, // 1 hora em segundos
-      user: usuarioCompleto as any,
+      user: usuarioDoLogin,
     };
   }
 

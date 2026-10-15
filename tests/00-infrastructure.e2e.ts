@@ -9,7 +9,7 @@ interface TestResult {
   test: string;
   status: 'PASS' | 'FAIL' | 'WARN';
   message: string;
-  data?: any;
+  data?: unknown;
 }
 
 const results: TestResult[] = [];

@@ -1,6 +1,7 @@
 import { Injectable, NotFoundException, BadRequestException, Optional, Inject } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { Prisma } from '@prisma/client';
+import type { equipamentos } from '@prisma/client';
 // Builtins do Node, sem efeito colateral na carga: nao ha por que adia-los com
 // require() dentro da funcao, que alem de esconder a dependencia obriga o TS a
 // tratar o modulo como `any`.
@@ -9,7 +10,7 @@ import * as caminho from 'path';
 import { PrismaService } from '../../prisma/prisma.service';
 import { depoisDeGravar } from '../../prisma/transacao-em-curso';
 import { IMqttBroker, MQTT_BROKER } from '../../common/interfaces/mqtt-broker.interface';
-import { CreateEquipamentoDto } from './dto/create-equipamento.dto';
+import { CreateEquipamentoDto, DadoTecnicoDto } from './dto/create-equipamento.dto';
 import { UpdateEquipamentoDto } from './dto/update-equipamento.dto';
 import { EquipamentoQueryDto } from './dto/equipamento-query.dto';
 import { comNomeDaPosicao } from './nome-exibido';
@@ -223,7 +224,7 @@ export class EquipamentosService {
     const equipamento = await this.prisma.$transaction(async (prisma) => {
       // Criar equipamento
       const equipamento = await prisma.equipamentos.create({
-        data: equipamentoData as any,
+        data: equipamentoData,
         include: {
           unidade: {
             select: {
@@ -287,11 +288,11 @@ export class EquipamentosService {
     });
 
     // Emitir evento APOS commit — se o equipamento ja vem com MQTT habilitado e topico
-    if (equipamento && (equipamento as any).mqtt_habilitado && (equipamento as any).topico_mqtt) {
+    if (equipamento && equipamento.mqtt_habilitado && equipamento.topico_mqtt) {
       this.emitMqttChanged({
         equipamentoId: equipamento.id?.trim?.() ?? equipamento.id,
         topicoAntigo: null,
-        topicoNovo: ((equipamento as any).topico_mqtt as string).trim(),
+        topicoNovo: equipamento.topico_mqtt.trim(),
         habilitado: true,
       });
     }
@@ -443,7 +444,7 @@ export class EquipamentosService {
     // não serviria para nada. São N consultas rápidas por índice, antes da
     // transação.
     const usadas = new Set<string>();
-    const normalizados: Record<string, unknown>[] = [];
+    const normalizados: Prisma.equipamentosUncheckedCreateInput[] = [];
 
     for (const item of itens) {
       const nome = item.nome.trim();
@@ -465,10 +466,10 @@ export class EquipamentosService {
 
     const criados = await this.prisma.$transaction(
       async (tx) => {
-        const resultado: any[] = [];
+        const resultado: equipamentos[] = [];
 
         for (const data of normalizados) {
-          const equipamento = await tx.equipamentos.create({ data: data as any });
+          const equipamento = await tx.equipamentos.create({ data });
 
           if (dados_tecnicos && dados_tecnicos.length > 0) {
             await tx.equipamentos_dados_tecnicos.createMany({
@@ -502,13 +503,13 @@ export class EquipamentosService {
 
     // Só faz sentido no lote de um, que é o único que aceita tópico.
     const comMqtt = criados.find(
-      (e: any) => e.mqtt_habilitado && e.topico_mqtt,
+      (e) => e.mqtt_habilitado && e.topico_mqtt,
     );
     if (comMqtt) {
       this.emitMqttChanged({
         equipamentoId: comMqtt.id?.trim?.() ?? comMqtt.id,
         topicoAntigo: null,
-        topicoNovo: (comMqtt.topico_mqtt as string).trim(),
+        topicoNovo: comMqtt.topico_mqtt.trim(),
         habilitado: true,
       });
     }
@@ -738,9 +739,10 @@ export class EquipamentosService {
     const skip = (page - 1) * limit;
 
     // Construir filtros
-    const where: any = {
+    // `AND` como lista: os filtros abaixo vao empurrando nela
+    const where: Prisma.equipamentosWhereInput & { AND: Prisma.equipamentosWhereInput[] } = {
       deleted_at: null,
-      AND: [] as any[],
+      AND: [],
     };
 
     // Scope RBAC por planta (operador/proprietario veem apenas equipamentos das plantas vinculadas).
@@ -914,7 +916,7 @@ export class EquipamentosService {
       : undefined;
 
     // Adicionar contagem de componentes e informações de diagrama
-    const dataWithCounts = comNomeDaPosicao(data).map((equipamento: any) => ({
+    const dataWithCounts = comNomeDaPosicao(data).map((equipamento) => ({
       ...equipamento,
       totalComponentes: equipamento.equipamentos_filhos?.length || 0,
       noDiagrama: equipamento.diagrama_id !== null,
@@ -1189,8 +1191,8 @@ export class EquipamentosService {
 
     // Emitir evento APOS commit, somente se topico_mqtt ou mqtt_habilitado mudou
     if (mqttFieldTouched && equipamento) {
-      const topicoNovo = (equipamento as any).topico_mqtt?.trim() || null;
-      const habilitadoNovo = !!(equipamento as any).mqtt_habilitado;
+      const topicoNovo = equipamento.topico_mqtt?.trim() || null;
+      const habilitadoNovo = !!equipamento.mqtt_habilitado;
       const houveMudanca =
         topicoNovo !== topicoAntigo || habilitadoNovo !== habilitadoAntigo;
 
@@ -1433,7 +1435,7 @@ export class EquipamentosService {
     'classificacao', 'equipamento_pai_id', 'unidade_id',
   ]);
 
-  private camposGravaveisDoEquipamento(entrada: Record<string, any>) {
+  private camposGravaveisDoEquipamento(entrada: Record<string, unknown>): Partial<Prisma.equipamentosCreateManyInput> {
     const modelo = Prisma.dmmf.datamodel.models.find(m => m.name === 'equipamentos');
     const colunas = new Set(
       (modelo?.fields ?? [])
@@ -1450,7 +1452,7 @@ export class EquipamentosService {
         .map(f => f.name),
     );
 
-    const dados: Record<string, any> = {};
+    const dados: Record<string, unknown> = {};
     for (const [chave, valor] of Object.entries(entrada ?? {})) {
       // `undefined` no Prisma significa "nao mexe": deixar de fora preserva o
       // que ja esta gravado, que e o esperado num update parcial.
@@ -1458,7 +1460,8 @@ export class EquipamentosService {
       if (valor === '' && naoTexto.has(chave)) continue;
       dados[chave] = valor;
     }
-    return dados;
+    // So colunas escalares do model (filtradas pelo DMMF), com o valor do DTO
+    return dados as Partial<Prisma.equipamentosCreateManyInput>;
   }
 
   /**
@@ -1503,7 +1506,7 @@ export class EquipamentosService {
   private async regravarDadosTecnicos(
     prisma: PrismaService,
     equipamentoId: string,
-    dadosTecnicos?: any[],
+    dadosTecnicos?: DadoTecnicoDto[],
   ) {
     if (!dadosTecnicos) return; // ausente = nao mexer; [] = apagar
     await prisma.equipamentos_dados_tecnicos.deleteMany({
@@ -1536,7 +1539,7 @@ export class EquipamentosService {
 
     const idsExistentes = componentesExistentes.map(c => c.id.trim());
     const idsRecebidos = componentes
-      .map(c => (c as any).id?.trim())
+      .map(c => c.id?.trim())
       .filter(Boolean); // Remove undefined/null
 
     // 2. Identificar componentes a serem excluídos (soft delete)
@@ -1557,11 +1560,11 @@ export class EquipamentosService {
     const resultados = [];
 
     const tipos = await this.resolverTiposDeEquipamento(
-      componentes.map(c => (c as any).tipo_equipamento_id),
+      componentes.map(c => c.tipo_equipamento_id),
     );
 
     for (const componente of componentes) {
-      const componenteId = (componente as any).id?.trim();
+      const componenteId = componente.id?.trim();
       const { dados_tecnicos } = componente;
 
       const campos = this.camposGravaveisDoEquipamento(componente);
@@ -1586,8 +1589,9 @@ export class EquipamentosService {
         resultados.push(atualizado);
       } else {
         // Criar novo componente
+        // nome e criticidade vem do componente: o Partial e porque o lote tambem atualiza
         const criado = await this.prisma.equipamentos.create({
-          data: baseData as any,
+          data: baseData as Prisma.equipamentosUncheckedCreateInput,
         });
         await this.regravarDadosTecnicos(this.prisma, criado.id.trim(), dados_tecnicos);
         resultados.push(criado);
@@ -1812,7 +1816,7 @@ export class EquipamentosService {
       typeof dto.topico_mqtt === 'string' &&
       dto.topico_mqtt.trim() === ''
     ) {
-      dto.topico_mqtt = null as any;
+      dto.topico_mqtt = null;
     }
 
     if (

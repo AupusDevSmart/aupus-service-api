@@ -1,6 +1,6 @@
 // src/modules/tarefas/tarefas.service.ts
 import { Injectable, NotFoundException, BadRequestException, ConflictException } from '@nestjs/common';
-import { PrismaService, PermissionScopeService, ScopedUser } from '@/core';
+import { FrequenciaTarefa, PrismaService, PermissionScopeService, ScopedUser } from '@/core';
 import {
   CreateTarefaDto,
   UpdateTarefaDto,
@@ -9,7 +9,21 @@ import {
   TarefaResponseDto,
 } from './dto';
 import { Prisma } from '@/core';
+import type { tarefas } from '@prisma/client';
 import { PropagacaoPlanosService } from '../planos-manutencao/propagacao-planos.service';
+
+/**
+ * Tarefa como as consultas deste service a leem. As relacoes dependem do
+ * include de cada rota, por isso sao opcionais.
+ */
+type TarefaLida = tarefas & {
+  plano_manutencao?: TarefaResponseDto['plano_manutencao'] | null;
+  planta?: TarefaResponseDto['planta'] | null;
+  equipamento?: TarefaResponseDto['equipamento'] | null;
+  instrucao?: TarefaResponseDto['instrucao'] | null;
+  usuario_criador?: TarefaResponseDto['usuario_criador'] | null;
+  usuario_atualizador?: TarefaResponseDto['usuario_atualizador'] | null;
+};
 
 @Injectable()
 export class TarefasService {
@@ -319,7 +333,7 @@ export class TarefasService {
       await this.verificarTagUnica(updateDto.tag, id);
     }
 
-    const dadosAtualizacao: any = { ...updateDto };
+    const dadosAtualizacao: Prisma.tarefasUncheckedUpdateInput = { ...updateDto };
 
     if (updateDto.instrucao_id && updateDto.instrucao_id !== tarefaExistente.instrucao_id) {
       await this.verificarInstrucaoExiste(updateDto.instrucao_id);
@@ -369,7 +383,7 @@ export class TarefasService {
   }
 
   /** Os quatro campos de definicao. Mudanca de ordem ou tag nao customiza. */
-  private alteraDefinicao(updateDto: UpdateTarefaDto, atual: any): boolean {
+  private alteraDefinicao(updateDto: UpdateTarefaDto, atual: tarefas): boolean {
     const campos: Array<keyof UpdateTarefaDto> = [
       'nome',
       'instrucao_id',
@@ -531,7 +545,7 @@ export class TarefasService {
     }
   }
 
-  private validarFrequenciaPersonalizada(frequencia: any, frequenciaPersonalizada?: number) {
+  private validarFrequenciaPersonalizada(frequencia: FrequenciaTarefa, frequenciaPersonalizada?: number) {
     if (frequencia === 'PERSONALIZADA') {
       if (!frequenciaPersonalizada || frequenciaPersonalizada < 1) {
         throw new BadRequestException('Frequência personalizada deve ser informada e maior que zero quando a frequência é PERSONALIZADA');
@@ -766,7 +780,7 @@ export class TarefasService {
    * copiadas daqui e saiam `undefined` — e `duracao_estimada` saia `NaN`,
    * porque `Number(undefined)` nao e nulo.
    */
-  private mapearParaResponse(tarefa: any): TarefaResponseDto {
+  private mapearParaResponse(tarefa: TarefaLida): TarefaResponseDto {
     return {
       // Os ids sao aparados porque o banco tem colunas `Char(26)` e devolve
       // padding a direita; comparacao sem trim falha calada.
@@ -808,7 +822,7 @@ export class TarefasService {
 
   private calcularProximaExecucao(
     dataUltimaExecucao: Date,
-    frequencia: any,
+    frequencia: FrequenciaTarefa | null,
     frequenciaPersonalizada?: number
   ): Date {
     const proximaExecucao = new Date(dataUltimaExecucao);

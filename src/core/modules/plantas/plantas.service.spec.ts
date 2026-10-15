@@ -489,17 +489,17 @@ describe('PlantasService', () => {
   // ✅ TESTES EXISTENTES - MÉTODOS PRIVADOS (mantidos)
   describe('getTipoProprietario (private method)', () => {
     it('should identify pessoa_fisica correctly (CPF)', () => {
-      const result = (service as any).getTipoProprietario('123.456.789-00');
+      const result = service['getTipoProprietario']('123.456.789-00');
       expect(result).toBe('pessoa_fisica');
     });
 
     it('should identify pessoa_juridica correctly (CNPJ)', () => {
-      const result = (service as any).getTipoProprietario('12.345.678/0001-90');
+      const result = service['getTipoProprietario']('12.345.678/0001-90');
       expect(result).toBe('pessoa_juridica');
     });
 
     it('should default to pessoa_juridica when cpf_cnpj is null', () => {
-      const result = (service as any).getTipoProprietario(null);
+      const result = service['getTipoProprietario'](null);
       expect(result).toBe('pessoa_juridica');
     });
   });
@@ -507,7 +507,7 @@ describe('PlantasService', () => {
   describe('formatPlantaResponse (private method)', () => {
     it('should format database response correctly', () => {
       // Act
-      const result = (service as any).formatPlantaResponse(mockPlantaCriada);
+      const result = service['formatPlantaResponse'](mockPlantaCriada as never);
 
       // Assert
       expect(result).toEqual({
@@ -541,7 +541,7 @@ describe('PlantasService', () => {
       delete plantaSemProprietario.proprietario;
 
       // Act
-      const result = (service as any).formatPlantaResponse(plantaSemProprietario);
+      const result = service['formatPlantaResponse'](plantaSemProprietario as never);
 
       // Assert
       expect(result.proprietario).toBeUndefined();

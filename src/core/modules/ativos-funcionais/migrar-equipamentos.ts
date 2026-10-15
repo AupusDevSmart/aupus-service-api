@@ -1,4 +1,4 @@
-import { PrismaService } from '../../prisma/prisma.service';
+import type { PrismaClient } from '@prisma/client';
 
 export interface RelatorioDaMigracao {
   migrados: number;
@@ -39,7 +39,8 @@ interface OpcoesDaMigracao {
  * silencia exclusao vira descoberta ruim seis meses depois.
  */
 export async function migrarEquipamentosParaPosicoes(
-  prisma: PrismaService,
+  // O client e nao o PrismaService: quem roda e o script de migracao (e o spec)
+  prisma: PrismaClient,
   opcoes: OpcoesDaMigracao = {},
 ): Promise<RelatorioDaMigracao> {
   const equipamentos = await prisma.equipamentos.findMany({

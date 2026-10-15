@@ -70,7 +70,12 @@ export class HistoricoEquipamentoService {
    * O que situa o item no tempo, na ordem em que a informação fica confiável:
    * o que de fato aconteceu, depois o que foi agendado, depois o previsto.
    */
-  private dataDeReferencia(os: any): Date | null {
+  private dataDeReferencia(os: {
+    data_hora_inicio_real?: Date | null;
+    data_hora_programada?: Date | null;
+    data_previsao_inicio?: Date | null;
+    criado_em?: Date | null;
+  }): Date | null {
     return (
       os.data_hora_inicio_real ??
       os.data_hora_programada ??

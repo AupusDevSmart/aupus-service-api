@@ -384,7 +384,7 @@ describe('ProgramacaoOSService', () => {
           tempo_estimado: 1,
           duracao_estimada: 1,
           tarefas_ids: ['tarefa_1'],
-        } as any,
+        },
         'user123',
       );
 
@@ -431,7 +431,7 @@ describe('ProgramacaoOSService', () => {
           tempo_estimado: 1,
           duracao_estimada: 1,
           tarefas_ids: ['tarefa_1'],
-        } as any,
+        },
         'user123',
       );
 
@@ -882,7 +882,7 @@ describe('ProgramacaoOSService', () => {
       mockPrismaService.anomalias.findFirst.mockResolvedValue(mockAnomaliaData);
 
       // Mock do método criar
-      jest.spyOn(service, 'criar').mockResolvedValue(mockProgramacaoData as any);
+      jest.spyOn(service, 'criar').mockResolvedValue(mockProgramacaoData);
 
       const result = await service.criarDeAnomalia('clrx1234567890123456789012', createAnomaliaDto, 'user123');
 
@@ -934,7 +934,7 @@ describe('ProgramacaoOSService', () => {
       mockPrismaService.tarefas.findMany.mockResolvedValue(mockTarefasData);
 
       // Mock do método criar
-      jest.spyOn(service, 'criar').mockResolvedValue(mockProgramacaoData as any);
+      jest.spyOn(service, 'criar').mockResolvedValue(mockProgramacaoData);
 
       const result = await service.criarDeTarefas(createTarefasDto, 'user123');
 
@@ -994,7 +994,7 @@ describe('ProgramacaoOSService', () => {
       mockPrismaService.$transaction.mockImplementation(mockTransaction);
 
       // Mock do buscarPorId
-      jest.spyOn(service, 'buscarPorId').mockResolvedValue(mockProgramacaoData as any);
+      jest.spyOn(service, 'buscarPorId').mockResolvedValue(mockProgramacaoData);
 
       mockPrismaService.tarefas.findMany.mockResolvedValue([mockTarefasData[1]]);
       mockPrismaService.tarefas_programacao_os.findMany.mockResolvedValue([]);
@@ -1028,7 +1028,7 @@ describe('ProgramacaoOSService', () => {
       mockPrismaService.$transaction.mockImplementation(mockTransaction);
 
       // Mock do buscarPorId
-      jest.spyOn(service, 'buscarPorId').mockResolvedValue(mockProgramacaoData as any);
+      jest.spyOn(service, 'buscarPorId').mockResolvedValue(mockProgramacaoData);
 
       mockPrismaService.tarefas_programacao_os.updateMany.mockResolvedValue({ count: 1 });
       mockPrismaService.historico_programacao_os.create.mockResolvedValue({});
@@ -1058,7 +1058,7 @@ describe('ProgramacaoOSService', () => {
       mockPrismaService.$transaction.mockImplementation(mockTransaction);
 
       // Mock do buscarPorId
-      jest.spyOn(service, 'buscarPorId').mockResolvedValue(mockProgramacaoData as any);
+      jest.spyOn(service, 'buscarPorId').mockResolvedValue(mockProgramacaoData);
 
       mockPrismaService.tarefas_programacao_os.findFirst.mockResolvedValue({
         id: 'clrx1234567890123456789012',
@@ -1079,7 +1079,7 @@ describe('ProgramacaoOSService', () => {
 
     it('deve lançar NotFoundException quando tarefa não encontrada na programação', async () => {
       // Mock do buscarPorId
-      jest.spyOn(service, 'buscarPorId').mockResolvedValue(mockProgramacaoData as any);
+      jest.spyOn(service, 'buscarPorId').mockResolvedValue(mockProgramacaoData);
 
       mockPrismaService.tarefas_programacao_os.findFirst.mockResolvedValue(null);
 
@@ -1094,7 +1094,7 @@ describe('ProgramacaoOSService', () => {
       jest.spyOn(service, 'buscarPorId').mockResolvedValue({
         ...mockProgramacaoData,
         status: StatusProgramacaoOS.PENDENTE,
-      } as any);
+      });
 
       mockPrismaService.programacoes_os.update.mockResolvedValue({});
       mockPrismaService.historico_programacao_os.create.mockResolvedValue({});
@@ -1112,7 +1112,7 @@ describe('ProgramacaoOSService', () => {
       jest.spyOn(service, 'buscarPorId').mockResolvedValue({
         ...mockProgramacaoData,
         status: StatusProgramacaoOS.APROVADA,
-      } as any);
+      });
 
       await expect(service.deletar('clrx1234567890123456789012', 'user123'))
         .rejects.toThrow(ConflictException);

@@ -1,7 +1,7 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { PrismaService, PermissionScopeService, ScopedUser } from '@/core';
 import { VeiculosService } from '../veiculos/veiculos.service';
-import { StatusReserva, Prisma } from '@/core';
+import { StatusReserva, Prisma, type reserva_veiculo, type veiculo } from '@/core';
 import { camposDaJanela, garantirViaturaLivre, validarJanela, type JanelaDaReserva } from './ocupacao-da-viatura';
 import {
   CreateReservaDto,
@@ -10,6 +10,10 @@ import {
   ReservaResponseDto
 } from './dto';
 
+/** A reserva como as consultas deste service a trazem: com o resumo da viatura */
+type ReservaParaResposta = reserva_veiculo & {
+  veiculo?: Pick<veiculo, 'id' | 'nome' | 'placa' | 'tipo' | 'capacidade_passageiros'> | null;
+};
 
 export interface PaginatedResponse<T> {
   data: T[];
@@ -181,7 +185,7 @@ export class ReservasService {
     }
 
     // Scope RBAC: 403 se a planta do veiculo nao esta no escopo
-    await this.scopeService.assertPlantaInScope((reserva as any).veiculo?.planta_id ?? null, user);
+    await this.scopeService.assertPlantaInScope(reserva.veiculo?.planta_id ?? null, user);
 
     return this.mapearParaResponse(reserva);
   }
@@ -334,7 +338,7 @@ export class ReservasService {
     }
   }
 
-  private mapearParaResponse(reserva: any): ReservaResponseDto {
+  private mapearParaResponse(reserva: ReservaParaResposta): ReservaResponseDto {
     return {
       id: reserva.id,
       veiculoId: reserva.veiculo_id,

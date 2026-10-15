@@ -14,7 +14,7 @@ describe('TarefasSchedulerService', () => {
 
   const DIA = 24 * 60 * 60 * 1000;
 
-  const mockPrismaService: any = {
+  const mockPrismaService = {
     tarefas: { findMany: jest.fn(), update: jest.fn() },
     tarefas_os: { findMany: jest.fn() },
     tarefas_programacao_os: { findMany: jest.fn(), updateMany: jest.fn() },
@@ -23,7 +23,7 @@ describe('TarefasSchedulerService', () => {
     feriados: { findMany: jest.fn() },
   };
 
-  const mockProgramacaoService: any = { criarDeTarefas: jest.fn() };
+  const mockProgramacaoService = { criarDeTarefas: jest.fn() };
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
@@ -84,8 +84,8 @@ describe('TarefasSchedulerService', () => {
       equipamento: { id: 'eq_1', nome: 'Motor', criticidade: 'A', unidade_id: 'un_1', unidade: { id: 'un_1', nome: 'Unidade 1' } },
     };
 
-    const calcular = (tarefa: any, ultima?: Date) =>
-      (service as any).calcularProximaExecucao(tarefa, ultima);
+    const calcular = (tarefa: Record<string, unknown>, ultima?: Date) =>
+      service['calcularProximaExecucao'](tarefa as never, ultima);
 
     it('conta a partir da ultima execucao efetiva, nao da criacao', () => {
       const ultima = new Date('2026-06-01T00:00:00Z');
@@ -139,7 +139,7 @@ describe('TarefasSchedulerService', () => {
       criticidade: tarefa,
       equipamento: { criticidade: equipamento },
     });
-    const prioridade = (cluster: unknown[]) => (service as any).determinarPrioridade(cluster);
+    const prioridade = (cluster: unknown[]) => service['determinarPrioridade'](cluster as never);
 
     it('usa a criticidade 1 a 5 do cadastro de hoje (antes so A/B/C contava e tudo saia MEDIA)', () => {
       expect(prioridade([comCriticidade('5')])).toBe('ALTA');
@@ -161,7 +161,7 @@ describe('TarefasSchedulerService', () => {
       proxima_execucao: new Date('2026-10-18T13:00:00Z'),
       equipamento: { id: 'eq_1', nome: 'Motor', criticidade: '3', unidade_id: 'un_1', unidade: { id: 'un_1', nome: 'Unidade 1', planta_id: 'pl_1' } },
     };
-    const gerar = () => (service as any).criarProgramacaoParaCluster([tarefaDoDomingo], 'Unidade 1', 'un_1');
+    const gerar = () => service['criarProgramacaoParaCluster']([tarefaDoDomingo] as never, 'Unidade 1', 'un_1');
 
     it('a programacao gerada cai no proximo dia util da planta (antes saia no domingo e no feriado)', async () => {
       mockPrismaService.feriados.findMany.mockResolvedValue([{ data: new Date('2026-10-19T00:00:00Z'), recorrente: false, nome: 'Feriado' }]);
@@ -191,7 +191,7 @@ describe('TarefasSchedulerService', () => {
     it('so considera tarefa CONCLUIDA em OS FINALIZADA', async () => {
       mockPrismaService.tarefas_os.findMany.mockResolvedValue([]);
 
-      await (service as any).buscarUltimasExecucoes(['tarefa_1']);
+      await service['buscarUltimasExecucoes'](['tarefa_1']);
 
       const where = mockPrismaService.tarefas_os.findMany.mock.calls[0][0].where;
       expect(where.status).toBe('CONCLUIDA');
@@ -207,7 +207,7 @@ describe('TarefasSchedulerService', () => {
         { tarefa_id: 'tarefa_1', data_conclusao: recente },
       ]);
 
-      const mapa = await (service as any).buscarUltimasExecucoes(['tarefa_1']);
+      const mapa = await service['buscarUltimasExecucoes'](['tarefa_1']);
 
       expect(mapa.get('tarefa_1')).toEqual(recente);
     });
@@ -225,7 +225,7 @@ describe('TarefasSchedulerService', () => {
         { tarefa_id: 'tarefa_1', ciclo_referencia: ciclo },
       ]);
 
-      const result = await (service as any).filtrarCiclosJaGerados([tarefa(ciclo)]);
+      const result = await service['filtrarCiclosJaGerados']([tarefa(ciclo)] as never);
 
       expect(result).toHaveLength(0);
     });
@@ -237,7 +237,7 @@ describe('TarefasSchedulerService', () => {
         { tarefa_id: 'tarefa_1', ciclo_referencia: cicloAntigo },
       ]);
 
-      const result = await (service as any).filtrarCiclosJaGerados([tarefa(cicloAtual)]);
+      const result = await service['filtrarCiclosJaGerados']([tarefa(cicloAtual)] as never);
 
       expect(result).toHaveLength(1);
     });
@@ -248,7 +248,7 @@ describe('TarefasSchedulerService', () => {
         { tarefa_id: 'tarefa_1', ciclo_referencia: null },
       ]);
 
-      const result = await (service as any).filtrarCiclosJaGerados([tarefa(ciclo)]);
+      const result = await service['filtrarCiclosJaGerados']([tarefa(ciclo)] as never);
 
       expect(result).toHaveLength(0);
     });
@@ -257,7 +257,7 @@ describe('TarefasSchedulerService', () => {
       const ciclo = new Date('2026-09-01T00:00:00Z');
       mockPrismaService.tarefas_os.findMany.mockResolvedValue([]);
 
-      const result = await (service as any).filtrarCiclosJaGerados([tarefa(ciclo)]);
+      const result = await service['filtrarCiclosJaGerados']([tarefa(ciclo)] as never);
 
       const statusConsultados =
         mockPrismaService.tarefas_os.findMany.mock.calls[0][0].where.ordem_servico.status.in;

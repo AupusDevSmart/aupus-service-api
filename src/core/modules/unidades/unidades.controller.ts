@@ -41,6 +41,7 @@ import { EquipamentoQueryDto } from '../equipamentos/dto/equipamento-query.dto';
 import { UserProprietarioId } from '../auth/decorators/user-proprietario.decorator';
 import { Permissions } from '../auth/decorators/permissions.decorator';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
+import type { ScopedUser } from '../auth/permission-scope.service';
 
 @ApiTags('unidades')
 @Controller('unidades')
@@ -89,7 +90,7 @@ export class UnidadesController {
   @ApiResponse({ status: 201, description: 'Anexo enviado' })
   uploadAnexo(
     @Param('id') id: string,
-    @UploadedFile() file: any,
+    @UploadedFile() file: Express.Multer.File,
     @Body('descricao') descricao?: string,
   ) {
     return this.anexosService.uploadAnexo(id, file, descricao);
@@ -164,7 +165,7 @@ export class UnidadesController {
   async findAll(
     @Query(new ValidationPipe({ transform: true })) queryDto: FindAllUnidadesDto,
     @UserProprietarioId() autoProprietarioId: string | null,
-    @CurrentUser() user: any
+    @CurrentUser() user: ScopedUser
   ): Promise<PaginatedUnidadesResponse> {
     const effectiveProprietarioId = autoProprietarioId || queryDto.proprietarioId;
 
@@ -207,7 +208,7 @@ export class UnidadesController {
   })
   async findByPlanta(
     @Param('plantaId') plantaId: string,
-    @CurrentUser() user: any,
+    @CurrentUser() user: ScopedUser,
   ): Promise<UnidadeResponse[]> {
     this.logger.log(`📋 [LIST UNIDADES BY PLANTA] Planta: ${plantaId}`);
 
@@ -243,7 +244,7 @@ export class UnidadesController {
   })
   async findOne(
     @Param('id') id: string,
-    @CurrentUser() user: any,
+    @CurrentUser() user: ScopedUser,
   ): Promise<UnidadeResponse> {
     this.logger.log(`🔍 [GET UNIDADE] Buscando unidade: ${id}`);
 
@@ -400,7 +401,7 @@ export class UnidadesController {
   async findEquipamentosByUnidade(
     @Param('id') id: string,
     @Query(new ValidationPipe({ transform: true })) query: EquipamentoQueryDto,
-    @CurrentUser() user: any,
+    @CurrentUser() user: ScopedUser,
   ) {
     this.logger.log(`📋 [LIST EQUIPAMENTOS BY UNIDADE] Unidade: ${id}`);
     this.logger.log(`📝 [LIST EQUIPAMENTOS BY UNIDADE] Filtros:`, JSON.stringify(query, null, 2));

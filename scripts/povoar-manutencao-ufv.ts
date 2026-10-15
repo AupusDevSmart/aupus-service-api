@@ -27,6 +27,12 @@ import { ExecucaoOSService } from '../src/modules/execucao-os/execucao-os.servic
 
 const diasAtras = (n: number) => new Date(Date.now() - n * 86400000);
 
+/**
+ * O payload que o metodo do service recebe na posicao `I`, tirado da propria
+ * assinatura. O script manda so o que o cenario precisa; o service completa.
+ */
+type Payload<F extends (...args: never[]) => unknown, I extends number = 0> = Parameters<F>[I];
+
 /** Instruções de manutenção de usina fotovoltaica, por categoria de equipamento. */
 const INSTRUCOES = [
   {
@@ -297,7 +303,7 @@ async function main() {
   const programacaoService = app.get(ProgramacaoOSService);
   const execucaoService = app.get(ExecucaoOSService);
 
-  const log = (...args: any[]) => console.log(...args);
+  const log = (...args: unknown[]) => console.log(...args);
 
   // ---------------------------------------------------------------- contexto
   const planta = await prisma.plantas.findFirst({
@@ -341,9 +347,9 @@ async function main() {
     const criada = await instrucoesService.criar({
       nome: def.nome,
       descricao: def.descricao,
-      categoria: def.categoria as any,
-      tipo_manutencao: def.tipo_manutencao as any,
-      condicao_ativo: def.condicao_ativo as any,
+      categoria: def.categoria,
+      tipo_manutencao: def.tipo_manutencao,
+      condicao_ativo: def.condicao_ativo,
       criticidade: def.criticidade,
       duracao_estimada: def.duracao_estimada,
       tempo_estimado: def.tempo_estimado,
@@ -352,8 +358,8 @@ async function main() {
         descricao,
         ordem: i + 1,
         tempo_estimado: 0.25,
-      })) as any,
-    } as any);
+      })),
+    } as Payload<InstrucoesService['criar']>);
 
     instrucaoPorChave.set(def.chave, criada.id);
     log(`  + ${criada.tag} ${def.nome}`);
@@ -383,7 +389,7 @@ async function main() {
         nome: def.nome,
         descricao: def.descricao,
         criado_por: usuarioId,
-      } as any);
+      } as Payload<PlanosManutencaoService['criar']>);
       plano = { id: criado.id };
       log(`  + ${def.nome}`);
 
@@ -394,12 +400,12 @@ async function main() {
         await tarefasService.criar({
           nome: t.nome,
           instrucao_id: instrucaoId,
-          frequencia: t.frequencia as any,
+          frequencia: t.frequencia,
           criticidade: t.criticidade,
           plano_manutencao_id: plano.id,
           ordem: i + 1,
           criado_por: usuarioId,
-        } as any);
+        } as Payload<TarefasService['criar']>);
         log(`      · ${t.nome} (${t.frequencia})`);
       }
     }
@@ -441,7 +447,7 @@ async function main() {
       const r = await planosService.vincularEquipamento({
         equipamento_id: eq.id,
         plano_id: planoIdResolvido,
-      } as any);
+      } as Payload<PlanosManutencaoService['vincularEquipamento']>);
       log(`  + ${eq.nome.trim()} → ${r.tarefas_copiadas} tarefa(s)`);
     } else {
       log(`  = ${eq.nome.trim()} (já tinha plano)`);
@@ -475,7 +481,7 @@ async function main() {
         prioridade: 'MEDIA',
         data_hora_programada: diasAtras(20).toISOString(),
         agrupar_por: 'equipamento',
-      } as any,
+      } as Payload<ProgramacaoOSService['criarDeTarefas']>,
       usuarioId,
     );
 
@@ -492,7 +498,7 @@ async function main() {
   const abrirOS = async (programacaoId: string) => {
     await programacaoService.aprovar(
       programacaoId,
-      { observacoes: 'Aprovada para execução' } as any,
+      { observacoes: 'Aprovada para execução' } as Payload<ProgramacaoOSService['aprovar'], 1>,
       usuarioId,
     );
 
@@ -502,7 +508,7 @@ async function main() {
     });
     if (!os) throw new Error('aprovação não gerou OS');
 
-    await execucaoService.iniciar(os.id, { responsavel_execucao: usuario?.nome } as any, usuarioId);
+    await execucaoService.iniciar(os.id, { responsavel_execucao: usuario?.nome } as Payload<ExecucaoOSService['iniciar'], 1>, usuarioId);
     return os.id;
   };
 
@@ -545,12 +551,12 @@ async function main() {
           select: { tarefa_id: true },
         });
         for (const v of vinculos) {
-          await execucaoService.concluirTarefa(osId, v.tarefa_id!, { observacoes: 'Executado conforme instrução' } as any, usuarioId);
+          await execucaoService.concluirTarefa(osId, v.tarefa_id!, { observacoes: 'Executado conforme instrução' } as Payload<ExecucaoOSService['concluirTarefa'], 2>, usuarioId);
         }
 
-        await execucaoService.executar(osId, { resultado_servico: 'Serviço executado sem intercorrências' } as any, usuarioId);
-        await execucaoService.auditar(osId, { avaliacao_qualidade: 5, observacoes_qualidade: 'Conforme' } as any, usuarioId);
-        await execucaoService.finalizar(osId, { observacoes: 'Encerrada' } as any, usuarioId);
+        await execucaoService.executar(osId, { resultado_servico: 'Serviço executado sem intercorrências' } as Payload<ExecucaoOSService['executar'], 1>, usuarioId);
+        await execucaoService.auditar(osId, { avaliacao_qualidade: 5, observacoes_qualidade: 'Conforme' } as Payload<ExecucaoOSService['auditar'], 1>, usuarioId);
+        await execucaoService.finalizar(osId, { observacoes: 'Encerrada' } as Payload<ExecucaoOSService['finalizar'], 1>, usuarioId);
         return osId;
       },
     ]);
@@ -570,12 +576,12 @@ async function main() {
           select: { tarefa_id: true },
         });
         for (const v of vinculos.slice(0, Math.max(1, vinculos.length - 1))) {
-          await execucaoService.concluirTarefa(osId, v.tarefa_id!, { observacoes: 'Executado' } as any, usuarioId);
+          await execucaoService.concluirTarefa(osId, v.tarefa_id!, { observacoes: 'Executado' } as Payload<ExecucaoOSService['concluirTarefa'], 2>, usuarioId);
         }
 
-        await execucaoService.executar(osId, { resultado_servico: 'Parcial: faltou insumo para uma tarefa' } as any, usuarioId);
-        await execucaoService.auditar(osId, { avaliacao_qualidade: 3, observacoes_qualidade: 'Pendência registrada' } as any, usuarioId);
-        await execucaoService.finalizar(osId, { observacoes: 'Encerrada com pendência' } as any, usuarioId);
+        await execucaoService.executar(osId, { resultado_servico: 'Parcial: faltou insumo para uma tarefa' } as Payload<ExecucaoOSService['executar'], 1>, usuarioId);
+        await execucaoService.auditar(osId, { avaliacao_qualidade: 3, observacoes_qualidade: 'Pendência registrada' } as Payload<ExecucaoOSService['auditar'], 1>, usuarioId);
+        await execucaoService.finalizar(osId, { observacoes: 'Encerrada com pendência' } as Payload<ExecucaoOSService['finalizar'], 1>, usuarioId);
         return osId;
       },
     ]);
@@ -589,7 +595,7 @@ async function main() {
         const p3 = await programar(alvoCancelada, `Manutenção preventiva — ${alvoCancelada.nome}`);
         if (!p3) return 'sem tarefas';
         const osId = await abrirOS(p3.id);
-        await execucaoService.cancelar(osId, { motivo_cancelamento: 'Equipe remanejada para emergência' } as any, usuarioId);
+        await execucaoService.cancelar(osId, { motivo_cancelamento: 'Equipe remanejada para emergência' } as Payload<ExecucaoOSService['cancelar'], 1>, usuarioId);
         return osId;
       },
     ]);
@@ -614,7 +620,7 @@ async function main() {
       async () => {
         const p5 = await programar(alvoPendente, `Manutenção preventiva — ${alvoPendente.nome}`);
         if (!p5) return 'sem tarefas';
-        await programacaoService.aprovar(p5.id, { observacoes: 'Aprovada' } as any, usuarioId);
+        await programacaoService.aprovar(p5.id, { observacoes: 'Aprovada' } as Payload<ProgramacaoOSService['aprovar'], 1>, usuarioId);
         return p5.id;
       },
     ]);
@@ -661,22 +667,22 @@ async function main() {
 
         const prog = await programacaoService.criarDeAnomalia(
           anomalia.id,
-          { ajustes: { descricao: `Correção — ${alvoAnomalia.nome}`, prioridade: 'ALTA' } } as any,
+          { ajustes: { descricao: `Correção — ${alvoAnomalia.nome}`, prioridade: 'ALTA' } } as Payload<ProgramacaoOSService['criarDeAnomalia'], 1>,
           usuarioId,
         );
 
         const osId = await abrirOS(prog.id);
         await execucaoService.executar(
           osId,
-          { resultado_servico: 'Mancal lubrificado e ruído cessou' } as any,
+          { resultado_servico: 'Mancal lubrificado e ruído cessou' } as Payload<ExecucaoOSService['executar'], 1>,
           usuarioId,
         );
         await execucaoService.auditar(
           osId,
-          { avaliacao_qualidade: 4, observacoes_qualidade: 'Acompanhar na próxima inspeção' } as any,
+          { avaliacao_qualidade: 4, observacoes_qualidade: 'Acompanhar na próxima inspeção' } as Payload<ExecucaoOSService['auditar'], 1>,
           usuarioId,
         );
-        await execucaoService.finalizar(osId, { observacoes: 'Encerrada' } as any, usuarioId);
+        await execucaoService.finalizar(osId, { observacoes: 'Encerrada' } as Payload<ExecucaoOSService['finalizar'], 1>, usuarioId);
         return osId;
       },
     ]);
@@ -686,9 +692,9 @@ async function main() {
     try {
       const id = await executar();
       log(`  + ${rotulo} → ${id}`);
-    } catch (e: any) {
-      log(`  ! ${rotulo} → FALHOU: ${e?.message ?? e}`);
-      if (process.env.STACK) console.log(e?.stack);
+    } catch (e) {
+      log(`  ! ${rotulo} → FALHOU: ${e instanceof Error ? e.message : e}`);
+      if (process.env.STACK) console.log(e instanceof Error ? e.stack : undefined);
     }
   }
 

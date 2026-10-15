@@ -75,6 +75,6 @@ describe('comNomeDaPosicao', () => {
       { id: 'b', nome: 'Motor B', ativo_funcional: null },
     ]);
 
-    expect(saida.map((e: any) => e.nome)).toEqual(['Motor 3/11', 'Motor B']);
+    expect(saida.map((e) => e.nome)).toEqual(['Motor 3/11', 'Motor B']);
   });
 });

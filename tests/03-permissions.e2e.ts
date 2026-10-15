@@ -2,12 +2,13 @@
 // FASE 4: Testes de Roles e Permissions
 
 import axios, { AxiosInstance } from 'axios';
+import { erroDaApi } from './erro-da-api';
 
 interface TestResult {
   test: string;
   status: 'PASS' | 'FAIL' | 'WARN';
   message: string;
-  data?: any;
+  data?: unknown;
 }
 
 const results: TestResult[] = [];
@@ -47,7 +48,8 @@ async function setup() {
       api.defaults.headers.common['Authorization'] = `Bearer ${adminToken}`;
       console.log('✅ Autenticado com sucesso\n');
     }
-  } catch (error: any) {
+  } catch (e) {
+    const error = erroDaApi(e);
     console.log('⚠️  Não foi possível autenticar:', error.response?.data?.message || error.message);
     console.log('   Alguns testes podem falhar\n');
   }
@@ -67,7 +69,8 @@ async function setup() {
     testUserId = responseData.id;
     console.log('✅ Usuário de teste criado:', testUserId);
     console.log('');
-  } catch (error: any) {
+  } catch (e) {
+    const error = erroDaApi(e);
     console.error('❌ Erro ao criar usuário de teste:', error.response?.data?.message || error.message);
     console.log('');
   }
@@ -119,7 +122,8 @@ async function runPermissionsTests() {
         });
         console.log('   ❌ FAIL - Status inesperado');
       }
-    } catch (error: any) {
+    } catch (e) {
+      const error = erroDaApi(e);
       results.push({
         test: 'Atribuir Role',
         status: 'FAIL',
@@ -177,7 +181,8 @@ async function runPermissionsTests() {
         });
         console.log('   ❌ FAIL - Status inesperado');
       }
-    } catch (error: any) {
+    } catch (e) {
+      const error = erroDaApi(e);
       results.push({
         test: 'Atribuir Permissão Direta',
         status: 'FAIL',
@@ -219,7 +224,8 @@ async function runPermissionsTests() {
         });
         console.log('   ❌ FAIL - Status inesperado');
       }
-    } catch (error: any) {
+    } catch (e) {
+      const error = erroDaApi(e);
       results.push({
         test: 'Remover Permissão Direta',
         status: 'FAIL',
@@ -246,7 +252,7 @@ async function runPermissionsTests() {
       const permsResponse = await api.get('/usuarios/available/permissions');
       const permissions = permsResponse.data.data || permsResponse.data;
 
-      const permissionIds = permissions.slice(0, 3).map((p: any) => p.id);
+      const permissionIds = permissions.slice(0, 3).map((p: { id: number }) => p.id);
 
       const response = await api.post(`/usuarios/${testUserId}/sync-permissions`, {
         permissionIds: permissionIds
@@ -272,7 +278,8 @@ async function runPermissionsTests() {
         });
         console.log('   ❌ FAIL - Status inesperado');
       }
-    } catch (error: any) {
+    } catch (e) {
+      const error = erroDaApi(e);
       results.push({
         test: 'Sincronizar Permissões',
         status: 'FAIL',
@@ -323,7 +330,8 @@ async function runPermissionsTests() {
         });
         console.log('   ❌ FAIL - Status inesperado');
       }
-    } catch (error: any) {
+    } catch (e) {
+      const error = erroDaApi(e);
       results.push({
         test: 'Buscar Permissões do Usuário',
         status: 'FAIL',
@@ -398,7 +406,8 @@ async function runPermissionsTests() {
         });
         console.log('   ❌ FAIL - Status inesperado');
       }
-    } catch (error: any) {
+    } catch (e) {
+      const error = erroDaApi(e);
       results.push({
         test: 'Verificar Permissão Específica',
         status: 'FAIL',
@@ -463,7 +472,8 @@ async function runPermissionsTests() {
         });
         console.log('   ❌ FAIL - Status inesperado');
       }
-    } catch (error: any) {
+    } catch (e) {
+      const error = erroDaApi(e);
       results.push({
         test: 'Verificar Múltiplas Permissões',
         status: 'FAIL',
@@ -513,7 +523,8 @@ async function runPermissionsTests() {
         });
         console.log('   ❌ FAIL - Status inesperado');
       }
-    } catch (error: any) {
+    } catch (e) {
+      const error = erroDaApi(e);
       results.push({
         test: 'Categorização de Permissões',
         status: 'FAIL',

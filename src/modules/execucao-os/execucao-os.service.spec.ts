@@ -695,10 +695,10 @@ describe('ExecucaoOSService', () => {
         data_hora_inicio_real: new Date('2025-02-15T08:00:00Z'),
       });
 
-      (mockPrismaService as any).usuarios = {
-        findUnique: jest.fn().mockResolvedValue({ nome: 'Admin' }),
-      };
-      (mockPrismaService as any).programacoes_os = {
+      Object.assign(mockPrismaService, {
+        usuarios: { findUnique: jest.fn().mockResolvedValue({ nome: 'Admin' }) },
+      });
+      mockPrismaService.programacoes_os = {
         findUnique: jest.fn().mockResolvedValue(null),
         update: jest.fn().mockResolvedValue({ solicitacao_servico_id: null }),
       };
@@ -740,10 +740,10 @@ describe('ExecucaoOSService', () => {
         ...mockOSData,
         status: StatusOS.AUDITADA,
       });
-      (mockPrismaService as any).usuarios = {
-        findUnique: jest.fn().mockResolvedValue({ nome: 'Admin' }),
-      };
-      (mockPrismaService as any).programacoes_os = {
+      Object.assign(mockPrismaService, {
+        usuarios: { findUnique: jest.fn().mockResolvedValue({ nome: 'Admin' }) },
+      });
+      mockPrismaService.programacoes_os = {
         findUnique: jest.fn().mockResolvedValue(null),
         update: jest.fn().mockResolvedValue({ solicitacao_servico_id: null }),
       };
@@ -761,7 +761,7 @@ describe('ExecucaoOSService', () => {
       ]);
       mockPrismaService.tarefas_os.count.mockResolvedValue(3);
 
-      await service.finalizar('clrx1234567890123456789012', { observacoes: 'ok' } as any, 'user123');
+      await service.finalizar('clrx1234567890123456789012', { observacoes: 'ok' }, 'user123');
 
       // A consulta tem que filtrar por CONCLUIDA: OS pode fechar com tarefa
       // pendente ou cancelada, e marcar todas como executadas faria a
@@ -786,7 +786,7 @@ describe('ExecucaoOSService', () => {
       mockPrismaService.tarefas_os.findMany.mockResolvedValue([]);
       mockPrismaService.tarefas_os.count.mockResolvedValue(2);
 
-      await service.finalizar('clrx1234567890123456789012', { observacoes: 'ok' } as any, 'user123');
+      await service.finalizar('clrx1234567890123456789012', { observacoes: 'ok' }, 'user123');
 
       expect(mockPrismaService.tarefas.update).not.toHaveBeenCalled();
     });
@@ -898,10 +898,10 @@ describe('ExecucaoOSService', () => {
           data_hora_inicio_real: new Date('2025-02-15T08:00:00Z'),
         });
 
-        (mockPrismaService as any).usuarios = {
-          findUnique: jest.fn().mockResolvedValue({ nome: 'Admin' }),
-        };
-        (mockPrismaService as any).programacoes_os = {
+        Object.assign(mockPrismaService, {
+          usuarios: { findUnique: jest.fn().mockResolvedValue({ nome: 'Admin' }) },
+        });
+        mockPrismaService.programacoes_os = {
           findUnique: jest.fn().mockResolvedValue(null),
           update: jest.fn().mockResolvedValue({ solicitacao_servico_id: null }),
         };
@@ -935,10 +935,10 @@ describe('ExecucaoOSService', () => {
           data_hora_inicio_real: null,
         });
 
-        (mockPrismaService as any).usuarios = {
-          findUnique: jest.fn().mockResolvedValue({ nome: 'Admin' }),
-        };
-        (mockPrismaService as any).programacoes_os = {
+        Object.assign(mockPrismaService, {
+          usuarios: { findUnique: jest.fn().mockResolvedValue({ nome: 'Admin' }) },
+        });
+        mockPrismaService.programacoes_os = {
           findUnique: jest.fn().mockResolvedValue(null),
           update: jest.fn().mockResolvedValue({ solicitacao_servico_id: null }),
         };
@@ -973,10 +973,10 @@ describe('ExecucaoOSService', () => {
           status: StatusOS.AUDITADA,
         });
 
-        (mockPrismaService as any).usuarios = {
-          findUnique: jest.fn().mockResolvedValue({ nome: 'Admin' }),
-        };
-        (mockPrismaService as any).programacoes_os = {
+        Object.assign(mockPrismaService, {
+          usuarios: { findUnique: jest.fn().mockResolvedValue({ nome: 'Admin' }) },
+        });
+        mockPrismaService.programacoes_os = {
           findUnique: jest.fn().mockResolvedValue(null),
           update: jest.fn().mockResolvedValue({ solicitacao_servico_id: null }),
         };
@@ -1104,7 +1104,7 @@ describe('ExecucaoOSService', () => {
         expect(dados[1].atividade).toBe('Relação de transformação: Realizar o ensaio');
 
         // Sem itens genéricos de segurança no fim
-        expect(dados.map((d: any) => d.ordem)).toEqual([1, 2]);
+        expect(dados.map((d: { ordem: number }) => d.ordem)).toEqual([1, 2]);
       });
 
       it('ignora tarefa cuja instrucao nao tem sub-instrucoes', async () => {

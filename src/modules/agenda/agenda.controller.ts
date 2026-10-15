@@ -22,6 +22,19 @@ import {
 import { Permissions } from '@/core';
 import { AgendaService, DiaUtilResponse, ProximosDiasUteisResponse } from './agenda.service';
 import { FeriadosService, PaginatedResponse } from './feriados.service';
+
+/** Query crua de `verificar-dia-util`: tudo chega como texto. */
+interface QueryVerificarDiaUtil {
+  data: string;
+  plantaId?: string;
+}
+
+/** Query crua de `proximos-dias-uteis`: tudo chega como texto. */
+interface QueryProximosDiasUteis {
+  quantidade: string;
+  dataInicio?: string;
+  plantaId?: string;
+}
 import { ConfiguracoesDiasUteisService } from './configuracoes-dias-uteis.service';
 import {
   CreateFeriadoDto,
@@ -451,7 +464,7 @@ export class AgendaController {
     status: HttpStatus.OK,
     description: 'Verificação realizada com sucesso'
   })
-  async verificarDiaUtil(@Query() query: any): Promise<DiaUtilResponse> {
+  async verificarDiaUtil(@Query() query: QueryVerificarDiaUtil): Promise<DiaUtilResponse> {
     const { data, plantaId } = query;
     this.logger.log(`🗓️ [VERIFICAR DIA UTIL] Verificando data: ${data}, planta: ${plantaId || 'geral'}`);
 
@@ -482,7 +495,7 @@ export class AgendaController {
     status: HttpStatus.OK,
     description: 'Próximos dias úteis obtidos com sucesso'
   })
-  async proximosDiasUteis(@Query() query: any): Promise<ProximosDiasUteisResponse> {
+  async proximosDiasUteis(@Query() query: QueryProximosDiasUteis): Promise<ProximosDiasUteisResponse> {
     const { quantidade, dataInicio, plantaId } = query;
     this.logger.log(`📅 [PROXIMOS DIAS UTEIS] Buscando ${quantidade} dias úteis`);
 

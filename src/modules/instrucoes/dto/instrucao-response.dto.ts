@@ -5,7 +5,8 @@ import {
   TipoManutencao,
   CondicaoAtivo,
   TipoRecurso,
-  TipoAnexo
+  TipoAnexo,
+  Prisma
 } from '@/core';
 
 export class UsuarioResumoDto {
@@ -28,7 +29,8 @@ export class RecursoInstrucaoResponseDto {
   id: string;
   tipo: TipoRecurso;
   descricao: string;
-  quantidade?: number;
+  // Decimal(10,3) no banco, repassado sem conversao: no JSON chega como texto.
+  quantidade?: Prisma.Decimal;
   unidade?: string;
   obrigatorio: boolean;
   created_at: Date;

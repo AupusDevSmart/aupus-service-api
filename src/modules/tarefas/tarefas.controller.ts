@@ -12,7 +12,7 @@ import {
   HttpCode
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiParam } from '@nestjs/swagger';
-import { Permissions, CurrentUser } from '@/core';
+import { Permissions, CurrentUser, ScopedUser } from '@/core';
 import { TarefasService } from './tarefas.service';
 import { TarefasSchedulerService } from './tarefas-scheduler.service';
 import {
@@ -91,7 +91,7 @@ export class TarefasController {
       }
     }
   })
-  async listar(@Query() queryDto: QueryTarefasDto, @CurrentUser() user: any) {
+  async listar(@Query() queryDto: QueryTarefasDto, @CurrentUser() user: ScopedUser) {
     return this.tarefasService.listar(queryDto, user);
   }
 
@@ -109,7 +109,7 @@ export class TarefasController {
   })
   async listarPorPlano(
     @Param('planoId') planoId: string,
-    @CurrentUser() user: any,
+    @CurrentUser() user: ScopedUser,
     @Query() queryDto?: Partial<QueryTarefasDto>
   ): Promise<TarefaResponseDto[]> {
     return this.tarefasService.listarPorPlano(planoId, queryDto, user);
@@ -125,7 +125,7 @@ export class TarefasController {
   })
   async listarPorEquipamento(
     @Param('equipamentoId') equipamentoId: string,
-    @CurrentUser() user: any,
+    @CurrentUser() user: ScopedUser,
     @Query() queryDto?: Partial<QueryTarefasDto>
   ): Promise<TarefaResponseDto[]> {
     return this.tarefasService.listarPorEquipamento(equipamentoId, queryDto, user);
@@ -145,7 +145,7 @@ export class TarefasController {
   })
   async buscarPorId(
     @Param('id') id: string,
-    @CurrentUser() user: any
+    @CurrentUser() user: ScopedUser
   ): Promise<TarefaResponseDto> {
     return this.tarefasService.buscarPorId(id, user);
   }
@@ -170,7 +170,7 @@ export class TarefasController {
   async atualizar(
     @Param('id') id: string,
     @Body() updateDto: UpdateTarefaDto,
-    @CurrentUser() user: any
+    @CurrentUser() user: ScopedUser
   ): Promise<TarefaResponseDto> {
     return this.tarefasService.atualizar(id, updateDto, user);
   }
@@ -195,7 +195,7 @@ export class TarefasController {
   async reordenar(
     @Param('id') id: string,
     @Body() reordenarDto: ReordenarTarefaDto,
-    @CurrentUser() user: any
+    @CurrentUser() user: ScopedUser
   ): Promise<TarefaResponseDto> {
     return this.tarefasService.reordenar(id, reordenarDto, user);
   }
@@ -215,7 +215,7 @@ export class TarefasController {
   })
   async remover(
     @Param('id') id: string,
-    @CurrentUser() user: any
+    @CurrentUser() user: ScopedUser
   ): Promise<void> {
     return this.tarefasService.remover(id, user);
   }

@@ -37,6 +37,7 @@ import { ReplicarAnexosDto } from './dto/replicar-anexos.dto';
 import { UserProprietarioId } from '../auth/decorators/user-proprietario.decorator';
 import { Permissions } from '../auth/decorators/permissions.decorator';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
+import type { ScopedUser } from '../auth/permission-scope.service';
 
 @ApiTags('Equipamentos')
 @Controller('equipamentos')
@@ -114,7 +115,7 @@ export class EquipamentosController {
   findAll(
     @Query() query: EquipamentoQueryDto,
     @UserProprietarioId() autoProprietarioId: string | null,
-    @CurrentUser() user: any
+    @CurrentUser() user: ScopedUser
   ) {
     return this.equipamentosService.findAll({
       ...query,
@@ -200,7 +201,7 @@ export class EquipamentosController {
   @ApiResponse({ status: 201, description: 'Anexo enviado' })
   uploadAnexo(
     @Param('id') id: string,
-    @UploadedFile() file: any,
+    @UploadedFile() file: Express.Multer.File,
     @Body('descricao') descricao?: string,
   ) {
     return this.anexosService.uploadAnexo(id, file, descricao);
@@ -219,7 +220,7 @@ export class EquipamentosController {
   @ApiOperation({ summary: 'Buscar equipamento por ID' })
   @ApiResponse({ status: 200, description: 'Equipamento encontrado' })
   @ApiResponse({ status: 404, description: 'Equipamento não encontrado' })
-  findOne(@Param('id') id: string, @CurrentUser() user: any) {
+  findOne(@Param('id') id: string, @CurrentUser() user: ScopedUser) {
     return this.equipamentosService.findOne(id, user);
   }
 
@@ -228,7 +229,7 @@ export class EquipamentosController {
   @ApiOperation({ summary: 'Listar componentes UAR de um equipamento UC' })
   @ApiResponse({ status: 200, description: 'Lista de componentes' })
   @ApiResponse({ status: 404, description: 'Equipamento não encontrado' })
-  async findComponentes(@Param('id') id: string, @CurrentUser() user: any) {
+  async findComponentes(@Param('id') id: string, @CurrentUser() user: ScopedUser) {
     await this.equipamentosService.garantirNoEscopo(id, user);
     return this.equipamentosService.findComponentesByEquipamento(id);
   }
@@ -267,7 +268,7 @@ export class EquipamentosController {
   @ApiOperation({ summary: 'Listar componentes UAR para gerenciamento de uma UC' })
   @ApiResponse({ status: 200, description: 'Lista de componentes com dados completos' })
   @ApiResponse({ status: 404, description: 'Equipamento UC não encontrado' })
-  async findComponentesParaGerenciar(@Param('ucId') ucId: string, @CurrentUser() user: any) {
+  async findComponentesParaGerenciar(@Param('ucId') ucId: string, @CurrentUser() user: ScopedUser) {
     await this.equipamentosService.garantirNoEscopo(ucId, user);
     return this.equipamentosService.findComponentesParaGerenciar(ucId);
   }
@@ -290,7 +291,7 @@ export class EquipamentosController {
   findByUnidade(
     @Param('unidadeId') unidadeId: string,
     @Query() query: EquipamentoQueryDto,
-    @CurrentUser() user: any
+    @CurrentUser() user: ScopedUser
   ) {
     return this.equipamentosService.findByUnidade(unidadeId, query, user);
   }

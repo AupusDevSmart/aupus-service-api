@@ -5,7 +5,12 @@ import * as path from 'path';
 const prisma = new PrismaClient();
 
 // Função para serializar BigInt para JSON
-(BigInt.prototype as any).toJSON = function() {
+declare global {
+  interface BigInt {
+    toJSON(): string;
+  }
+}
+BigInt.prototype.toJSON = function (this: bigint) {
   return this.toString();
 };
 
@@ -138,8 +143,8 @@ async function backupDatabase() {
 
       console.log(`   ✅ ${recordCount} registros exportados`);
 
-    } catch (error: any) {
-      console.error(`   ❌ Erro ao exportar ${tableName}: ${error.message}`);
+    } catch (error) {
+      console.error(`   ❌ Erro ao exportar ${tableName}: ${error instanceof Error ? error.message : String(error)}`);
       stats.push({
         tableName,
         recordCount: 0,

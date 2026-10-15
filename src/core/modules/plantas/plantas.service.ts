@@ -3,10 +3,16 @@ import { Injectable, NotFoundException, BadRequestException, ConflictException, 
 import { PrismaService } from '../../prisma/prisma.service';
 import { Planta } from './entities/planta.entity';
 import { PrismaClientKnownRequestError } from '@prisma/client/runtime/library';
+import type { Prisma, plantas } from '@prisma/client';
 import { CreatePlantaDto } from './dto/create-planta.dto';
 import { UpdatePlantaDto } from './dto/update-planta.dto';
 import { FindAllPlantasDto } from './dto/find-all-plantas.dto';
 import { PermissionScopeService, ScopedUser } from '../auth/permission-scope.service';
+
+/** A planta como sai do banco, com o proprietario que as consultas incluem. */
+type PlantaDoBanco = plantas & {
+  proprietario?: { id: string; nome: string; cpf_cnpj: string | null } | null;
+};
 
 export interface PaginatedResponse<T> {
   data: T[];
@@ -117,7 +123,7 @@ export class PlantasService {
 
     try {
       // ✅ CORRIGIDO: Usando tipo genérico any para WHERE
-      const whereClause: any = {
+      const whereClause: Prisma.plantasWhereInput & { AND: Prisma.plantasWhereInput[] } = {
         deleted_at: null,
         AND: []
       };
@@ -152,7 +158,7 @@ export class PlantasService {
       }
 
       // ✅ CORRIGIDO: Construir ordenação com tipo genérico
-      const orderByClause: any = {};
+      const orderByClause: Prisma.plantasOrderByWithRelationInput = {};
       
       switch (orderBy) {
         case 'nome':
@@ -316,7 +322,7 @@ export class PlantasService {
       }
 
       // ✅ CORRIGIDO: Usando tipo genérico any para UPDATE
-      const updateData: any = {};
+      const updateData: Prisma.plantasUncheckedUpdateInput = {};
 
       // Campos básicos
       if (plantaData.nome !== undefined) updateData.nome = plantaData.nome;
@@ -375,7 +381,7 @@ export class PlantasService {
   }
 
   async findProprietarios(comUnidades?: boolean) {
-    const where: any = {
+    const where: Prisma.usuariosWhereInput = {
       is_active: true,
       deleted_at: null,
       OR: [
@@ -419,7 +425,7 @@ export class PlantasService {
     }));
   }
 
-  private formatPlantaResponse(plantaDb: any): Planta {
+  private formatPlantaResponse(plantaDb: PlantaDoBanco): Planta {
     return {
       id: plantaDb.id?.trim() || plantaDb.id, // ✅ TRIM para remover espaços extras
       nome: plantaDb.nome,
@@ -454,7 +460,7 @@ export class PlantasService {
     user?: ScopedUser,
   ) {
     try {
-      const whereClausePlanta: any = {
+      const whereClausePlanta: Prisma.plantasWhereInput = {
         id: plantaId,
         deleted_at: null
       };
@@ -477,7 +483,7 @@ export class PlantasService {
       // Scope RBAC: 403 se a planta nao esta no escopo do usuario
       await this.scopeService.assertPlantaInScope(planta.id, user);
 
-      const whereClause: any = {
+      const whereClause: Prisma.unidadesWhereInput = {
         planta_id: plantaId,
         deleted_at: null
       };

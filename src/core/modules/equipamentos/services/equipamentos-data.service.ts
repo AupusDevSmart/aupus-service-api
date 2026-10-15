@@ -1,4 +1,5 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
+import type { Prisma, equipamentos_dados } from '@prisma/client';
 import { PrismaService } from '../../../prisma/prisma.service';
 
 @Injectable()
@@ -71,14 +72,15 @@ export class EquipamentosDataService {
     }
 
     // Construir filtro de datas
-    const whereClause: any = {
+    const whereClause: Prisma.equipamentos_dadosWhereInput = {
       equipamento_id: equipamentoId,
     };
 
     if (inicio || fim) {
-      whereClause.timestamp_dados = {};
-      if (inicio) whereClause.timestamp_dados.gte = inicio;
-      if (fim) whereClause.timestamp_dados.lte = fim;
+      const periodo: Prisma.DateTimeFilter = {};
+      if (inicio) periodo.gte = inicio;
+      if (fim) periodo.lte = fim;
+      whereClause.timestamp_dados = periodo;
     }
 
     // Buscar dados
@@ -115,7 +117,10 @@ export class EquipamentosDataService {
   /**
    * Formata resposta de um dado
    */
-  private formatDadoResponse(equipamento: any, dado: any) {
+  private formatDadoResponse(
+    equipamento: Prisma.equipamentosGetPayload<{ include: { tipo_equipamento_rel: true } }>,
+    dado: equipamentos_dados,
+  ) {
     return {
       equipamento: {
         id: equipamento.id,

@@ -28,7 +28,7 @@ async function main() {
     return;
   }
 
-  const detalhe: any = await execucao.buscarPorId(os.id);
+  const detalhe = await execucao.buscarPorId(os.id);
   const tarefas = detalhe.tarefas_os ?? [];
 
   console.log(`${os.numero_os} — tarefas_os: ${tarefas.length}`);

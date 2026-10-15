@@ -1,4 +1,5 @@
 import { Injectable, ConflictException, BadRequestException } from '@nestjs/common';
+import type { Prisma } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { CreateTipoEquipamentoDto } from './dto/create-tipo-equipamento.dto';
 
@@ -8,7 +9,7 @@ export interface CampoTecnico {
   tipo: 'number' | 'text' | 'date' | 'select';
   unidade?: string;
   obrigatorio?: boolean;
-  valor_padrao?: any;
+  valor_padrao?: Prisma.JsonValue;
   opcoes?: string[];
   descricao?: string;
 }
@@ -27,7 +28,7 @@ export class TiposEquipamentosService {
    */
   async findAll(categoria_id?: string, search?: string) {
     // Construir filtros
-    const where: any = {};
+    const where: Prisma.tipos_equipamentosWhereInput = {};
 
     if (categoria_id) {
       where.categoria_id = categoria_id;

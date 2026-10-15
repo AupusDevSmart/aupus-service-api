@@ -25,7 +25,7 @@ import {
   ApiConsumes,
   ApiBody,
 } from '@nestjs/swagger';
-import { Permissions } from '@/core';
+import { Permissions, ScopedUser, StatusSolicitacaoServico, type comentarios_solicitacao_servico } from '@/core';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { Response } from 'express';
 import { SolicitacoesServicoService } from './solicitacoes-servico.service';
@@ -40,6 +40,9 @@ import {
   AdicionarComentarioDto,
   GerarProgramacaoOSDto,
 } from './dto';
+
+/** O que este controller lê da requisição: o usuário que a JwtStrategy pôs nela */
+type RequisicaoAutenticada = { user?: ScopedUser };
 
 @ApiTags('Solicitações de Serviço')
 @Controller('solicitacoes-servico')
@@ -61,7 +64,7 @@ export class SolicitacoesServicoController {
   })
   async create(
     @Body() createDto: CreateSolicitacaoDto,
-    @Request() req?: any,
+    @Request() req?: RequisicaoAutenticada,
   ): Promise<SolicitacaoResponseDto> {
     const usuarioId = req?.user?.id;
     return this.solicitacoesService.create(createDto, usuarioId, req?.user);
@@ -76,7 +79,7 @@ export class SolicitacoesServicoController {
   })
   async findAll(
     @Query() filters: SolicitacaoFiltersDto,
-    @Request() req?: any,
+    @Request() req?: RequisicaoAutenticada,
   ): Promise<ListarSolicitacoesResponseDto> {
     return this.solicitacoesService.findAll(filters, req?.user);
   }
@@ -88,7 +91,7 @@ export class SolicitacoesServicoController {
     description: 'Estatísticas das solicitações',
     type: SolicitacaoStatsDto,
   })
-  async getStats(@Request() req?: any): Promise<SolicitacaoStatsDto> {
+  async getStats(@Request() req?: RequisicaoAutenticada): Promise<SolicitacaoStatsDto> {
     return this.solicitacoesService.getStats(req?.user);
   }
 
@@ -104,7 +107,7 @@ export class SolicitacoesServicoController {
     status: HttpStatus.NOT_FOUND,
     description: 'Solicitação não encontrada',
   })
-  async findOne(@Param('id') id: string, @Request() req?: any): Promise<SolicitacaoResponseDto> {
+  async findOne(@Param('id') id: string, @Request() req?: RequisicaoAutenticada): Promise<SolicitacaoResponseDto> {
     console.log(`[CONTROLLER] GET /solicitacoes-servico/${id} chamado`);
     const result = await this.solicitacoesService.findOne(id, req?.user);
     console.log('[CONTROLLER] Resposta enviada:', {
@@ -135,7 +138,7 @@ export class SolicitacoesServicoController {
   async update(
     @Param('id') id: string,
     @Body() updateDto: UpdateSolicitacaoDto,
-    @Request() req?: any,
+    @Request() req?: RequisicaoAutenticada,
   ): Promise<SolicitacaoResponseDto> {
     const usuarioId = req?.user?.id;
     return this.solicitacoesService.update(id, updateDto, usuarioId, req?.user);
@@ -156,7 +159,7 @@ export class SolicitacoesServicoController {
   })
   async remove(
     @Param('id') id: string,
-    @Request() req?: any,
+    @Request() req?: RequisicaoAutenticada,
   ): Promise<void> {
     const usuarioId = req?.user?.id;
     await this.solicitacoesService.remove(id, usuarioId);
@@ -176,7 +179,7 @@ export class SolicitacoesServicoController {
   async adicionarComentario(
     @Param('id') id: string,
     @Body() dto: AdicionarComentarioDto,
-  ): Promise<any> {
+  ): Promise<comentarios_solicitacao_servico> {
     return this.solicitacoesService.adicionarComentario(id, dto);
   }
 
@@ -187,7 +190,7 @@ export class SolicitacoesServicoController {
     status: HttpStatus.OK,
     description: 'Lista de comentários',
   })
-  async listarComentarios(@Param('id') id: string): Promise<any[]> {
+  async listarComentarios(@Param('id') id: string): Promise<comentarios_solicitacao_servico[]> {
     return this.solicitacoesService.listarComentarios(id);
   }
 
@@ -208,8 +211,10 @@ export class SolicitacoesServicoController {
   async gerarProgramacaoOS(
     @Param('id') id: string,
     @Body() dto: GerarProgramacaoOSDto,
-    @Request() req?: any,
-  ): Promise<any> {
+    @Request() req?: RequisicaoAutenticada,
+  ): Promise<
+    { message: string; solicitacao_id: string; solicitacao_numero: string; status: StatusSolicitacaoServico } & GerarProgramacaoOSDto
+  > {
     // Verificar se a solicitação está aprovada
     const solicitacao = await this.solicitacoesService.findOne(id);
 
@@ -243,7 +248,9 @@ export class SolicitacoesServicoController {
     status: HttpStatus.NOT_FOUND,
     description: 'Programação de OS não encontrada',
   })
-  async getProgramacaoOS(@Param('id') id: string): Promise<any> {
+  async getProgramacaoOS(
+    @Param('id') id: string,
+  ): Promise<{ message: string } | { programacao_os_id: string; ordem_servico_id: string }> {
     const solicitacao = await this.solicitacoesService.findOne(id);
 
     if (!solicitacao.programacao_os_id) {
@@ -293,9 +300,15 @@ export class SolicitacoesServicoController {
   async uploadAnexo(
     @Param('id') id: string,
     @UploadedFile() file: Express.Multer.File,
-    @Body() body: any,
-    @Request() req?: any,
-  ): Promise<any> {
+    @Body() body: { descricao?: string; tipo_documento?: string },
+    @Request() req?: RequisicaoAutenticada,
+  ): Promise<{
+    message: string;
+    filename: string;
+    solicitacao_id: string;
+    descricao?: string;
+    tipo_documento?: string;
+  }> {
     if (!file) {
       throw new BadRequestException('Arquivo não fornecido');
     }
@@ -318,7 +331,7 @@ export class SolicitacoesServicoController {
     status: HttpStatus.OK,
     description: 'Lista de anexos',
   })
-  async listarAnexos(@Param('id') id: string): Promise<any[]> {
+  async listarAnexos(@Param('id') id: string): Promise<unknown[]> {
     // Por enquanto, retornar lista vazia
     // O serviço de anexos será implementado posteriormente
     return [];
@@ -335,7 +348,7 @@ export class SolicitacoesServicoController {
   async buscarAnexo(
     @Param('id') id: string,
     @Param('anexoId') anexoId: string,
-  ): Promise<any> {
+  ): Promise<{ message: string }> {
     // Por enquanto, retornar mensagem informativa
     // O serviço de anexos será implementado posteriormente
     return { message: 'Serviço de anexos será implementado' };
@@ -374,7 +387,7 @@ export class SolicitacoesServicoController {
   async removerAnexo(
     @Param('id') id: string,
     @Param('anexoId') anexoId: string,
-    @Request() req?: any,
+    @Request() req?: RequisicaoAutenticada,
   ): Promise<void> {
     // Por enquanto, não fazer nada
     // O serviço de anexos será implementado posteriormente
@@ -403,14 +416,14 @@ export class SolicitacoesServicoController {
     description:
       'O front manda o estado final da lista. Recalcula os totais em seguida.',
   })
-  async salvarItensDaProposta(@Param('id') id: string, @Body() body: { itens: any[] }) {
+  async salvarItensDaProposta(@Param('id') id: string, @Body() body: { itens: Parameters<PropostaService['salvarItens']>[1] }) {
     return this.propostaService.salvarItens(id, body?.itens ?? []);
   }
 
   @Put(':id/proposta/outros-custos')
   @Permissions('solicitacoes.manage')
   @ApiOperation({ summary: 'Substitui a lista de outros custos' })
-  async salvarOutrosCustos(@Param('id') id: string, @Body() body: { custos: any[] }) {
+  async salvarOutrosCustos(@Param('id') id: string, @Body() body: { custos: Parameters<PropostaService['salvarOutrosCustos']>[1] }) {
     return this.propostaService.salvarOutrosCustos(id, body?.custos ?? []);
   }
 
@@ -421,7 +434,10 @@ export class SolicitacoesServicoController {
     description:
       'Aceita bdi_regime e os nove percentuais. Recalcula os totais em seguida.',
   })
-  async salvarCondicoes(@Param('id') id: string, @Body() body: any) {
+  async salvarCondicoes(
+    @Param('id') id: string,
+    @Body() body: Parameters<PropostaService['salvarCondicoes']>[1],
+  ) {
     return this.propostaService.salvarCondicoes(id, body ?? {});
   }
 

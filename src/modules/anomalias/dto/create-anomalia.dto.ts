@@ -111,7 +111,7 @@ export class CreateAnomaliaDto {
   })
   @IsOptional()
   @IsArray()
-  anexos?: any[];
+  anexos?: unknown[];
 
   @ApiProperty({
     description: 'IDs das instruções a vincular',

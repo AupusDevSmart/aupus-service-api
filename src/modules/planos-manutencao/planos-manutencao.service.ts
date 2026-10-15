@@ -13,12 +13,29 @@ import {
   PreviaDesvinculoDto,
   PlanoManutencaoResponseDto,
   PlanoResumoDto,
-  DashboardPlanosDto
+  DashboardPlanosDto,
+  CategoriaResumoDto,
+  EquipamentoResumoDto,
+  UsuarioResumoDto
 } from './dto';
 import { Prisma } from '@/core';
+import type { equipamentos, planos_manutencao, tarefas } from '@prisma/client';
 import { PropagacaoPlanosService } from './propagacao-planos.service';
 import { categoriaDoEquipamento } from './categoria-do-equipamento';
 import { planoAHerdar, mapearAjustesParaCopia, aplicarDatasHerdadas } from './heranca-de-plano';
+
+/**
+ * Plano como as consultas deste service o leem. As relacoes variam com o
+ * include de cada rota, por isso sao todas opcionais.
+ */
+type PlanoLido = planos_manutencao & {
+  categoria?: CategoriaResumoDto | null;
+  equipamento?: EquipamentoResumoDto | null;
+  usuario_criador?: UsuarioResumoDto | null;
+  usuario_atualizador?: UsuarioResumoDto | null;
+  tarefas?: Pick<tarefas, 'id' | 'tag' | 'nome' | 'ordem' | 'criticidade' | 'instrucao_id' | 'ativo'>[];
+  _count?: { tarefas?: number; copias?: number };
+};
 
 @Injectable()
 export class PlanosManutencaoService {
@@ -33,12 +50,24 @@ export class PlanosManutencaoService {
     return this.propagacaoService.consultar(planoId);
   }
 
-  /** Fragmento `where` para planos restringindo ao escopo via equipamento.unidade.planta_id. */
+  /**
+   * Fragmento `where` para planos de equipamento restringindo ao escopo: a
+   * planta do equipamento, a da unidade dele ou, no componente (UAR), a da
+   * unidade do UC pai.
+   */
   private async scopeFragment(user?: ScopedUser): Promise<Prisma.planos_manutencaoWhereInput | undefined> {
     const scope = await this.scopeService.getScope(user);
     if (!this.scopeService.isScoped(scope)) return undefined;
     if (scope.length === 0) return { id: '__NEVER__' };
-    return { equipamento: { unidade: { planta_id: { in: scope } } } };
+    return {
+      equipamento: {
+        OR: [
+          { planta_id: { in: scope } },
+          { unidade: { planta_id: { in: scope } } },
+          { equipamento_pai: { unidade: { planta_id: { in: scope } } } },
+        ],
+      },
+    };
   }
 
   /**
@@ -83,10 +112,15 @@ export class PlanosManutencaoService {
     // Com `vinculados`, o recorte inverte — sao justamente as copias que
     // interessam a quem programa uma OS, porque a OS e para um ativo e o
     // template nao tem equipamento.
+    // A cópia é de um equipamento, e o equipamento é de uma planta: com
+    // `vinculados` vale o escopo. Antes não valia, e o técnico e o cliente viam
+    // os planos (e os nomes dos equipamentos) das plantas dos outros.
+    const escopo = vinculados ? await this.scopeFragment(user) : undefined;
     const where: Prisma.planos_manutencaoWhereInput = {
       deleted_at: null,
       ...(vinculados ? { equipamento_id: { not: null } } : this.SOMENTE_TEMPLATES),
       ...this.construirFiltros(filters, search),
+      ...(escopo && { AND: [escopo] }),
     };
 
     // Construir ordenação
@@ -136,7 +170,7 @@ export class PlanosManutencaoService {
   }
 
   async buscarPorId(id: string, incluirTarefas = false, user?: ScopedUser): Promise<PlanoManutencaoResponseDto> {
-    const includeOptions: any = {
+    const includeOptions: Prisma.planos_manutencaoInclude = {
       ...this.includeRelacionamentos(),
       ...(incluirTarefas && {
         tarefas: {
@@ -159,7 +193,7 @@ export class PlanosManutencaoService {
     }
 
     // Scope RBAC: 403 se planta do equipamento nao esta no escopo
-    if (user) await this.scopeService.assertEntityInScope('equipamento', (plano as any).equipamento_id, user);
+    if (user) await this.scopeService.assertEntityInScope('equipamento', plano.equipamento_id, user);
 
     return this.mapearParaResponse(plano);
   }
@@ -209,7 +243,7 @@ export class PlanosManutencaoService {
     };
 
     // Construir include com base nos parâmetros
-    const includeOptions: any = {
+    const includeOptions: Prisma.planos_manutencaoInclude = {
       equipamento: {
         select: {
           id: true,
@@ -297,7 +331,7 @@ export class PlanosManutencaoService {
     };
 
     // Construir include com base nos parâmetros
-    const includeOptions: any = {
+    const includeOptions: Prisma.planos_manutencaoInclude = {
       equipamento: {
         select: {
           id: true,
@@ -368,15 +402,15 @@ export class PlanosManutencaoService {
 
     // Copia (tem origem) segue amarrada a um equipamento e mantem o escopo por
     // planta. Template e global por categoria e nao tem escopo.
-    if (user && (existente as any).equipamento_id) {
-      await this.scopeService.assertEntityInScope('equipamento', (existente as any).equipamento_id, user);
+    if (user && existente.equipamento_id) {
+      await this.scopeService.assertEntityInScope('equipamento', existente.equipamento_id, user);
     }
 
     if (updateDto.categoria_id) {
       await this.verificarCategoriaExiste(updateDto.categoria_id);
     }
 
-    const dadosAtualizacao: any = {
+    const dadosAtualizacao: Prisma.planos_manutencaoUncheckedUpdateInput = {
       ...updateDto,
       updated_at: new Date()
     };
@@ -389,7 +423,7 @@ export class PlanosManutencaoService {
 
     // Enfileirado DEPOIS do update: o worker le o template do banco, entao
     // enfileirar antes abre janela para ele propagar o conteudo antigo.
-    if (!(existente as any).plano_origem_id) {
+    if (!existente.plano_origem_id) {
       await this.propagacaoService.enfileirar(id);
     }
 
@@ -765,7 +799,7 @@ export class PlanosManutencaoService {
    * mais o registro do que foi pedido. Antes do congelamento isso destruiria
    * historico em silencio.
    */
-  private async removerCopia(tx: any, planoId: string): Promise<void> {
+  private async removerCopia(tx: Prisma.TransactionClient, planoId: string): Promise<void> {
     // Os vinculos com OS/programacao ficam com tarefa_id nulo (a FK e opcional),
     // preservando o snapshot ja gravado neles.
     await tx.tarefas.deleteMany({ where: { plano_manutencao_id: planoId } });
@@ -914,7 +948,9 @@ export class PlanosManutencaoService {
    * uma mudanca de comportamento em rota de listagem, que merece teste e commit
    * proprios — nao entrou no escopo do alinhamento de tipo.
    */
-  private async hidratarEquipamentos(planos: any[]): Promise<void> {
+  private async hidratarEquipamentos(
+    planos: Array<Pick<planos_manutencao, 'equipamento_id'> & { equipamento: equipamentos | null }>,
+  ): Promise<void> {
     const ids = [
       ...new Set(
         planos
@@ -990,7 +1026,7 @@ export class PlanosManutencaoService {
     return orderBy;
   }
 
-  private mapearParaResponse(plano: any): PlanoManutencaoResponseDto {
+  private mapearParaResponse(plano: PlanoLido): PlanoManutencaoResponseDto {
     return {
       id: plano.id,
       categoria_id: plano.categoria_id?.trim() || plano.categoria_id,
@@ -1009,7 +1045,7 @@ export class PlanosManutencaoService {
       equipamento: plano.equipamento,
       usuario_criador: plano.usuario_criador,
       usuario_atualizador: plano.usuario_atualizador,
-      tarefas: plano.tarefas?.map((tarefa: any) => ({
+      tarefas: plano.tarefas?.map((tarefa) => ({
         id: tarefa.id,
         tag: tarefa.tag,
         nome: tarefa.nome,
@@ -1018,36 +1054,11 @@ export class PlanosManutencaoService {
         instrucao_id: tarefa.instrucao_id,
       })),
       total_tarefas: plano._count?.tarefas || plano.tarefas?.length || 0,
-      tarefas_ativas: plano.tarefas?.filter((t: any) => t.ativo)?.length || 0,
+      tarefas_ativas: plano.tarefas?.filter((t) => t.ativo)?.length || 0,
       criticidade_media: plano.tarefas?.length > 0 ? 
-        Math.round(plano.tarefas.reduce((acc: number, t: any) => acc + t.criticidade, 0) / plano.tarefas.length * 10) / 10 : 
+        Math.round(plano.tarefas.reduce((acc: number, t) => acc + t.criticidade, 0) / plano.tarefas.length * 10) / 10 : 
         undefined,
     };
-  }
-
-  private async gerarNovaTag(equipamentoId: string, prefixo: string): Promise<string> {
-    // Gerar TAG única sem depender de função do banco
-    // Buscar plano do equipamento
-    const plano = await this.prisma.planos_manutencao.findFirst({
-      where: {
-        equipamento_id: equipamentoId,
-        deleted_at: null
-      },
-      include: {
-        tarefas: {
-          where: { deleted_at: null },
-          select: { tag: true }
-        }
-      }
-    });
-
-    if (!plano) {
-      // Se não há plano ainda (caso raro durante criação), usar timestamp
-      return `${prefixo}-${Date.now()}`;
-    }
-
-    const numero = await this.proximoNumeroDeTag(this.prisma, prefixo);
-    return `${prefixo}-${numero.toString().padStart(3, '0')}`;
   }
 
   /**
@@ -1060,7 +1071,7 @@ export class PlanosManutencaoService {
    * então nunca pegava a colisão — caía no fallback com timestamp, que é de
    * onde vinham TAGs como TRF-1786559551441.
    */
-  private async proximoNumeroDeTag(cliente: any, prefixo: string): Promise<number> {
+  private async proximoNumeroDeTag(cliente: Prisma.TransactionClient, prefixo: string): Promise<number> {
     const linhas = await cliente.tarefas.findMany({ select: { tag: true } });
 
     // Números absurdos são resquício das TAGs-timestamp e não servem de base.
@@ -1075,9 +1086,5 @@ export class PlanosManutencaoService {
     }, 0);
 
     return maior + 1;
-  }
-
-  private contarPorTipo(distribuicao: any[], tipo: string): number {
-    return distribuicao.find(d => d.tipo_manutencao === tipo)?._count || 0;
   }
 }

@@ -14,7 +14,7 @@ import {
   ApiResponse,
   ApiBearerAuth,
 } from '@nestjs/swagger';
-import { AuthService } from './auth.service';
+import { AuthService, RespostaDoLogin } from './auth.service';
 import { LoginDto } from './dto/login.dto';
 import { RefreshTokenDto } from './dto/refresh-token.dto';
 import { AuthResponseDto } from './dto/auth-response.dto';
@@ -23,6 +23,7 @@ import { ResetPasswordWithTokenDto } from './dto/reset-password.dto';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { CurrentUser } from './decorators/current-user.decorator';
 import { Public } from './decorators/public.decorator';
+import type { UsuarioAutenticado } from './strategies/jwt.strategy';
 
 /**
  * Controller de autenticação
@@ -48,7 +49,7 @@ export class AuthController {
   })
   @ApiResponse({ status: 401, description: 'Credenciais inválidas' })
   @ApiResponse({ status: 403, description: 'Usuário inativo' })
-  async login(@Body() loginDto: LoginDto): Promise<AuthResponseDto> {
+  async login(@Body() loginDto: LoginDto): Promise<RespostaDoLogin> {
     return this.authService.login(loginDto);
   }
 
@@ -103,7 +104,7 @@ export class AuthController {
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Realiza logout' })
   @ApiResponse({ status: 200, description: 'Logout realizado com sucesso' })
-  async logout(@CurrentUser() user: any) {
+  async logout(@CurrentUser() user: UsuarioAutenticado) {
     return this.authService.logout(user.id);
   }
 
@@ -118,7 +119,7 @@ export class AuthController {
   @ApiOperation({ summary: 'Retorna dados do usuário autenticado' })
   @ApiResponse({ status: 200, description: 'Dados do usuário' })
   @ApiResponse({ status: 401, description: 'Não autenticado' })
-  async getProfile(@CurrentUser() user: any) {
+  async getProfile(@CurrentUser() user: UsuarioAutenticado) {
     return this.authService.getCurrentUser(user.id);
   }
 }

@@ -1,5 +1,6 @@
 import { ConflictException, NotFoundException } from '@nestjs/common';
 import { PrismaClient } from '@prisma/client';
+import type { PrismaService } from '../../prisma/prisma.service';
 import { AtivosFuncionaisService } from './ativos-funcionais.service';
 
 /**
@@ -13,7 +14,7 @@ import { AtivosFuncionaisService } from './ativos-funcionais.service';
  */
 describe('AtivosFuncionaisService (banco real)', () => {
   const prisma = new PrismaClient();
-  const service = new AtivosFuncionaisService(prisma as any);
+  const service = new AtivosFuncionaisService(prisma as unknown as PrismaService);
 
   let categoriaId: string;
   let unidadeId: string;

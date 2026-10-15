@@ -1,4 +1,4 @@
-import { PrismaClient } from '@prisma/client';
+import { Prisma, PrismaClient } from '@prisma/client';
 import { migrarEquipamentosParaPosicoes } from './migrar-equipamentos';
 
 /**
@@ -64,7 +64,7 @@ describe('migrarEquipamentosParaPosicoes (banco real)', () => {
 
   afterAll(async () => { await prisma.$disconnect(); });
 
-  const criarUC = (nome: string, extra: any = {}) =>
+  const criarUC = (nome: string, extra: Partial<Prisma.equipamentosUncheckedCreateInput> = {}) =>
     prisma.equipamentos.create({
       data: {
         nome, classificacao: 'UC', criticidade: '3',
@@ -77,7 +77,7 @@ describe('migrarEquipamentosParaPosicoes (banco real)', () => {
   it('cria uma posicao e um vinculo aberto para cada UC', async () => {
     const uc = await criarUC('MIG Inversor 1');
 
-    await migrarEquipamentosParaPosicoes(prisma as any);
+    await migrarEquipamentosParaPosicoes(prisma);
 
     const eq = await prisma.equipamentos.findUnique({ where: { id: uc.id } });
     expect(eq?.ativo_funcional_id).not.toBeNull();
@@ -92,7 +92,7 @@ describe('migrarEquipamentosParaPosicoes (banco real)', () => {
 
   it('sobe nome, categoria, instalacao e localizacao para a posicao', async () => {
     const uc = await criarUC('MIG Motor 3/11');
-    await migrarEquipamentosParaPosicoes(prisma as any);
+    await migrarEquipamentosParaPosicoes(prisma);
 
     const eq = await prisma.equipamentos.findUnique({
       where: { id: uc.id },
@@ -115,7 +115,7 @@ describe('migrarEquipamentosParaPosicoes (banco real)', () => {
       },
     });
 
-    const relatorio = await migrarEquipamentosParaPosicoes(prisma as any);
+    const relatorio = await migrarEquipamentosParaPosicoes(prisma);
 
     // O UAR e peca do equipamento, nao posicao da instalacao.
     const uar = await prisma.equipamentos.findFirst({ where: { nome: 'MIG Barramento' } });
@@ -129,7 +129,7 @@ describe('migrarEquipamentosParaPosicoes (banco real)', () => {
       data: { nome: 'MIG Sem unidade', classificacao: 'UC', criticidade: '3', tipo_equipamento_id: ID_TIPO },
     });
 
-    const relatorio = await migrarEquipamentosParaPosicoes(prisma as any);
+    const relatorio = await migrarEquipamentosParaPosicoes(prisma);
 
     const semUnidade = await prisma.equipamentos.findFirst({ where: { nome: "MIG Sem unidade" } });
     expect(semUnidade?.ativo_funcional_id).toBeNull();
@@ -141,7 +141,7 @@ describe('migrarEquipamentosParaPosicoes (banco real)', () => {
       data: { nome: 'MIG Sem tipo', classificacao: 'UC', criticidade: '3', unidade_id: ID_UNIDADE },
     });
 
-    const relatorio = await migrarEquipamentosParaPosicoes(prisma as any);
+    const relatorio = await migrarEquipamentosParaPosicoes(prisma);
 
     // Afirmacao sobre o REGISTRO, nao sobre o total: o banco de teste e
     // compartilhado entre as suites, e contagem global depende de quem rodou
@@ -154,8 +154,8 @@ describe('migrarEquipamentosParaPosicoes (banco real)', () => {
   it('rodar duas vezes nao duplica', async () => {
     await criarUC('MIG Idempotente');
 
-    await migrarEquipamentosParaPosicoes(prisma as any);
-    const segunda = await migrarEquipamentosParaPosicoes(prisma as any);
+    await migrarEquipamentosParaPosicoes(prisma);
+    const segunda = await migrarEquipamentosParaPosicoes(prisma);
 
     const eq = await prisma.equipamentos.findFirst({ where: { nome: "MIG Idempotente" } });
     expect(segunda.detalhes.some(d => d.id === eq!.id.trim() && /ja tem posicao/.test(d.motivo))).toBe(true);
@@ -173,7 +173,7 @@ describe('migrarEquipamentosParaPosicoes (banco real)', () => {
   it('nao grava nada quando roda em modo simulacao', async () => {
     await criarUC('MIG Simulacao');
 
-    const relatorio = await migrarEquipamentosParaPosicoes(prisma as any, { simular: true });
+    const relatorio = await migrarEquipamentosParaPosicoes(prisma, { simular: true });
 
     expect(relatorio.migrados).toBeGreaterThan(0); // conta o que faria
     expect(await prisma.ativos_funcionais.count({ where: { unidade_id: ID_UNIDADE } })).toBe(0);

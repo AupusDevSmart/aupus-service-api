@@ -1,4 +1,4 @@
-import { PrismaClient } from '@prisma/client';
+import { Prisma, PrismaClient } from '@prisma/client';
 import * as fs from 'fs';
 import * as path from 'path';
 
@@ -6,9 +6,69 @@ const prisma = new PrismaClient();
 
 interface QueryResult {
   title: string;
-  data: any[];
+  data: unknown[];
   summary?: string;
 }
+
+// As linhas de cada consulta. No $queryRaw, COUNT do Postgres chega como
+// bigint, e ROUND/AVG/EXTRACT (numeric) como Decimal.
+type LinhaUltimaRecepcao = {
+  id: string;
+  nome: string;
+  tag: string | null;
+  topico_mqtt: string;
+  mqtt_habilitado: boolean;
+  tipo_equipamento: string | null;
+  ultima_recepcao: Date | null;
+  ultimo_registro_criado: Date | null;
+  total_registros_48h: bigint;
+  horas_desde_ultimo: Prisma.Decimal | null;
+};
+type LinhaEstatisticas = {
+  equipamentos_com_dados_24h: bigint;
+  total_registros_24h: bigint;
+  primeiro_registro: Date | null;
+  ultimo_registro: Date | null;
+  media_leituras_por_registro: Prisma.Decimal | null;
+  fontes_distintas: bigint;
+};
+type LinhaSemDados = {
+  id: string;
+  nome: string;
+  tag: string | null;
+  topico_mqtt: string;
+  tipo_equipamento: string | null;
+  unidade: string | null;
+  ultima_recepcao_conhecida: Date | null;
+};
+type LinhaDistribuicao = { hora: Date; registros: bigint; equipamentos_distintos: bigint };
+type LinhaQualidade = { qualidade: string | null; registros: bigint; equipamentos: bigint; percentual: Prisma.Decimal };
+type LinhaTopico = { topico_mqtt: string; quantidade_equipamentos: bigint; equipamentos: string[] };
+type LinhaUltimoRegistro = {
+  id: string;
+  equipamento: string;
+  topico_mqtt: string | null;
+  timestamp_dados: Date;
+  created_at: Date;
+  fonte: string;
+  qualidade: string | null;
+  num_leituras: number | null;
+  delay_segundos: Prisma.Decimal;
+};
+type LinhaGap = {
+  nome: string;
+  topico_mqtt: string | null;
+  inicio_gap: Date;
+  fim_gap: Date;
+  minutos_sem_dados: Prisma.Decimal;
+};
+type LinhaPorUnidade = {
+  unidade: string;
+  total_equipamentos: bigint;
+  mqtt_habilitado: bigint;
+  com_topico: bigint;
+  recebendo_dados_24h: bigint;
+};
 
 async function executeDiagnostic() {
   console.log('🔍 ===== DIAGNÓSTICO MQTT =====\n');
@@ -19,7 +79,7 @@ async function executeDiagnostic() {
   try {
     // 1️⃣ ÚLTIMA RECEPÇÃO POR EQUIPAMENTO
     console.log('1️⃣ Analisando última recepção por equipamento...');
-    const ultimaRecepcao = await prisma.$queryRaw<any[]>`
+    const ultimaRecepcao = await prisma.$queryRaw<LinhaUltimaRecepcao[]>`
       SELECT
         e.id,
         e.nome,
@@ -56,7 +116,7 @@ async function executeDiagnostic() {
 
     // 2️⃣ ESTATÍSTICAS GERAIS
     console.log('2️⃣ Calculando estatísticas gerais...');
-    const stats = await prisma.$queryRaw<any[]>`
+    const stats = await prisma.$queryRaw<LinhaEstatisticas[]>`
       SELECT
         COUNT(DISTINCT equipamento_id) as equipamentos_com_dados_24h,
         COUNT(*) as total_registros_24h,
@@ -80,7 +140,7 @@ async function executeDiagnostic() {
 
     // 3️⃣ EQUIPAMENTOS SEM DADOS
     console.log('3️⃣ Identificando equipamentos sem dados...');
-    const semDados24h = await prisma.$queryRaw<any[]>`
+    const semDados24h = await prisma.$queryRaw<LinhaSemDados[]>`
       SELECT
         e.id,
         e.nome,
@@ -115,7 +175,7 @@ async function executeDiagnostic() {
 
     // 4️⃣ DISTRIBUIÇÃO POR HORA
     console.log('4️⃣ Analisando distribuição temporal...');
-    const distribuicao = await prisma.$queryRaw<any[]>`
+    const distribuicao = await prisma.$queryRaw<LinhaDistribuicao[]>`
       SELECT
         DATE_TRUNC('hour', timestamp_dados) as hora,
         COUNT(*) as registros,
@@ -136,7 +196,7 @@ async function executeDiagnostic() {
 
     // 5️⃣ QUALIDADE DOS DADOS
     console.log('5️⃣ Analisando qualidade...');
-    const qualidade = await prisma.$queryRaw<any[]>`
+    const qualidade = await prisma.$queryRaw<LinhaQualidade[]>`
       SELECT
         qualidade,
         COUNT(*) as registros,
@@ -162,7 +222,7 @@ async function executeDiagnostic() {
 
     // 6️⃣ TÓPICOS CONFIGURADOS
     console.log('6️⃣ Listando tópicos MQTT...');
-    const topicos = await prisma.$queryRaw<any[]>`
+    const topicos = await prisma.$queryRaw<LinhaTopico[]>`
       SELECT
         topico_mqtt,
         COUNT(*) as quantidade_equipamentos,
@@ -185,7 +245,7 @@ async function executeDiagnostic() {
 
     // 7️⃣ ÚLTIMOS REGISTROS
     console.log('7️⃣ Buscando últimos registros...');
-    const ultimos = await prisma.$queryRaw<any[]>`
+    const ultimos = await prisma.$queryRaw<LinhaUltimoRegistro[]>`
       SELECT
         ed.id,
         e.nome as equipamento,
@@ -218,7 +278,7 @@ async function executeDiagnostic() {
 
     // 8️⃣ GAPS DE DADOS
     console.log('8️⃣ Identificando gaps de dados...');
-    const gaps = await prisma.$queryRaw<any[]>`
+    const gaps = await prisma.$queryRaw<LinhaGap[]>`
       WITH dados_timeline AS (
         SELECT
           equipamento_id,
@@ -251,7 +311,7 @@ async function executeDiagnostic() {
 
     // 9️⃣ EQUIPAMENTOS POR UNIDADE
     console.log('9️⃣ Analisando por unidade...');
-    const porUnidade = await prisma.$queryRaw<any[]>`
+    const porUnidade = await prisma.$queryRaw<LinhaPorUnidade[]>`
       SELECT
         u.nome as unidade,
         COUNT(*) as total_equipamentos,
@@ -292,7 +352,11 @@ async function executeDiagnostic() {
       results
     };
 
-    fs.writeFileSync(reportPath, JSON.stringify(reportContent, null, 2));
+    // As contagens sao bigint, que o JSON.stringify recusa: saem como texto
+    fs.writeFileSync(
+      reportPath,
+      JSON.stringify(reportContent, (_, valor) => (typeof valor === 'bigint' ? valor.toString() : valor), 2),
+    );
     console.log(`✅ Relatório salvo em: ${reportPath}\n`);
 
     // RESUMO EXECUTIVO
@@ -315,7 +379,7 @@ async function executeDiagnostic() {
       console.log('   4. Logs do serviço MQTT no backend\n');
     }
 
-    if (stats[0]?.total_registros_24h === 0 || stats[0]?.total_registros_24h === null) {
+    if (stats[0]?.total_registros_24h === BigInt(0) || stats[0]?.total_registros_24h === null) {
       console.log('🔴 CRÍTICO: Nenhum dado recebido nas últimas 24h!');
       console.log('   O sistema MQTT pode estar completamente offline.\n');
     }

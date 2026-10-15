@@ -1,7 +1,14 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { PrismaService, PermissionScopeService, PlantaScope } from '@/core';
+import { Prisma, PrismaService, PermissionScopeService, PlantaScope, ScopedUser } from '@/core';
 
-type UserCtx = { id: string; role?: string | null } | undefined;
+type UserCtx = ScopedUser | undefined;
+
+/** Filtros que a rota `GET /dashboard/advanced` declara no Swagger. */
+export interface FiltrosDashboardAvancado {
+  plantaId?: string;
+  unidadeId?: string;
+  periodo?: 'hoje' | '7dias' | '30dias' | '6meses' | 'ano' | 'custom';
+}
 
 @Injectable()
 export class DashboardSimpleService {
@@ -17,19 +24,19 @@ export class DashboardSimpleService {
     return this.scopeService.getPlantasDoUsuario(user.id, user.role);
   }
 
-  private plantaIdIn(scope: PlantaScope): Record<string, any> {
+  private plantaIdIn(scope: PlantaScope): Prisma.ordens_servicoWhereInput {
     if (!Array.isArray(scope)) return {};
     if (scope.length === 0) return { id: '__NEVER__' };
     return { planta_id: { in: scope } };
   }
 
-  private eqViaUnidade(scope: PlantaScope): Record<string, any> {
+  private eqViaUnidade(scope: PlantaScope): Prisma.equipamentosWhereInput {
     if (!Array.isArray(scope)) return {};
     if (scope.length === 0) return { id: '__NEVER__' };
     return { unidade: { planta_id: { in: scope } } };
   }
 
-  private anomEither(scope: PlantaScope): Record<string, any> {
+  private anomEither(scope: PlantaScope): Prisma.anomaliasWhereInput {
     if (!Array.isArray(scope)) return {};
     if (scope.length === 0) return { id: '__NEVER__' };
     return {
@@ -40,7 +47,7 @@ export class DashboardSimpleService {
     };
   }
 
-  private tarefaEither(scope: PlantaScope): Record<string, any> {
+  private tarefaEither(scope: PlantaScope): Prisma.tarefasWhereInput {
     if (!Array.isArray(scope)) return {};
     if (scope.length === 0) return { id: '__NEVER__' };
     return {
@@ -52,13 +59,13 @@ export class DashboardSimpleService {
   }
 
   /** planos_manutencao nao tem planta_id direto - so via equipamento.unidade.planta_id. */
-  private planoFilter(scope: PlantaScope): Record<string, any> {
+  private planoFilter(scope: PlantaScope): Prisma.planos_manutencaoWhereInput {
     if (!Array.isArray(scope)) return {};
     if (scope.length === 0) return { id: '__NEVER__' };
     return { equipamento: { unidade: { planta_id: { in: scope } } } };
   }
 
-  async getSimpleDashboard(filters: any, user?: UserCtx) {
+  async getSimpleDashboard(filters: FiltrosDashboardAvancado, user?: UserCtx) {
     try {
       const scope = await this.getScope(user);
       this.logger.log(
@@ -188,7 +195,7 @@ export class DashboardSimpleService {
           numeroAnomalias: 0,
           numeroManutencoes: 0,
           tempoInativo: 0,
-          criticidade: (eq.criticidade as any) || 'MEDIA',
+          criticidade: eq.criticidade || 'MEDIA',
           ultimaManutencao: undefined,
           proximaManutencao: undefined,
         })),
@@ -198,7 +205,7 @@ export class DashboardSimpleService {
           equipamento: pm.equipamento?.nome || 'Sem equipamento',
           dataProximaExecucao: '',
           diasRestantes: 0,
-          prioridade: 'MEDIA' as any,
+          prioridade: 'MEDIA',
         })),
         tendencias: [],
         reservas: {

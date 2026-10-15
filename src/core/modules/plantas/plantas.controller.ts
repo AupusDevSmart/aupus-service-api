@@ -28,6 +28,7 @@ import { Planta, ProprietarioBasico } from './entities/planta.entity';
 import { UserProprietarioId } from '../auth/decorators/user-proprietario.decorator';
 import { Permissions } from '../auth/decorators/permissions.decorator';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
+import type { ScopedUser } from '../auth/permission-scope.service';
 
 @ApiTags('plantas')
 @Controller('plantas') // ✅ CORRIGIDO: Remover 'api/v1' - só deixar 'plantas'
@@ -128,7 +129,7 @@ export class PlantasController {
   async findAll(
     @Query(new ValidationPipe({ transform: true })) queryDto: FindAllPlantasDto,
     @UserProprietarioId() autoProprietarioId: string | null,
-    @CurrentUser() user: any
+    @CurrentUser() user: ScopedUser
   ): Promise<PaginatedResponse<Planta>> {
     // Auto-injetar proprietarioId para usuários não-admin
     const effectiveProprietarioId = autoProprietarioId || queryDto.proprietarioId;
@@ -177,7 +178,7 @@ export class PlantasController {
   })
   async findOne(
     @Param('id') id: string,
-    @CurrentUser() user: any
+    @CurrentUser() user: ScopedUser
   ): Promise<Planta> {
     this.logger.log(`🔍 [GET PLANTA] Buscando planta com ID: ${id}`);
 
@@ -218,7 +219,7 @@ export class PlantasController {
   async findUnidadesByPlanta(
     @Param('plantaId') plantaId: string,
     @UserProprietarioId() autoProprietarioId: string | null,
-    @CurrentUser() user: any,
+    @CurrentUser() user: ScopedUser,
     @Query('tipo') tipo?: string,
     @Query('status') status?: string,
   ) {

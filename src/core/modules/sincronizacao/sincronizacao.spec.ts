@@ -1,4 +1,5 @@
 import { PrismaClient } from '@prisma/client';
+import type { PrismaService } from '../../prisma/prisma.service';
 import { SincronizacaoService } from './sincronizacao.service';
 import { OutboxService } from './outbox.service';
 import { montarPayload, filtrarParaEsteBanco } from './recursos';
@@ -16,8 +17,8 @@ import { montarPayload, filtrarParaEsteBanco } from './recursos';
  */
 describe('sincronizacao (banco real)', () => {
   const prisma = new PrismaClient();
-  const service = new SincronizacaoService(prisma as any);
-  const outbox = new OutboxService(prisma as any);
+  const service = new SincronizacaoService(prisma as unknown as PrismaService);
+  const outbox = new OutboxService(prisma as unknown as PrismaService);
 
   const ID_PROP = 'TESTESYNCPROPRIETARIO0001';
   const ID_PLANTA = 'TESTESYNCPLANTA000000001';
@@ -70,7 +71,7 @@ describe('sincronizacao (banco real)', () => {
    */
   const payloadReal = async (nome: string) => {
     const linha = await prisma.plantas.findUnique({ where: { id: ID_PLANTA } });
-    return { ...montarPayload('plantas', linha as any), nome };
+    return { ...montarPayload('plantas', linha), nome };
   };
 
   describe('o portao', () => {
@@ -213,7 +214,7 @@ describe('sincronizacao (banco real)', () => {
   describe('o que nunca viaja', () => {
     it('senha, remember_token, deve_trocar_senha e role ficam fora do payload de saida', async () => {
       const usuario = await prisma.usuarios.findUnique({ where: { id: ID_PROP } });
-      const payload = montarPayload('usuarios', usuario as any);
+      const payload = montarPayload('usuarios', usuario);
 
       expect(payload).not.toHaveProperty('senha');
       expect(payload).not.toHaveProperty('remember_token');

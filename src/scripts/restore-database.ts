@@ -224,8 +224,8 @@ async function restoreDatabase(backupPath: string) {
 
       console.log(`   ✅ ${totalInserted} registros restaurados`);
 
-    } catch (error: any) {
-      console.error(`   ❌ Erro ao restaurar ${tableName}: ${error.message}`);
+    } catch (error) {
+      console.error(`   ❌ Erro ao restaurar ${tableName}: ${error instanceof Error ? error.message : String(error)}`);
       stats.push({
         tableName,
         recordCount: 0,

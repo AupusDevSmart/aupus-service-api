@@ -8,7 +8,7 @@ import {
   HttpException,
   Logger
 } from '@nestjs/common';
-import { Prisma, roles } from '@prisma/client';
+import { Prisma, roles, usuarios } from '@prisma/client';
 // Builtins do Node, sem efeito colateral na carga: nao ha por que adia-los com
 // require() dentro da funcao, que alem de esconder a dependencia obriga o TS a
 // tratar o modulo como `any`.
@@ -50,6 +50,15 @@ const MODEL_TYPE = 'App\\Models\\User';
 
 type PermissaoMinima = { id: bigint; name: string };
 
+/** Uma permissão como as rotas de papel e de permissão direta a devolvem. */
+type PermissaoResumida = { id: number; name: string; guard_name: string };
+
+/** O papel atribuído, com as permissões que ele dá. */
+type PapelComPermissoes = PermissaoResumida & { permissions: PermissaoResumida[] };
+
+/** Um item de operação em lote que falhou, e o motivo. */
+type FalhaDoLote = { userId: string; roleId?: number; permissionIds?: number[]; error: string };
+
 @Injectable()
 export class UsuariosService {
   private readonly logger = new Logger(UsuariosService.name);
@@ -79,7 +88,7 @@ export class UsuariosService {
     const skip = (page - 1) * limit;
 
     // Construir filtros
-    const where: any = {};
+    const where: Prisma.usuariosWhereInput = {};
 
     // Cada grupo de OR entra AQUI, e nao direto em where.OR.
     //
@@ -87,7 +96,7 @@ export class UsuariosService {
     // os tres em where.OR — o ultimo a rodar apagava os anteriores. Na pratica:
     // um proprietario que digitasse qualquer coisa na busca perdia o recorte
     // por created_by e passava a enxergar TODOS os usuarios do sistema.
-    const grupos: any[] = [];
+    const grupos: Prisma.usuariosWhereInput[] = [];
 
     // Filtrar apenas ativos por padrão
     if (!includeInactive) {
@@ -386,7 +395,7 @@ export class UsuariosService {
         ...result,
         senhaTemporaria, // Para informar ao frontend
         primeiroAcesso: true,
-      } as any;
+      };
     } catch (error) {
       if (error instanceof HttpException) throw error;
       this.logger.error(`Erro ao criar usuário: ${error.message}`);
@@ -938,7 +947,7 @@ export class UsuariosService {
    * Atribui uma role para um usuário (substitui a role atual)
    * Sincroniza tanto o sistema Spatie quanto a coluna role para compatibilidade
    */
-  async assignRole(userId: string, roleId: number): Promise<{ message: string; role: any }> {
+  async assignRole(userId: string, roleId: number): Promise<{ message: string; role: PapelComPermissoes }> {
     try {
       const usuario = await this.prisma.usuarios.findFirst({
         where: { 
@@ -1023,7 +1032,7 @@ export class UsuariosService {
   /**
    * Atribui uma permissão direta ao usuário
    */
-  async assignPermission(userId: string, permissionId: number): Promise<{ message: string; permission: any }> {
+  async assignPermission(userId: string, permissionId: number): Promise<{ message: string; permission: PermissaoResumida }> {
     try {
       const usuario = await this.prisma.usuarios.findFirst({
         where: { 
@@ -1137,7 +1146,7 @@ export class UsuariosService {
   /**
    * Sincroniza permissões diretas do usuário (substitui todas)
    */
-  async syncUserPermissions(userId: string, permissionIds: number[]): Promise<{ message: string; permissions: any[] }> {
+  async syncUserPermissions(userId: string, permissionIds: number[]): Promise<{ message: string; permissions: PermissaoResumida[] }> {
     try {
       const usuario = await this.prisma.usuarios.findFirst({
         where: { 
@@ -1172,7 +1181,7 @@ export class UsuariosService {
       });
 
       // Adicionar as novas permissões
-      let newPermissions: any[] = [];
+      let newPermissions: PermissaoResumida[] = [];
       if (permissionIds.length > 0) {
         await this.prisma.model_has_permissions.createMany({
           data: permissionIds.map(permissionId => ({
@@ -1203,9 +1212,9 @@ export class UsuariosService {
     }
   }
 
-  async bulkAssignRoles(bulkData: BulkAssignRolesDto, solicitante: Solicitante): Promise<{ success: number; failures: any[] }> {
+  async bulkAssignRoles(bulkData: BulkAssignRolesDto, solicitante: Solicitante): Promise<{ success: number; failures: FalhaDoLote[] }> {
     let success = 0;
-    const failures: any[] = [];
+    const failures: FalhaDoLote[] = [];
 
     for (const assignment of bulkData.assignments) {
       try {
@@ -1223,9 +1232,9 @@ export class UsuariosService {
     return { success, failures };
   }
 
-  async bulkAssignPermissions(bulkData: BulkAssignPermissionsDto, solicitante: Solicitante): Promise<{ success: number; failures: any[] }> {
+  async bulkAssignPermissions(bulkData: BulkAssignPermissionsDto, solicitante: Solicitante): Promise<{ success: number; failures: FalhaDoLote[] }> {
     let success = 0;
-    const failures: any[] = [];
+    const failures: FalhaDoLote[] = [];
 
     for (const assignment of bulkData.assignments) {
       try {
@@ -1448,10 +1457,10 @@ export class UsuariosService {
    * Método auxiliar para migrar usuários existentes do sistema legacy para Spatie
    * Use apenas quando necessário para sincronização de dados
    */
-  async syncLegacyRolesToSpatie(): Promise<{ migrated: number; errors: any[] }> {
+  async syncLegacyRolesToSpatie(): Promise<{ migrated: number; errors: FalhaDoLote[] }> {
     try {
       let migrated = 0;
-      const errors: any[] = [];
+      const errors: FalhaDoLote[] = [];
 
       // Buscar usuários que têm role na coluna mas não no sistema Spatie
       const usuariosComRole = await this.prisma.usuarios.findMany({
@@ -1530,7 +1539,7 @@ export class UsuariosService {
   // MÉTODOS AUXILIARES
   // ============================================================================
 
-  private async mapToUsuarioResponseDtoOptimized(usuario: any): Promise<UsuarioResponseDto> {
+  private async mapToUsuarioResponseDtoOptimized(usuario: usuarios): Promise<UsuarioResponseDto> {
     // ✅ SIMPLIFICADO: Usar apenas a coluna role da tabela usuarios
     const role = usuario.role || 'vendedor'; // Default apenas se NULL
 
@@ -1558,7 +1567,7 @@ export class UsuariosService {
     };
   }
 
-  private async mapToUsuarioResponseDto(usuario: any): Promise<UsuarioResponseDto> {
+  private async mapToUsuarioResponseDto(usuario: usuarios): Promise<UsuarioResponseDto> {
     try {
       // Buscar permissões e roles do usuário de forma mais robusta
       const userPermissions = await this.getUserPermissions(usuario.id).catch((error) => {

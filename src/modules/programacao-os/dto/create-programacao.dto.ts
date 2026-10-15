@@ -14,7 +14,7 @@ import {
 } from 'class-validator';
 import { Type } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { CondicaoOS, TipoOS, PrioridadeOS, OrigemOS } from '@/core';
+import { CondicaoOS, TipoOS, PrioridadeOS, OrigemOS, Prisma } from '@/core';
 
 export class MaterialProgramacaoDto {
   @ApiProperty({ description: 'Descrição do material', example: 'Óleo lubrificante SAE 20W-50' })
@@ -191,7 +191,7 @@ export class CreateProgramacaoDto {
 
   @ApiPropertyOptional({ description: 'Dados extras da origem' })
   @IsOptional()
-  dados_origem?: any;
+  dados_origem?: Prisma.InputJsonValue;
 
   // Array de IDs das tarefas (relacionamento N:N)
   @ApiPropertyOptional({

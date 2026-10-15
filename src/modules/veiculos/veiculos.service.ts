@@ -9,8 +9,31 @@ import {
   InativarVeiculoDto,
   VeiculosDisponiveisDto
 } from './dto';
-import { StatusVeiculo, Prisma } from '@/core';
+import { StatusVeiculo, Prisma, type documentacao_veiculo, type reserva_veiculo } from '@/core';
 import { disponibilidadeDasViaturas, type DisponibilidadeDaViatura } from '../reservas/ocupacao-da-viatura';
+
+/** O veículo como as consultas deste service o trazem (a do detalhe vem com documentação e reservas) */
+type VeiculoParaResposta = Prisma.veiculoGetPayload<{
+  include: { _count: { select: { documentacao: true; reservas: true } } };
+}> & {
+  documentacao?: documentacao_veiculo[];
+  reservas?: reserva_veiculo[];
+};
+
+/** Formato antigo de `GET /veiculos/disponiveis` (só as livres) */
+export interface VeiculosDisponiveisResponse {
+  veiculos: Array<{
+    id: string;
+    nome: string;
+    placa: string;
+    capacidadePassageiros: number;
+    tipo: string;
+    disponivel: true;
+    proximaIndisponibilidade: null;
+  }>;
+  conflitos: unknown[];
+  sugestoes: unknown[];
+}
 
 export interface PaginatedResponse<T> {
   data: T[];
@@ -34,10 +57,10 @@ export class VeiculosService {
     const scope = await this.scopeService.getScope(user);
     if (!this.scopeService.isScoped(scope)) return;
     if (scope.length === 0) {
-      (where as any).id = '__NEVER__';
+      where.id = '__NEVER__';
       return;
     }
-    (where as any).planta_id = { in: scope };
+    where.planta_id = { in: scope };
   }
 
   async criar(createDto: CreateVeiculoDto, user?: ScopedUser): Promise<VeiculoResponseDto> {
@@ -440,7 +463,7 @@ export class VeiculosService {
   }
 
   /** Formato antigo (só as livres), mantido para as telas que já o usam */
-  async buscarDisponiveis(queryDto: VeiculosDisponiveisDto, user?: ScopedUser): Promise<any> {
+  async buscarDisponiveis(queryDto: VeiculosDisponiveisDto, user?: ScopedUser): Promise<VeiculosDisponiveisResponse> {
     const livres = (await this.disponibilidade(queryDto, user)).filter((v) => v.disponivel);
     return {
       veiculos: livres.map((veiculo) => ({
@@ -493,7 +516,7 @@ export class VeiculosService {
     }
   }
 
-  private mapearParaResponse(veiculo: any): VeiculoResponseDto {
+  private mapearParaResponse(veiculo: VeiculoParaResposta): VeiculoResponseDto {
     return {
       id: veiculo.id,
       nome: veiculo.nome,

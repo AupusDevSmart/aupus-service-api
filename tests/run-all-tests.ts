@@ -7,12 +7,13 @@ import { runAuthTests } from './02-authentication.e2e';
 import { runPermissionsTests } from './03-permissions.e2e';
 import * as fs from 'fs';
 import * as path from 'path';
+import { erroDaApi } from './erro-da-api';
 
 interface TestResult {
   test: string;
   status: 'PASS' | 'FAIL' | 'WARN';
   message: string;
-  data?: any;
+  data?: unknown;
 }
 
 interface PhaseResult {
@@ -80,7 +81,8 @@ async function runAllTests() {
       // Perguntar se deseja continuar (em produção, poderia simplesmente parar)
       console.log('   Continuando com os testes...\n');
     }
-  } catch (error: any) {
+  } catch (e) {
+    const error = erroDaApi(e);
     console.error('❌ Erro fatal na FASE 1:', error.message);
     phases.push({
       phase: 'FASE 1: Infraestrutura',
@@ -117,7 +119,8 @@ async function runAllTests() {
         message: r.message
       });
     });
-  } catch (error: any) {
+  } catch (e) {
+    const error = erroDaApi(e);
     console.error('❌ Erro fatal na FASE 2:', error.message);
     phases.push({
       phase: 'FASE 2: CRUD de Usuários',
@@ -154,7 +157,8 @@ async function runAllTests() {
         message: r.message
       });
     });
-  } catch (error: any) {
+  } catch (e) {
+    const error = erroDaApi(e);
     console.error('❌ Erro fatal na FASE 3:', error.message);
     phases.push({
       phase: 'FASE 3: Autenticação',
@@ -191,7 +195,8 @@ async function runAllTests() {
         message: r.message
       });
     });
-  } catch (error: any) {
+  } catch (e) {
+    const error = erroDaApi(e);
     console.error('❌ Erro fatal na FASE 4:', error.message);
     phases.push({
       phase: 'FASE 4: Roles e Permissions',

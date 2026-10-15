@@ -7,11 +7,19 @@ import {
   ConflictException,
   BadRequestException,
 } from '@nestjs/common';
-import { PrismaService } from '@/core';
+import { Prisma, PrismaService } from '@/core';
+import type { ferramentas, historico_calibracoes, historico_manutencoes } from '@prisma/client';
 import { CreateFerramentaDto } from '../dto/create-ferramenta.dto';
 import { UpdateFerramentaDto } from '../dto/update-ferramenta.dto';
 import { QueryFerramentasDto } from '../dto/query-ferramentas.dto';
 import { FerramentaEntity } from '../entities/ferramenta.entity';
+
+/** Ferramenta como as consultas deste service a leem; as relacoes variam com o include. */
+type FerramentaLida = ferramentas & {
+  responsavel?: FerramentaEntity['responsavel'] | null;
+  historico_calibracoes?: historico_calibracoes[];
+  historico_manutencoes?: historico_manutencoes[];
+};
 
 @Injectable()
 export class FerramentasService {
@@ -81,7 +89,7 @@ export class FerramentasService {
     const skip = (page - 1) * limit;
 
     // Construir filtros WHERE
-    const where: any = {
+    const where: Prisma.ferramentasWhereInput = {
       deleted_at: null,
       ...(filters.organizacao_nome && { organizacao_nome: filters.organizacao_nome }),
       ...(filters.fabricante && { fabricante: { contains: filters.fabricante, mode: 'insensitive' } }),
@@ -260,7 +268,7 @@ export class FerramentasService {
   }
 
   async getAlertas(organizacaoNome?: string) {
-    const where: any = {
+    const where: Prisma.ferramentasWhereInput = {
       deleted_at: null,
       ...(organizacaoNome && { organizacao_nome: organizacaoNome }),
     };
@@ -339,7 +347,7 @@ export class FerramentasService {
   }
 
   private async calculateStatistics(organizacaoNome?: string) {
-    const where: any = {
+    const where: Prisma.ferramentasWhereInput = {
       deleted_at: null,
       ...(organizacaoNome && { organizacao_nome: organizacaoNome }),
     };
@@ -413,7 +421,7 @@ export class FerramentasService {
     };
   }
 
-  private addCalculatedFields(ferramenta: any): FerramentaEntity {
+  private addCalculatedFields(ferramenta: FerramentaLida): FerramentaEntity {
     let diasParaVencimentoCalibracao: number | null = null;
     let statusCalibracao: 'ok' | 'vencendo' | 'vencida' | 'sem_data' | 'nao_necessita' = 'nao_necessita';
 

@@ -115,7 +115,7 @@ export class UsuariosController {
     status: 200,
     description: 'Lista paginada de usuários',
   })
-  async findAll(@Query() query: UsuarioQueryDto, @CurrentUser() currentUser?: any) {
+  async findAll(@Query() query: UsuarioQueryDto, @CurrentUser() currentUser?: Solicitante) {
     const requestingUserId = currentUser?.id;
 
     return this.usuariosService.findAll(query, requestingUserId);
@@ -158,7 +158,7 @@ export class UsuariosController {
   update(
     @Param('id') id: string,
     @Body() updateUsuarioDto: UpdateUsuarioDto,
-    @CurrentUser() currentUser?: any,
+    @CurrentUser() currentUser?: Solicitante,
   ) {
     return this.usuariosService.update(id, updateUsuarioDto, currentUser);
   }
@@ -169,7 +169,7 @@ export class UsuariosController {
   @ApiParam({ name: 'id', description: 'ID do usuário' })
   @ApiResponse({ status: 200, description: 'Usuário excluído com sucesso' })
   @ApiResponse({ status: 404, description: 'Usuário não encontrado' })
-  remove(@Param('id') id: string, @CurrentUser() currentUser?: any) {
+  remove(@Param('id') id: string, @CurrentUser() currentUser?: Solicitante) {
     return this.usuariosService.remove(id, currentUser);
   }
 

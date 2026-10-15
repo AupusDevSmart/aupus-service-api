@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { PrismaService, PermissionScopeService, PlantaScope } from '@/core';
+import { Prisma, PrismaService, PermissionScopeService, PlantaScope, ScopedUser } from '@/core';
 import { DashboardOverviewDto } from './dto/overview.dto';
 import { DashboardWorkOrdersDto } from './dto/work-orders.dto';
 import { DashboardTaskPrioritiesDto } from './dto/task-priorities.dto';
@@ -7,7 +7,7 @@ import { DashboardSeverityDistributionDto } from './dto/severity-distribution.dt
 import { DashboardPlannedVsCompletedDto } from './dto/planned-vs-completed.dto';
 import { DashboardSystemStatusDto } from './dto/system-status.dto';
 
-type UserCtx = { id: string; role?: string | null } | undefined;
+type UserCtx = ScopedUser | undefined;
 
 @Injectable()
 export class DashboardService {
@@ -26,14 +26,14 @@ export class DashboardService {
   }
 
   /** Filtro para `equipamentos` (planta via unidade). `{}` quando sem escopo. */
-  private eqFilter(scope: PlantaScope): Record<string, any> {
+  private eqFilter(scope: PlantaScope): Prisma.equipamentosWhereInput {
     if (!Array.isArray(scope)) return {};
     if (scope.length === 0) return { id: '__NEVER__' };
     return { unidade: { planta_id: { in: scope } } };
   }
 
   /** Filtro para `anomalias` (pode ter planta_id direto OU via equipamento). */
-  private anomFilter(scope: PlantaScope): Record<string, any> {
+  private anomFilter(scope: PlantaScope): Prisma.anomaliasWhereInput {
     if (!Array.isArray(scope)) return {};
     if (scope.length === 0) return { id: '__NEVER__' };
     return {
@@ -45,7 +45,7 @@ export class DashboardService {
   }
 
   /** Filtro para `ordens_servico` / `programacoes_os` / `tarefas` (tem `planta_id` direto). */
-  private plantaIdFilter(scope: PlantaScope): Record<string, any> {
+  private plantaIdFilter(scope: PlantaScope): Prisma.ordens_servicoWhereInput {
     if (!Array.isArray(scope)) return {};
     if (scope.length === 0) return { id: '__NEVER__' };
     return { planta_id: { in: scope } };
@@ -167,7 +167,8 @@ export class DashboardService {
 
   async getTaskPriorities(user?: UserCtx): Promise<DashboardTaskPrioritiesDto> {
     const scope = await this.getScope(user);
-    const baseTarefaWhere: any = { deleted_at: null, status: 'ATIVA' };
+    // `tarefas` nao tem coluna `status`: tarefa ativa e `ativo = true`.
+    const baseTarefaWhere: Prisma.tarefasWhereInput = { deleted_at: null, ativo: true };
     if (Array.isArray(scope)) {
       if (scope.length === 0) baseTarefaWhere.id = '__NEVER__';
       else {
@@ -210,9 +211,9 @@ export class DashboardService {
   async getSeverityDistribution(user?: UserCtx): Promise<DashboardSeverityDistributionDto> {
     const scope = await this.getScope(user);
     const anom = this.anomFilter(scope);
-    const baseWhere = {
+    const baseWhere: Prisma.anomaliasWhereInput = {
       deleted_at: null,
-      status: { in: ['REGISTRADA', 'PROGRAMADA'] as any },
+      status: { in: ['REGISTRADA', 'PROGRAMADA'] },
       ...anom,
     };
 
@@ -272,7 +273,7 @@ export class DashboardService {
       'Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez',
     ];
 
-    const meses: any[] = [];
+    const meses: DashboardPlannedVsCompletedDto['meses'] = [];
     let totalPlanejadas = 0;
     let totalConcluidas = 0;
 

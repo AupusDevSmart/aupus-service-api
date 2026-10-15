@@ -6,7 +6,7 @@ import * as path from 'path';
 import * as fs from 'fs';
 
 /** Quem pede: o usuário do JWT. Sem ele (chamada interna), o escopo não se aplica. */
-type Solicitante = { id: string; role?: string | null; permissions?: string[] };
+export type Solicitante = { id: string; role?: string | null; permissions?: string[] };
 
 /**
  * Anexos da OS: as fotos (antes, durante, depois) e os documentos que provam o

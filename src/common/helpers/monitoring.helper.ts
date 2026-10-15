@@ -13,7 +13,7 @@ export class MonitoringHelper {
   static async withMonitoring<T>(
     operationName: string,
     operation: () => Promise<T>,
-    context?: Record<string, any>,
+    context?: Record<string, unknown>,
   ): Promise<T> {
     const startTime = Date.now();
 
@@ -101,7 +101,7 @@ export class MonitoringHelper {
    */
   static logBusinessEvent(
     eventName: string,
-    data: Record<string, any>,
+    data: Record<string, unknown>,
     level: 'info' | 'warn' = 'info',
   ): void {
     loggers.business[level](

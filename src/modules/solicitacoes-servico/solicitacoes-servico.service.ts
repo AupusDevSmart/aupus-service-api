@@ -16,7 +16,7 @@ import {
   SolicitacaoStatsDto,
   AdicionarComentarioDto,
 } from './dto';
-import { Prisma } from '@/core';
+import { Prisma, type solicitacoes_servico, type comentarios_solicitacao_servico } from '@/core';
 
 // Import the enum from Prisma
 import { StatusSolicitacaoServico } from '@/core';
@@ -35,7 +35,7 @@ export class SolicitacoesServicoService {
   /**
    * Mapear solicitação do Prisma para DTO
    */
-  private mapToResponseDto(solicitacao: any): SolicitacaoResponseDto {
+  private mapToResponseDto(solicitacao: solicitacoes_servico): SolicitacaoResponseDto {
     return {
       ...solicitacao,
       tempo_estimado: solicitacao.tempo_estimado ? Number(solicitacao.tempo_estimado) : null,
@@ -91,7 +91,7 @@ export class SolicitacoesServicoService {
    * Registra histórico de ações
    */
   private async registrarHistorico(
-    prisma: any,
+    prisma: Prisma.TransactionClient,
     solicitacao_id: string,
     acao: string,
     usuario_nome: string,
@@ -99,7 +99,7 @@ export class SolicitacoesServicoService {
     observacoes?: string,
     status_anterior?: StatusSolicitacaoServico,
     status_novo?: StatusSolicitacaoServico,
-    dados_extras?: any,
+    dados_extras?: Prisma.InputJsonValue,
   ) {
     await prisma.historico_solicitacao_servico.create({
       data: {
@@ -209,7 +209,7 @@ export class SolicitacoesServicoService {
       if (user) await this.scopeService.assertPlantaInScope(planta_id, user);
 
       // Extrair campos que não são colunas da tabela antes de criar
-      const { instrucoes_ids, tarefas_ids, ...camposDaTabela } = createDto as any;
+      const { instrucoes_ids, tarefas_ids, ...camposDaTabela } = createDto;
       const createData = comDataNecessidadeNormalizada(camposDaTabela);
 
       // Criar solicitação com solicitante_id e solicitante_nome preenchidos
@@ -227,8 +227,9 @@ export class SolicitacoesServicoService {
           // Removido planta do include pois pode estar com deleted_at
           equipamento: true,
           unidade: true, // Incluir unidade
-          proprietario: true, // Incluir proprietário
-          solicitante: true,
+          // Nunca a linha inteira do usuario: levava o hash da senha na resposta
+          proprietario: { select: { id: true, nome: true, email: true } },
+          solicitante: { select: { id: true, nome: true, email: true } },
         },
       });
 
@@ -319,12 +320,12 @@ export class SolicitacoesServicoService {
 
     // Filtros específicos
     if (status) where.status = status;
-    if (tipo) where.tipo = tipo as any;
+    if (tipo) where.tipo = tipo;
     if (prioridade) where.prioridade = prioridade;
-    if (origem) where.origem = origem as any;
+    if (origem) where.origem = origem;
     if (planta_id) where.planta_id = planta_id;
-    if (unidade_id) (where as any).unidade_id = unidade_id;
-    if (proprietario_id) (where as any).proprietario_id = proprietario_id;
+    if (unidade_id) where.unidade_id = unidade_id;
+    if (proprietario_id) where.proprietario_id = proprietario_id;
     if (equipamento_id) where.equipamento_id = equipamento_id;
     if (departamento) where.departamento = { contains: departamento, mode: 'insensitive' };
     if (solicitante_nome) where.solicitante_nome = { contains: solicitante_nome, mode: 'insensitive' };
@@ -362,7 +363,7 @@ export class SolicitacoesServicoService {
             tipo_equipamento: true,
           },
         },
-        proprietario: true, // Incluir proprietário
+        proprietario: { select: { id: true, nome: true, email: true } },
         anexos: {
           select: {
             id: true,
@@ -445,8 +446,8 @@ export class SolicitacoesServicoService {
       include: {
         // Removido planta e unidade do include - serão buscados manualmente
         equipamento: true,
-        proprietario: true, // Incluir proprietário
-        solicitante: true, // Incluir solicitante
+        proprietario: { select: { id: true, nome: true, email: true } },
+        solicitante: { select: { id: true, nome: true, email: true } },
         anexos: true,
         historico: {
           orderBy: { data: 'desc' },
@@ -521,7 +522,7 @@ export class SolicitacoesServicoService {
     })) || [];
 
     // Mapear instruções associadas
-    const instrucoes = (solicitacao as any).solicitacoes_instrucoes?.map((si: any) => ({
+    const instrucoes = solicitacao.solicitacoes_instrucoes?.map((si) => ({
       ...si.instrucao,
       ordem: si.ordem,
       observacoes: si.observacoes
@@ -556,8 +557,9 @@ export class SolicitacoesServicoService {
       );
     }
 
-    // Extrair instrucoes_ids antes de passar para o Prisma (não é coluna da tabela)
-    const { instrucoes_ids, ...camposDaTabela } = updateDto as any;
+    // Extrair instrucoes_ids e tarefas_ids antes de passar para o Prisma (não são
+    // colunas da tabela). tarefas_ids ia junto e o Prisma recusava com 500.
+    const { instrucoes_ids, tarefas_ids, ...camposDaTabela } = updateDto;
     const prismaData = comDataNecessidadeNormalizada(camposDaTabela);
 
     return await this.prisma.$transaction(async (prisma) => {
@@ -568,7 +570,7 @@ export class SolicitacoesServicoService {
           // Removido planta do include para evitar erro com soft delete
           equipamento: true,
           unidade: true, // Incluir unidade
-          proprietario: true, // Incluir proprietário
+          proprietario: { select: { id: true, nome: true, email: true } },
         },
       });
 
@@ -589,6 +591,12 @@ export class SolicitacoesServicoService {
         if (instrucoes_ids && instrucoes_ids.length > 0) {
           await this.associarInstrucoes(prisma, id, instrucoes_ids);
         }
+      }
+
+      // As tarefas avulsas, como no criar
+      if (tarefas_ids !== undefined) {
+        await prisma.tarefas_solicitacoes.deleteMany({ where: { solicitacao_id: id } });
+        if (tarefas_ids.length > 0) await this.associarTarefas(prisma, id, tarefas_ids);
       }
 
       // Buscar a planta manualmente se existir e não estiver deletada
@@ -647,7 +655,7 @@ export class SolicitacoesServicoService {
   async adicionarComentario(
     id: string,
     dto: AdicionarComentarioDto,
-  ): Promise<any> {
+  ): Promise<comentarios_solicitacao_servico> {
     const solicitacao = await this.findOne(id);
 
     const comentario = await this.prisma.comentarios_solicitacao_servico.create({
@@ -666,7 +674,7 @@ export class SolicitacoesServicoService {
   /**
    * Listar comentários
    */
-  async listarComentarios(id: string): Promise<any[]> {
+  async listarComentarios(id: string): Promise<comentarios_solicitacao_servico[]> {
     const solicitacao = await this.findOne(id);
 
     return await this.prisma.comentarios_solicitacao_servico.findMany({
@@ -756,7 +764,7 @@ export class SolicitacoesServicoService {
     ordem_servico_id?: string,
   ): Promise<void> {
     await this.prisma.$transaction(async (prisma) => {
-      const updateData: any = {
+      const updateData: Prisma.solicitacoes_servicoUncheckedUpdateInput = {
         status: StatusSolicitacaoServico.FINALIZADA,
       };
       if (ordem_servico_id) {
@@ -813,7 +821,7 @@ export class SolicitacoesServicoService {
    * Associar tarefas independentes à solicitação
    */
   private async associarTarefas(
-    prisma: any,
+    prisma: Prisma.TransactionClient,
     solicitacaoId: string,
     tarefasIds: string[]
   ) {
@@ -844,7 +852,7 @@ export class SolicitacoesServicoService {
   }
 
   private async associarInstrucoes(
-    prisma: any,
+    prisma: Prisma.TransactionClient,
     solicitacaoId: string,
     instrucoesIds: string[]
   ) {

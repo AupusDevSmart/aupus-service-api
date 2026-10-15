@@ -1,5 +1,19 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { StatusOS, TipoOS, PrioridadeOS, OrigemOS, CondicaoOS, TipoAnexoOS } from '@/core';
+import {
+  StatusOS,
+  TipoOS,
+  PrioridadeOS,
+  OrigemOS,
+  CondicaoOS,
+  TipoAnexoOS,
+  Prisma,
+  type anomalias,
+  type equipamentos,
+  type planos_manutencao,
+  type plantas,
+  type programacoes_os,
+  type solicitacoes_servico,
+} from '@/core';
 
 export class TarefaOSResponseDto {
   @ApiProperty({ description: 'ID do relacionamento' })
@@ -18,7 +32,7 @@ export class TarefaOSResponseDto {
   status: string;
 
   @ApiPropertyOptional({ description: 'Data de conclusão' })
-  data_conclusao?: string;
+  data_conclusao?: Date;
 
   @ApiPropertyOptional({ description: 'Quem concluiu' })
   concluida_por?: string;
@@ -56,17 +70,17 @@ export class TarefaOSResponseDto {
   observacoes?: string;
 
   @ApiProperty({ description: 'Data de criação' })
-  created_at: string;
+  created_at: Date;
 
   @ApiProperty({ description: 'Data de atualização' })
-  updated_at: string;
+  updated_at: Date;
 
   @ApiProperty({ description: 'Dados da tarefa' })
+  // Só id e nome: categoria e tipo de manutenção saíram da tabela `tarefas`
+  // no PR6. O conteúdo da época está nos campos `*_snapshot`.
   tarefa: {
     id: string;
     nome: string;
-    categoria: string;
-    tipo_manutencao: string;
   };
 }
 
@@ -105,10 +119,10 @@ export class MaterialOSResponseDto {
   observacoes?: string;
 
   @ApiProperty({ description: 'Data de criação' })
-  created_at: string;
+  created_at: Date;
 
   @ApiProperty({ description: 'Data de atualização' })
-  updated_at: string;
+  updated_at: Date;
 }
 
 export class FerramentaOSResponseDto {
@@ -143,10 +157,10 @@ export class FerramentaOSResponseDto {
   observacoes?: string;
 
   @ApiProperty({ description: 'Data de criação' })
-  created_at: string;
+  created_at: Date;
 
   @ApiProperty({ description: 'Data de atualização' })
-  updated_at: string;
+  updated_at: Date;
 }
 
 export class TecnicoOSResponseDto {
@@ -184,10 +198,10 @@ export class TecnicoOSResponseDto {
   tecnico_id?: string;
 
   @ApiProperty({ description: 'Data de criação' })
-  created_at: string;
+  created_at: Date;
 
   @ApiProperty({ description: 'Data de atualização' })
-  updated_at: string;
+  updated_at: Date;
 }
 
 export class ChecklistAtividadeResponseDto {
@@ -216,7 +230,7 @@ export class ChecklistAtividadeResponseDto {
   observacoes?: string;
 
   @ApiPropertyOptional({ description: 'Data de conclusão' })
-  concluida_em?: string;
+  concluida_em?: Date;
 
   @ApiPropertyOptional({ description: 'Quem concluiu' })
   concluida_por?: string;
@@ -225,10 +239,10 @@ export class ChecklistAtividadeResponseDto {
   concluida_por_id?: string;
 
   @ApiProperty({ description: 'Data de criação' })
-  created_at: string;
+  created_at: Date;
 
   @ApiProperty({ description: 'Data de atualização' })
-  updated_at: string;
+  updated_at: Date;
 }
 
 export class AnexoOSResponseDto {
@@ -291,17 +305,13 @@ export class RegistroTempoOSResponseDto {
   @ApiProperty({ description: 'Nome do técnico' })
   tecnico_nome: string;
 
-  @ApiProperty({ description: 'Data de início' })
-  data_inicio: string;
+  // As colunas são data_hora_inicio/data_hora_fim. O DTO dizia data_inicio,
+  // hora_inicio, data_fim e hora_fim, que não existem: saíam sempre vazios (SN-36).
+  @ApiPropertyOptional({ description: 'Data e hora de início' })
+  data_hora_inicio?: Date;
 
-  @ApiProperty({ description: 'Hora de início' })
-  hora_inicio: string;
-
-  @ApiPropertyOptional({ description: 'Data de fim' })
-  data_fim?: string;
-
-  @ApiPropertyOptional({ description: 'Hora de fim' })
-  hora_fim?: string;
+  @ApiPropertyOptional({ description: 'Data e hora de fim' })
+  data_hora_fim?: Date;
 
   @ApiPropertyOptional({ description: 'Tempo total em minutos' })
   tempo_total?: number;
@@ -313,13 +323,13 @@ export class RegistroTempoOSResponseDto {
   observacoes?: string;
 
   @ApiPropertyOptional({ description: 'Pausas durante execução' })
-  pausas?: any;
+  pausas?: Prisma.JsonValue;
 
   @ApiProperty({ description: 'Data de criação' })
-  created_at: string;
+  created_at: Date;
 
   @ApiProperty({ description: 'Data de atualização' })
-  updated_at: string;
+  updated_at: Date;
 }
 
 export class ItemOrcamentoOSResponseDto {
@@ -336,10 +346,10 @@ export class ItemOrcamentoOSResponseDto {
   valor: number;
 
   @ApiProperty({ description: 'Data de criação' })
-  created_at: string;
+  created_at: Date;
 
   @ApiProperty({ description: 'Data de atualização' })
-  updated_at: string;
+  updated_at: Date;
 }
 
 export class HistoricoOSResponseDto {
@@ -359,7 +369,7 @@ export class HistoricoOSResponseDto {
   usuario_id?: string;
 
   @ApiProperty({ description: 'Data da ação' })
-  data: string;
+  data: Date;
 
   @ApiPropertyOptional({ description: 'Observações' })
   observacoes?: string;
@@ -371,7 +381,7 @@ export class HistoricoOSResponseDto {
   status_novo?: StatusOS;
 
   @ApiPropertyOptional({ description: 'Dados extras' })
-  dados_extras?: any;
+  dados_extras?: Prisma.JsonValue;
 }
 
 export class ReservaVeiculoResponseDto {
@@ -396,10 +406,10 @@ export class ReservaVeiculoResponseDto {
   tipo_solicitante: string;
 
   @ApiProperty({ description: 'Data de início' })
-  data_inicio: string;
+  data_inicio: Date;
 
   @ApiProperty({ description: 'Data de fim' })
-  data_fim: string;
+  data_fim: Date;
 
   @ApiProperty({ description: 'Hora de início' })
   hora_inicio: string;
@@ -432,10 +442,10 @@ export class ReservaVeiculoResponseDto {
   observacoes?: string;
 
   @ApiProperty({ description: 'Data de criação' })
-  criado_em: string;
+  criado_em: Date;
 
   @ApiProperty({ description: 'Data de atualização' })
-  atualizado_em: string;
+  atualizado_em: Date;
 }
 
 export class InstalacaoDaOSDto {
@@ -466,13 +476,13 @@ export class OrdemServicoResponseDto {
   id: string;
 
   @ApiProperty({ description: 'Data de criação' })
-  criado_em: string;
+  criado_em: Date;
 
   @ApiProperty({ description: 'Data de atualização' })
-  atualizado_em: string;
+  atualizado_em: Date;
 
   @ApiPropertyOptional({ description: 'Data de exclusão' })
-  deletado_em?: string;
+  deletado_em?: Date;
 
   // Relacionamento
   @ApiProperty({ description: 'ID da programação origem' })
@@ -524,7 +534,7 @@ export class OrdemServicoResponseDto {
   reserva_id?: string;
 
   @ApiPropertyOptional({ description: 'Dados da origem' })
-  dados_origem?: any;
+  dados_origem?: Prisma.JsonValue;
 
   // Planejamento
   @ApiProperty({ description: 'Tempo estimado em horas' })
@@ -535,7 +545,7 @@ export class OrdemServicoResponseDto {
 
   // Programação definitiva
   @ApiProperty({ description: 'Data e hora programada' })
-  data_hora_programada: string;
+  data_hora_programada: Date;
 
   @ApiProperty({ description: 'Responsável' })
   responsavel: string;
@@ -548,10 +558,10 @@ export class OrdemServicoResponseDto {
 
   // Execução Real
   @ApiPropertyOptional({ description: 'Data e hora de início real' })
-  data_hora_inicio_real?: string;
+  data_hora_inicio_real?: Date;
 
   @ApiPropertyOptional({ description: 'Data e hora de fim real' })
-  data_hora_fim_real?: string;
+  data_hora_fim_real?: Date;
 
   @ApiPropertyOptional({ description: 'Tempo real de execução em minutos' })
   tempo_real_execucao?: number;
@@ -665,23 +675,23 @@ export class OrdemServicoResponseDto {
   aprovado_por_id?: string;
 
   @ApiPropertyOptional({ description: 'Data da aprovação' })
-  data_aprovacao?: string;
+  data_aprovacao?: Date;
 
   // Relacionamentos expandidos
   @ApiPropertyOptional({ description: 'Dados da programação de origem' })
-  programacao?: any;
+  programacao?: Pick<programacoes_os, 'id' | 'codigo' | 'descricao'>;
 
   @ApiPropertyOptional({ description: 'Dados da anomalia' })
-  anomalia?: any;
+  anomalia?: Pick<anomalias, 'id' | 'descricao' | 'prioridade' | 'status'>;
 
   @ApiPropertyOptional({ description: 'Dados do plano de manutenção' })
-  plano_manutencao?: any;
+  plano_manutencao?: Pick<planos_manutencao, 'id' | 'nome' | 'descricao'>;
 
   @ApiPropertyOptional({ description: 'Dados da planta' })
-  planta?: any;
+  planta?: Pick<plantas, 'id' | 'nome'>;
 
   @ApiPropertyOptional({ description: 'Dados do equipamento' })
-  equipamento?: any;
+  equipamento?: Pick<equipamentos, 'id' | 'nome' | 'tipo_equipamento' | 'fabricante' | 'modelo'>;
 
   @ApiPropertyOptional({ description: 'Reserva de veículo', type: ReservaVeiculoResponseDto })
   reserva_veiculo?: ReservaVeiculoResponseDto;
@@ -689,10 +699,22 @@ export class OrdemServicoResponseDto {
 
 export class OrdemServicoDetalhesResponseDto extends OrdemServicoResponseDto {
   @ApiProperty({ description: 'Programação origem' })
-  programacao_origem: any;
+  programacao_origem: programacoes_os;
 
   @ApiPropertyOptional({ description: 'Dados da solicitação de serviço (via programação)' })
-  solicitacao_servico?: any;
+  solicitacao_servico?: Pick<
+    solicitacoes_servico,
+    | 'id'
+    | 'numero'
+    | 'titulo'
+    | 'descricao'
+    | 'tipo'
+    | 'prioridade'
+    | 'status'
+    | 'local'
+    | 'solicitante_nome'
+    | 'data_solicitacao'
+  >;
 
   @ApiProperty({ description: 'Materiais da OS', type: [MaterialOSResponseDto] })
   materiais: MaterialOSResponseDto[];
@@ -757,6 +779,12 @@ export class OSStatsDto {
 
   @ApiProperty({ description: 'OS canceladas' })
   canceladas: number;
+
+  @ApiProperty({ description: 'OS atrasadas (programadas antes de hoje e não finalizadas)' })
+  atrasadas: number;
+
+  @ApiProperty({ description: 'OS críticas não finalizadas' })
+  criticas: number;
 }
 
 export class ListarOSResponseDto {

@@ -1,8 +1,9 @@
 // src/modules/dashboard/dashboard-manutencao.service.ts
 import { Injectable, Logger } from '@nestjs/common';
-import { PrismaService, PermissionScopeService, PlantaScope } from '@/core';
+import type { anomalias, equipamentos, ordens_servico } from '@prisma/client';
+import { Prisma, PrismaService, PermissionScopeService, PlantaScope, ScopedUser } from '@/core';
 
-type UserCtx = { id: string; role?: string | null } | undefined;
+type UserCtx = ScopedUser | undefined;
 
 export interface FiltrosDashboardManutencao {
   periodo?: '12meses' | 'mes' | 'trimestre' | 'ano';
@@ -41,6 +42,33 @@ const STATUS_EM_ABERTO = ['PENDENTE', 'EM_EXECUCAO', 'PAUSADA'];
 /** Ordens que já produziram resultado. */
 const STATUS_CONCLUIDO = ['EXECUTADA', 'AUDITADA', 'FINALIZADA'];
 
+/** Linha de OS como o `select` de `getDashboard` a lê. */
+type OrdemDoPainel = Pick<
+  ordens_servico,
+  | 'id'
+  | 'criado_em'
+  | 'status'
+  | 'tipo'
+  | 'origem'
+  | 'tempo_estimado'
+  | 'custo_real'
+  | 'orcamento_previsto'
+  | 'custos_adicionais'
+  | 'data_hora_programada'
+  | 'data_hora_inicio_real'
+  | 'data_hora_fim_real'
+  | 'time_equipe'
+  | 'equipamento_id'
+> & { equipamento: Pick<equipamentos, 'nome'> | null };
+
+/** OS vinculada a uma anomalia, como o `select` de `getDashboard` a lê. */
+type OrdemDaAnomalia = Pick<ordens_servico, 'id' | 'status' | 'criado_em' | 'data_hora_fim_real'>;
+
+/** Linha de anomalia como o `select` de `getDashboard` a lê. */
+type AnomaliaDoPainel = Pick<anomalias, 'id' | 'created_at' | 'status' | 'equipamento_id'> & {
+  ordens_servico: OrdemDaAnomalia[];
+};
+
 @Injectable()
 export class DashboardManutencaoService {
   private readonly logger = new Logger(DashboardManutencaoService.name);
@@ -66,12 +94,13 @@ export class DashboardManutencaoService {
    * preenchido em parte das linhas — no resto, a planta só se alcança pelo
    * equipamento. Filtrar só pela coluna direta esconderia OS legítimas.
    */
-  private filtroOS(scope: PlantaScope, filtros: FiltrosDashboardManutencao): Record<string, any> {
-    const where: any = { deletado_em: null, AND: [] as any[] };
+  private filtroOS(scope: PlantaScope, filtros: FiltrosDashboardManutencao): Prisma.ordens_servicoWhereInput {
+    const condicoes: Prisma.ordens_servicoWhereInput[] = [];
+    const where: Prisma.ordens_servicoWhereInput = { deletado_em: null, AND: condicoes };
 
     if (Array.isArray(scope)) {
       if (scope.length === 0) return { id: '__NEVER__' };
-      where.AND.push({
+      condicoes.push({
         OR: [
           { planta_id: { in: scope } },
           { equipamento: { unidade: { planta_id: { in: scope } } } },
@@ -81,7 +110,7 @@ export class DashboardManutencaoService {
 
     const plantaId = filtros.plantaId?.trim();
     if (plantaId && plantaId !== 'all') {
-      where.AND.push({
+      condicoes.push({
         OR: [
           { planta_id: plantaId },
           { equipamento: { unidade: { planta_id: plantaId } } },
@@ -91,7 +120,7 @@ export class DashboardManutencaoService {
 
     const unidadeId = filtros.unidadeId?.trim();
     if (unidadeId && unidadeId !== 'all') {
-      where.AND.push({ equipamento: { unidade_id: unidadeId } });
+      condicoes.push({ equipamento: { unidade_id: unidadeId } });
     }
 
     // Criticidade mora no equipamento, então filtrar por ela exclui as OS sem
@@ -99,24 +128,25 @@ export class DashboardManutencaoService {
     // tem criticidade e não pertence a nenhuma faixa.
     const criticidade = filtros.criticidade?.trim();
     if (criticidade && criticidade !== 'all') {
-      where.AND.push({ equipamento: { criticidade } });
+      condicoes.push({ equipamento: { criticidade } });
     }
 
     const equipe = filtros.equipe?.trim();
     if (equipe && equipe !== 'all') {
-      where.AND.push({ time_equipe: equipe });
+      condicoes.push({ time_equipe: equipe });
     }
 
-    if (where.AND.length === 0) delete where.AND;
+    if (condicoes.length === 0) delete where.AND;
     return where;
   }
 
-  private filtroAnomalia(scope: PlantaScope, filtros: FiltrosDashboardManutencao): Record<string, any> {
-    const where: any = { deleted_at: null, AND: [] as any[] };
+  private filtroAnomalia(scope: PlantaScope, filtros: FiltrosDashboardManutencao): Prisma.anomaliasWhereInput {
+    const condicoes: Prisma.anomaliasWhereInput[] = [];
+    const where: Prisma.anomaliasWhereInput = { deleted_at: null, AND: condicoes };
 
     if (Array.isArray(scope)) {
       if (scope.length === 0) return { id: '__NEVER__' };
-      where.AND.push({
+      condicoes.push({
         OR: [
           { planta_id: { in: scope } },
           { equipamento: { unidade: { planta_id: { in: scope } } } },
@@ -126,7 +156,7 @@ export class DashboardManutencaoService {
 
     const plantaId = filtros.plantaId?.trim();
     if (plantaId && plantaId !== 'all') {
-      where.AND.push({
+      condicoes.push({
         OR: [
           { planta_id: plantaId },
           { equipamento: { unidade: { planta_id: plantaId } } },
@@ -136,15 +166,15 @@ export class DashboardManutencaoService {
 
     const unidadeId = filtros.unidadeId?.trim();
     if (unidadeId && unidadeId !== 'all') {
-      where.AND.push({ equipamento: { unidade_id: unidadeId } });
+      condicoes.push({ equipamento: { unidade_id: unidadeId } });
     }
 
     const criticidade = filtros.criticidade?.trim();
     if (criticidade && criticidade !== 'all') {
-      where.AND.push({ equipamento: { criticidade } });
+      condicoes.push({ equipamento: { criticidade } });
     }
 
-    if (where.AND.length === 0) delete where.AND;
+    if (condicoes.length === 0) delete where.AND;
     return where;
   }
 
@@ -186,7 +216,7 @@ export class DashboardManutencaoService {
     return janela.findIndex((m) => m.ano === d.getFullYear() && m.mes === d.getMonth());
   }
 
-  private numero(valor: any): number {
+  private numero(valor: Prisma.Decimal | number | null | undefined): number {
     if (valor === null || valor === undefined) return 0;
     const n = typeof valor === 'object' && 'toNumber' in valor ? valor.toNumber() : Number(valor);
     return Number.isFinite(n) ? n : 0;
@@ -269,7 +299,7 @@ export class DashboardManutencaoService {
    * página. A lista de unidades acompanha a planta escolhida.
    */
   private async montarOpcoes(scope: PlantaScope, filtros: FiltrosDashboardManutencao) {
-    const wherePlanta: any = { deleted_at: null };
+    const wherePlanta: Prisma.plantasWhereInput = { deleted_at: null };
     if (Array.isArray(scope)) {
       if (scope.length === 0) return { plantas: [], unidades: [], equipes: [] };
       wherePlanta.id = { in: scope };
@@ -282,7 +312,7 @@ export class DashboardManutencaoService {
     });
 
     const plantaId = filtros.plantaId?.trim();
-    const whereUnidade: any = { deleted_at: null };
+    const whereUnidade: Prisma.unidadesWhereInput = { deleted_at: null };
     if (plantaId && plantaId !== 'all') {
       whereUnidade.planta_id = plantaId;
     } else if (Array.isArray(scope)) {
@@ -323,7 +353,7 @@ export class DashboardManutencaoService {
   // AGREGAÇÕES
   // ============================================================
 
-  private montarBlocos(ordens: any[], anomalias: any[], janela: ReturnType<typeof this.janelaDeMeses>) {
+  private montarBlocos(ordens: OrdemDoPainel[], anomalias: AnomaliaDoPainel[], janela: ReturnType<typeof this.janelaDeMeses>) {
     const emAberto = ordens.filter((o) => STATUS_EM_ABERTO.includes(o.status));
     const concluidas = ordens.filter((o) => STATUS_CONCLUIDO.includes(o.status));
 
@@ -341,7 +371,12 @@ export class DashboardManutencaoService {
     };
   }
 
-  private montarKpis(ordens: any[], emAberto: any[], concluidas: any[], anomalias: any[]): Indicador[] {
+  private montarKpis(
+    ordens: OrdemDoPainel[],
+    emAberto: OrdemDoPainel[],
+    concluidas: OrdemDoPainel[],
+    anomalias: AnomaliaDoPainel[],
+  ): Indicador[] {
     const doPlano = ordens.filter((o) => o.origem === 'PLANO_MANUTENCAO' || o.origem === 'TAREFA');
     const planoConcluidas = doPlano.filter((o) => STATUS_CONCLUIDO.includes(o.status));
 
@@ -458,7 +493,7 @@ export class DashboardManutencaoService {
     ];
   }
 
-  private montarAderencia(ordens: any[], concluidas: any[]) {
+  private montarAderencia(ordens: OrdemDoPainel[], concluidas: OrdemDoPainel[]) {
     const doPlano = ordens.filter((o) => o.origem === 'PLANO_MANUTENCAO' || o.origem === 'TAREFA');
     const planoConcluidas = doPlano.filter((o) => STATUS_CONCLUIDO.includes(o.status));
 
@@ -500,7 +535,7 @@ export class DashboardManutencaoService {
    * `custo_real` é um número único. A divisão abaixo é proporção fixa, para a
    * tela poder ser validada, e vem marcada como simulada.
    */
-  private montarCusto(ordens: any[], janela: ReturnType<typeof this.janelaDeMeses>) {
+  private montarCusto(ordens: OrdemDoPainel[], janela: ReturnType<typeof this.janelaDeMeses>) {
     const total = new Array(12).fill(0);
     const orcado = new Array(12).fill(0);
 
@@ -525,7 +560,7 @@ export class DashboardManutencaoService {
     };
   }
 
-  private montarCustoPorOS(ordens: any[], janela: ReturnType<typeof this.janelaDeMeses>) {
+  private montarCustoPorOS(ordens: OrdemDoPainel[], janela: ReturnType<typeof this.janelaDeMeses>) {
     const soma = { corretiva: new Array(12).fill(0), preventiva: new Array(12).fill(0) };
     const qtd = { corretiva: new Array(12).fill(0), preventiva: new Array(12).fill(0) };
 
@@ -562,7 +597,7 @@ export class DashboardManutencaoService {
    * serviço, o resto como manutenção. É uma leitura defensável, mas é derivada,
    * não declarada.
    */
-  private montarFinalidade(ordens: any[], janela: ReturnType<typeof this.janelaDeMeses>) {
+  private montarFinalidade(ordens: OrdemDoPainel[], janela: ReturnType<typeof this.janelaDeMeses>) {
     const manutencao = new Array(12).fill(0);
     const servicos = new Array(12).fill(0);
 
@@ -588,7 +623,7 @@ export class DashboardManutencaoService {
    * evento do mês (abertas vs. fechadas) faria a soma perder o sentido em mês
    * de mutirão.
    */
-  private montarAnomalias(anomalias: any[], janela: ReturnType<typeof this.janelaDeMeses>) {
+  private montarAnomalias(anomalias: AnomaliaDoPainel[], janela: ReturnType<typeof this.janelaDeMeses>) {
     const resolvida = new Array(12).fill(0);
     const emExecucao = new Array(12).fill(0);
     const semOS = new Array(12).fill(0);
@@ -602,11 +637,11 @@ export class DashboardManutencaoService {
       const i = this.indiceDoMes(a.created_at, janela);
       const os = a.ordens_servico ?? [];
       const temOS = os.length > 0;
-      const osFechada = os.find((o: any) => STATUS_CONCLUIDO.includes(o.status));
+      const osFechada = os.find((o) => STATUS_CONCLUIDO.includes(o.status));
 
       if (temOS) {
         viraramOS += 1;
-        const primeira = os.reduce((mais: any, o: any) =>
+        const primeira = os.reduce<OrdemDaAnomalia | null>((mais, o) =>
           !mais || new Date(o.criado_em) < new Date(mais.criado_em) ? o : mais, null);
         if (primeira) {
           diasAteOS.push(
@@ -649,7 +684,7 @@ export class DashboardManutencaoService {
     };
   }
 
-  private montarBacklog(emAberto: any[]) {
+  private montarBacklog(emAberto: OrdemDoPainel[]) {
     const faixas = [
       { faixa: '0 a 7 d', ate: 7, qtd: 0 },
       { faixa: '8 a 15 d', ate: 15, qtd: 0 },
@@ -668,7 +703,7 @@ export class DashboardManutencaoService {
     return faixas.map(({ faixa, qtd }) => ({ faixa, qtd }));
   }
 
-  private montarOfensores(ordens: any[]) {
+  private montarOfensores(ordens: OrdemDoPainel[]) {
     const porEquipamento = new Map<string, { ativo: string; custo: number }>();
 
     for (const o of ordens) {
@@ -692,7 +727,7 @@ export class DashboardManutencaoService {
    * todas as OS. O HH sai de verdade — planejado é `tempo_estimado`, apontado é
    * a duração real entre início e fim.
    */
-  private montarProdutividade(ordens: any[], concluidas: any[], janela: ReturnType<typeof this.janelaDeMeses>) {
+  private montarProdutividade(ordens: OrdemDoPainel[], concluidas: OrdemDoPainel[], janela: ReturnType<typeof this.janelaDeMeses>) {
     const porEquipe = new Map<string, { total: number; noPrazo: number }>();
 
     for (const o of concluidas) {
@@ -741,7 +776,11 @@ export class DashboardManutencaoService {
     };
   }
 
-  private montarAlertas(ordens: any[], concluidas: any[], anomalias: any[]): Indicador[] {
+  private montarAlertas(
+    ordens: OrdemDoPainel[],
+    concluidas: OrdemDoPainel[],
+    anomalias: AnomaliaDoPainel[],
+  ): Indicador[] {
     const travadas = ordens.filter((o) => o.status === 'PAUSADA').length;
 
     // Reincidência: equipamento com mais de uma anomalia em 90 dias.

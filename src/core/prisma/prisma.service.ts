@@ -22,6 +22,12 @@ function transacaoAninhada(tx: Prisma.TransactionClient) {
   };
 }
 
+/** O `code` dos erros do Prisma (P2037, P1001...), quando o erro tem um. */
+function codigoDoErro(erro: unknown): string | undefined {
+  if (typeof erro !== 'object' || erro === null || !('code' in erro)) return undefined;
+  return typeof erro.code === 'string' ? erro.code : undefined;
+}
+
 function desviarParaTransacaoEmCurso(alvo: PrismaService, propriedade: string | symbol, receptor: unknown) {
   const emCurso = TransacaoEmCurso.atual();
 
@@ -41,7 +47,12 @@ function desviarParaTransacaoEmCurso(alvo: PrismaService, propriedade: string | 
 }
 
 @Injectable()
-export class PrismaService extends PrismaClient implements OnModuleInit, OnModuleDestroy {
+export class PrismaService
+  // O 2º genérico são os eventos de log ligados no construtor: sem ele o `$on`
+  // só aceitava `never` e cada evento chegava sem tipo.
+  extends PrismaClient<Prisma.PrismaClientOptions, Prisma.LogLevel>
+  implements OnModuleInit, OnModuleDestroy
+{
   private readonly logger = new Logger(PrismaService.name);
 
   // Metricas de queries
@@ -68,7 +79,7 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
 
     const slowQueryThreshold = parseInt(process.env.SLOW_QUERY_THRESHOLD || '1000');
 
-    this.$on('query' as never, (e: any) => {
+    this.$on('query', (e) => {
       this.queryMetrics.totalQueries++;
       if (e.duration > slowQueryThreshold) {
         this.queryMetrics.slowQueries++;
@@ -76,12 +87,12 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
       }
     });
 
-    this.$on('error' as never, (e: any) => {
+    this.$on('error', (e) => {
       this.queryMetrics.errorCount++;
       this.logger.error(`Erro no Prisma: ${e.message || JSON.stringify(e)}`);
     });
 
-    this.$on('warn' as never, (e: any) => {
+    this.$on('warn', (e) => {
       this.logger.warn(`Aviso do Prisma: ${e.message || JSON.stringify(e)}`);
     });
 
@@ -124,16 +135,17 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
     for (let i = 0; i < maxRetries; i++) {
       try {
         return await operation();
-      } catch (error: any) {
-        lastError = error;
-        if (error.code === 'P2037') {
+      } catch (error) {
+        lastError = error as Error;
+        const codigo = codigoDoErro(error);
+        if (codigo === 'P2037') {
           this.logger.warn(`Pool esgotado (P2037). Aguardando ${(i + 1) * 2}s... (${i + 1}/${maxRetries})`);
           await new Promise((resolve) => setTimeout(resolve, 2000 * (i + 1)));
           continue;
         }
         const reconnectionErrors = ['P1001', 'P1002', 'P1008', 'P1017'];
-        if (reconnectionErrors.includes(error.code)) {
-          this.logger.warn(`Erro de conexao (${error.code}). Tentativa ${i + 1}/${maxRetries}`);
+        if (reconnectionErrors.includes(codigo)) {
+          this.logger.warn(`Erro de conexao (${codigo}). Tentativa ${i + 1}/${maxRetries}`);
           try {
             await this.$disconnect();
             await this.$connect();

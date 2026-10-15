@@ -2,13 +2,19 @@ import { Injectable, Logger } from '@nestjs/common';
 import { Interval } from '@nestjs/schedule';
 import axios from 'axios';
 import { PrismaService } from '../../prisma/prisma.service';
-import { Recurso, montarPayload } from './recursos';
+import { Recurso, delegatePorNome, montarPayload } from './recursos';
 
 /** Quantos eventos por rodada. Volume real e baixo; lotes grandes so atrasariam o primeiro. */
 const LOTE = 20;
 
 /** Espera antes de tentar de novo, por numero de tentativas. A ultima e ~8 min. */
 const BACKOFF_SEGUNDOS = [5, 15, 60, 300, 500];
+
+/** A mensagem que o outro lado devolveu, ou a do proprio erro (timeout, rede, banco). */
+function motivoDaFalha(e: unknown): string {
+  const corpo = axios.isAxiosError<{ message?: string }>(e) ? e.response?.data : undefined;
+  return corpo?.message ?? (e instanceof Error ? e.message : undefined) ?? 'falha desconhecida';
+}
 
 @Injectable()
 export class EntregaWorker {
@@ -103,8 +109,8 @@ export class EntregaWorker {
               versao: ev.versao, origem, resultado: resultado ?? 'aplicado',
             },
           });
-        } catch (e: any) {
-          const motivo = e?.response?.data?.message ?? e?.message ?? 'falha desconhecida';
+        } catch (e) {
+          const motivo = motivoDaFalha(e);
           await this.adiar(ev.id, ev.tentativas, motivo);
           // Uma falha costuma valer para todas: o outro lado caiu, ou o token
           // esta errado. Insistir no lote inteiro so multiplicaria o timeout.
@@ -121,12 +127,12 @@ export class EntregaWorker {
     recurso: Recurso,
     registroId: string,
     operacao: string,
-  ): Promise<Record<string, any> | null> {
+  ): Promise<Record<string, unknown> | null> {
     const id = registroId.trim();
     // Remocao nao precisa do conteudo: o outro lado so precisa saber quem sair.
     if (operacao === 'delete') return { id };
 
-    const linha = await (this.prisma as any)[recurso].findUnique({ where: { id } });
+    const linha = await delegatePorNome(this.prisma, recurso).findUnique({ where: { id } });
     return linha ? montarPayload(recurso, linha) : null;
   }
 

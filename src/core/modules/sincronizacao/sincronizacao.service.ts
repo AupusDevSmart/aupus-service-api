@@ -2,7 +2,8 @@ import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import { createHash } from 'node:crypto';
 import { PrismaService } from '../../prisma/prisma.service';
 import { comoReplicacao } from './outbox.service';
-import { DEPENDENCIAS, Recurso, filtrarParaEsteBanco } from './recursos';
+import type { Prisma } from '@prisma/client';
+import { DEPENDENCIAS, Recurso, delegatePorNome, filtrarParaEsteBanco } from './recursos';
 import { aoReceber } from './transformacoes';
 import { resolverCadeia } from './cadeia-de-dependencias';
 
@@ -12,7 +13,7 @@ export interface EventoRecebido {
   operacao: 'upsert' | 'delete';
   versao: string;
   origem: string;
-  payload: Record<string, any>;
+  payload: Record<string, unknown>;
   ator?: string;
 }
 
@@ -74,7 +75,7 @@ export class SincronizacaoService {
       }
 
       if (operacao === 'delete') {
-        await (tx as any)[recurso].updateMany({ where: { id }, data: { deleted_at: new Date() } });
+        await delegatePorNome(tx, recurso).updateMany({ where: { id }, data: { deleted_at: new Date() } });
       } else {
         const faltando = await this.dependenciaAusente(tx, recurso, evento.payload);
         if (faltando) {
@@ -85,7 +86,7 @@ export class SincronizacaoService {
         const { dados, ignorados } = filtrarParaEsteBanco(recurso, evento.payload);
         delete dados.id;
 
-        await (tx as any)[recurso].upsert({
+        await delegatePorNome(tx, recurso).upsert({
           where: { id },
           create: { ...dados, id },
           update: dados,
@@ -148,21 +149,22 @@ export class SincronizacaoService {
    * copia de cadastro inteiro disparada por uma edicao de nome.
    */
   private async dependenciaAusente(
-    tx: any,
+    tx: Prisma.TransactionClient,
     recurso: Recurso,
-    payload: Record<string, any>,
+    payload: Record<string, unknown>,
   ): Promise<string | null> {
     for (const dep of DEPENDENCIAS[recurso]) {
-      const alvo = payload[dep.campo]?.trim?.();
+      const valor = payload[dep.campo];
+      const alvo = typeof valor === 'string' ? valor.trim() : undefined;
       if (!alvo) continue;
 
-      const existe = await tx[dep.tabela].findFirst({ where: { id: alvo }, select: { id: true } });
+      const existe = await delegatePorNome(tx, dep.tabela).findFirst({ where: { id: alvo }, select: { id: true } });
       if (!existe) return `${dep.comoChamar} (${dep.campo}=${alvo}) não existe neste sistema`;
     }
     return null;
   }
 
-  private async auditar(tx: any, e: EventoRecebido, resultado: Resultado, detalhe?: string) {
+  private async auditar(tx: Prisma.TransactionClient, e: EventoRecebido, resultado: Resultado, detalhe?: string) {
     await tx.sincronizacao_auditoria.create({
       data: {
         direcao: 'recebido',

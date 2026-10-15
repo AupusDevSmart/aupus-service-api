@@ -1,4 +1,5 @@
 import { PrismaClient } from '@prisma/client';
+import type { PrismaService } from '@/core';
 import { planoAHerdar, aplicarDatasHerdadas, mapearAjustesParaCopia } from './heranca-de-plano';
 
 /**
@@ -126,7 +127,7 @@ describe('heranca de plano (banco real)', () => {
     it('devolve o TEMPLATE do plano do ocupante anterior, nao a copia dele', async () => {
       const { template } = await montarTroca();
 
-      const heranca = await planoAHerdar(prisma as any, posicaoId);
+      const heranca = await planoAHerdar(prisma as unknown as PrismaService, posicaoId);
 
       // Herdar a copia amarraria o equipamento novo ao plano do antigo. O que se
       // repete e o template da categoria.
@@ -137,7 +138,7 @@ describe('heranca de plano (banco real)', () => {
     it('traz as datas de cada tarefa, que sao o que precisa ser ajustado', async () => {
       await montarTroca();
 
-      const heranca = await planoAHerdar(prisma as any, posicaoId);
+      const heranca = await planoAHerdar(prisma as unknown as PrismaService, posicaoId);
 
       expect(heranca?.tarefas).toHaveLength(1);
       expect(heranca?.tarefas[0].nome).toBe('Troca de oleo');
@@ -152,11 +153,11 @@ describe('heranca de plano (banco real)', () => {
         },
       });
 
-      expect(await planoAHerdar(prisma as any, posicaoId)).toBeNull();
+      expect(await planoAHerdar(prisma as unknown as PrismaService, posicaoId)).toBeNull();
     });
 
     it('devolve nulo quando nunca houve ocupante anterior', async () => {
-      expect(await planoAHerdar(prisma as any, posicaoId)).toBeNull();
+      expect(await planoAHerdar(prisma as unknown as PrismaService, posicaoId)).toBeNull();
     });
   });
 
@@ -175,7 +176,7 @@ describe('heranca de plano (banco real)', () => {
         },
       });
 
-      await aplicarDatasHerdadas(prisma as any, novo, [
+      await aplicarDatasHerdadas(prisma as unknown as PrismaService, novo, [
         { tarefa_id: tarefaNova.id, data_ultima_execucao: new Date('2026-04-02T00:00:00Z') },
       ]);
 
@@ -190,7 +191,7 @@ describe('heranca de plano (banco real)', () => {
       const doAntigo = await prisma.tarefas.findFirst({ where: { plano_manutencao_id: copia } });
 
       // Ajustar tarefa de outro equipamento reescreveria historico alheio.
-      await aplicarDatasHerdadas(prisma as any, novo, [
+      await aplicarDatasHerdadas(prisma as unknown as PrismaService, novo, [
         { tarefa_id: doAntigo!.id, data_ultima_execucao: new Date('2020-01-01T00:00:00Z') },
       ]);
 
@@ -229,7 +230,7 @@ describe('heranca de plano (banco real)', () => {
         },
       });
 
-      const traduzidos = await mapearAjustesParaCopia(prisma as any, novo, [
+      const traduzidos = await mapearAjustesParaCopia(prisma as unknown as PrismaService, novo, [
         { tarefa_id: doAntigo!.id, data_ultima_execucao: new Date('2026-04-02T00:00:00Z') },
       ]);
 
@@ -242,7 +243,7 @@ describe('heranca de plano (banco real)', () => {
       // A tarefa criada em montarTroca nasce sem tarefa_origem_id.
       const solta = await prisma.tarefas.findFirst({ where: { plano_manutencao_id: copia } });
 
-      const traduzidos = await mapearAjustesParaCopia(prisma as any, novo, [
+      const traduzidos = await mapearAjustesParaCopia(prisma as unknown as PrismaService, novo, [
         { tarefa_id: solta!.id, data_ultima_execucao: new Date('2026-04-02T00:00:00Z') },
       ]);
 

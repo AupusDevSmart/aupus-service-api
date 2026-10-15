@@ -1,12 +1,17 @@
 // src/modules/tarefas/tarefas-scheduler.service.ts
 import { Injectable, Logger } from '@nestjs/common';
 import { Cron } from '@nestjs/schedule';
-import { PrismaService } from '@/core';
+import { Prisma, PrismaService } from '@/core';
 import { ProgramacaoOSService } from '../programacao-os/programacao-os.service';
 import { calcularProximaExecucao } from './periodicidade';
 import { variantesDeIds } from './ids';
-import { prioridadePelaCriticidade } from './prioridade-pela-criticidade';
+import { PrioridadeDaPreventiva, prioridadePelaCriticidade } from './prioridade-pela-criticidade';
 import { proximoDiaUtil, regraDeDiasUteis } from '../agenda/dias-uteis';
+
+/** `dados_origem` e Json: so um objeto recebe as chaves da geracao automatica. */
+function ehObjetoJson(valor: unknown): valor is Prisma.JsonObject {
+  return typeof valor === 'object' && valor !== null && !Array.isArray(valor);
+}
 
 /** Janela de agrupamento em dias */
 const JANELA_AGRUPAMENTO_DIAS = 14;
@@ -24,8 +29,8 @@ interface TarefaElegivel {
   data_ultima_execucao: Date | null;
   data_ancora: Date | null;
   created_at: Date;
-  tempo_estimado: number;
-  duracao_estimada: any;
+  // A duracao vem da instrucao: a tarefa nao guarda mais esse dado.
+  instrucao: { tempo_estimado: number; duracao_estimada: Prisma.Decimal } | null;
   equipamento_id: string;
   equipamento: {
     id: string;
@@ -205,7 +210,7 @@ export class TarefasSchedulerService {
           : { ...equipamento, unidade_id: pai?.unidade_id ?? null, unidade: pai?.unidade ?? null },
       };
     });
-    return comUnidadeEfetiva as unknown as TarefaElegivel[];
+    return comUnidadeEfetiva;
   }
 
   /**
@@ -464,7 +469,7 @@ export class TarefasSchedulerService {
     // Atualizar dados_origem com info extra da geração automática
     if (resultado?.id) {
       try {
-        const dadosOrigemAtual = (resultado as any).dados_origem || {};
+        const dadosOrigemAtual = ehObjetoJson(resultado.dados_origem) ? resultado.dados_origem : {};
         await this.prisma.programacoes_os.update({
           where: { id: resultado.id },
           data: {
@@ -495,7 +500,7 @@ export class TarefasSchedulerService {
   }
 
   /** Prioridade pela criticidade mais alta do grupo — regra em prioridade-pela-criticidade.ts. */
-  private determinarPrioridade(cluster: Pick<TarefaElegivel, 'criticidade' | 'equipamento'>[]): string {
+  private determinarPrioridade(cluster: Pick<TarefaElegivel, 'criticidade' | 'equipamento'>[]): PrioridadeDaPreventiva {
     return prioridadePelaCriticidade(cluster.flatMap((t) => [t.equipamento?.criticidade, t.criticidade]));
   }
 }

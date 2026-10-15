@@ -1,5 +1,5 @@
 import { ConflictException, Injectable, Logger, NotFoundException } from '@nestjs/common';
-import { Prisma, StatusProgramacaoOS } from '@/core';
+import { Prisma, StatusProgramacaoOS, PrioridadeOS, type TipoOS, type programacoes_os, type tarefas_programacao_os } from '@/core';
 import { plantasDosEquipamentos } from '@/core/modules/auth/planta-dos-equipamentos';
 import { garantirPessoasQuePodemAtuar, PessoasDaPlanta, pessoasQuePodemAtuar } from './pessoas-da-os';
 import { equipamentosDasTarefas, plantaDaProgramacao } from './planta-da-programacao';
@@ -32,12 +32,57 @@ import {
   CreateProgramacaoAnomaliaDto,
   CreateProgramacaoDto,
   CreateProgramacaoTarefasDto,
+  FerramentaProgramacaoDto,
+  ItemOrcamentoProgramacaoDto,
   ListarProgramacoesResponseDto,
+  MaterialProgramacaoDto,
   ProgramacaoDetalhesResponseDto,
   ProgramacaoFiltersDto,
   ProgramacaoResponseDto,
+  ProgramacaoStatsDto,
+  TecnicoProgramacaoDto,
   UpdateProgramacaoDto,
 } from './dto';
+
+/** A programação como as consultas deste service a trazem para a resposta */
+type ProgramacaoParaResposta = programacoes_os & {
+  tarefas_programacao?: Array<tarefas_programacao_os & { tarefa?: { id: string; nome: string } | null }>;
+};
+
+/** A programação com tudo o que `buscarPorId` inclui */
+type ProgramacaoComDetalhes = Prisma.programacoes_osGetPayload<{
+  include: {
+    tarefas_programacao: { include: { tarefa: { select: { id: true; nome: true } } } };
+    materiais: true;
+    ferramentas: true;
+    tecnicos: true;
+    itens_orcamento: true;
+    historico: true;
+    ordem_servico: true;
+    solicitacao_servico: {
+      select: {
+        id: true;
+        numero: true;
+        titulo: true;
+        descricao: true;
+        tipo: true;
+        prioridade: true;
+        status: true;
+        local: true;
+        solicitante_nome: true;
+        data_solicitacao: true;
+      };
+    };
+  };
+}>;
+
+/** A reserva da programação, com a viatura */
+type ReservaComVeiculo = Prisma.reserva_veiculoGetPayload<{ include: { veiculo: true } }>;
+
+/** A tarefa como `adicionarTarefas` a lê para congelar o pedido */
+type TarefaParaSnapshot = Prisma.tarefasGetPayload<{
+  include: { instrucao: { select: { tag: true; nome: true; descricao: true } } };
+}>;
 
 @Injectable()
 export class ProgramacaoOSService {
@@ -349,7 +394,7 @@ export class ProgramacaoOSService {
           anomalia_id: createDto.anomalia_id?.trim() || null,
           plano_manutencao_id: createDto.plano_manutencao_id?.trim() || null,
           solicitacao_servico_id: createDto.solicitacao_servico_id?.trim()
-            || (createDto.dados_origem as any)?.solicitacaoServicoId?.trim()
+            || (createDto.dados_origem as { solicitacaoServicoId?: string } | undefined)?.solicitacaoServicoId?.trim()
             || null,
           dados_origem: createDto.dados_origem,
           tempo_estimado: createDto.tempo_estimado || 2, // Padrão: 2 horas
@@ -471,8 +516,9 @@ export class ProgramacaoOSService {
 
     // Prepare data without undefined fields to avoid Prisma issues
     // ✅ Separar campos de relacionamentos (materiais, ferramentas, tecnicos)
-    const { materiais, ferramentas, tecnicos, itens_orcamento, tarefas_ids, ...restDto } = updateDto as any;
-    const updateData: any = {};
+    // unidade_id está no DTO, mas não é coluna: ia para o update e o Prisma recusava (500)
+    const { materiais, ferramentas, tecnicos, itens_orcamento, tarefas_ids, unidade_id: _unidadeId, ...restDto } = updateDto;
+    const updateData: Record<string, unknown> = {};
 
     Object.keys(restDto).forEach(key => {
       const value = restDto[key as keyof typeof restDto];
@@ -494,7 +540,8 @@ export class ProgramacaoOSService {
     return await this.prisma.$transaction(async (prisma) => {
       const programacaoAtualizada = await prisma.programacoes_os.update({
         where: { id },
-        data: updateData,
+        // As chaves vêm do DTO, que espelha as colunas da tabela
+        data: updateData as Prisma.programacoes_osUncheckedUpdateInput,
         include: {
           tarefas_programacao: {
             include: {
@@ -545,7 +592,7 @@ export class ProgramacaoOSService {
           materiais: materiais || programacao.materiais || [],
           tecnicos: tecnicos || programacao.tecnicos || [],
           itens_orcamento: itens_orcamento || programacao.itens_orcamento || [],
-        } as any);
+        });
 
         if (orcamento > 0) {
           await prisma.programacoes_os.update({
@@ -850,7 +897,7 @@ export class ProgramacaoOSService {
       ativo: anomalia.ativo,
       condicoes: anomalia.condicao === 'FUNCIONANDO' ? 'FUNCIONANDO' : 'PARADO',
       tipo: 'CORRETIVA',
-      prioridade: dto.ajustes?.prioridade as any || anomalia.prioridade,
+      prioridade: dto.ajustes?.prioridade || anomalia.prioridade,
       origem: 'ANOMALIA',
       equipamento_id: anomalia.equipamento_id,
       anomalia_id: anomalia.id,
@@ -869,7 +916,7 @@ export class ProgramacaoOSService {
 
   async criarDeSolicitacao(
     solicitacaoId: string,
-    dto: any,
+    dto: Partial<CreateProgramacaoDto>,
     usuarioId?: string
   ): Promise<ProgramacaoResponseDto> {
     // Buscar solicitação do serviço de solicitações
@@ -890,8 +937,8 @@ export class ProgramacaoOSService {
     }
 
     // Mapear tipo de solicitação para tipo de OS
-    const mapTipoSolicitacaoToTipoOS = (tipo: string): string => {
-      const mapeamento: Record<string, string> = {
+    const mapTipoSolicitacaoToTipoOS = (tipo: string): TipoOS => {
+      const mapeamento: Record<string, TipoOS> = {
         INSTALACAO: 'CORRETIVA',
         MANUTENCAO_PREVENTIVA: 'PREVENTIVA',
         MANUTENCAO_CORRETIVA: 'CORRETIVA',
@@ -912,9 +959,11 @@ export class ProgramacaoOSService {
       local: solicitacao.local,
       ativo: solicitacao.equipamento?.nome || 'N/A',
       condicoes: 'FUNCIONANDO',
-      tipo: mapTipoSolicitacaoToTipoOS(solicitacao.tipo) as any,
-      prioridade: solicitacao.prioridade as any,
-      origem: 'SOLICITACAO_SERVICO' as any,
+      tipo: mapTipoSolicitacaoToTipoOS(solicitacao.tipo),
+      // A solicitação tem URGENTE, a OS não: vai para CRITICA, o topo da OS.
+      // Antes seguia como veio e o Prisma recusava (500).
+      prioridade: solicitacao.prioridade === 'URGENTE' ? PrioridadeOS.CRITICA : (solicitacao.prioridade as PrioridadeOS),
+      origem: 'SOLICITACAO_SERVICO',
       planta_id: solicitacao.planta_id,
       equipamento_id: solicitacao.equipamento_id,
       solicitacao_servico_id: solicitacao.id,
@@ -982,7 +1031,7 @@ export class ProgramacaoOSService {
         : 'Múltiplos equipamentos',
       condicoes: 'FUNCIONANDO',
       tipo: 'PREVENTIVA',
-      prioridade: dto.prioridade as any || 'MEDIA',
+      prioridade: dto.prioridade || PrioridadeOS.MEDIA,
       origem: 'TAREFA',
       planta_id: plantas.length === 1 ? plantas[0] : undefined,
       equipamento_id: equipamentos.length === 1 ? equipamentos[0] : null,
@@ -1207,7 +1256,7 @@ export class ProgramacaoOSService {
     return `PRG-${ano}-${String((maior?.ultimo ?? 0) + 1).padStart(3, '0')}`;
   }
 
-  private calcularOrcamentoPrevisto(dto: CreateProgramacaoDto): number {
+  private calcularOrcamentoPrevisto(dto: Pick<CreateProgramacaoDto, 'materiais' | 'tecnicos' | 'itens_orcamento'>): number {
     let total = 0;
 
     if (dto.materiais) {
@@ -1233,7 +1282,7 @@ export class ProgramacaoOSService {
     return total;
   }
 
-  private async adicionarTarefas(prisma: any, programacaoId: string, tarefasIds: string[]): Promise<void> {
+  private async adicionarTarefas(prisma: Prisma.TransactionClient, programacaoId: string, tarefasIds: string[]): Promise<void> {
     // Verificar se as tarefas existem. A instrucao vem junto porque o conteudo
     // do que esta sendo pedido e congelado aqui — ver montarSnapshotTarefa.
     const tarefas = await prisma.tarefas.findMany({
@@ -1267,7 +1316,7 @@ export class ProgramacaoOSService {
     }
 
     // Adicionar tarefas ja congelando o conteudo pedido
-    const porId = new Map(tarefas.map((t: any) => [t.id?.trim(), t]));
+    const porId = new Map(tarefas.map((t) => [t.id?.trim(), t] as const));
 
     const dados = tarefasIds.map((tarefaId, index) => ({
       programacao_id: programacaoId,
@@ -1287,7 +1336,7 @@ export class ProgramacaoOSService {
    * historico do que foi pedido. O objetivo da OS e justamente comparar o que
    * foi pedido com o que foi entregue.
    */
-  private montarSnapshotTarefa(tarefa: any) {
+  private montarSnapshotTarefa(tarefa: TarefaParaSnapshot | undefined) {
     if (!tarefa) return {};
 
     return {
@@ -1304,7 +1353,7 @@ export class ProgramacaoOSService {
     };
   }
 
-  private async criarMateriais(prisma: any, programacaoId: string, materiais: any[]): Promise<void> {
+  private async criarMateriais(prisma: Prisma.TransactionClient, programacaoId: string, materiais: MaterialProgramacaoDto[]): Promise<void> {
     const dados = materiais.map(material => ({
       programacao_id: programacaoId,
       descricao: material.descricao,
@@ -1317,7 +1366,7 @@ export class ProgramacaoOSService {
     await prisma.materiais_programacao_os.createMany({ data: dados });
   }
 
-  private async criarFerramentas(prisma: any, programacaoId: string, ferramentas: any[]): Promise<void> {
+  private async criarFerramentas(prisma: Prisma.TransactionClient, programacaoId: string, ferramentas: FerramentaProgramacaoDto[]): Promise<void> {
     const dados = ferramentas.map(ferramenta => ({
       programacao_id: programacaoId,
       descricao: ferramenta.descricao,
@@ -1391,7 +1440,7 @@ export class ProgramacaoOSService {
     }
   }
 
-  private async criarTecnicos(prisma: any, programacaoId: string, tecnicos: any[]): Promise<void> {
+  private async criarTecnicos(prisma: Prisma.TransactionClient, programacaoId: string, tecnicos: TecnicoProgramacaoDto[]): Promise<void> {
     const dados = tecnicos.map(tecnico => ({
       programacao_id: programacaoId,
       nome: tecnico.nome,
@@ -1405,7 +1454,7 @@ export class ProgramacaoOSService {
     await prisma.tecnicos_programacao_os.createMany({ data: dados });
   }
 
-  private async criarItensOrcamento(prisma: any, programacaoId: string, itensOrcamento: any[]): Promise<void> {
+  private async criarItensOrcamento(prisma: Prisma.TransactionClient, programacaoId: string, itensOrcamento: ItemOrcamentoProgramacaoDto[]): Promise<void> {
     const dados = itensOrcamento.map(item => ({
       programacao_id: programacaoId,
       descricao: item.descricao,
@@ -1416,7 +1465,7 @@ export class ProgramacaoOSService {
   }
 
   private async registrarHistorico(
-    prismaOrTransaction: any,
+    prismaOrTransaction: Prisma.TransactionClient,
     programacaoId: string,
     acao: string,
     usuario: string,
@@ -1426,7 +1475,7 @@ export class ProgramacaoOSService {
     statusNovo?: StatusProgramacaoOS,
   ): Promise<void> {
     // Use a instância fornecida (pode ser this.prisma ou uma transação)
-    const prismaClient = prismaOrTransaction || this.prisma;
+    const prismaClient: Prisma.TransactionClient = prismaOrTransaction || this.prisma;
 
     // O nome vem do id quando ha id: as chamadas passavam 'Sistema' como autor
     // e o usuarioId de verdade ao lado, entao a trilha guardava quem foi mas
@@ -1454,7 +1503,7 @@ export class ProgramacaoOSService {
     });
   }
 
-  private async gerarOrdemServico(prisma: any, programacaoId: string): Promise<string> {
+  private async gerarOrdemServico(prisma: Prisma.TransactionClient, programacaoId: string): Promise<string> {
     const programacao = await prisma.programacoes_os.findUnique({
       where: { id: programacaoId },
       include: {
@@ -1574,6 +1623,8 @@ export class ProgramacaoOSService {
         os_id: os.id,
         descricao: f.descricao,
         quantidade: f.quantidade,
+        // A unidade acompanha a quantidade, como no iniciarDeProgramacao (SN-36)
+        unidade: f.unidade ?? null,
         confirmada: f.confirmada,
         disponivel: f.disponivel,
         observacoes: f.observacoes,
@@ -1698,7 +1749,7 @@ export class ProgramacaoOSService {
    */
   private async reservarViaturaDaProgramacao(
     prisma: Prisma.TransactionClient,
-    programacao: any,
+    programacao: programacoes_os,
     usuarioId?: string,
   ): Promise<void> {
     const veiculoId = programacao.veiculo_id?.trim();
@@ -1741,7 +1792,7 @@ export class ProgramacaoOSService {
    */
   private async reservarViaturaDaOS(
     prisma: Prisma.TransactionClient,
-    programacao: any,
+    programacao: ProgramacaoResponseDto,
     osId: string,
     novaData: { dia: string | null; hora: string | null },
     usuarioId?: string,
@@ -1786,7 +1837,7 @@ export class ProgramacaoOSService {
     await prisma.programacoes_os.update({ where: { id: programacao.id }, data: { reserva_id: reservaId } });
   }
 
-  private async obterEstatisticas(): Promise<any> {
+  private async obterEstatisticas(): Promise<ProgramacaoStatsDto> {
     const stats = await this.prisma.programacoes_os.groupBy({
       by: ['status'],
       where: { deletado_em: null },
@@ -1827,7 +1878,7 @@ export class ProgramacaoOSService {
    * update mandassem `[]` só por não terem consultado, diriam a mesma coisa
    * sem terem olhado.
    */
-  private mapearParaResponse(programacao: any, instalacoes?: Instalacao[]): ProgramacaoResponseDto {
+  private mapearParaResponse(programacao: ProgramacaoParaResposta, instalacoes?: Instalacao[]): ProgramacaoResponseDto {
     return {
       instalacoes,
       id: programacao.id,
@@ -1875,7 +1926,7 @@ export class ProgramacaoOSService {
       motivo_rejeicao: programacao.motivo_rejeicao,
       sugestoes_melhoria: programacao.sugestoes_melhoria,
       motivo_cancelamento: programacao.motivo_cancelamento,
-      tarefas_programacao: programacao.tarefas_programacao?.map((tp: any) => ({
+      tarefas_programacao: programacao.tarefas_programacao?.map((tp) => ({
         id: tp.id,
         programacao_id: tp.programacao_id,
         tarefa_id: tp.tarefa_id,
@@ -1916,15 +1967,15 @@ export class ProgramacaoOSService {
   }
 
   private mapearParaDetalhes(
-    programacao: any,
-    reserva?: any,
+    programacao: ProgramacaoComDetalhes,
+    reserva?: ReservaComVeiculo,
     instalacoes?: Instalacao[],
   ): ProgramacaoDetalhesResponseDto {
     const base = this.mapearParaResponse(programacao, instalacoes);
 
     return {
       ...base,
-      materiais: programacao.materiais?.map((m: any) => ({
+      materiais: programacao.materiais?.map((m) => ({
         id: m.id,
         programacao_id: m.programacao_id,
         descricao: m.descricao,
@@ -1938,18 +1989,18 @@ export class ProgramacaoOSService {
         created_at: m.created_at,
         updated_at: m.updated_at,
       })) || [],
-      ferramentas: programacao.ferramentas?.map((f: any) => ({
+      ferramentas: programacao.ferramentas?.map((f) => ({
         id: f.id,
         programacao_id: f.programacao_id,
         descricao: f.descricao,
-        quantidade: f.quantidade,
+        quantidade: Number(f.quantidade),
         confirmada: f.confirmada,
         disponivel: f.disponivel,
         observacoes: f.observacoes,
         created_at: f.created_at,
         updated_at: f.updated_at,
       })) || [],
-      tecnicos: programacao.tecnicos?.map((t: any) => ({
+      tecnicos: programacao.tecnicos?.map((t) => ({
         id: t.id,
         programacao_id: t.programacao_id,
         nome: t.nome,
@@ -1962,7 +2013,7 @@ export class ProgramacaoOSService {
         created_at: t.created_at,
         updated_at: t.updated_at,
       })) || [],
-      itens_orcamento: programacao.itens_orcamento?.map((i: any) => ({
+      itens_orcamento: programacao.itens_orcamento?.map((i) => ({
         id: i.id,
         programacao_id: i.programacao_id,
         descricao: i.descricao,
@@ -1970,7 +2021,7 @@ export class ProgramacaoOSService {
         created_at: i.created_at,
         updated_at: i.updated_at,
       })) || [],
-      historico: programacao.historico?.map((h: any) => ({
+      historico: programacao.historico?.map((h) => ({
         id: h.id,
         programacao_id: h.programacao_id,
         acao: h.acao,

@@ -2,6 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { NotFoundException } from '@nestjs/common';
 import { PrismaService, PermissionScopeService } from '@/core';
 import { TarefasService } from './tarefas.service';
+import type { TarefaResponseDto } from './dto';
 import { PropagacaoPlanosService } from '../planos-manutencao/propagacao-planos.service';
 
 /**
@@ -28,7 +29,7 @@ describe('TarefasService', () => {
     deleted_at: null,
   };
 
-  const mockPrismaService: any = {
+  const mockPrismaService = {
     tarefas: {
       findFirst: jest.fn(),
       findMany: jest.fn(),
@@ -63,10 +64,12 @@ describe('TarefasService', () => {
     }).compile();
 
     service = module_ref.get<TarefasService>(TarefasService);
-    mockPrismaService.$transaction.mockImplementation(async (cb: any) => cb(mockPrismaService));
+    mockPrismaService.$transaction.mockImplementation(
+      async (cb: (tx: typeof mockPrismaService) => unknown) => cb(mockPrismaService),
+    );
     mockPrismaService.instrucoes.findFirst.mockResolvedValue(instrucao);
     mockPrismaService.tarefas.count.mockResolvedValue(0);
-    jest.spyOn(service, 'buscarPorId').mockResolvedValue({ id: 'tarefa_1' } as any);
+    jest.spyOn(service, 'buscarPorId').mockResolvedValue({ id: 'tarefa_1' } as TarefaResponseDto);
   });
 
   afterEach(() => jest.clearAllMocks());
@@ -84,7 +87,7 @@ describe('TarefasService', () => {
       await service.criar({
         nome: 'Ensaio anual',
         instrucao_id: 'inst_1',
-        frequencia: 'ANUAL' as any,
+        frequencia: 'ANUAL',
         criticidade: 4,
         plano_manutencao_id: 'plano_1',
       });
@@ -109,7 +112,7 @@ describe('TarefasService', () => {
         service.criar({
           nome: 'X',
           instrucao_id: 'nao_existe',
-          frequencia: 'MENSAL' as any,
+          frequencia: 'MENSAL',
           criticidade: 3,
         }),
       ).rejects.toThrow(NotFoundException);
@@ -127,7 +130,7 @@ describe('TarefasService', () => {
       await service.criar({
         nome: 'Ensaio anual',
         instrucao_id: 'inst_1',
-        frequencia: 'ANUAL' as any,
+        frequencia: 'ANUAL',
         criticidade: 4,
         plano_manutencao_id: 'template_1',
       });
@@ -155,7 +158,7 @@ describe('TarefasService', () => {
       await service.criar({
         nome: 'Nova',
         instrucao_id: 'inst_1',
-        frequencia: 'MENSAL' as any,
+        frequencia: 'MENSAL',
         criticidade: 3,
         plano_manutencao_id: 'template_1',
       });
@@ -178,7 +181,7 @@ describe('TarefasService', () => {
       await service.criar({
         nome: 'Nova',
         instrucao_id: 'inst_1',
-        frequencia: 'MENSAL' as any,
+        frequencia: 'MENSAL',
         criticidade: 3,
         plano_manutencao_id: 'copia_1',
       });

@@ -1,4 +1,5 @@
 import { PrismaClient } from '@prisma/client';
+import type { PrismaService } from '@/core';
 import { categoriaDoEquipamento } from './categoria-do-equipamento';
 
 /**
@@ -85,7 +86,7 @@ describe('categoriaDoEquipamento (banco real)', () => {
 
     // O modelo aponta para outra categoria de proposito: e o caso que prova
     // qual das duas vale.
-    const categoria = await categoriaDoEquipamento(prisma as any, eq.id);
+    const categoria = await categoriaDoEquipamento(prisma as unknown as PrismaService, eq.id);
     expect(categoria).toBe(ID_CAT_POSICAO);
   });
 
@@ -99,7 +100,7 @@ describe('categoriaDoEquipamento (banco real)', () => {
       },
     });
 
-    const categoria = await categoriaDoEquipamento(prisma as any, eq.id);
+    const categoria = await categoriaDoEquipamento(prisma as unknown as PrismaService, eq.id);
     expect(categoria).toBe(ID_CAT_MODELO);
   });
 
@@ -111,7 +112,7 @@ describe('categoriaDoEquipamento (banco real)', () => {
       },
     });
 
-    expect(await categoriaDoEquipamento(prisma as any, eq.id)).toBeNull();
+    expect(await categoriaDoEquipamento(prisma as unknown as PrismaService, eq.id)).toBeNull();
   });
 
   it('ignora equipamento removido', async () => {
@@ -123,7 +124,7 @@ describe('categoriaDoEquipamento (banco real)', () => {
       },
     });
 
-    expect(await categoriaDoEquipamento(prisma as any, eq.id)).toBeNull();
+    expect(await categoriaDoEquipamento(prisma as unknown as PrismaService, eq.id)).toBeNull();
   });
 
   it('tolera id com espaco em branco', async () => {
@@ -136,6 +137,6 @@ describe('categoriaDoEquipamento (banco real)', () => {
 
     // Os ids sao Char(26) e voltam do banco com padding — comparar sem trim
     // falha calado, e ja custou bug neste projeto.
-    expect(await categoriaDoEquipamento(prisma as any, `  ${eq.id}  `)).toBe(ID_CAT_POSICAO);
+    expect(await categoriaDoEquipamento(prisma as unknown as PrismaService, `  ${eq.id}  `)).toBe(ID_CAT_POSICAO);
   });
 });

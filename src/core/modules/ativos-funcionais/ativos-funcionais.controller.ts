@@ -9,6 +9,8 @@ import {
   Req,
 } from '@nestjs/common';
 import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
+import type { Request } from 'express';
+import type { UsuarioAutenticado } from '../auth/strategies/jwt.strategy';
 import { AtivosFuncionaisService } from './ativos-funcionais.service';
 import {
   CriarAtivoFuncionalDto,
@@ -32,8 +34,10 @@ import {
 export class AtivosFuncionaisController {
   constructor(private readonly service: AtivosFuncionaisService) {}
 
-  private usuarioDe(req: any): string | undefined {
-    return req?.user?.id ?? req?.user?.sub;
+  private usuarioDe(req: Request): string | undefined {
+    // `sub` e o nome do id no payload do token; o JwtStrategy entrega `id`
+    const usuario = req?.user as (UsuarioAutenticado & { sub?: string }) | undefined;
+    return usuario?.id ?? usuario?.sub;
   }
 
   @Get()
@@ -91,7 +95,7 @@ export class AtivosFuncionaisController {
   async instalar(
     @Param('id') id: string,
     @Body() dto: InstalarEquipamentoDto,
-    @Req() req: any,
+    @Req() req: Request,
   ) {
     return this.service.instalar(id, dto.equipamento_id, {
       usuarioId: this.usuarioDe(req),
@@ -105,7 +109,7 @@ export class AtivosFuncionaisController {
   async remover(
     @Param('id') id: string,
     @Body() dto: RemoverEquipamentoDto,
-    @Req() req: any,
+    @Req() req: Request,
   ) {
     return this.service.remover(id, { motivo: dto.motivo, usuarioId: this.usuarioDe(req) });
   }
@@ -122,7 +126,7 @@ export class AtivosFuncionaisController {
   async transferir(
     @Param('equipamentoId') equipamentoId: string,
     @Body() dto: TransferirEquipamentoDto,
-    @Req() req: any,
+    @Req() req: Request,
   ) {
     return this.service.transferir(equipamentoId, dto.ativo_funcional_id, {
       motivo: dto.motivo,

@@ -77,12 +77,15 @@ export class UsuarioResponseDto {
   })
   all_permissions: UserPermissionResponse[];
 
+  /**
+   * Duas formas, conforme a rota: o detalhe (GET /usuarios/:id, login) traz o
+   * papel como objeto; a lista otimizada traz só o nome. O front lê as duas.
+   */
   @ApiProperty({
-    description: 'Roles do usuário (nomes)',
-    type: [String],
-    example: ['admin']
+    description: 'Papel do usuário: objeto no detalhe, nome na lista',
+    example: [{ id: 1, name: 'admin', guard_name: 'web' }]
   })
-  roles: string[];
+  roles: Array<UserRoleResponse | string>;
 
   @ApiPropertyOptional({ 
     description: 'Role detalhada do usuário (sistema Spatie)',

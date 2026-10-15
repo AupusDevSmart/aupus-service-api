@@ -1,5 +1,5 @@
 // prisma/seeds/anomalias.seed.ts
-import { PrismaClient } from '@/core';
+import { CondicaoAnomalia, OrigemAnomalia, PrioridadeAnomalia, PrismaClient, StatusAnomalia } from '@/core';
 
 const prisma = new PrismaClient();
 
@@ -230,6 +230,15 @@ export async function seedAnomalias() {
       );
     };
 
+    // Os status deste seed (AGUARDANDO, EM_ANALISE, OS_GERADA, RESOLVIDA,
+    // CANCELADA) são de antes do enum de hoje e o Prisma os recusava. Gravam o
+    // equivalente; o histórico continua contando a história com os nomes antigos.
+    const statusDeHoje = (antigo: string): StatusAnomalia => {
+      if (antigo === 'OS_GERADA') return 'PROGRAMADA';
+      if (antigo === 'RESOLVIDA' || antigo === 'CANCELADA') return 'FINALIZADA';
+      return 'REGISTRADA';
+    };
+
     // Função para criar histórico baseado no status
     const createHistoricoByStatus = (status: string, criado_por: string, observacoes?: string) => {
       const historicos = [
@@ -370,10 +379,10 @@ export async function seedAnomalias() {
             local: local,
             ativo: equipamento.nome,
             data: dataBase,
-            condicao: anomaliaData.condicao as any,
-            origem: anomaliaData.origem as any,
-            status: anomaliaData.status as any,
-            prioridade: anomaliaData.prioridade as any,
+            condicao: anomaliaData.condicao as CondicaoAnomalia,
+            origem: anomaliaData.origem as OrigemAnomalia,
+            status: statusDeHoje(anomaliaData.status),
+            prioridade: anomaliaData.prioridade as PrioridadeAnomalia,
             observacoes: anomaliaData.observacoes,
             criado_por: usuarioFinal.nome,
             ordem_servico_id: anomaliaData.ordem_servico_id || null,
@@ -423,8 +432,8 @@ export async function seedAnomalias() {
               data: dataBase,
               condicao: 'FUNCIONANDO',
               origem: 'OPERADOR',
-              status: status as any,
-              prioridade: prioridade as any,
+              status: statusDeHoje(status),
+              prioridade: prioridade as PrioridadeAnomalia,
               observacoes: `Anomalia ${i + 1} criada automaticamente pelo seed`,
               criado_por: usuarioAleatorio.nome,
               planta_id: plantaAleatorio.id,

@@ -1,9 +1,10 @@
 import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
-import { Recurso } from './recursos';
+import type { Prisma } from '@prisma/client';
+import { Recurso, delegatePorNome } from './recursos';
 import { resolverCadeia } from './cadeia-de-dependencias';
 
-type Tx = any;
+type Tx = Prisma.TransactionClient;
 
 /**
  * Marca a transacao como replicacao, para o trigger nao gerar evento de volta.
@@ -70,7 +71,7 @@ export class OutboxService {
     id: string,
     porQuem?: string,
   ): Promise<void> {
-    const existe = await (tx as any)[recurso].findUnique({ where: { id }, select: { id: true } });
+    const existe = await delegatePorNome(tx, recurso).findUnique({ where: { id }, select: { id: true } });
     if (!existe) throw new BadRequestException(`${recurso} ${id} não existe`);
 
     const vinculo = await tx.sincronizacao_vinculos.upsert({

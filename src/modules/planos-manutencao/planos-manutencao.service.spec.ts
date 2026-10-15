@@ -20,7 +20,7 @@ describe('PlanosManutencaoService', () => {
   const MODELO_ID = 'mod_00000000000000000000';
   const TEMPLATE_ID = 'plano_template_0000000000';
 
-  const mockPrismaService: any = {
+  const mockPrismaService = {
     planos_manutencao: {
       findFirst: jest.fn(),
       findMany: jest.fn(),
@@ -68,7 +68,9 @@ describe('PlanosManutencaoService', () => {
     }).compile();
 
     service = module.get<PlanosManutencaoService>(PlanosManutencaoService);
-    mockPrismaService.$transaction.mockImplementation(async (cb: any) => cb(mockPrismaService));
+    mockPrismaService.$transaction.mockImplementation(
+      async (cb: (tx: typeof mockPrismaService) => unknown) => cb(mockPrismaService),
+    );
   });
 
   afterEach(() => jest.clearAllMocks());
@@ -157,7 +159,7 @@ describe('PlanosManutencaoService', () => {
       mockPrismaService.planos_manutencao.findMany.mockResolvedValue([]);
       mockPrismaService.planos_manutencao.count.mockResolvedValue(0);
 
-      await service.listar({ page: 1, limit: 10 } as any);
+      await service.listar({ page: 1, limit: 10 });
 
       const where = mockPrismaService.planos_manutencao.findMany.mock.calls[0][0].where;
       expect(where.plano_origem_id).toBeNull();
@@ -187,13 +189,13 @@ describe('PlanosManutencaoService', () => {
     };
 
     const prepararCenarioFeliz = () => {
-      mockPrismaService.equipamentos.findFirst.mockImplementation(async ({ select }: any) =>
+      mockPrismaService.equipamentos.findFirst.mockImplementation(async ({ select }: { select?: { tipo_equipamento_id?: boolean } }) =>
         select?.tipo_equipamento_id ? { tipo_equipamento_id: MODELO_ID } : equipamentoUC,
       );
       mockPrismaService.tipos_equipamentos.findUnique.mockResolvedValue({
         categoria_id: CATEGORIA_MOTOR,
       });
-      mockPrismaService.planos_manutencao.findFirst.mockImplementation(async ({ where }: any) =>
+      mockPrismaService.planos_manutencao.findFirst.mockImplementation(async ({ where }: { where?: { id?: string; equipamento_id?: string } }) =>
         where?.id === TEMPLATE_ID ? template : null,
       );
       mockPrismaService.planos_manutencao.create.mockResolvedValue({ id: 'copia_0000000000000000' });
@@ -218,7 +220,7 @@ describe('PlanosManutencaoService', () => {
       expect(result.substituiu_vinculo_anterior).toBe(false);
 
       const origens = mockPrismaService.tarefas.create.mock.calls.map(
-        (c: any[]) => c[0].data.origem_status,
+        (c) => c[0].data.origem_status,
       );
       expect(origens).toEqual(['HERDADA', 'HERDADA']);
 
@@ -229,7 +231,7 @@ describe('PlanosManutencaoService', () => {
 
       // E cada tarefa precisa apontar para a tarefa de origem
       const origemIds = mockPrismaService.tarefas.create.mock.calls.map(
-        (c: any[]) => c[0].data.tarefa_origem_id,
+        (c) => c[0].data.tarefa_origem_id,
       );
       expect(origemIds).toEqual(['tarefa_template_1', 'tarefa_template_2']);
     });
@@ -258,7 +260,7 @@ describe('PlanosManutencaoService', () => {
 
     it('rejeita equipamento sem modelo, que nao tem categoria', async () => {
       prepararCenarioFeliz();
-      mockPrismaService.equipamentos.findFirst.mockImplementation(async ({ select }: any) =>
+      mockPrismaService.equipamentos.findFirst.mockImplementation(async ({ select }: { select?: { tipo_equipamento_id?: boolean } }) =>
         select?.tipo_equipamento_id ? { tipo_equipamento_id: null } : equipamentoUC,
       );
 
@@ -269,7 +271,7 @@ describe('PlanosManutencaoService', () => {
 
     it('rejeita vincular uma copia em vez de um template', async () => {
       prepararCenarioFeliz();
-      mockPrismaService.planos_manutencao.findFirst.mockImplementation(async ({ where }: any) =>
+      mockPrismaService.planos_manutencao.findFirst.mockImplementation(async ({ where }: { where?: { id?: string; equipamento_id?: string } }) =>
         where?.id === TEMPLATE_ID ? { ...template, plano_origem_id: 'outro_template' } : null,
       );
 
@@ -291,7 +293,7 @@ describe('PlanosManutencaoService', () => {
         ],
       };
 
-      mockPrismaService.planos_manutencao.findFirst.mockImplementation(async ({ where }: any) => {
+      mockPrismaService.planos_manutencao.findFirst.mockImplementation(async ({ where }: { where?: { id?: string; equipamento_id?: string } }) => {
         if (where?.id === TEMPLATE_ID) return template;
         if (where?.equipamento_id) return copiaAnterior;
         return null;

@@ -33,7 +33,7 @@ export class AnexosConcessionariasService {
 
   async uploadAnexo(
     concessionariaId: string,
-    file: any,
+    file: Express.Multer.File,
     descricao?: string,
   ) {
     // Verificar se concessionária existe

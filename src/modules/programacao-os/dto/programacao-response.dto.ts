@@ -1,5 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { StatusProgramacaoOS, TipoOS, PrioridadeOS, OrigemOS, CondicaoOS } from '@/core';
+import { StatusProgramacaoOS, TipoOS, PrioridadeOS, OrigemOS, CondicaoOS, Prisma, type ordens_servico, type veiculo } from '@/core';
 
 export class UsuarioSimpleDto {
   @ApiProperty({ description: 'ID do usuário' })
@@ -19,17 +19,8 @@ export class TarefaSimpleDto {
   @ApiProperty({ description: 'Nome da tarefa' })
   nome: string;
 
-  @ApiProperty({ description: 'Categoria da tarefa' })
-  categoria: string;
-
-  @ApiProperty({ description: 'Tipo de manutenção' })
-  tipo_manutencao: string;
-
-  @ApiProperty({ description: 'Tempo estimado em horas' })
-  tempo_estimado: number;
-
-  @ApiProperty({ description: 'Duração estimada em horas' })
-  duracao_estimada: number;
+  // Só id e nome: categoria, tipo de manutenção e tempos saíram da tabela
+  // `tarefas` no PR6 e nunca mais vieram na resposta. O conteúdo vive na instrução.
 }
 
 export class SolicitacaoServicoSimpleDto {
@@ -61,7 +52,7 @@ export class SolicitacaoServicoSimpleDto {
   solicitante_nome: string;
 
   @ApiProperty({ description: 'Data da solicitação' })
-  data_solicitacao: string;
+  data_solicitacao: Date;
 }
 
 export class TarefaProgramacaoResponseDto {
@@ -84,10 +75,10 @@ export class TarefaProgramacaoResponseDto {
   observacoes?: string;
 
   @ApiProperty({ description: 'Data de criação' })
-  created_at: string;
+  created_at: Date;
 
   @ApiProperty({ description: 'Data de atualização' })
-  updated_at: string;
+  updated_at: Date;
 
   @ApiProperty({ description: 'Dados da tarefa', type: TarefaSimpleDto })
   tarefa: TarefaSimpleDto;
@@ -125,10 +116,10 @@ export class MaterialProgramacaoResponseDto {
   observacoes?: string;
 
   @ApiProperty({ description: 'Data de criação' })
-  created_at: string;
+  created_at: Date;
 
   @ApiProperty({ description: 'Data de atualização' })
-  updated_at: string;
+  updated_at: Date;
 }
 
 export class FerramentaProgramacaoResponseDto {
@@ -154,10 +145,10 @@ export class FerramentaProgramacaoResponseDto {
   observacoes?: string;
 
   @ApiProperty({ description: 'Data de criação' })
-  created_at: string;
+  created_at: Date;
 
   @ApiProperty({ description: 'Data de atualização' })
-  updated_at: string;
+  updated_at: Date;
 }
 
 export class TecnicoProgramacaoResponseDto {
@@ -189,10 +180,10 @@ export class TecnicoProgramacaoResponseDto {
   tecnico_id?: string;
 
   @ApiProperty({ description: 'Data de criação' })
-  created_at: string;
+  created_at: Date;
 
   @ApiProperty({ description: 'Data de atualização' })
-  updated_at: string;
+  updated_at: Date;
 }
 
 export class ItemOrcamentoProgramacaoResponseDto {
@@ -209,10 +200,10 @@ export class ItemOrcamentoProgramacaoResponseDto {
   valor: number;
 
   @ApiProperty({ description: 'Data de criação' })
-  created_at: string;
+  created_at: Date;
 
   @ApiProperty({ description: 'Data de atualização' })
-  updated_at: string;
+  updated_at: Date;
 }
 
 export class HistoricoProgramacaoResponseDto {
@@ -232,7 +223,7 @@ export class HistoricoProgramacaoResponseDto {
   usuario_id?: string;
 
   @ApiProperty({ description: 'Data da ação' })
-  data: string;
+  data: Date;
 
   @ApiPropertyOptional({ description: 'Observações' })
   observacoes?: string;
@@ -244,7 +235,7 @@ export class HistoricoProgramacaoResponseDto {
   status_novo?: StatusProgramacaoOS;
 
   @ApiPropertyOptional({ description: 'Dados extras' })
-  dados_extras?: any;
+  dados_extras?: Prisma.JsonValue;
 }
 
 export class InstalacaoDaProgramacaoDto {
@@ -275,13 +266,13 @@ export class ProgramacaoResponseDto {
   id: string;
 
   @ApiProperty({ description: 'Data de criação' })
-  criado_em: string;
+  criado_em: Date;
 
   @ApiProperty({ description: 'Data de atualização' })
-  atualizado_em: string;
+  atualizado_em: Date;
 
   @ApiPropertyOptional({ description: 'Data de exclusão' })
-  deletado_em?: string;
+  deletado_em?: Date;
 
   // Identificação
   @ApiProperty({ description: 'Código da programação', example: 'PRG-2025-001' })
@@ -329,14 +320,14 @@ export class ProgramacaoResponseDto {
   solicitacao_servico_id?: string;
 
   @ApiPropertyOptional({ description: 'Dados da origem' })
-  dados_origem?: any;
+  dados_origem?: Prisma.JsonValue;
 
   // Planejamento
   @ApiPropertyOptional({ description: 'Data de previsão de início' })
-  data_previsao_inicio?: string;
+  data_previsao_inicio?: Date;
 
   @ApiPropertyOptional({ description: 'Data de previsão de fim' })
-  data_previsao_fim?: string;
+  data_previsao_fim?: Date;
 
   @ApiProperty({ description: 'Tempo estimado em horas' })
   tempo_estimado: number;
@@ -352,10 +343,10 @@ export class ProgramacaoResponseDto {
   veiculo_id?: string;
 
   @ApiPropertyOptional({ description: 'Data de início da reserva' })
-  reserva_data_inicio?: string;
+  reserva_data_inicio?: Date;
 
   @ApiPropertyOptional({ description: 'Data de fim da reserva' })
-  reserva_data_fim?: string;
+  reserva_data_fim?: Date;
 
   @ApiPropertyOptional({ description: 'Hora de início da reserva (HH:mm)' })
   reserva_hora_inicio?: string;
@@ -380,7 +371,7 @@ export class ProgramacaoResponseDto {
 
   // Programação
   @ApiPropertyOptional({ description: 'Data e hora programada' })
-  data_hora_programada?: string;
+  data_hora_programada?: Date;
 
   @ApiPropertyOptional({ description: 'Responsável' })
   responsavel?: string;
@@ -432,7 +423,7 @@ export class ProgramacaoResponseDto {
   analisado_por_id?: string;
 
   @ApiPropertyOptional({ description: 'Data da análise' })
-  data_analise?: string;
+  data_analise?: Date;
 
   @ApiPropertyOptional({ description: 'Observações da análise' })
   observacoes_analise?: string;
@@ -444,7 +435,7 @@ export class ProgramacaoResponseDto {
   aprovado_por_id?: string;
 
   @ApiPropertyOptional({ description: 'Data da aprovação' })
-  data_aprovacao?: string;
+  data_aprovacao?: Date;
 
   @ApiPropertyOptional({ description: 'Observações da aprovação' })
   observacoes_aprovacao?: string;
@@ -453,7 +444,7 @@ export class ProgramacaoResponseDto {
   ajustes_orcamento?: number;
 
   @ApiPropertyOptional({ description: 'Data sugerida para programação' })
-  data_programada_sugerida?: string;
+  data_programada_sugerida?: Date;
 
   @ApiPropertyOptional({ description: 'Hora sugerida para programação (HH:mm)' })
   hora_programada_sugerida?: string;
@@ -465,7 +456,7 @@ export class ProgramacaoResponseDto {
   finalizado_por_id?: string;
 
   @ApiPropertyOptional({ description: 'Data da finalização' })
-  data_finalizacao?: string;
+  data_finalizacao?: Date;
 
   @ApiPropertyOptional({ description: 'Observações da finalização' })
   observacoes_finalizacao?: string;
@@ -488,7 +479,7 @@ export class ProgramacaoDetalhesResponseDto extends ProgramacaoResponseDto {
   historico: HistoricoProgramacaoResponseDto[];
 
   @ApiPropertyOptional({ description: 'Ordem de serviço gerada (se aprovada)' })
-  ordem_servico?: any;
+  ordem_servico?: ordens_servico;
 
   @ApiPropertyOptional({ description: 'Solicitação de serviço vinculada (se houver)', type: SolicitacaoServicoSimpleDto })
   solicitacao_servico?: SolicitacaoServicoSimpleDto;
@@ -504,7 +495,7 @@ export class ProgramacaoDetalhesResponseDto extends ProgramacaoResponseDto {
     responsavel: string;
     finalidade: string;
     status: string;
-    veiculo?: any;
+    veiculo?: veiculo;
   };
 }
 

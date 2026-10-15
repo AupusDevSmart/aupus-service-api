@@ -18,8 +18,25 @@ import {
   OrdemServicoResponseDto,
   OrdemServicoDetalhesResponseDto,
   ListarOSResponseDto,
+  OSStatsDto,
 } from './dto';
-import { StatusOS, PrioridadeOS, Prisma } from '@/core';
+import {
+  StatusOS,
+  PrioridadeOS,
+  Prisma,
+  type anomalias,
+  type equipamentos,
+  type ferramentas_os,
+  type materiais_os,
+  type ordens_servico,
+  type planos_manutencao,
+  type plantas,
+  type programacoes_os,
+  type reserva_veiculo,
+  type tarefas_os,
+  type tecnicos_os,
+  type veiculo,
+} from '@/core';
 import { gerarNumeroOS } from '../../common/helpers/numeracao-os';
 import { Instalacao, instalacoesDasOrdens } from '../../common/helpers/instalacao-da-os';
 import { finalizarOrigem, origemDaProgramacao } from '../../common/helpers/status-da-origem';
@@ -40,8 +57,98 @@ import { devolverViatura } from '../reservas/ocupacao-da-viatura';
  * O snapshot vem primeiro de propósito: é o que foi pedido na época, e é para
  * isso que o congelamento existe.
  */
-const nomeDaTarefa = (vinculo: any): string =>
+const nomeDaTarefa = (vinculo: VinculoComNome | null | undefined): string =>
   vinculo?.nome_snapshot || vinculo?.instrucao_nome || vinculo?.tarefa?.nome || 'tarefa sem nome';
+
+/** O que `nomeDaTarefa` lê do vínculo da tarefa na OS */
+type VinculoComNome = Pick<tarefas_os, 'nome_snapshot' | 'instrucao_nome'> & { tarefa?: { nome: string } | null };
+
+/** A reserva da OS como as consultas deste service a trazem: com o resumo da viatura */
+type ReservaDaOS = reserva_veiculo & { veiculo: Pick<veiculo, 'id' | 'placa' | 'modelo' | 'marca'> };
+
+/**
+ * A OS como `mapearParaResponse` a lê. A listagem e o detalhe incluem relações
+ * diferentes; o tipo é o que as duas têm em comum.
+ */
+type OSParaResposta = ordens_servico & {
+  tarefas_os?: Array<
+    tarefas_os & {
+      tarefa?: {
+        id: string;
+        nome: string;
+        instrucao_id?: string | null;
+        plano_manutencao?: { id: string; nome: string } | null;
+      } | null;
+    }
+  >;
+  materiais?: materiais_os[];
+  ferramentas?: ferramentas_os[];
+  tecnicos?: tecnicos_os[];
+  programacao?: Pick<programacoes_os, 'id' | 'codigo' | 'descricao'> | null;
+  anomalia?: Pick<anomalias, 'id' | 'descricao' | 'prioridade' | 'status'> | null;
+  plano_manutencao?: Pick<planos_manutencao, 'id' | 'nome' | 'descricao'> | null;
+  planta?: Pick<plantas, 'id' | 'nome'> | null;
+  equipamento?: Pick<equipamentos, 'id' | 'nome' | 'tipo_equipamento' | 'fabricante' | 'modelo'> | null;
+  reserva_veiculo?: ReservaDaOS | null;
+};
+
+/** A OS com tudo o que `buscarPorId` inclui */
+type OSComDetalhes = Prisma.ordens_servicoGetPayload<{
+  include: {
+    programacao: {
+      include: {
+        solicitacao_servico: {
+          select: {
+            id: true;
+            numero: true;
+            titulo: true;
+            descricao: true;
+            tipo: true;
+            prioridade: true;
+            status: true;
+            local: true;
+            solicitante_nome: true;
+            data_solicitacao: true;
+          };
+        };
+      };
+    };
+    anomalia: {
+      select: {
+        id: true;
+        descricao: true;
+        prioridade: true;
+        status: true;
+        local: true;
+        ativo: true;
+        condicao: true;
+        origem: true;
+        observacoes: true;
+        created_at: true;
+        updated_at: true;
+      };
+    };
+    plano_manutencao: { select: { id: true; nome: true; descricao: true } };
+    planta: { select: { id: true; nome: true } };
+    equipamento: { select: { id: true; nome: true; tipo_equipamento: true; fabricante: true; modelo: true } };
+    tarefas_os: {
+      include: {
+        tarefa: {
+          select: { id: true; nome: true; instrucao_id: true; plano_manutencao: { select: { id: true; nome: true } } };
+        };
+      };
+    };
+    materiais: true;
+    ferramentas: true;
+    tecnicos: true;
+    itens_orcamento: true;
+    checklist_atividades: true;
+    anexos: true;
+    registros_tempo: true;
+    historico: true;
+    reserva_veiculo: { include: { veiculo: { select: { id: true; placa: true; modelo: true; marca: true } } } };
+  };
+}>;
 
 @Injectable()
 export class ExecucaoOSService {
@@ -137,7 +244,7 @@ export class ExecucaoOSService {
                 { planta_id: null, equipamento: { equipamento_pai: { unidade: { planta_id: { in: scope } } } } },
               ],
             };
-      where.AND = where.AND ? [...(where.AND as any[]), scopeFragment] : [scopeFragment];
+      where.AND = where.AND ? [...(where.AND as Prisma.ordens_servicoWhereInput[]), scopeFragment] : [scopeFragment];
     }
 
     // Contar total
@@ -243,7 +350,7 @@ export class ExecucaoOSService {
       if (ordem.reserva_id && !ordem.reserva_veiculo) {
         const reservaId = ordem.reserva_id.trim();
         if (reservaId) {
-          (ordem as any).reserva_veiculo = await this.prisma.reserva_veiculo.findUnique({
+          ordem.reserva_veiculo = await this.prisma.reserva_veiculo.findUnique({
             where: { id: reservaId },
             include: {
               veiculo: {
@@ -413,7 +520,7 @@ export class ExecucaoOSService {
     if (os.reserva_id && !os.reserva_veiculo) {
       const reservaId = os.reserva_id.trim();
       if (reservaId) {
-        (os as any).reserva_veiculo = await this.prisma.reserva_veiculo.findUnique({
+        os.reserva_veiculo = await this.prisma.reserva_veiculo.findUnique({
           where: { id: reservaId },
           include: {
             veiculo: {
@@ -446,7 +553,7 @@ export class ExecucaoOSService {
           status: StatusOS.EM_EXECUCAO,
           data_hora_inicio_real: dataHoraInicio,
           responsavel: dto.responsavel_execucao || os.responsavel,
-          equipe_presente: dto.equipe_presente as any || undefined,
+          equipe_presente: dto.equipe_presente || undefined,
           observacoes_execucao: dto.observacoes,
         },
       });
@@ -562,7 +669,7 @@ export class ExecucaoOSService {
           anomalia_id: programacao.anomalia_id,
           plano_manutencao_id: programacao.plano_manutencao_id,
           reserva_id: programacao.reserva_id,
-          dados_origem: programacao.dados_origem as any,
+          dados_origem: programacao.dados_origem,
           tempo_estimado: programacao.tempo_estimado,
           duracao_estimada: programacao.duracao_estimada,
           responsavel: dto.responsavel_execucao || programacao.responsavel,
@@ -575,7 +682,7 @@ export class ExecucaoOSService {
           data_hora_programada:
             programacao.data_hora_programada || programacao.data_previsao_inicio,
           data_hora_inicio_real: dataHoraInicio,
-          equipe_presente: dto.equipe_presente as any,
+          equipe_presente: dto.equipe_presente,
           orcamento_previsto: programacao.orcamento_previsto,
           observacoes: programacao.observacoes,
           observacoes_programacao: programacao.observacoes_programacao,
@@ -1335,7 +1442,7 @@ export class ExecucaoOSService {
    * O texto e copiado (a tabela guarda `atividade` como texto, nao FK), entao o
    * checklist fica congelado junto com o resto do conteudo da OS.
    */
-  private async gerarChecklistPadrao(prisma: any, osId: string): Promise<void> {
+  private async gerarChecklistPadrao(prisma: Prisma.TransactionClient, osId: string): Promise<void> {
     const checklistExistente = await prisma.checklist_atividades_os.count({
       where: { os_id: osId },
     });
@@ -1450,7 +1557,7 @@ export class ExecucaoOSService {
    * Sem itens devolve null — 0% diria que nada foi feito, quando na verdade
    * nao havia o que fazer.
    */
-  private async calcularChecklistConcluido(prisma: any, osId: string): Promise<number | null> {
+  private async calcularChecklistConcluido(prisma: Prisma.TransactionClient, osId: string): Promise<number | null> {
     const [total, concluidas] = await Promise.all([
       prisma.checklist_atividades_os.count({ where: { os_id: osId } }),
       prisma.checklist_atividades_os.count({ where: { os_id: osId, concluida: true } }),
@@ -1503,7 +1610,7 @@ export class ExecucaoOSService {
    * automatica — e que continua como "Sistema".
    */
   private async registrarHistorico(
-    prisma: any,
+    prisma: Prisma.TransactionClient,
     osId: string,
     acao: string,
     usuario: string,
@@ -1535,14 +1642,14 @@ export class ExecucaoOSService {
     });
   }
 
-  private async obterEstatisticas(): Promise<any> {
+  private async obterEstatisticas(): Promise<OSStatsDto> {
     const stats = await this.prisma.ordens_servico.groupBy({
       by: ['status'],
       where: { deletado_em: null },
       _count: true,
     });
 
-    const resultado: Record<string, number> = {
+    const resultado: OSStatsDto = {
       pendentes: 0,
       em_execucao: 0,
       pausadas: 0,
@@ -1608,7 +1715,7 @@ export class ExecucaoOSService {
    * não tem instalação" — a OS manual não tem —, e é o que a tela mostra como
    * "—". Ausente é o chamador que não apurou.
    */
-  private mapearParaResponse(os: any, instalacoes?: Instalacao[]): OrdemServicoResponseDto {
+  private mapearParaResponse(os: OSParaResposta, instalacoes?: Instalacao[]): OrdemServicoResponseDto {
     return {
       instalacoes,
       id: os.id,
@@ -1639,7 +1746,8 @@ export class ExecucaoOSService {
       time_equipe: os.time_equipe,
       data_hora_inicio_real: os.data_hora_inicio_real,
       data_hora_fim_real: os.data_hora_fim_real,
-      equipe_presente: os.equipe_presente,
+      // Coluna Json, gravada só a partir de IniciarExecucaoDto.equipe_presente (string[])
+      equipe_presente: os.equipe_presente as string[],
       orcamento_previsto: os.orcamento_previsto ? Number(os.orcamento_previsto) : null,
       custo_real: os.custo_real ? Number(os.custo_real) : null,
       observacoes: os.observacoes,
@@ -1665,7 +1773,7 @@ export class ExecucaoOSService {
       // para cobrir — cópia do plano apagada, e id de 25 chars que não casa com
       // o Char(26) do FK. A OS ficava sem checklist e o card de origem sem
       // nada a dizer.
-      tarefas_os: os.tarefas_os?.map((to: any) => ({
+      tarefas_os: os.tarefas_os?.map((to) => ({
         id: to.id,
         os_id: to.os_id,
         tarefa_id: to.tarefa_id,
@@ -1700,7 +1808,7 @@ export class ExecucaoOSService {
             }
           : null,
       })) || [],
-      materiais: os.materiais?.map((m: any) => ({
+      materiais: os.materiais?.map((m) => ({
         id: m.id,
         os_id: m.os_id,
         descricao: m.descricao,
@@ -1715,11 +1823,11 @@ export class ExecucaoOSService {
         created_at: m.created_at,
         updated_at: m.updated_at,
       })) || [],
-      ferramentas: os.ferramentas?.map((f: any) => ({
+      ferramentas: os.ferramentas?.map((f) => ({
         id: f.id,
         os_id: f.os_id,
         descricao: f.descricao,
-        quantidade: f.quantidade,
+        quantidade: Number(f.quantidade),
         confirmada: f.confirmada,
         disponivel: f.disponivel,
         utilizada: f.utilizada,
@@ -1729,7 +1837,7 @@ export class ExecucaoOSService {
         created_at: f.created_at,
         updated_at: f.updated_at,
       })) || [],
-      tecnicos: os.tecnicos?.map((t: any) => ({
+      tecnicos: os.tecnicos?.map((t) => ({
         id: t.id,
         os_id: t.os_id,
         nome: t.nome,
@@ -1764,14 +1872,14 @@ export class ExecucaoOSService {
     };
   }
 
-  private mapearParaDetalhes(os: any, instalacoes?: Instalacao[]): OrdemServicoDetalhesResponseDto {
+  private mapearParaDetalhes(os: OSComDetalhes, instalacoes?: Instalacao[]): OrdemServicoDetalhesResponseDto {
     const base = this.mapearParaResponse(os, instalacoes);
 
     return {
       ...base,
       programacao_origem: os.programacao,
       solicitacao_servico: os.programacao?.solicitacao_servico || undefined,
-      materiais: os.materiais?.map((m: any) => ({
+      materiais: os.materiais?.map((m) => ({
         id: m.id,
         os_id: m.os_id,
         descricao: m.descricao,
@@ -1786,11 +1894,11 @@ export class ExecucaoOSService {
         created_at: m.created_at,
         updated_at: m.updated_at,
       })) || [],
-      ferramentas: os.ferramentas?.map((f: any) => ({
+      ferramentas: os.ferramentas?.map((f) => ({
         id: f.id,
         os_id: f.os_id,
         descricao: f.descricao,
-        quantidade: f.quantidade,
+        quantidade: Number(f.quantidade),
         confirmada: f.confirmada,
         disponivel: f.disponivel,
         utilizada: f.utilizada,
@@ -1800,7 +1908,7 @@ export class ExecucaoOSService {
         created_at: f.created_at,
         updated_at: f.updated_at,
       })) || [],
-      itens_orcamento: os.itens_orcamento?.map((i: any) => ({
+      itens_orcamento: os.itens_orcamento?.map((i) => ({
         id: i.id,
         os_id: i.os_id,
         descricao: i.descricao,
@@ -1808,7 +1916,7 @@ export class ExecucaoOSService {
         created_at: i.created_at,
         updated_at: i.updated_at,
       })) || [],
-      tecnicos: os.tecnicos?.map((t: any) => ({
+      tecnicos: os.tecnicos?.map((t) => ({
         id: t.id,
         os_id: t.os_id,
         nome: t.nome,
@@ -1823,7 +1931,7 @@ export class ExecucaoOSService {
         created_at: t.created_at,
         updated_at: t.updated_at,
       })) || [],
-      checklist: os.checklist_atividades?.map((c: any) => ({
+      checklist: os.checklist_atividades?.map((c) => ({
         id: c.id,
         os_id: c.os_id,
         atividade: c.atividade,
@@ -1839,7 +1947,7 @@ export class ExecucaoOSService {
         created_at: c.created_at,
         updated_at: c.updated_at,
       })) || [],
-      anexos: os.anexos?.map((a: any) => ({
+      anexos: os.anexos?.map((a) => ({
         id: a.id,
         os_id: a.os_id,
         nome: a.nome,
@@ -1856,15 +1964,15 @@ export class ExecucaoOSService {
         uploaded_by_id: a.uploaded_by_id,
         deletado_em: a.deletado_em,
       })) || [],
-      registros_tempo: os.registros_tempo?.map((r: any) => ({
+      registros_tempo: os.registros_tempo?.map((r) => ({
         id: r.id,
         os_id: r.os_id,
         tecnico_id: r.tecnico_id,
         tecnico_nome: r.tecnico_nome,
-        data_inicio: r.data_inicio,
-        hora_inicio: r.hora_inicio,
-        data_fim: r.data_fim,
-        hora_fim: r.hora_fim,
+        // Eram data_inicio/hora_inicio/data_fim/hora_fim, que não existem na
+        // tabela: saíam sempre vazios (SN-36)
+        data_hora_inicio: r.data_hora_inicio,
+        data_hora_fim: r.data_hora_fim,
         tempo_total: r.tempo_total,
         atividade: r.atividade,
         observacoes: r.observacoes,
@@ -1892,7 +2000,7 @@ export class ExecucaoOSService {
         criado_em: os.reserva_veiculo.criado_em,
         atualizado_em: os.reserva_veiculo.atualizado_em,
       } : undefined,
-      historico: os.historico?.map((h: any) => ({
+      historico: os.historico?.map((h) => ({
         id: h.id,
         os_id: h.os_id,
         acao: h.acao,

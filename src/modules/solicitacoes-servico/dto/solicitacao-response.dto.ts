@@ -3,8 +3,25 @@ import {
   StatusSolicitacaoServico,
   TipoSolicitacaoServico,
   PrioridadeSolicitacao,
-  OrigemSolicitacao
+  OrigemSolicitacao,
+  type plantas,
+  type unidades,
+  type usuarios,
+  type equipamentos,
+  type anexos_solicitacao_servico,
+  type historico_solicitacao_servico,
+  type comentarios_solicitacao_servico,
 } from '@/core';
+
+/** Tarefa ou instrução vinculada, achatada com a ordem e a observação do vínculo */
+type VinculoDaSolicitacao = {
+  id: string;
+  tag: string;
+  nome: string;
+  criticidade: number;
+  ordem: number;
+  observacoes: string | null;
+};
 
 export class SolicitacaoResponseDto {
   @ApiProperty()
@@ -112,39 +129,40 @@ export class SolicitacaoResponseDto {
   @ApiProperty()
   updated_at: Date;
 
-  // Relacionamentos opcionais
+  // Relacionamentos opcionais. Vêm parciais: a listagem lê planta e unidade por
+  // SQL cru (só algumas colunas) e o equipamento e os anexos por `select`.
   @ApiPropertyOptional()
-  planta?: any;
+  planta?: Partial<plantas>;
 
   @ApiPropertyOptional()
-  unidade?: any;
+  unidade?: Partial<unidades>;
 
   @ApiPropertyOptional()
-  proprietario?: any;
+  proprietario?: usuarios;
 
   @ApiPropertyOptional()
-  equipamento?: any;
+  equipamento?: Partial<equipamentos>;
 
   @ApiPropertyOptional()
-  anexos?: any[];
+  anexos?: Partial<anexos_solicitacao_servico>[];
 
   @ApiPropertyOptional()
-  historico?: any[];
+  historico?: historico_solicitacao_servico[];
 
   @ApiPropertyOptional()
-  comentarios?: any[];
+  comentarios?: comentarios_solicitacao_servico[];
 
   @ApiPropertyOptional({
     description: 'Tarefas associadas à solicitação',
     type: [Object]
   })
-  tarefas?: any[];
+  tarefas?: VinculoDaSolicitacao[];
 
   @ApiPropertyOptional({
     description: 'Instruções associadas à solicitação',
     type: [Object]
   })
-  instrucoes?: any[];
+  instrucoes?: VinculoDaSolicitacao[];
 }
 
 export class ListarSolicitacoesResponseDto {

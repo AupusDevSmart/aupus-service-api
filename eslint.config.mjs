@@ -34,10 +34,11 @@ export default tseslint.config(
       'unused-imports': unusedImports,
     },
     rules: {
-      // `any` e convencao neste backend (o mapper de resposta recebe a linha
-      // crua do Prisma, os specs montam mocks soltos). Como AVISO ele ainda
-      // aparece para quem esta escrevendo codigo novo, sem reprovar a base.
-      '@typescript-eslint/no-explicit-any': 'warn',
+      // `any` zerado no SN-36 (out/2026): 671 em 158 arquivos, a maioria
+      // escondendo coluna que nao existe ou tipo errado. ERRO para nao voltar:
+      // linha do Prisma tem tipo (`Prisma.<model>GetPayload`), Json e
+      // `Prisma.JsonValue`, valor arbitrario e `unknown` com narrowing.
+      '@typescript-eslint/no-explicit-any': 'error',
       '@typescript-eslint/no-unused-vars': 'off',
       'unused-imports/no-unused-imports': 'error',
       'unused-imports/no-unused-vars': [

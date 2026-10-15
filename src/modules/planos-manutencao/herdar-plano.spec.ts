@@ -1,5 +1,7 @@
 import { PrismaClient } from '@prisma/client';
+import type { PermissionScopeService, PrismaService } from '@/core';
 import { PlanosManutencaoService } from './planos-manutencao.service';
+import type { PropagacaoPlanosService } from './propagacao-planos.service';
 import { planoAHerdar } from './heranca-de-plano';
 
 /**
@@ -14,9 +16,9 @@ import { planoAHerdar } from './heranca-de-plano';
 describe('herdarPlano (banco real)', () => {
   const prisma = new PrismaClient();
   const service = new PlanosManutencaoService(
-    prisma as any,
-    { assertEntityInScope: async () => undefined } as any,
-    { propagarParaCopias: async () => undefined } as any,
+    prisma as unknown as PrismaService,
+    { assertEntityInScope: async () => undefined } as unknown as PermissionScopeService,
+    { enfileirar: async () => 'propagacao-de-teste' } as unknown as PropagacaoPlanosService,
   );
 
   const ID_PROP = 'TESTEHDRPROPRIETARIO00001';
@@ -112,7 +114,7 @@ describe('herdarPlano (banco real)', () => {
   afterAll(async () => { await prisma.$disconnect(); });
 
   it('copia o template para o equipamento novo e aplica as datas revisadas', async () => {
-    const heranca = await planoAHerdar(prisma as any, posicaoId);
+    const heranca = await planoAHerdar(prisma as unknown as PrismaService, posicaoId);
     const trocaDeOleo = heranca!.tarefas.find(t => t.nome === 'Troca de oleo')!;
 
     const r = await service.herdarPlano({

@@ -65,7 +65,7 @@ export class AnexosUnidadesService {
     }
   }
 
-  async uploadAnexo(unidadeId: string, file: any, descricao?: string) {
+  async uploadAnexo(unidadeId: string, file: Express.Multer.File, descricao?: string) {
     const id = unidadeId?.trim();
     await this.assertUnidadeExiste(id);
 

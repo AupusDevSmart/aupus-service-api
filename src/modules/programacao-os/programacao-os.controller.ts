@@ -10,7 +10,7 @@ import {
   Post,
   Query,
 } from '@nestjs/common';
-import { CurrentUser, Permissions } from '@/core';
+import { CurrentUser, Permissions, ScopedUser } from '@/core';
 import { ParseULIDPipe } from '../../shared/pipes/parse-ulid.pipe';
 import {
   ApiOperation,
@@ -65,7 +65,7 @@ export class ProgramacaoOSController {
   @ApiQuery({ name: 'data_inicio', required: false, description: 'Data início (YYYY-MM-DD)' })
   @ApiQuery({ name: 'data_fim', required: false, description: 'Data fim (YYYY-MM-DD)' })
   @ApiQuery({ name: 'criado_por_id', required: false, description: 'Filtrar por criador' })
-  async listar(@Query() filters: ProgramacaoFiltersDto, @CurrentUser() user?: any): Promise<ListarProgramacoesResponseDto> {
+  async listar(@Query() filters: ProgramacaoFiltersDto, @CurrentUser() user?: ScopedUser): Promise<ListarProgramacoesResponseDto> {
     return this.programacaoOSService.listar(filters, user);
   }
 
@@ -85,7 +85,7 @@ export class ProgramacaoOSController {
     description: 'Dados inválidos',
   })
   
-  async criar(@Body() createDto: CreateProgramacaoDto, @CurrentUser() user?: any): Promise<ProgramacaoResponseDto> {
+  async criar(@Body() createDto: CreateProgramacaoDto, @CurrentUser() user?: ScopedUser): Promise<ProgramacaoResponseDto> {
     return this.programacaoOSService.criar(createDto, user?.id, user);
   }
 
@@ -111,7 +111,7 @@ export class ProgramacaoOSController {
   })
   async buscarPorUnidade(
     @Param('unidadeId') unidadeId: string,
-    @CurrentUser() user?: any,
+    @CurrentUser() user?: ScopedUser,
     @Query() filters?: Partial<ProgramacaoFiltersDto>,
   ): Promise<ListarProgramacoesResponseDto> {
     return this.programacaoOSService.buscarPorUnidade(unidadeId, filters, user);
@@ -124,7 +124,7 @@ export class ProgramacaoOSController {
     description: 'Equipe da planta (técnicos de campo vinculados) e apoio (planejador, gerente, administrador)',
   })
   @ApiQuery({ name: 'planta_id', required: false, description: 'Sem planta, só o apoio' })
-  async pessoas(@Query('planta_id') plantaId?: string, @CurrentUser() user?: any): Promise<PessoasDaPlanta> {
+  async pessoas(@Query('planta_id') plantaId?: string, @CurrentUser() user?: ScopedUser): Promise<PessoasDaPlanta> {
     return this.programacaoOSService.pessoasQuePodemAtuar(plantaId, user);
   }
 
@@ -143,7 +143,7 @@ export class ProgramacaoOSController {
     status: HttpStatus.NOT_FOUND,
     description: 'Programação não encontrada',
   })
-  async buscarPorId(@Param('id', ParseULIDPipe) id: string, @CurrentUser() user?: any): Promise<ProgramacaoDetalhesResponseDto> {
+  async buscarPorId(@Param('id', ParseULIDPipe) id: string, @CurrentUser() user?: ScopedUser): Promise<ProgramacaoDetalhesResponseDto> {
     return this.programacaoOSService.buscarPorId(id, user);
   }
 
@@ -172,7 +172,7 @@ export class ProgramacaoOSController {
   async atualizar(
     @Param('id', ParseULIDPipe) id: string,
     @Body() updateDto: UpdateProgramacaoDto,
-    @CurrentUser() user?: any,
+    @CurrentUser() user?: ScopedUser,
   ): Promise<ProgramacaoResponseDto> {
     return this.programacaoOSService.atualizar(id, updateDto, user?.id, user);
   }
@@ -189,7 +189,7 @@ export class ProgramacaoOSController {
   async aprovar(
     @Param('id', ParseULIDPipe) id: string,
     @Body() dto: AprovarProgramacaoDto,
-    @CurrentUser() user?: any,
+    @CurrentUser() user?: ScopedUser,
   ): Promise<{ message: string }> {
     await this.programacaoOSService.aprovar(id, dto, user?.id, user);
     return { message: 'Programação aprovada e OS gerada com sucesso' };
@@ -209,7 +209,7 @@ export class ProgramacaoOSController {
   async cancelar(
     @Param('id', ParseULIDPipe) id: string,
     @Body() dto: CancelarProgramacaoDto,
-    @CurrentUser() user?: any,
+    @CurrentUser() user?: ScopedUser,
   ): Promise<{ message: string }> {
     await this.programacaoOSService.cancelar(id, dto, user?.id, user);
     return { message: 'Programação cancelada' };
@@ -234,7 +234,7 @@ export class ProgramacaoOSController {
   async criarDeAnomalia(
     @Param('anomaliaId', ParseULIDPipe) anomaliaId: string,
     @Body() dto: CreateProgramacaoAnomaliaDto,
-    @CurrentUser() user?: any,
+    @CurrentUser() user?: ScopedUser,
   ): Promise<ProgramacaoResponseDto> {
     return this.programacaoOSService.criarDeAnomalia(anomaliaId, dto, user?.id);
   }
@@ -254,7 +254,7 @@ export class ProgramacaoOSController {
     status: HttpStatus.NOT_FOUND,
     description: 'Uma ou mais tarefas não encontradas',
   })
-  async criarDeTarefas(@Body() dto: CreateProgramacaoTarefasDto, @CurrentUser() user?: any): Promise<ProgramacaoResponseDto> {
+  async criarDeTarefas(@Body() dto: CreateProgramacaoTarefasDto, @CurrentUser() user?: ScopedUser): Promise<ProgramacaoResponseDto> {
     return this.programacaoOSService.criarDeTarefas(dto, user?.id);
   }
 
@@ -280,8 +280,8 @@ export class ProgramacaoOSController {
   })
   async criarDeSolicitacao(
     @Param('solicitacaoId', ParseULIDPipe) solicitacaoId: string,
-    @Body() dto?: any,
-    @CurrentUser() user?: any,
+    @Body() dto?: Partial<CreateProgramacaoDto>,
+    @CurrentUser() user?: ScopedUser,
   ): Promise<ProgramacaoResponseDto> {
     return this.programacaoOSService.criarDeSolicitacao(solicitacaoId, dto, user?.id);
   }
@@ -304,7 +304,7 @@ export class ProgramacaoOSController {
   async adicionarTarefas(
     @Param('id', ParseULIDPipe) id: string,
     @Body() dto: AdicionarTarefasDto,
-    @CurrentUser() user?: any,
+    @CurrentUser() user?: ScopedUser,
   ): Promise<{ message: string }> {
     await this.programacaoOSService.adicionarTarefasProgramacao(id, dto, user?.id);
     return { message: 'Tarefas adicionadas com sucesso' };
@@ -324,7 +324,7 @@ export class ProgramacaoOSController {
   async atualizarTarefas(
     @Param('id', ParseULIDPipe) id: string,
     @Body() dto: AtualizarTarefasDto,
-    @CurrentUser() user?: any,
+    @CurrentUser() user?: ScopedUser,
   ): Promise<{ message: string }> {
     await this.programacaoOSService.atualizarTarefasProgramacao(id, dto, user?.id);
     return { message: 'Tarefas atualizadas com sucesso' };
@@ -349,7 +349,7 @@ export class ProgramacaoOSController {
   async removerTarefa(
     @Param('id', ParseULIDPipe) id: string,
     @Param('tarefaId', ParseULIDPipe) tarefaId: string,
-    @CurrentUser() user?: any,
+    @CurrentUser() user?: ScopedUser,
   ): Promise<{ message: string }> {
     await this.programacaoOSService.removerTarefaProgramacao(id, tarefaId, user?.id);
     return { message: 'Tarefa removida com sucesso' };
@@ -370,7 +370,7 @@ export class ProgramacaoOSController {
     status: HttpStatus.CONFLICT,
     description: 'Programações aprovadas não podem ser deletadas',
   })
-  async deletar(@Param('id', ParseULIDPipe) id: string, @CurrentUser() user?: any): Promise<{ message: string }> {
+  async deletar(@Param('id', ParseULIDPipe) id: string, @CurrentUser() user?: ScopedUser): Promise<{ message: string }> {
     await this.programacaoOSService.deletar(id, user?.id);
     return { message: 'Programação deletada com sucesso' };
   }

@@ -1,7 +1,7 @@
 // src/modules/planos-manutencao/propagacao-planos.service.ts
 import { Injectable, Logger } from '@nestjs/common';
 import { Cron } from '@nestjs/schedule';
-import { PrismaService, depoisDeGravar } from '@/core';
+import { Prisma, PrismaService, depoisDeGravar } from '@/core';
 
 /** Campos que a propagacao pode escrever. Ver comentario em aplicarNaCopia. */
 const CAMPOS_DE_DEFINICAO = [
@@ -11,6 +11,9 @@ const CAMPOS_DE_DEFINICAO = [
   'frequencia_personalizada',
   'criticidade',
 ] as const;
+
+/** Plano com as tarefas, como `propagar` le o template e cada copia. */
+type PlanoComTarefas = Prisma.planos_manutencaoGetPayload<{ include: { tarefas: true } }>;
 
 export interface ResultadoPropagacao {
   copias_atualizadas: number;
@@ -190,7 +193,7 @@ export class PropagacaoPlanosService {
     return resultado;
   }
 
-  private async aplicarNaCopia(template: any, copia: any) {
+  private async aplicarNaCopia(template: PlanoComTarefas, copia: PlanoComTarefas) {
     const parcial = {
       tarefas_atualizadas: 0,
       tarefas_criadas: 0,
@@ -198,7 +201,7 @@ export class PropagacaoPlanosService {
       tarefas_preservadas: 0,
     };
 
-    const porOrigem = new Map<string, any>();
+    const porOrigem = new Map<string, PlanoComTarefas['tarefas'][number]>();
     for (const tarefa of copia.tarefas) {
       const origemId = tarefa.tarefa_origem_id?.trim();
       if (origemId) porOrigem.set(origemId, tarefa);
@@ -279,7 +282,7 @@ export class PropagacaoPlanosService {
 
     // Tarefa apagada do template sai das copias, exceto onde foi customizada:
     // ali o usuario assumiu a tarefa como dele.
-    const idsNoTemplate = new Set(template.tarefas.map((t: any) => t.id.trim()));
+    const idsNoTemplate = new Set(template.tarefas.map((t) => t.id.trim()));
     for (const tarefa of copia.tarefas) {
       const origemId = tarefa.tarefa_origem_id?.trim();
       if (!origemId || idsNoTemplate.has(origemId)) continue;

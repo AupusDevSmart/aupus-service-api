@@ -1,4 +1,5 @@
 import { PrismaClient } from '@prisma/client';
+import type { PrismaService } from '../../prisma/prisma.service';
 import { OutboxService } from './outbox.service';
 
 /**
@@ -11,7 +12,7 @@ import { OutboxService } from './outbox.service';
  */
 describe('vincular com cadeia (banco real)', () => {
   const prisma = new PrismaClient();
-  const outbox = new OutboxService(prisma as any);
+  const outbox = new OutboxService(prisma as unknown as PrismaService);
 
   const ID_PROP = 'TESTEVINPROPRIETARIO00001';
   const ID_PLANTA = 'TESTEVINPLANTA0000000001';

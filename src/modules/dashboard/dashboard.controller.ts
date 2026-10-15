@@ -1,9 +1,9 @@
 import { Controller, Get, Query } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiQuery } from '@nestjs/swagger';
 import { DashboardService } from './dashboard.service';
-import { DashboardSimpleService } from './dashboard-simple.service';
-import { DashboardManutencaoService } from './dashboard-manutencao.service';
-import { Permissions, CurrentUser } from '@/core';
+import { DashboardSimpleService, FiltrosDashboardAvancado } from './dashboard-simple.service';
+import { DashboardManutencaoService, FiltrosDashboardManutencao } from './dashboard-manutencao.service';
+import { Permissions, CurrentUser, ScopedUser } from '@/core';
 import { DashboardOverviewDto } from './dto/overview.dto';
 import { DashboardWorkOrdersDto } from './dto/work-orders.dto';
 import { DashboardTaskPrioritiesDto } from './dto/task-priorities.dto';
@@ -28,7 +28,7 @@ export class DashboardController {
     description: 'Visão geral retornada com sucesso',
     type: DashboardOverviewDto,
   })
-  async getOverview(@CurrentUser() user: any): Promise<DashboardOverviewDto> {
+  async getOverview(@CurrentUser() user: ScopedUser): Promise<DashboardOverviewDto> {
     return this.dashboardService.getOverview(user);
   }
 
@@ -39,7 +39,7 @@ export class DashboardController {
     description: 'Métricas de OS retornadas com sucesso',
     type: DashboardWorkOrdersDto,
   })
-  async getWorkOrders(@CurrentUser() user: any): Promise<DashboardWorkOrdersDto> {
+  async getWorkOrders(@CurrentUser() user: ScopedUser): Promise<DashboardWorkOrdersDto> {
     return this.dashboardService.getWorkOrders(user);
   }
 
@@ -50,7 +50,7 @@ export class DashboardController {
     description: 'Tarefas prioritárias retornadas com sucesso',
     type: DashboardTaskPrioritiesDto,
   })
-  async getTaskPriorities(@CurrentUser() user: any): Promise<DashboardTaskPrioritiesDto> {
+  async getTaskPriorities(@CurrentUser() user: ScopedUser): Promise<DashboardTaskPrioritiesDto> {
     return this.dashboardService.getTaskPriorities(user);
   }
 
@@ -61,7 +61,7 @@ export class DashboardController {
     description: 'Distribuição de prioridades retornada com sucesso',
     type: DashboardSeverityDistributionDto,
   })
-  async getSeverityDistribution(@CurrentUser() user: any): Promise<DashboardSeverityDistributionDto> {
+  async getSeverityDistribution(@CurrentUser() user: ScopedUser): Promise<DashboardSeverityDistributionDto> {
     return this.dashboardService.getSeverityDistribution(user);
   }
 
@@ -74,7 +74,7 @@ export class DashboardController {
     description: 'Comparação retornada com sucesso',
     type: DashboardPlannedVsCompletedDto,
   })
-  async getPlannedVsCompleted(@CurrentUser() user: any): Promise<DashboardPlannedVsCompletedDto> {
+  async getPlannedVsCompleted(@CurrentUser() user: ScopedUser): Promise<DashboardPlannedVsCompletedDto> {
     return this.dashboardService.getPlannedVsCompleted(user);
   }
 
@@ -89,7 +89,7 @@ export class DashboardController {
     description: 'Status do sistema retornado com sucesso',
     type: DashboardSystemStatusDto,
   })
-  async getSystemStatus(@CurrentUser() user: any): Promise<DashboardSystemStatusDto> {
+  async getSystemStatus(@CurrentUser() user: ScopedUser): Promise<DashboardSystemStatusDto> {
     return this.dashboardService.getSystemStatus(user);
   }
 
@@ -106,7 +106,7 @@ export class DashboardController {
   @ApiQuery({ name: 'unidadeId', required: false })
   @ApiQuery({ name: 'equipe', required: false })
   @ApiQuery({ name: 'criticidade', required: false })
-  async getDashboardManutencao(@Query() filtros: any, @CurrentUser() user: any) {
+  async getDashboardManutencao(@Query() filtros: FiltrosDashboardManutencao, @CurrentUser() user: ScopedUser) {
     return this.dashboardManutencaoService.getDashboard(filtros, user);
   }
 
@@ -118,7 +118,7 @@ export class DashboardController {
   @ApiQuery({ name: 'plantaId', required: false })
   @ApiQuery({ name: 'unidadeId', required: false })
   @ApiQuery({ name: 'periodo', required: false, enum: ['hoje', '7dias', '30dias', '6meses', 'ano', 'custom'] })
-  async getAdvancedDashboard(@Query() filters: any, @CurrentUser() user: any) {
+  async getAdvancedDashboard(@Query() filters: FiltrosDashboardAvancado, @CurrentUser() user: ScopedUser) {
     return this.dashboardSimpleService.getSimpleDashboard(filters, user);
   }
 }

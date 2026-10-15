@@ -3,6 +3,7 @@ import { ApiTags, ApiOperation, ApiParam } from '@nestjs/swagger';
 import { PlantaOperadoresService } from './planta-operadores.service';
 import { Permissions } from '../auth/decorators/permissions.decorator';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
+import type { UsuarioAutenticado } from '../auth/strategies/jwt.strategy';
 
 @ApiTags('plantas-operadores')
 @Controller()
@@ -16,7 +17,7 @@ export class PlantaOperadoresController {
   @Get('usuarios/:usuarioId/plantas-operadas')
   @ApiOperation({ summary: 'Listar plantas onde o usuario eh operador' })
   @ApiParam({ name: 'usuarioId', description: 'ID do usuario' })
-  async listByOperador(@Param('usuarioId') usuarioId: string, @CurrentUser() user?: any) {
+  async listByOperador(@Param('usuarioId') usuarioId: string, @CurrentUser() user?: UsuarioAutenticado) {
     const permissoes: string[] = user?.permissions ?? [];
     const podeVerOutros = permissoes.includes('usuarios.view') || permissoes.includes('plantas.manage_operadores');
     const isSelf = user?.id?.trim() === usuarioId.trim();
@@ -30,7 +31,7 @@ export class PlantaOperadoresController {
   @Permissions('plantas.manage_operadores')
   @ApiOperation({ summary: 'Listar operadores vinculados a uma planta' })
   @ApiParam({ name: 'plantaId', description: 'ID da planta' })
-  async list(@Param('plantaId') plantaId: string, @CurrentUser() user?: any) {
+  async list(@Param('plantaId') plantaId: string, @CurrentUser() user?: UsuarioAutenticado) {
     return this.service.list(plantaId, user);
   }
 
@@ -41,7 +42,7 @@ export class PlantaOperadoresController {
   async add(
     @Param('plantaId') plantaId: string,
     @Body() body: { usuario_id: string },
-    @CurrentUser() user?: any,
+    @CurrentUser() user?: UsuarioAutenticado,
   ) {
     return this.service.add(plantaId, body.usuario_id, user);
   }
@@ -54,7 +55,7 @@ export class PlantaOperadoresController {
   async remove(
     @Param('plantaId') plantaId: string,
     @Param('usuarioId') usuarioId: string,
-    @CurrentUser() user?: any,
+    @CurrentUser() user?: UsuarioAutenticado,
   ) {
     return this.service.remove(plantaId, usuarioId, user);
   }

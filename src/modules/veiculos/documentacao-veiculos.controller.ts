@@ -206,7 +206,7 @@ export class DocumentacaoVeiculosController {
   })
   async uploadArquivo(
     @Param('documentacaoId') documentacaoId: string,
-    @UploadedFile() file: any
+    @UploadedFile() file: Express.Multer.File
   ): Promise<DocumentacaoVeiculoResponseDto> {
     return this.documentacaoService.uploadArquivo(documentacaoId, file);
   }

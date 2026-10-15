@@ -3,12 +3,13 @@
 
 import axios, { AxiosInstance } from 'axios';
 import * as jwt from 'jsonwebtoken';
+import { erroDaApi } from './erro-da-api';
 
 interface TestResult {
   test: string;
   status: 'PASS' | 'FAIL' | 'WARN';
   message: string;
-  data?: any;
+  data?: unknown;
 }
 
 const results: TestResult[] = [];
@@ -60,7 +61,8 @@ async function setup() {
     console.log('   Email:', testUserEmail);
     console.log('   Senha:', testUserPassword);
     console.log('');
-  } catch (error: any) {
+  } catch (e) {
+    const error = erroDaApi(e);
     console.error('❌ Erro ao criar usuário de teste:', error.response?.data?.message || error.message);
     console.log('   Tentando continuar com credenciais padrão...\n');
 
@@ -129,7 +131,8 @@ async function runAuthTests() {
       });
       console.log('   ❌ FAIL - Status inesperado:', response.status);
     }
-  } catch (error: any) {
+  } catch (e) {
+    const error = erroDaApi(e);
     results.push({
       test: 'Login com Credenciais Válidas',
       status: 'FAIL',
@@ -158,7 +161,8 @@ async function runAuthTests() {
       data: response.data
     });
     console.log('   ❌ FAIL - Login não deveria ter sucesso com senha errada');
-  } catch (error: any) {
+  } catch (e) {
+    const error = erroDaApi(e);
     if (error.response?.status === 401 || error.response?.status === 400) {
       results.push({
         test: 'Login com Credenciais Inválidas',
@@ -188,7 +192,7 @@ async function runAuthTests() {
       console.log('\n📋 TEST 16: Verificar payload do JWT...');
 
       // Decodificar JWT (sem verificar assinatura)
-      const decoded: any = jwt.decode(accessToken);
+      const decoded = jwt.decode(accessToken, { json: true });
 
       if (!decoded) {
         throw new Error('Não foi possível decodificar o token');
@@ -226,7 +230,8 @@ async function runAuthTests() {
         });
         console.log('   ❌ FAIL - Campos faltando:', missingFields.join(', '));
       }
-    } catch (error: any) {
+    } catch (e) {
+      const error = erroDaApi(e);
       results.push({
         test: 'Payload do JWT',
         status: 'FAIL',
@@ -283,7 +288,8 @@ async function runAuthTests() {
         });
         console.log('   ❌ FAIL - Resposta inesperada');
       }
-    } catch (error: any) {
+    } catch (e) {
+      const error = erroDaApi(e);
       results.push({
         test: 'Refresh Token',
         status: 'FAIL',
@@ -307,7 +313,7 @@ async function runAuthTests() {
       console.log('\n📋 TEST 18: Acesso a rota protegida com token válido...');
 
       // Decodificar token para obter ID do usuário
-      const decoded: any = jwt.decode(accessToken);
+      const decoded = jwt.decode(accessToken, { json: true });
       const userId = decoded?.sub;
 
       if (!userId) {
@@ -346,7 +352,8 @@ async function runAuthTests() {
         });
         console.log('   ❌ FAIL - Resposta inesperada');
       }
-    } catch (error: any) {
+    } catch (e) {
+      const error = erroDaApi(e);
       results.push({
         test: 'Rota Protegida com Token Válido',
         status: 'FAIL',
@@ -378,7 +385,8 @@ async function runAuthTests() {
       data: { status: response.status }
     });
     console.log('   ⚠️  WARN - Rota acessível sem autenticação');
-  } catch (error: any) {
+  } catch (e) {
+    const error = erroDaApi(e);
     if (error.response?.status === 401) {
       results.push({
         test: 'Rota Protegida sem Token',

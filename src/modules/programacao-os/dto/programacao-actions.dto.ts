@@ -1,5 +1,7 @@
-import { IsString, IsOptional, IsNumber, IsDateString, IsArray, IsNotEmpty, Length } from 'class-validator';
+import { IsString, IsOptional, IsNumber, IsDateString, IsArray, IsNotEmpty, Length, IsEnum, ValidateNested } from 'class-validator';
+import { Type } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { PrioridadeOS } from '@/core';
 
 export class AprovarProgramacaoDto {
   @ApiPropertyOptional({ description: 'Observações da aprovação' })
@@ -38,14 +40,30 @@ export class CancelarProgramacaoDto {
   motivo_cancelamento: string;
 }
 
-export class CreateProgramacaoAnomaliaDto {
-  @ApiPropertyOptional({ description: 'Ajustes na programação criada a partir da anomalia' })
+/** Antes era um objeto sem validação: qualquer prioridade chegava crua ao Prisma (500). */
+export class AjustesDaProgramacaoDaAnomaliaDto {
+  @ApiPropertyOptional()
   @IsOptional()
-  ajustes?: {
-    descricao?: string;
-    prioridade?: string;
-    tempo_estimado?: number;
-  };
+  @IsString()
+  descricao?: string;
+
+  @ApiPropertyOptional({ enum: PrioridadeOS })
+  @IsOptional()
+  @IsEnum(PrioridadeOS)
+  prioridade?: PrioridadeOS;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsNumber()
+  tempo_estimado?: number;
+}
+
+export class CreateProgramacaoAnomaliaDto {
+  @ApiPropertyOptional({ description: 'Ajustes na programação criada a partir da anomalia', type: AjustesDaProgramacaoDaAnomaliaDto })
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => AjustesDaProgramacaoDaAnomaliaDto)
+  ajustes?: AjustesDaProgramacaoDaAnomaliaDto;
 }
 
 export class CreateProgramacaoTarefasDto {
@@ -59,10 +77,10 @@ export class CreateProgramacaoTarefasDto {
   @IsString()
   descricao?: string;
 
-  @ApiPropertyOptional({ description: 'Prioridade geral' })
+  @ApiPropertyOptional({ description: 'Prioridade geral', enum: PrioridadeOS })
   @IsOptional()
-  @IsString()
-  prioridade?: string;
+  @IsEnum(PrioridadeOS)
+  prioridade?: PrioridadeOS;
 
   @ApiPropertyOptional({ description: 'Data e hora sugerida', example: '2025-02-15T08:00:00Z' })
   @IsOptional()

@@ -67,7 +67,7 @@ describe('cadeia de dependencias (banco real)', () => {
     });
 
   it('equipamento puxa instalacao, planta e proprietario, do mais basico ao mais especifico', async () => {
-    const cadeia = await resolverCadeia(prisma as any, 'equipamentos', ID_EQUIP);
+    const cadeia = await resolverCadeia(prisma, 'equipamentos', ID_EQUIP);
 
     expect(cadeia.alvo.nome).toBe('Equipamento Cadeia');
     // A ordem E o resultado: vincular a planta antes do dono dela faria o
@@ -79,14 +79,14 @@ describe('cadeia de dependencias (banco real)', () => {
   });
 
   it('planta puxa so o proprietario', async () => {
-    const cadeia = await resolverCadeia(prisma as any, 'plantas', ID_PLANTA);
+    const cadeia = await resolverCadeia(prisma, 'plantas', ID_PLANTA);
 
     expect(cadeia.faltando.map(e => e.recurso)).toEqual(['usuarios']);
     expect(cadeia.faltando[0].comoChamar).toBe('o proprietário');
   });
 
   it('usuario nao puxa nada — e o topo da hierarquia', async () => {
-    const cadeia = await resolverCadeia(prisma as any, 'usuarios', ID_PROP);
+    const cadeia = await resolverCadeia(prisma, 'usuarios', ID_PROP);
 
     expect(cadeia.faltando).toEqual([]);
   });
@@ -96,7 +96,7 @@ describe('cadeia de dependencias (banco real)', () => {
     // a cadeia acima foi resolvida quando ELA foi compartilhada.
     await compartilhar('plantas', ID_PLANTA);
 
-    const cadeia = await resolverCadeia(prisma as any, 'equipamentos', ID_EQUIP);
+    const cadeia = await resolverCadeia(prisma, 'equipamentos', ID_EQUIP);
 
     expect(cadeia.faltando.map(e => e.recurso)).toEqual(['unidades']);
   });
@@ -104,7 +104,7 @@ describe('cadeia de dependencias (banco real)', () => {
   it('cadeia vazia quando tudo acima ja esta compartilhado', async () => {
     await compartilhar('unidades', ID_UNIDADE);
 
-    const cadeia = await resolverCadeia(prisma as any, 'equipamentos', ID_EQUIP);
+    const cadeia = await resolverCadeia(prisma, 'equipamentos', ID_EQUIP);
 
     expect(cadeia.faltando).toEqual([]);
   });
@@ -117,7 +117,7 @@ describe('cadeia de dependencias (banco real)', () => {
     // Quem parou de compartilhar quer que o registro volte a atravessar quando
     // for religado; tratar "existe linha" como "esta compartilhado" faria a
     // instalacao sumir da confirmacao e o evento ser recusado depois.
-    const cadeia = await resolverCadeia(prisma as any, 'equipamentos', ID_EQUIP);
+    const cadeia = await resolverCadeia(prisma, 'equipamentos', ID_EQUIP);
 
     expect(cadeia.faltando.map(e => e.recurso)).toContain('unidades');
   });
@@ -133,7 +133,7 @@ describe('cadeia de dependencias (banco real)', () => {
       },
     });
 
-    const cadeia = await resolverCadeia(prisma as any, 'equipamentos', ID_FILHO);
+    const cadeia = await resolverCadeia(prisma, 'equipamentos', ID_FILHO);
 
     const unidades = cadeia.faltando.filter(e => e.recurso === 'unidades');
     expect(unidades).toHaveLength(1);

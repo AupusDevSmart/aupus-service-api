@@ -76,7 +76,7 @@ async function main() {
   }
 
   // tentar tambem com model_id raw (sem trim) caso haja espaco
-  const rolesRaw = await prisma.$queryRaw<any[]>`
+  const rolesRaw = await prisma.$queryRaw<Array<{ model_id: string; role_id: bigint; name: string; guard_name: string }>>`
     SELECT mhr.model_id, r.id as role_id, r.name, r.guard_name
     FROM model_has_roles mhr
     JOIN roles r ON r.id = mhr.role_id
@@ -128,7 +128,7 @@ async function main() {
   }
 
   // verificar via SQL raw com TRIM em ambos os lados
-  const vinculosRaw = await prisma.$queryRaw<any[]>`
+  const vinculosRaw = await prisma.$queryRaw<Array<{ planta_id: string; nome: string | null; deleted_at: Date | null }>>`
     SELECT po.planta_id, p.nome, p.deleted_at
     FROM planta_operadores po
     LEFT JOIN plantas p ON TRIM(p.id) = TRIM(po.planta_id)

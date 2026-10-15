@@ -1,6 +1,7 @@
 // src/modules/instrucoes/anexos-instrucoes.service.ts
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
-import { PrismaService } from '@/core';
+import { PrismaService, TipoAnexo } from '@/core';
+import type { anexos_instrucao } from '@prisma/client';
 import { AnexoInstrucaoDetalhesDto } from './dto';
 import * as path from 'path';
 import * as fs from 'fs';
@@ -14,9 +15,7 @@ export class AnexosInstrucoesService {
 
   async uploadAnexo(
     instrucaoId: string,
-    file: any,
-    descricao?: string,
-    usuarioId?: string
+    file: Express.Multer.File,
   ): Promise<AnexoInstrucaoDetalhesDto> {
     await this.verificarInstrucaoExiste(instrucaoId);
     this.validarArquivo(file);
@@ -107,7 +106,7 @@ export class AnexosInstrucoesService {
     }
   }
 
-  private validarArquivo(file: any): void {
+  private validarArquivo(file: Express.Multer.File): void {
     if (!file) {
       throw new BadRequestException('Arquivo é obrigatório');
     }
@@ -130,7 +129,7 @@ export class AnexosInstrucoesService {
     return path.extname(nomeArquivo).toLowerCase().substring(1);
   }
 
-  private determinarTipoAnexo(nomeArquivo: string): any {
+  private determinarTipoAnexo(nomeArquivo: string): TipoAnexo {
     const extensao = this.extrairExtensao(nomeArquivo);
 
     switch (extensao) {
@@ -156,7 +155,7 @@ export class AnexosInstrucoesService {
     return `${nomeBase}_${timestamp}_${random}${extensao}`;
   }
 
-  private async salvarArquivoLocal(file: any, nomeArquivo: string): Promise<string> {
+  private async salvarArquivoLocal(file: Express.Multer.File, nomeArquivo: string): Promise<string> {
     const uploadDir = path.join(process.cwd(), 'uploads', 'instrucoes', 'anexos');
 
     if (!fs.existsSync(uploadDir)) {
@@ -169,7 +168,7 @@ export class AnexosInstrucoesService {
     return caminhoCompleto;
   }
 
-  private mapearParaResponse(anexo: any): AnexoInstrucaoDetalhesDto {
+  private mapearParaResponse(anexo: anexos_instrucao): AnexoInstrucaoDetalhesDto {
     return {
       id: anexo.id,
       nome: anexo.nome,

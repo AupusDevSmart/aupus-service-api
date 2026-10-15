@@ -1,8 +1,14 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import type { Prisma, anexos_concessionarias_energia, concessionarias_energia } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { CreateConcessionariaDto } from './dto/create-concessionaria.dto';
 import { UpdateConcessionariaDto } from './dto/update-concessionaria.dto';
 import { ConcessionariaQueryDto } from './dto/concessionaria-query.dto';
+
+/** A concessionária como sai do banco, com os anexos que as consultas incluem. */
+type ConcessionariaDoBanco = concessionarias_energia & {
+  anexos?: Pick<anexos_concessionarias_energia, 'id' | 'nome_original' | 'tamanho' | 'created_at'>[];
+};
 
 @Injectable()
 export class ConcessionariasService {
@@ -18,7 +24,7 @@ export class ConcessionariasService {
     }
 
     // Extrair tarifas dos objetos aninhados
-    const data: any = {
+    const data: Prisma.concessionarias_energiaUncheckedCreateInput = {
       nome: createDto.nome,
       estado: createDto.estado.toUpperCase(),
       numero_reh: createDto.numero_reh || null,
@@ -85,7 +91,7 @@ export class ConcessionariasService {
     const skip = (page - 1) * limit;
 
     // Construir filtros
-    const where: any = {
+    const where: Prisma.concessionarias_energiaWhereInput = {
       deleted_at: null,
     };
 
@@ -167,7 +173,7 @@ export class ConcessionariasService {
       }
     }
 
-    const data: any = {};
+    const data: Prisma.concessionarias_energiaUncheckedUpdateInput = {};
 
     // Atualizar campos básicos
     if (updateDto.nome !== undefined) data.nome = updateDto.nome;
@@ -243,7 +249,7 @@ export class ConcessionariasService {
   }
 
   // Método auxiliar para formatar a resposta
-  private formatConcessionariaResponse(concessionaria: any) {
+  private formatConcessionariaResponse(concessionaria: ConcessionariaDoBanco) {
     return {
       id: concessionaria.id,
       nome: concessionaria.nome,

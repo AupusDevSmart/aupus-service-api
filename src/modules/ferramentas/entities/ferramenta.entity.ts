@@ -2,6 +2,8 @@
 // src/modules/ferramentas/entities/ferramenta.entity.ts
 // ===============================
 import { ApiProperty } from '@nestjs/swagger';
+import type { historico_calibracoes, historico_manutencoes } from '@prisma/client';
+import { Prisma } from '@/core';
 import { StatusFerramenta } from '../dto/create-ferramenta.dto';
 
 export class FerramentaEntity {
@@ -47,11 +49,14 @@ export class FerramentaEntity {
   @ApiProperty()
   data_aquisicao: Date;
 
-  @ApiProperty({ nullable: true })
-  valor_aquisicao?: number;
+  // Decimal(10,2) no banco, repassado sem conversao: no JSON chega como texto.
+  @ApiProperty({ nullable: true, type: Number })
+  valor_aquisicao?: Prisma.Decimal;
 
+  // A coluna e VarChar: o enum e o que o DTO de entrada aceita, nao uma
+  // garantia do banco.
   @ApiProperty({ enum: StatusFerramenta })
-  status: StatusFerramenta;
+  status: string;
 
   @ApiProperty({ nullable: true })
   observacoes?: string;
@@ -85,6 +90,6 @@ export class FerramentaEntity {
     email: string;
   };
 
-  historicoCalibracao?: any[];
-  historicoManutencao?: any[];
+  historicoCalibracao?: historico_calibracoes[];
+  historicoManutencao?: historico_manutencoes[];
 }

@@ -12,13 +12,11 @@ import {
 } from 'class-validator';
 import { Type } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { TipoFeriado } from '@/core';
 
-export enum TipoFeriado {
-  NACIONAL = 'NACIONAL',
-  ESTADUAL = 'ESTADUAL',
-  MUNICIPAL = 'MUNICIPAL',
-  PERSONALIZADO = 'PERSONALIZADO'
-}
+// O enum e o do banco. A copia local que existia aqui tinha os mesmos valores,
+// mas para o TypeScript era outro tipo e nao aceitava o `tipo` lido do Prisma.
+export { TipoFeriado };
 
 export class CreateFeriadoDto {
   @ApiProperty({

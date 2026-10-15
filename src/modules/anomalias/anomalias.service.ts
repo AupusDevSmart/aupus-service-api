@@ -5,7 +5,7 @@ import { CreateAnomaliaDto, UpdateAnomaliaDto, AnomaliaFiltersDto, AnomaliaStats
 import { Prisma } from '@/core';
 import { plantasDosEquipamentos } from '@/core/modules/auth/planta-dos-equipamentos';
 
-type UserCtx = { id: string; role?: string | null; permissions?: string[] } | undefined;
+export type UserCtx = { id: string; role?: string | null; permissions?: string[] } | undefined;
 
 @Injectable()
 export class AnomaliasService {
@@ -149,7 +149,8 @@ export class AnomaliasService {
             }
           }
         },
-        usuario: true,
+        // Nunca a linha inteira: levava o hash da senha na resposta
+        usuario: { select: { id: true, nome: true, email: true } },
         historico: {
           orderBy: { created_at: 'desc' }
         },
@@ -190,9 +191,9 @@ export class AnomaliasService {
           { id: { contains: search, mode: 'insensitive' } }
         ]
       }),
-      ...(status && { status: status as any }),
-      ...(prioridade && { prioridade: prioridade as any }),
-      ...(origem && { origem: origem as any }),
+      ...(status && { status }),
+      ...(prioridade && { prioridade }),
+      ...(origem && { origem }),
       // A planta é gravada na anomalia (a do equipamento, inclusive componente)
       ...(planta && !unidade && { planta_id: planta }),
       // Unidade: a do equipamento ou, no componente (UAR), a do UC pai
@@ -222,7 +223,7 @@ export class AnomaliasService {
             }
           }
         },
-          usuario: true,
+          usuario: { select: { id: true, nome: true, email: true } },
           anomalias_instrucoes: {
             include: {
               instrucao: {
@@ -270,7 +271,7 @@ export class AnomaliasService {
             }
           }
         },
-        usuario: true,
+        usuario: { select: { id: true, nome: true, email: true } },
         historico: {
           orderBy: { created_at: 'desc' }
         },
@@ -383,7 +384,7 @@ export class AnomaliasService {
   async getStats(user?: UserCtx, periodo?: string): Promise<AnomaliaStatsDto> {
     const scope = await this.getScope(user);
     const scopeFilter = this.scopeWhere(scope);
-    const whereBase: any = { deleted_at: null, ...(scopeFilter && { AND: [scopeFilter] }) };
+    const whereBase: Prisma.anomaliasWhereInput = { deleted_at: null, ...(scopeFilter && { AND: [scopeFilter] }) };
 
     if (periodo) {
       const now = new Date();
@@ -481,7 +482,7 @@ export class AnomaliasService {
 
   async getUnidadesSelect(user?: UserCtx, plantaId?: string) {
     const scope = await this.getScope(user);
-    const where: any = { deleted_at: null };
+    const where: Prisma.unidadesWhereInput = { deleted_at: null };
 
     if (plantaId) {
       where.planta_id = plantaId;
@@ -512,7 +513,7 @@ export class AnomaliasService {
 
   async getEquipamentosSelect(user?: UserCtx, plantaId?: string) {
     const scope = await this.getScope(user);
-    const where: any = { deleted_at: null };
+    const where: Prisma.equipamentosWhereInput = { deleted_at: null };
 
     if (plantaId) {
       where.unidade = { planta_id: plantaId };

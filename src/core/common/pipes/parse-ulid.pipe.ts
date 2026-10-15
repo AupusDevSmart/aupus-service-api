@@ -2,7 +2,7 @@ import { Injectable, PipeTransform, BadRequestException } from '@nestjs/common';
 
 @Injectable()
 export class ParseULIDPipe implements PipeTransform {
-  transform(value: any): string {
+  transform(value: unknown): string {
     if (!value || typeof value !== 'string') {
       throw new BadRequestException('Invalid ID format');
     }

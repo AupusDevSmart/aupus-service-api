@@ -112,7 +112,7 @@ export class PermissionScopeService {
    *   applyPlantaFilter({}, scope, 'equipamento.unidade.planta_id')
    *     -> { equipamento: { unidade: { planta_id: { in: scope } } } }
    */
-  applyPlantaFilter<T extends Record<string, any>>(
+  applyPlantaFilter<T extends Record<string, unknown>>(
     where: T,
     scope: PlantaScope,
     path: string = 'planta_id',
@@ -122,18 +122,20 @@ export class PermissionScopeService {
     const parts = path.split('.').filter(Boolean);
     if (parts.length === 0) return where;
 
+    // O caminho so se conhece em runtime: a escrita e pelo tipo largo do where
+    const alvo: Record<string, unknown> = where;
     const leaf = { in: scope };
     if (parts.length === 1) {
-      (where as any)[parts[0]] = leaf;
+      alvo[parts[0]] = leaf;
       return where;
     }
 
     // Constroi nested where reverso: equipamento -> { unidade: { planta_id: leaf } }
-    let nested: any = leaf;
+    let nested: Record<string, unknown> = leaf;
     for (let i = parts.length - 1; i >= 1; i--) {
       nested = { [parts[i]]: nested };
     }
-    (where as any)[parts[0]] = nested;
+    alvo[parts[0]] = nested;
     return where;
   }
 

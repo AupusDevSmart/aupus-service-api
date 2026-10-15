@@ -5,9 +5,17 @@ import {
   UpdateFeriadoDto,
   QueryFeriadosDto,
   FeriadoResponseDto,
-  AssociarPlantasDto
+  AssociarPlantasDto,
+  PlantaResumoDto
 } from './dto';
 import { Prisma } from '@/core';
+import type { feriados } from '@prisma/client';
+
+/** Feriado como `listar` e `buscarPorId` o leem: com as plantas e a contagem. */
+type FeriadoLido = feriados & {
+  feriado_plantas?: { plantas: PlantaResumoDto | null }[];
+  _count?: { feriado_plantas?: number };
+};
 
 export interface PaginatedResponse<T> {
   data: T[];
@@ -351,7 +359,7 @@ export class FeriadosService {
     }
   }
 
-  private mapearParaResponse(feriado: any): FeriadoResponseDto {
+  private mapearParaResponse(feriado: FeriadoLido): FeriadoResponseDto {
     return {
       id: feriado.id,
       nome: feriado.nome,
@@ -363,7 +371,7 @@ export class FeriadosService {
       ativo: feriado.ativo,
       created_at: feriado.created_at,
       updated_at: feriado.updated_at,
-      plantas: feriado.feriado_plantas?.map((fp: any) => fp.plantas) || [],
+      plantas: feriado.feriado_plantas?.map((fp) => fp.plantas) || [],
       total_plantas: feriado.geral ? null : feriado._count?.feriado_plantas || 0
     };
   }

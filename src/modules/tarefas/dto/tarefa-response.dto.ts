@@ -19,7 +19,6 @@ export class PlanoResumoDto {
   id: string;
   nome: string;
   versao: string;
-  status: string;
 }
 
 export class EquipamentoResumoDto {

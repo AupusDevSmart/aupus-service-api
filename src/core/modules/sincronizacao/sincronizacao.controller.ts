@@ -1,6 +1,7 @@
 import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, Post, Query, UseGuards } from '@nestjs/common';
 import { ApiExcludeController, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { CurrentUser, Permissions, Public } from '@/core';
+import type { UsuarioAutenticado } from '@/core';
 import { PrismaService } from '../../prisma/prisma.service';
 import { OutboxService } from './outbox.service';
 import { EventoRecebido, SincronizacaoService } from './sincronizacao.service';
@@ -88,7 +89,7 @@ export class VinculosController {
   async vincular(
     @Param('recurso') recurso: string,
     @Param('id') id: string,
-    @CurrentUser() user?: any,
+    @CurrentUser() user?: UsuarioAutenticado,
   ) {
     return { ok: await this.comRecurso(recurso, r => this.outbox.vincular(r, id, user?.id)) };
   }

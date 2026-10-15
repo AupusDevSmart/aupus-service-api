@@ -5,6 +5,7 @@ import {
   BadRequestException,
   ForbiddenException,
 } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 
 type Requester = { id?: string; role?: string | null };
@@ -116,8 +117,8 @@ export class PlantaOperadoresService {
         },
       });
       return { id: vinculo.id.toString(), planta_id: vinculo.planta_id, usuario_id: vinculo.usuario_id };
-    } catch (err: any) {
-      if (err.code === 'P2002') {
+    } catch (err) {
+      if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') {
         throw new ConflictException('Operador ja esta vinculado a esta planta');
       }
       throw err;

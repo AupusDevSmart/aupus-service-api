@@ -21,7 +21,7 @@ async function main() {
   console.log(aplicar ? '>>> APLICANDO' : '>>> SIMULANDO (use --aplicar para gravar)');
   console.log(`>>> banco: ${banco}\n`);
 
-  const r = await migrarEquipamentosParaPosicoes(prisma as any, { simular: !aplicar });
+  const r = await migrarEquipamentosParaPosicoes(prisma, { simular: !aplicar });
 
   console.log(`posicoes ${aplicar ? 'criadas' : 'que seriam criadas'}: ${r.migrados}`);
   console.log('deixados de fora:');

@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException, BadRequestException, ConflictException } from '@nestjs/common';
 import { PrismaService } from '@/core';
-import { TipoDocumentacaoVeiculo } from '@/core';
+import { TipoDocumentacaoVeiculo, type documentacao_veiculo } from '@/core';
 import * as path from 'path';
 import * as fs from 'fs';
 
@@ -93,7 +93,7 @@ export class DocumentacaoVeiculosService {
 
   async uploadArquivo(
     documentacaoId: string,
-    file: any,
+    file: Express.Multer.File,
     usuarioId?: string
   ): Promise<DocumentacaoVeiculoResponseDto> {
     const documentacao = await this.buscarPorId(documentacaoId);
@@ -319,7 +319,7 @@ export class DocumentacaoVeiculosService {
     }
   }
 
-  private validarArquivo(file: any): void {
+  private validarArquivo(file: Express.Multer.File): void {
     if (!file) {
       throw new BadRequestException('Arquivo é obrigatório');
     }
@@ -363,7 +363,7 @@ export class DocumentacaoVeiculosService {
     return `${nomeBase}_${timestamp}_${random}${extensao}`;
   }
 
-  private async salvarArquivoLocal(file: any, nomeArquivo: string): Promise<string> {
+  private async salvarArquivoLocal(file: Express.Multer.File, nomeArquivo: string): Promise<string> {
     const uploadDir = path.join(process.cwd(), 'uploads', 'documentacao-veiculos');
 
     // Criar diretório se não existir
@@ -377,7 +377,7 @@ export class DocumentacaoVeiculosService {
     return caminhoCompleto;
   }
 
-  private mapearParaResponse(documentacao: any): DocumentacaoVeiculoResponseDto {
+  private mapearParaResponse(documentacao: documentacao_veiculo): DocumentacaoVeiculoResponseDto {
     return {
       id: documentacao.id,
       tipo: documentacao.tipo,

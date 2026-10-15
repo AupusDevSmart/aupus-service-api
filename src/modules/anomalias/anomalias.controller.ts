@@ -17,7 +17,7 @@ import {
 import { FileInterceptor } from '@nestjs/platform-express';
 import { ApiTags, ApiOperation, ApiResponse, ApiConsumes, ApiQuery, ApiBody } from '@nestjs/swagger';
 import { Permissions, CurrentUser } from '@/core';
-import { AnomaliasService } from './anomalias.service';
+import { AnomaliasService, type UserCtx } from './anomalias.service';
 import { AnexosAnomaliasService } from './anexos-anomalias.service';
 import { 
   CreateAnomaliaDto, 
@@ -49,7 +49,7 @@ export class AnomaliasController {
   })
   async create(
     @Body() createAnomaliaDto: CreateAnomaliaDto,
-    @CurrentUser() user: any,
+    @CurrentUser() user: UserCtx,
   ) {
     return this.anomaliasService.create(createAnomaliaDto, user);
   }
@@ -76,7 +76,7 @@ export class AnomaliasController {
       }
     }
   })
-  async findAll(@Query() filters: AnomaliaFiltersDto, @CurrentUser() user: any) {
+  async findAll(@Query() filters: AnomaliaFiltersDto, @CurrentUser() user: UserCtx) {
     return this.anomaliasService.findAll(filters, user);
   }
 
@@ -90,7 +90,7 @@ export class AnomaliasController {
     type: AnomaliaStatsDto 
   })
   async getStats(
-    @CurrentUser() user: any,
+    @CurrentUser() user: UserCtx,
     @Query('periodo') periodo?: string,
   ): Promise<AnomaliaStatsDto> {
     return this.anomaliasService.getStats(user, periodo);
@@ -108,7 +108,7 @@ export class AnomaliasController {
     status: HttpStatus.NOT_FOUND, 
     description: 'Anomalia não encontrada' 
   })
-  async findOne(@Param('id') id: string, @CurrentUser() user: any) {
+  async findOne(@Param('id') id: string, @CurrentUser() user: UserCtx) {
     return this.anomaliasService.findOne(id, user);
   }
 
@@ -123,7 +123,7 @@ export class AnomaliasController {
   async update(
     @Param('id') id: string,
     @Body() updateAnomaliaDto: UpdateAnomaliaDto,
-    @CurrentUser() user: any,
+    @CurrentUser() user: UserCtx,
   ) {
     return this.anomaliasService.update(id, updateAnomaliaDto, user);
   }
@@ -135,7 +135,7 @@ export class AnomaliasController {
     status: HttpStatus.OK, 
     description: 'Anomalia removida com sucesso' 
   })
-  async remove(@Param('id') id: string, @CurrentUser() user: any) {
+  async remove(@Param('id') id: string, @CurrentUser() user: UserCtx) {
     return this.anomaliasService.remove(id, user);
   }
 
@@ -156,7 +156,7 @@ export class AnomaliasController {
       }
     }
   })
-  async getPlantasSelect(@CurrentUser() user: any) {
+  async getPlantasSelect(@CurrentUser() user: UserCtx) {
     return this.anomaliasService.getPlantasSelect(user);
   }
 
@@ -186,7 +186,7 @@ export class AnomaliasController {
     }
   })
   async getUnidadesSelect(
-    @CurrentUser() user: any,
+    @CurrentUser() user: UserCtx,
     @Query('plantaId') plantaId?: string,
   ) {
     return this.anomaliasService.getUnidadesSelect(user, plantaId);
@@ -213,7 +213,7 @@ export class AnomaliasController {
     }
   })
   async getEquipamentosSelect(
-    @CurrentUser() user: any,
+    @CurrentUser() user: UserCtx,
     @Query('plantaId') plantaId?: string,
   ) {
     return this.anomaliasService.getEquipamentosSelect(user, plantaId);
@@ -273,7 +273,7 @@ export class AnomaliasController {
   })
   async uploadAnexo(
     @Param('id') anomaliaId: string,
-    @UploadedFile() file: any,
+    @UploadedFile() file: Express.Multer.File,
     @Body() uploadDto: UploadAnexoDto
   ) {
     return this.anexosService.uploadAnexo(

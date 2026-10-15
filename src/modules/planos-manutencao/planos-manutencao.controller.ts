@@ -12,7 +12,7 @@ import {
   HttpCode
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiParam, ApiQuery } from '@nestjs/swagger';
-import { Permissions, CurrentUser } from '@/core';
+import { Permissions, CurrentUser, ScopedUser } from '@/core';
 import { PlanosManutencaoService } from './planos-manutencao.service';
 import {
   CreatePlanoManutencaoDto,
@@ -57,7 +57,7 @@ export class PlanosManutencaoController {
   })
   async criar(
     @Body() createDto: CreatePlanoManutencaoDto,
-    @CurrentUser() user?: any,
+    @CurrentUser() user?: ScopedUser,
   ): Promise<PlanoManutencaoResponseDto> {
     return this.planosManutencaoService.criar(createDto, user);
   }
@@ -81,7 +81,7 @@ export class PlanosManutencaoController {
       }
     }
   })
-  async listar(@Query() queryDto: QueryPlanosDto, @CurrentUser() user?: any) {
+  async listar(@Query() queryDto: QueryPlanosDto, @CurrentUser() user?: ScopedUser) {
     return this.planosManutencaoService.listar(queryDto, user);
   }
 
@@ -141,7 +141,7 @@ export class PlanosManutencaoController {
   async buscarPorPlanta(
     @Param('plantaId') plantaId: string,
     @Query() queryDto: QueryPlanosPorPlantaDto,
-    @CurrentUser() user?: any,
+    @CurrentUser() user?: ScopedUser,
   ) {
     return this.planosManutencaoService.buscarPorPlanta(plantaId, queryDto, user);
   }
@@ -191,7 +191,7 @@ export class PlanosManutencaoController {
   async buscarPorUnidade(
     @Param('unidadeId') unidadeId: string,
     @Query() queryDto: QueryPlanosPorPlantaDto,
-    @CurrentUser() user?: any,
+    @CurrentUser() user?: ScopedUser,
   ) {
     return this.planosManutencaoService.buscarPorUnidade(unidadeId, queryDto, user);
   }
@@ -210,7 +210,7 @@ export class PlanosManutencaoController {
   })
   async buscarPorEquipamento(
     @Param('equipamentoId') equipamentoId: string,
-    @CurrentUser() user?: any,
+    @CurrentUser() user?: ScopedUser,
   ): Promise<PlanoManutencaoResponseDto> {
     return this.planosManutencaoService.buscarPorEquipamento(equipamentoId, user);
   }
@@ -227,7 +227,7 @@ export class PlanosManutencaoController {
   @ApiResponse({ status: HttpStatus.OK, type: [PlanoManutencaoResponseDto] })
   async listarTemplatesDoEquipamento(
     @Param('equipamentoId') equipamentoId: string,
-    @CurrentUser() user?: any,
+    @CurrentUser() user?: ScopedUser,
   ): Promise<PlanoManutencaoResponseDto[]> {
     return this.planosManutencaoService.listarTemplatesDoEquipamento(equipamentoId, user);
   }
@@ -254,7 +254,7 @@ export class PlanosManutencaoController {
   @ApiResponse({ status: HttpStatus.OK, type: PreviaDesvinculoDto })
   async previaDesvinculo(
     @Param('equipamentoId') equipamentoId: string,
-    @CurrentUser() user?: any,
+    @CurrentUser() user?: ScopedUser,
   ): Promise<PreviaDesvinculoDto> {
     return this.planosManutencaoService.previaDesvinculo(equipamentoId, user);
   }
@@ -273,7 +273,7 @@ export class PlanosManutencaoController {
   @ApiResponse({ status: HttpStatus.NOT_FOUND, description: 'Equipamento ou plano nao encontrado' })
   async vincularEquipamento(
     @Body() dto: VincularPlanoDto,
-    @CurrentUser() user?: any,
+    @CurrentUser() user?: ScopedUser,
   ): Promise<VincularPlanoResponseDto> {
     return this.planosManutencaoService.vincularEquipamento(
       { ...dto, criado_por: dto.criado_por || user?.id },
@@ -295,7 +295,7 @@ export class PlanosManutencaoController {
   @ApiResponse({ status: HttpStatus.NOT_FOUND, description: 'A posicao nao tem ocupante anterior com plano' })
   async herdarPlano(
     @Body() dto: HerdarPlanoDto,
-    @CurrentUser() user?: any,
+    @CurrentUser() user?: ScopedUser,
   ): Promise<HerdarPlanoResponseDto> {
     return this.planosManutencaoService.herdarPlano(
       { ...dto, criado_por: dto.criado_por || user?.id },
@@ -311,7 +311,7 @@ export class PlanosManutencaoController {
   @ApiResponse({ status: HttpStatus.NOT_FOUND, description: 'Equipamento sem plano vinculado' })
   async desvincularEquipamento(
     @Param('equipamentoId') equipamentoId: string,
-    @CurrentUser() user?: any,
+    @CurrentUser() user?: ScopedUser,
   ): Promise<PreviaDesvinculoDto> {
     return this.planosManutencaoService.desvincularEquipamento(equipamentoId, user);
   }
@@ -345,7 +345,7 @@ export class PlanosManutencaoController {
   })
   async buscarPorId(
     @Param('id') id: string,
-    @CurrentUser() user?: any,
+    @CurrentUser() user?: ScopedUser,
     @Query('incluirTarefas') incluirTarefas?: string,
   ): Promise<PlanoManutencaoResponseDto> {
     const incluir = incluirTarefas === 'true';
@@ -390,7 +390,7 @@ export class PlanosManutencaoController {
   async atualizar(
     @Param('id') id: string,
     @Body() updateDto: UpdatePlanoManutencaoDto,
-    @CurrentUser() user?: any,
+    @CurrentUser() user?: ScopedUser,
   ): Promise<PlanoManutencaoResponseDto> {
     return this.planosManutencaoService.atualizar(id, updateDto, user);
   }
@@ -410,7 +410,7 @@ export class PlanosManutencaoController {
   })
   async remover(
     @Param('id') id: string,
-    @CurrentUser() user?: any,
+    @CurrentUser() user?: ScopedUser,
   ): Promise<void> {
     return this.planosManutencaoService.remover(id, user);
   }

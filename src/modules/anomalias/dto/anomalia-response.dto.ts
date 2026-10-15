@@ -1,8 +1,21 @@
 // src/modules/anomalias/dto/anomalia-response.dto.ts
 import { ApiProperty } from '@nestjs/swagger';
 import { CondicaoAnomalia, OrigemAnomalia, PrioridadeAnomalia } from './create-anomalia.dto';
-import { StatusAnomalia } from '@/core';
+import { StatusAnomalia, Prisma, type plantas, type usuarios, type historico_anomalias } from '@/core';
 import { AnexoAnomaliaResponseDto } from './anexo-anomalia.dto';
+
+/** O equipamento como o service o inclui: com a unidade e a planta dela */
+type EquipamentoDaAnomalia = Prisma.equipamentosGetPayload<{
+  include: {
+    unidade: { select: { id: true; nome: true; planta_id: true; planta: { select: { id: true; nome: true } } } };
+  };
+}>;
+
+/** O vinculo com a instrucao como o service o inclui */
+type InstrucaoDaAnomalia = Prisma.anomalias_instrucoesGetPayload<{
+  include: { instrucao: { select: { id: true; tag: true; nome: true; status: true; ativo: true } } };
+}>;
+
 export class AnomaliaResponseDto {
   @ApiProperty()
   id: string;
@@ -57,20 +70,20 @@ export class AnomaliaResponseDto {
 
   // Relacionamentos opcionais
   @ApiProperty({ required: false })
-  planta?: any;
+  planta?: plantas;
 
   @ApiProperty({ required: false })
-  equipamento?: any;
+  equipamento?: EquipamentoDaAnomalia;
 
   @ApiProperty({ required: false })
-  usuario?: any;
+  usuario?: usuarios;
 
   @ApiProperty({ required: false, type: [Object] })
-  historico?: any[];
+  historico?: historico_anomalias[];
 
   @ApiProperty({ required: false, type: [AnexoAnomaliaResponseDto] })
   anexos?: AnexoAnomaliaResponseDto[];
 
   @ApiProperty({ required: false, type: [Object], description: 'Instruções associadas a esta anomalia' })
-  anomalias_instrucoes?: any[];
+  anomalias_instrucoes?: InstrucaoDaAnomalia[];
 }

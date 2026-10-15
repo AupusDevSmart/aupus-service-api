@@ -1,4 +1,5 @@
 import { PrismaClient } from '@prisma/client';
+import type { PrismaService } from '@/core';
 import { instalacoesDasOrdens, instalacoesDasProgramacoes } from './instalacao-da-os';
 
 /**
@@ -167,7 +168,7 @@ describe('instalacao da OS (banco real)', () => {
       });
     }
 
-    const mapa = await instalacoesDasProgramacoes(prisma as any, [programacaoId]);
+    const mapa = await instalacoesDasProgramacoes(prisma as unknown as PrismaService, [programacaoId]);
 
     expect(mapa.get(programacaoId)).toEqual([{ id: ID_UNIDADE, nome: 'Instalacao de teste' }]);
   });
@@ -177,7 +178,7 @@ describe('instalacao da OS (banco real)', () => {
       anomalia_id: anomaliaId,
     });
 
-    const mapa = await instalacoesDasProgramacoes(prisma as any, [programacaoId]);
+    const mapa = await instalacoesDasProgramacoes(prisma as unknown as PrismaService, [programacaoId]);
 
     expect(mapa.get(programacaoId)).toEqual([{ id: ID_UNIDADE, nome: 'Instalacao de teste' }]);
   });
@@ -203,7 +204,7 @@ describe('instalacao da OS (banco real)', () => {
       solicitacao_servico_id: solicitacao.id,
     });
 
-    const mapa = await instalacoesDasProgramacoes(prisma as any, [programacaoId]);
+    const mapa = await instalacoesDasProgramacoes(prisma as unknown as PrismaService, [programacaoId]);
 
     expect(mapa.get(programacaoId)).toEqual([{ id: ID_UNIDADE, nome: 'Instalacao de teste' }]);
   });
@@ -221,7 +222,7 @@ describe('instalacao da OS (banco real)', () => {
       local: 'Subestacao principal',
     });
 
-    const mapa = await instalacoesDasProgramacoes(prisma as any, [programacaoId]);
+    const mapa = await instalacoesDasProgramacoes(prisma as unknown as PrismaService, [programacaoId]);
 
     expect(mapa.get(programacaoId)).toBeUndefined();
   });
@@ -254,13 +255,13 @@ describe('instalacao da OS (banco real)', () => {
       });
     }
 
-    const mapa = await instalacoesDasOrdens(prisma as any, [os.id]);
+    const mapa = await instalacoesDasOrdens(prisma as unknown as PrismaService, [os.id]);
 
     expect(mapa.get(os.id)).toEqual([{ id: ID_UNIDADE, nome: 'Instalacao de teste' }]);
   });
 
   it('lista vazia nao consulta o banco', async () => {
-    const mapa = await instalacoesDasProgramacoes(prisma as any, []);
+    const mapa = await instalacoesDasProgramacoes(prisma as unknown as PrismaService, []);
 
     expect(mapa.size).toBe(0);
   });

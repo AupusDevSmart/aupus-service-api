@@ -1,11 +1,32 @@
 import { Injectable, NotFoundException, BadRequestException, ForbiddenException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
-import { CreateUnidadeDto } from './dto/create-unidade.dto';
+import {
+  CreateUnidadeDto,
+  GrupoUnidade,
+  StatusUnidade,
+  SubgrupoUnidade,
+  TipoUnidade,
+  TipoUnidadeEnergia,
+} from './dto/create-unidade.dto';
 import { UpdateUnidadeDto } from './dto/update-unidade.dto';
 import { FindAllUnidadesDto } from './dto/find-all-unidades.dto';
 import { UnidadeResponse, PaginatedUnidadesResponse } from './dto/unidade-response.dto';
 import { PrismaClientKnownRequestError } from '@prisma/client/runtime/library';
+import type { Prisma, unidades } from '@prisma/client';
 import { PermissionScopeService, ScopedUser } from '../auth/permission-scope.service';
+
+/** A unidade como sai do banco, com a planta e a contagem que as consultas incluem. */
+type UnidadeDoBanco = unidades & {
+  planta?: {
+    id: string;
+    nome: string;
+    localizacao: string;
+    cidade: string;
+    uf: string;
+    proprietario?: { id: string; nome: string; email: string } | null;
+  } | null;
+  _count?: { equipamentos: number };
+};
 
 @Injectable()
 export class UnidadesService {
@@ -140,9 +161,9 @@ export class UnidadesService {
 
     try {
       // Construir filtros
-      const whereClause: any = {
+      const whereClause: Prisma.unidadesWhereInput & { AND: Prisma.unidadesWhereInput[] } = {
         deleted_at: null,
-        AND: [] as any[],
+        AND: [],
       };
 
       // Filtro de busca textual
@@ -180,7 +201,7 @@ export class UnidadesService {
       }
 
       // Construir ordenação
-      const orderByClause: any = {};
+      const orderByClause: Prisma.unidadesOrderByWithRelationInput = {};
       switch (orderBy) {
         case 'nome':
           orderByClause.nome = orderDirection;
@@ -455,7 +476,7 @@ export class UnidadesService {
       }
 
       // 4. Preparar dados para atualização
-      const updateData: any = {
+      const updateData: Prisma.unidadesUncheckedUpdateInput = {
         ...unidadeData,
       };
 
@@ -678,29 +699,32 @@ export class UnidadesService {
     }
   }
 
-  private formatUnidadeResponse(unidadeDb: any): UnidadeResponse {
+  private formatUnidadeResponse(unidadeDb: UnidadeDoBanco): UnidadeResponse {
     // ✅ CORREÇÃO: Converter null/undefined para undefined, e fazer trim em strings
-    const formatId = (id: any): string | undefined => {
+    const formatId = (id: string | null | undefined): string | undefined => {
       if (!id || id === null) return undefined;
       return typeof id === 'string' ? id.trim() : id;
     };
 
+    // tipo, status, grupo, subgrupo e tipo_unidade sao texto no schema e guardam
+    // os valores dos enums do DTO, que e o que a gravacao valida; pontos_medicao
+    // e Json com a lista de pontos.
     return {
       id: unidadeDb.id?.trim() || unidadeDb.id, // ✅ TRIM para remover espaços extras
       plantaId: unidadeDb.planta_id?.trim() || unidadeDb.planta_id, // ✅ TRIM
       nome: unidadeDb.nome,
-      tipo: unidadeDb.tipo,
+      tipo: unidadeDb.tipo as TipoUnidade,
       estado: unidadeDb.estado,
       cidade: unidadeDb.cidade,
       latitude: Number(unidadeDb.latitude),
       longitude: Number(unidadeDb.longitude),
       potencia: Number(unidadeDb.potencia),
-      status: unidadeDb.status,
-      pontosMedicao: unidadeDb.pontos_medicao || [],
+      status: unidadeDb.status as StatusUnidade,
+      pontosMedicao: (unidadeDb.pontos_medicao as string[]) || [],
       irrigante: unidadeDb.irrigante,
-      grupo: unidadeDb.grupo,
-      subgrupo: unidadeDb.subgrupo,
-      tipoUnidade: unidadeDb.tipo_unidade,
+      grupo: unidadeDb.grupo as GrupoUnidade,
+      subgrupo: unidadeDb.subgrupo as SubgrupoUnidade,
+      tipoUnidade: unidadeDb.tipo_unidade as TipoUnidadeEnergia,
       demandaCarga: unidadeDb.demanda_carga ? Number(unidadeDb.demanda_carga) : undefined,
       demandaGeracao: unidadeDb.demanda_geracao ? Number(unidadeDb.demanda_geracao) : undefined,
       tensaoNominal: unidadeDb.tensao_nominal || undefined,

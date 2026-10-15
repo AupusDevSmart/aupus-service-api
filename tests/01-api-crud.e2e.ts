@@ -2,12 +2,13 @@
 // FASE 2: Testes de API - CRUD Básico de Usuários
 
 import axios, { AxiosInstance } from 'axios';
+import { erroDaApi } from './erro-da-api';
 
 interface TestResult {
   test: string;
   status: 'PASS' | 'FAIL' | 'WARN';
   message: string;
-  data?: any;
+  data?: unknown;
 }
 
 const results: TestResult[] = [];
@@ -49,7 +50,8 @@ async function setup() {
     } else {
       console.log('⚠️  Login retornou mas sem token\n');
     }
-  } catch (error: any) {
+  } catch (e) {
+    const error = erroDaApi(e);
     console.log('⚠️  Não foi possível autenticar (continuando sem token):', error.response?.data?.message || error.message);
     console.log('   Alguns testes podem falhar se autenticação for obrigatória\n');
   }
@@ -99,7 +101,8 @@ async function runCrudTests() {
       });
       console.log('   ❌ FAIL - Resposta inesperada');
     }
-  } catch (error: any) {
+  } catch (e) {
+    const error = erroDaApi(e);
     results.push({
       test: 'Criar Usuário Simples',
       status: 'FAIL',
@@ -156,7 +159,8 @@ async function runCrudTests() {
       });
       console.log('   ❌ FAIL - Resposta inesperada');
     }
-  } catch (error: any) {
+  } catch (e) {
+    const error = erroDaApi(e);
     results.push({
       test: 'Criar Usuário com RoleId',
       status: 'FAIL',
@@ -178,7 +182,7 @@ async function runCrudTests() {
       throw new Error('Nenhuma permission disponível no sistema');
     }
 
-    const permissionIds = permissions.slice(0, 3).map((p: any) => p.id);
+    const permissionIds = permissions.slice(0, 3).map((p: { id: number }) => p.id);
 
     const userData = {
       nome: 'Usuário Teste Com Permissions',
@@ -211,7 +215,8 @@ async function runCrudTests() {
       });
       console.log('   ❌ FAIL - Resposta inesperada');
     }
-  } catch (error: any) {
+  } catch (e) {
+    const error = erroDaApi(e);
     results.push({
       test: 'Criar Usuário com PermissionIds',
       status: 'FAIL',
@@ -260,7 +265,8 @@ async function runCrudTests() {
       });
       console.log('   ❌ FAIL - Formato inesperado');
     }
-  } catch (error: any) {
+  } catch (e) {
+    const error = erroDaApi(e);
     results.push({
       test: 'Listar Usuários',
       status: 'FAIL',
@@ -299,7 +305,8 @@ async function runCrudTests() {
         });
         console.log('   ❌ FAIL - Dados não correspondem');
       }
-    } catch (error: any) {
+    } catch (e) {
+      const error = erroDaApi(e);
       results.push({
         test: 'Buscar Usuário por ID',
         status: 'FAIL',
@@ -351,7 +358,8 @@ async function runCrudTests() {
         });
         console.log('   ❌ FAIL - Atualização não refletida');
       }
-    } catch (error: any) {
+    } catch (e) {
+      const error = erroDaApi(e);
       results.push({
         test: 'Atualizar Usuário',
         status: 'FAIL',
@@ -386,7 +394,8 @@ async function runCrudTests() {
             message: 'Usuário ainda acessível após delete (soft delete pode não estar funcionando)',
           });
           console.log('   ❌ FAIL - Usuário ainda acessível');
-        } catch (error: any) {
+        } catch (e) {
+          const error = erroDaApi(e);
           if (error.response?.status === 404) {
             results.push({
               test: 'Deletar Usuário',
@@ -407,7 +416,8 @@ async function runCrudTests() {
         });
         console.log('   ❌ FAIL - Status inesperado:', response.status);
       }
-    } catch (error: any) {
+    } catch (e) {
+      const error = erroDaApi(e);
       results.push({
         test: 'Deletar Usuário',
         status: 'FAIL',

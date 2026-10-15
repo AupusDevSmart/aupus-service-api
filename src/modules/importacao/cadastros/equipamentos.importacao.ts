@@ -265,7 +265,7 @@ export class EquipamentosImportacao implements CadastroImportavel<EquipamentoCom
   private dadosTecnicosMudaram(linhas: Array<Record<string, unknown>>, atual: EquipamentoComListas | null) {
     if (!atual) return linhas.length > 0;
     const novas = formaDosDadosTecnicos(linhas);
-    const antigas = formaDosDadosTecnicos(atual.dadosTecnicos as unknown as Array<Record<string, unknown>>);
+    const antigas = formaDosDadosTecnicos(atual.dadosTecnicos);
     return novas !== antigas;
   }
 
@@ -392,7 +392,7 @@ export class EquipamentosImportacao implements CadastroImportavel<EquipamentoCom
       });
     return {
       uc: [...campos(uc, COLUNAS_DA_UC), uc.unidade_id?.trim() ?? null, dia(uc.data_imobilizacao)],
-      dadosTecnicos: formaDosDadosTecnicos(dadosTecnicos as unknown as Array<Record<string, unknown>>),
+      dadosTecnicos: formaDosDadosTecnicos(dadosTecnicos),
       componentes: componentes
         .map((c) => [c.id.trim(), ...campos(c, COLUNAS_DO_COMPONENTE), dia(c.data_instalacao)])
         .sort((a, b) => String(a[0]).localeCompare(String(b[0]))),

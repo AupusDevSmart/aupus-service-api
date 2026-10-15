@@ -1,6 +1,34 @@
-import { PrismaClient } from '@prisma/client';
+import { Prisma, PrismaClient } from '@prisma/client';
 
 const prisma = new PrismaClient();
+
+// As linhas de cada consulta. No $queryRaw, COUNT do Postgres chega como
+// bigint, e ROUND (numeric) como Decimal.
+type LinhaFuncionando = {
+  nome: string;
+  topico_mqtt: string | null;
+  tipo: string | null;
+  registros_24h: bigint;
+  ultima_recepcao: Date;
+  horas_desde_ultimo: Prisma.Decimal;
+  qualidade: string | null;
+};
+type LinhaSemDados = {
+  nome: string;
+  topico_mqtt: string;
+  tipo: string | null;
+  unidade: string | null;
+  ultima_recepcao_conhecida: Date | null;
+};
+type LinhaQualidade = { qualidade: string; registros: bigint; percentual: Prisma.Decimal };
+type LinhaAmostra = {
+  nome: string;
+  timestamp_dados: Date;
+  created_at: Date;
+  qualidade: string | null;
+  fonte: string;
+  dados: string;
+};
 
 async function quickCheck() {
   console.log('\n🔍 QUICK MQTT CHECK\n');
@@ -9,7 +37,7 @@ async function quickCheck() {
   // EQUIPAMENTOS QUE ESTÃO ENVIANDO DADOS
   console.log('\n✅ EQUIPAMENTOS FUNCIONANDO (últimas 24h):\n');
 
-  const funcionando = await prisma.$queryRaw<any[]>`
+  const funcionando = await prisma.$queryRaw<LinhaFuncionando[]>`
     SELECT
       e.nome,
       e.topico_mqtt,
@@ -37,7 +65,7 @@ async function quickCheck() {
   // EQUIPAMENTOS SEM DADOS
   console.log('\n❌ EQUIPAMENTOS SEM DADOS (últimas 24h):\n');
 
-  const semDados = await prisma.$queryRaw<any[]>`
+  const semDados = await prisma.$queryRaw<LinhaSemDados[]>`
     SELECT
       e.nome,
       e.topico_mqtt,
@@ -75,7 +103,7 @@ async function quickCheck() {
   // ANÁLISE DE QUALIDADE
   console.log('\n📊 ANÁLISE DE QUALIDADE (últimas 24h):\n');
 
-  const qualidadeAnalise = await prisma.$queryRaw<any[]>`
+  const qualidadeAnalise = await prisma.$queryRaw<LinhaQualidade[]>`
     SELECT
       COALESCE(qualidade, 'null') as qualidade,
       COUNT(*) as registros,
@@ -94,7 +122,7 @@ async function quickCheck() {
   // SAMPLE DOS ÚLTIMOS DADOS
   console.log('\n\n🔍 SAMPLE DOS ÚLTIMOS 5 REGISTROS:\n');
 
-  const sample = await prisma.$queryRaw<any[]>`
+  const sample = await prisma.$queryRaw<LinhaAmostra[]>`
     SELECT
       e.nome,
       ed.timestamp_dados,

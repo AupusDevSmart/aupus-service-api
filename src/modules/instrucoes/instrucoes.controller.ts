@@ -237,11 +237,11 @@ export class InstrucoesController {
   @ApiResponse({ status: HttpStatus.BAD_REQUEST, description: 'Arquivo inválido ou muito grande' })
   async uploadAnexo(
     @Param('instrucaoId') instrucaoId: string,
-    @UploadedFile() file: any,
-    @Body('descricao') descricao?: string,
-    @Body('usuario_id') usuarioId?: string
+    @UploadedFile() file: Express.Multer.File,
   ): Promise<AnexoInstrucaoDetalhesDto> {
-    return this.anexosInstrucoesService.uploadAnexo(instrucaoId, file, descricao, usuarioId);
+    // descricao e usuario_id saíram: o anexo da instrução não tem essas colunas, e
+    // a rota recebia os dois (o autor pelo corpo, não pelo token) e descartava
+    return this.anexosInstrucoesService.uploadAnexo(instrucaoId, file);
   }
 
   @Get(':instrucaoId/anexos/:anexoId/download')

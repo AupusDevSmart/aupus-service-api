@@ -1,8 +1,13 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
-import { PrismaService } from '@/core';
+import { PrismaService, Prisma } from '@/core';
 import { CreateAnexoAnomaliaDto, AnexoAnomaliaResponseDto } from './dto';
 import * as path from 'path';
 import * as fs from 'fs';
+
+/** O anexo como as consultas deste service o trazem: com o resumo de quem enviou */
+type AnexoComUsuario = Prisma.anexos_anomaliasGetPayload<{
+  include: { usuario: { select: { id: true; nome: true; email: true } } };
+}>;
 
 @Injectable()
 export class AnexosAnomaliasService {
@@ -13,7 +18,7 @@ export class AnexosAnomaliasService {
 
   async uploadAnexo(
     anomaliaId: string,
-    file: any,
+    file: Express.Multer.File,
     descricao?: string,
     usuarioId?: string
   ): Promise<AnexoAnomaliaResponseDto> {
@@ -144,7 +149,7 @@ export class AnexosAnomaliasService {
     }
   }
 
-  private validarArquivo(file: any): void {
+  private validarArquivo(file: Express.Multer.File): void {
     if (!file) {
       throw new BadRequestException('Arquivo é obrigatório');
     }
@@ -176,7 +181,7 @@ export class AnexosAnomaliasService {
     return `${nomeBase}_${timestamp}_${random}${extensao}`;
   }
 
-  private async salvarArquivoLocal(file: any, nomeArquivo: string): Promise<string> {
+  private async salvarArquivoLocal(file: Express.Multer.File, nomeArquivo: string): Promise<string> {
     const uploadDir = path.join(process.cwd(), 'uploads', 'anexos');
     
     // Criar diretório se não existir
@@ -190,7 +195,7 @@ export class AnexosAnomaliasService {
     return caminhoCompleto;
   }
 
-  private mapearParaResponse(anexo: any): AnexoAnomaliaResponseDto {
+  private mapearParaResponse(anexo: AnexoComUsuario): AnexoAnomaliaResponseDto {
     return {
       id: anexo.id,
       nome: anexo.nome,

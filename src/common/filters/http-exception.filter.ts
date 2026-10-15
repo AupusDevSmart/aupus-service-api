@@ -9,6 +9,12 @@ import { Response } from 'express';
 import { v4 as uuidv4 } from 'uuid';
 import { SentryExceptionCaptured } from '@sentry/nestjs';
 
+/**
+ * O corpo de uma exceção do Nest criada com objeto: `message` é texto ou, na
+ * validação, a lista das frases; `code` é o código próprio, quando há.
+ */
+type CorpoDaExcecao = { message?: string | unknown[]; code?: unknown };
+
 @Catch(HttpException)
 export class HttpExceptionFilter implements ExceptionFilter {
   @SentryExceptionCaptured()
@@ -23,19 +29,19 @@ export class HttpExceptionFilter implements ExceptionFilter {
     const timestamp = new Date().toISOString();
 
     // Extrair mensagem e detalhes do erro
-    let message = exception.message;
-    let details: any = undefined;
+    let message: string | unknown[] = exception.message;
+    let details: unknown[] | undefined = undefined;
     // A exceção pode trazer um código próprio (ex.: TROCAR_SENHA), que a tela usa
     let codigoProprio: string | undefined;
 
     if (typeof exceptionResponse === 'object') {
-      const responseObj = exceptionResponse as any;
+      const responseObj: CorpoDaExcecao = exceptionResponse;
       message = responseObj.message || message;
       if (typeof responseObj.code === 'string') codigoProprio = responseObj.code;
 
       // Se há array de mensagens de validação
       if (Array.isArray(responseObj.message)) {
-        details = responseObj.message.map((msg: string | object) => {
+        details = responseObj.message.map((msg: unknown) => {
           if (typeof msg === 'string') {
             return { message: msg };
           }

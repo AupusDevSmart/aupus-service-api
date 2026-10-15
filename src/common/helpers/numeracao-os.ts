@@ -1,3 +1,5 @@
+import type { Prisma } from '@prisma/client';
+
 /**
  * O numero da OS: PREFIXO-ANO-0000, com serie PROPRIA por prefixo.
  *
@@ -38,7 +40,10 @@ export function prefixoPorOrigem(origem?: string): string {
  * qualquer exclusao: some uma OS, o proximo numero repete um que ja existiu.
  * A ordenacao alfabetica serve porque o padding deixa todos do mesmo tamanho.
  */
-export async function gerarNumeroOS(prisma: any, origem?: string): Promise<string> {
+export async function gerarNumeroOS(
+  prisma: Pick<Prisma.TransactionClient, 'ordens_servico'>,
+  origem?: string,
+): Promise<string> {
   const ano = new Date().getFullYear();
   const prefixo = `${prefixoPorOrigem(origem)}-${ano}-`;
 
