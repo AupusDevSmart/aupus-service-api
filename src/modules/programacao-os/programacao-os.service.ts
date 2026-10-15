@@ -313,9 +313,6 @@ export class ProgramacaoOSService {
     if (user) await this.scopeService.assertPlantaInScope(createDto.planta_id, user);
     await this.escalarPessoas(createDto, createDto.planta_id);
 
-    // Gerar código único
-    const codigo = await this.gerarCodigo();
-
     // Calcular custo total dos materiais e técnicos
     const orcamento_previsto = this.calcularOrcamentoPrevisto(createDto);
 
@@ -334,6 +331,8 @@ export class ProgramacaoOSService {
     }
 
     return await this.prisma.$transaction(async (prisma) => {
+      const codigo = await this.gerarCodigo(prisma);
+
       // Criar programação
       const programacao = await prisma.programacoes_os.create({
         data: {
@@ -1193,15 +1192,19 @@ export class ProgramacaoOSService {
     }
   }
 
-  private async gerarCodigo(): Promise<string> {
+  /**
+   * O próximo código: PRG-ANO-000. Lê o MAIOR número do ano em vez de contar as
+   * linhas — contar repetia um código depois de qualquer exclusão, e a criação
+   * falhava no índice único (o cron falhou assim em 15/10/2026). O maior é
+   * numérico: como texto, "PRG-2026-1000" viria antes de "PRG-2026-999". A trava
+   * da transação impede duas criações simultâneas de lerem o mesmo número.
+   */
+  private async gerarCodigo(tx: Prisma.TransactionClient): Promise<string> {
     const ano = new Date().getFullYear();
-    const count = await this.prisma.programacoes_os.count({
-      where: {
-        codigo: { startsWith: `PRG-${ano}-` },
-      },
-    });
-
-    return `PRG-${ano}-${String(count + 1).padStart(3, '0')}`;
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext('programacao-os:codigo'))`;
+    const [maior] = await tx.$queryRaw<{ ultimo: number | null }[]>`
+      SELECT max(substring(codigo from ${`^PRG-${ano}-([0-9]+)$`})::int) AS ultimo FROM programacoes_os`;
+    return `PRG-${ano}-${String((maior?.ultimo ?? 0) + 1).padStart(3, '0')}`;
   }
 
   private calcularOrcamentoPrevisto(dto: CreateProgramacaoDto): number {

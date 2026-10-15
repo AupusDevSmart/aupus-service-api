@@ -203,6 +203,8 @@ describe('ProgramacaoOSService', () => {
      * o certo aqui: quem testa instalacao e o teste do helper, nao estes.
      */
     $queryRaw: jest.fn().mockResolvedValue([]),
+    // A trava do código da programação (quem testa o código é codigo-da-programacao.spec)
+    $executeRaw: jest.fn().mockResolvedValue(0),
   };
 
   beforeEach(async () => {
