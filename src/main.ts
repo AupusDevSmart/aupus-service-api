@@ -1,16 +1,11 @@
 import './instrument';
-import { ValidationPipe } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { AppModule } from './app.module';
-import { ResponseInterceptor } from './common/interceptors/response.interceptor';
-import { HttpExceptionFilter } from './common/filters/http-exception.filter';
-import { LoggingInterceptor } from './common/interceptors/logging.interceptor';
+import { configurarApp } from './configurar-app';
 import { NestExpressApplication } from '@nestjs/platform-express';
-import { join } from 'path';
 import * as Sentry from '@sentry/nestjs';
 import logger from './config/logger.config';
-import { exceptionFactoryEmPortugues } from './common/pipes/mensagens-validacao';
 
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule, {
@@ -18,50 +13,7 @@ async function bootstrap() {
     bufferLogs: true,
   });
 
-  // Servir arquivos estáticos (uploads)
-  app.useStaticAssets(join(__dirname, '..', 'uploads'), {
-    prefix: '/uploads/',
-  });
-
-  // CORS: origens permitidas em CORS_ORIGIN (separadas por virgula). Vazio = reflete qualquer origem (dev).
-  const corsOriginEnv = process.env.CORS_ORIGIN?.trim();
-  const corsOrigin = corsOriginEnv
-    ? corsOriginEnv.split(',').map((o) => o.trim()).filter(Boolean)
-    : true;
-  app.enableCors({
-    origin: corsOrigin,
-    methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'x-xsrf-token'],
-    credentials: true,
-  });
-
-  // O padrão do body-parser (100 kB) não cabe uma planilha de cadastro
-  // importada: centenas de registros com as listas de cada um.
-  app.useBodyParser('json', { limit: '20mb' });
-
-  // ✅ Prefix global da API
-  app.setGlobalPrefix('api/v1');
-
-  app.useGlobalPipes(
-    new ValidationPipe({
-      whitelist: true,
-      forbidNonWhitelisted: true,
-      transform: true,
-      transformOptions: {
-        enableImplicitConversion: true,
-      },
-      // Sem isto o usuario recebia a frase crua do class-validator, em ingles
-      // e com o nome da coluna: "tempo_estimado must not be less than 1".
-      exceptionFactory: exceptionFactoryEmPortugues,
-    }),
-  );
-
-  // ✅ Interceptors (ordem importa!)
-  app.useGlobalInterceptors(new LoggingInterceptor()); // Primeiro: logging
-  app.useGlobalInterceptors(new ResponseInterceptor()); // Segundo: formatação de resposta
-
-  // ✅ Aplicar filtro de exceções global
-  app.useGlobalFilters(new HttpExceptionFilter());
+  configurarApp(app);
 
   const config = new DocumentBuilder()
     .setTitle('Sistema de Manutenção Industrial API')

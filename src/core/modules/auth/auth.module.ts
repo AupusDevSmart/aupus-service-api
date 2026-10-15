@@ -12,6 +12,7 @@ import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { PermissionsGuard } from './guards/permissions.guard';
 import { TrocaDeSenhaGuard } from './guards/troca-de-senha.guard';
 import { PermissionScopeModule } from './permission-scope.module';
+import { LimiteDeTentativasModule } from './limite-de-tentativas';
 
 /**
  * Módulo de Autenticação
@@ -32,6 +33,8 @@ import { PermissionScopeModule } from './permission-scope.module';
     }),
     UsuariosModule,
     PermissionScopeModule,
+    // Só nas rotas de auth que recebem senha ou mandam e-mail (SN-38)
+    LimiteDeTentativasModule,
   ],
   controllers: [AuthController],
   providers: [

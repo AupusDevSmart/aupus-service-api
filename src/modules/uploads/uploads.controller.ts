@@ -30,6 +30,9 @@ export class UploadsController {
     const arquivo = arquivoDaPasta(pasta, nome);
     // Sem o caminho na resposta: ele contava ao visitante onde o servidor guarda os arquivos
     if (!arquivo) return res.status(HttpStatus.NOT_FOUND).json({ message: 'File not found' });
+    // Nada do que é servido aqui roda: HTML enviado como "imagem" virava página
+    // com script na origem da API (SN-38). Não afeta a <img> da tela.
+    res.setHeader('Content-Security-Policy', "default-src 'none'; sandbox");
     return res.sendFile(arquivo);
   }
 

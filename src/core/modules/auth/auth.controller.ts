@@ -7,6 +7,7 @@ import {
   HttpCode,
   HttpStatus,
 } from '@nestjs/common';
+import { SkipThrottle, Throttle, ThrottlerGuard } from '@nestjs/throttler';
 import { LiberadoSemTrocarSenha } from './guards/troca-de-senha.guard';
 import {
   ApiTags,
@@ -23,6 +24,7 @@ import { ResetPasswordWithTokenDto } from './dto/reset-password.dto';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { CurrentUser } from './decorators/current-user.decorator';
 import { Public } from './decorators/public.decorator';
+import { LIMITE_DA_REDEFINICAO, LIMITE_DO_ESQUECI_A_SENHA, LIMITE_DO_LOGIN, SEM_CONTADOR_DE_EMAIL } from './limite-de-tentativas';
 import type { UsuarioAutenticado } from './strategies/jwt.strategy';
 
 /**
@@ -39,6 +41,9 @@ export class AuthController {
    * Retorna access_token, refresh_token e dados do usuário
    */
   @Public()
+  @UseGuards(ThrottlerGuard)
+  @Throttle(LIMITE_DO_LOGIN)
+  @SkipThrottle(SEM_CONTADOR_DE_EMAIL)
   @Post('login')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Realiza login e retorna JWT' })
@@ -49,6 +54,7 @@ export class AuthController {
   })
   @ApiResponse({ status: 401, description: 'Credenciais inválidas' })
   @ApiResponse({ status: 403, description: 'Usuário inativo' })
+  @ApiResponse({ status: 429, description: 'Muitas tentativas (SN-38)' })
   async login(@Body() loginDto: LoginDto): Promise<RespostaDoLogin> {
     return this.authService.login(loginDto);
   }
@@ -72,6 +78,8 @@ export class AuthController {
    * Sempre retorna sucesso genérico para não revelar se o email existe (anti-enumeração).
    */
   @Public()
+  @UseGuards(ThrottlerGuard)
+  @Throttle(LIMITE_DO_ESQUECI_A_SENHA)
   @Post('forgot-password')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Solicita redefinição de senha por email' })
@@ -84,6 +92,9 @@ export class AuthController {
    * Conclui a redefinição de senha usando o token recebido por email.
    */
   @Public()
+  @UseGuards(ThrottlerGuard)
+  @Throttle(LIMITE_DA_REDEFINICAO)
+  @SkipThrottle(SEM_CONTADOR_DE_EMAIL)
   @Post('reset-password')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Redefine a senha usando token do email' })

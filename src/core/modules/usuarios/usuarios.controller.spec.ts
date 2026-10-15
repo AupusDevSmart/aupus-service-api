@@ -1,4 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
+import { LimiteDeTentativasModule } from '../auth/limite-de-tentativas';
 import { UsuariosController } from './usuarios.controller';
 import { UsuariosService } from './usuarios.service';
 import { 
@@ -29,6 +30,8 @@ describe('UsuariosController', () => {
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
+      // A troca de senha tem limite de tentativas (SN-38): o guard precisa do módulo
+      imports: [LimiteDeTentativasModule],
       controllers: [UsuariosController],
       providers: [
         {

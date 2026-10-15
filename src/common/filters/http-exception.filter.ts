@@ -8,6 +8,7 @@ import {
 import { Response } from 'express';
 import { v4 as uuidv4 } from 'uuid';
 import { SentryExceptionCaptured } from '@sentry/nestjs';
+import logger from '../../config/logger.config';
 
 /**
  * O corpo de uma exceção do Nest criada com objeto: `message` é texto ou, na
@@ -50,6 +51,13 @@ export class HttpExceptionFilter implements ExceptionFilter {
       }
     }
 
+    // Limite de tentativas (SN-38): o 429 sai do guard antes do interceptor de
+    // log e não vai para o Sentry. Sem esta linha, força bruta não deixava
+    // rastro. Só IP e rota: o e-mail tentado fica fora do log.
+    if (status === HttpStatus.TOO_MANY_REQUESTS) {
+      logger.warn({ ip: request.ip, rota: request.originalUrl, requestId }, 'Limite de tentativas');
+    }
+
     response.status(status).json({
       success: false,
       error: {
@@ -78,6 +86,8 @@ export class HttpExceptionFilter implements ExceptionFilter {
         return 'CONFLICT';
       case HttpStatus.UNPROCESSABLE_ENTITY:
         return 'VALIDATION_ERROR';
+      case HttpStatus.TOO_MANY_REQUESTS:
+        return 'TOO_MANY_REQUESTS';
       case HttpStatus.INTERNAL_SERVER_ERROR:
         return 'INTERNAL_SERVER_ERROR';
       default:

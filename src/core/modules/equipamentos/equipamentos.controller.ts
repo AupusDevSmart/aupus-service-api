@@ -21,7 +21,7 @@ import * as fs from 'fs';
 import { ApiTags, ApiOperation, ApiResponse, ApiQuery, ApiConsumes, ApiParam } from '@nestjs/swagger';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { diskStorage } from 'multer';
-import { extname } from 'path';
+import { extensaoDaImagem } from '@/common/helpers/extensao-da-imagem';
 import { EquipamentosService } from './equipamentos.service';
 import { EquipamentosDataService } from './services/equipamentos-data.service';
 import { AnexosEquipamentosService } from './anexos-equipamentos.service';
@@ -393,7 +393,7 @@ export class EquipamentosController {
         destination: './uploads/equipamentos',
         filename: (_req, file, cb) => {
           const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9);
-          cb(null, `foto-${uniqueSuffix}${extname(file.originalname)}`);
+          cb(null, `foto-${uniqueSuffix}${extensaoDaImagem(file.mimetype)}`);
         },
       }),
       fileFilter: (_req, file, cb) => {

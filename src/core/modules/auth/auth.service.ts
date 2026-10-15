@@ -21,6 +21,14 @@ import type { UserRoleDto } from '../usuarios/dto/user-permissions-response.dto'
 /** Validade do link de redefinição de senha, em minutos. */
 const RESET_TOKEN_EXP_MINUTES = 60;
 
+/**
+ * Hash de uma senha que ninguém sabe, com o mesmo custo das senhas de verdade
+ * (12): o login de e-mail que não existe compara contra ele e demora o mesmo.
+ * Gerado uma vez, na primeira vez que precisa.
+ */
+let hashFalso: Promise<string> | undefined;
+const hashParaComparar = () => (hashFalso ??= bcrypt.hash(crypto.randomBytes(16).toString('hex'), 12));
+
 /** A linha do usuário sem a senha — o que `validateUser` devolve. */
 type UsuarioSemSenha = Omit<usuarios, 'senha'>;
 
@@ -67,33 +75,23 @@ export class AuthService {
     // Buscar usuário por email
     const usuario = await this.usuariosService.findByEmail(email);
 
-    if (!usuario) {
-      console.log(`❌ [AUTH] Usuário não encontrado: ${email}`);
+    // A senha é conferida antes de tudo e sempre passa pelo bcrypt, com o mesmo
+    // 401 para e-mail que não existe, conta sem senha e senha errada. Antes,
+    // inativa (403) e sem senha (400) respondiam antes da senha e o e-mail que
+    // não existe respondia sem o bcrypt: a mensagem e o tempo contavam quem
+    // tem conta (SN-38).
+    const senhaValida = await bcrypt.compare(senha, usuario?.senha || (await hashParaComparar()));
+    if (!usuario || !usuario.senha || !senhaValida) {
+      console.log(`❌ [AUTH] Credenciais inválidas para: ${email}`);
       throw new UnauthorizedException('Email ou senha inválidos');
     }
 
-    // Verificar se o usuário está ativo
+    // Só quem acertou a senha fica sabendo que a conta está inativa
     if (usuario.status !== 'Ativo' || !usuario.is_active || usuario.deleted_at) {
       console.log(`🚫 [AUTH] Usuário inativo: ${email}`);
       throw new ForbiddenException(
         'Usuário inativo. Entre em contato com o administrador.',
       );
-    }
-
-    // Verificar se o usuário tem senha definida
-    if (!usuario.senha) {
-      console.log(`⚠️ [AUTH] Usuário sem senha definida: ${email}`);
-      throw new BadRequestException(
-        'Usuário não possui senha definida. Entre em contato com o administrador.',
-      );
-    }
-
-    // Verificar a senha
-    const senhaValida = await bcrypt.compare(senha, usuario.senha);
-
-    if (!senhaValida) {
-      console.log(`❌ [AUTH] Senha inválida para: ${email}`);
-      throw new UnauthorizedException('Email ou senha inválidos');
     }
 
     console.log(`✅ [AUTH] Credenciais válidas para: ${email}`);

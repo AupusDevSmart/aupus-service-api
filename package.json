@@ -96,6 +96,7 @@
     "@nestjs/schedule": "^6.1.0",
     "@nestjs/serve-static": "^5.0.4",
     "@nestjs/swagger": "^11.2.0",
+    "@nestjs/throttler": "^6.7.1",
     "@prisma/client": "^6.0.0",
     "@sentry/nestjs": "^10.42.0",
     "@sentry/node": "^10.42.0",

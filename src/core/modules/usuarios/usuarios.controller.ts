@@ -12,8 +12,10 @@ import {
   HttpStatus,
   UploadedFile,
   UseInterceptors,
+  UseGuards,
   ForbiddenException,
 } from '@nestjs/common';
+import { SkipThrottle, Throttle, ThrottlerGuard } from '@nestjs/throttler';
 import {
   ApiTags,
   ApiOperation,
@@ -24,7 +26,7 @@ import {
 } from '@nestjs/swagger';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { diskStorage } from 'multer';
-import { extname } from 'path';
+import { extensaoDaImagem } from '@/common/helpers/extensao-da-imagem';
 import { UsuariosService } from './usuarios.service';
 import {
   CreateUsuarioDto,
@@ -46,6 +48,7 @@ import {
 } from './dto';
 import { Solicitante, mesmoUsuario } from './hierarquia-de-papeis';
 import { LiberadoSemTrocarSenha } from '../auth/guards/troca-de-senha.guard';
+import { LIMITE_DA_TROCA_DE_SENHA, SEM_CONTADOR_DE_EMAIL } from '../auth/limite-de-tentativas';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { Permissions } from '../auth/decorators/permissions.decorator';
 
@@ -179,6 +182,9 @@ export class UsuariosController {
 
   @Patch(':id/change-password')
   @LiberadoSemTrocarSenha()
+  @UseGuards(ThrottlerGuard)
+  @Throttle(LIMITE_DA_TROCA_DE_SENHA)
+  @SkipThrottle(SEM_CONTADOR_DE_EMAIL)
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Alterar senha do usuário' })
   @ApiParam({ name: 'id', description: 'ID do usuário' })
@@ -228,7 +234,7 @@ export class UsuariosController {
         destination: './uploads/avatars',
         filename: (req, file, callback) => {
           const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9);
-          const ext = extname(file.originalname);
+          const ext = extensaoDaImagem(file.mimetype);
           callback(null, `avatar-${uniqueSuffix}${ext}`);
         },
       }),

@@ -1,6 +1,6 @@
 import { mkdirSync, rmSync, writeFileSync } from 'fs';
 import { join, resolve } from 'path';
-import { arquivoDaPasta } from './uploads.controller';
+import { UploadsController, arquivoDaPasta } from './uploads.controller';
 
 /**
  * A rota pública de uploads só serve arquivo de dentro da pasta pedida. Antes,
@@ -43,5 +43,38 @@ describe('uploads: só arquivo de dentro da pasta', () => {
   it('arquivo que não existe e pasta no lugar de arquivo: 404', () => {
     expect(arquivoDaPasta(PASTA, 'nao-existe.png')).toBeNull();
     expect(arquivoDaPasta(PASTA, SUBPASTA)).toBeNull();
+  });
+});
+
+/**
+ * A rota é pública e o upload aceitava qualquer extensão com o tipo declarado
+ * pelo cliente: um `x.html` mandado como image/png era servido como text/html,
+ * com script, na origem da API (revisão de segurança do SN-38). O arquivo sai
+ * com CSP que não deixa nada rodar — e a `<img>` da tela não é afetada.
+ */
+describe('uploads: o arquivo servido não roda nada', () => {
+  const PASTA = 'avatars';
+  const NOME = 'teste-sn38-pagina.html';
+  const raiz = resolve(process.cwd(), 'uploads', PASTA);
+
+  beforeAll(() => {
+    mkdirSync(raiz, { recursive: true });
+    writeFileSync(join(raiz, NOME), '<script>alert(1)</script>');
+  });
+  afterAll(() => rmSync(join(raiz, NOME), { force: true }));
+
+  it('sai com CSP sandbox, sem permissão de script', () => {
+    const cabecalhos: Record<string, string> = {};
+    const res = {
+      setHeader: (nome: string, valor: string) => { cabecalhos[nome.toLowerCase()] = valor; },
+      sendFile: jest.fn(),
+      status: () => res,
+      json: jest.fn(),
+    };
+
+    new UploadsController().serveAvatar(NOME, res as never);
+
+    expect(res.sendFile).toHaveBeenCalled();
+    expect(cabecalhos['content-security-policy']).toBe("default-src 'none'; sandbox");
   });
 });
