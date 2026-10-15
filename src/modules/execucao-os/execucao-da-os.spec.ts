@@ -2,6 +2,7 @@ import { ConflictException } from '@nestjs/common';
 import { PrismaService, PermissionScopeService } from '@/core';
 import { ExecucaoOSService } from './execucao-os.service';
 import { ProgramacaoOSService } from '../programacao-os/programacao-os.service';
+import { criarPlantaDeTeste } from '../../../test/planta-de-teste';
 
 /**
  * O que se preenche durante a execução, contra Postgres de verdade
@@ -33,6 +34,7 @@ describe('execução da OS: checklist por tarefa, concluir e executar (banco rea
 
   let tarefaComItensId: string;
   let tarefaSemItensId: string;
+  let planta: Awaited<ReturnType<typeof criarPlantaDeTeste>>;
 
   const limpar = async () => {
     const progs = await prisma.programacoes_os.findMany({
@@ -54,6 +56,7 @@ describe('execução da OS: checklist por tarefa, concluir e executar (banco rea
 
   beforeAll(async () => {
     await limpar();
+    planta = await criarPlantaDeTeste(prisma, 'execucaoos', '95.000.000/0001-03');
     await prisma.tarefas.deleteMany({ where: { tag: { startsWith: 'TESTE-EXEC-' } } });
     await prisma.sub_instrucoes.deleteMany({ where: { instrucao: { tag: TAG_INSTRUCAO } } });
     await prisma.instrucoes.deleteMany({ where: { tag: TAG_INSTRUCAO } });
@@ -94,6 +97,7 @@ describe('execução da OS: checklist por tarefa, concluir e executar (banco rea
     await prisma.tarefas.deleteMany({ where: { tag: { startsWith: 'TESTE-EXEC-' } } });
     await prisma.sub_instrucoes.deleteMany({ where: { instrucao: { tag: TAG_INSTRUCAO } } });
     await prisma.instrucoes.deleteMany({ where: { tag: TAG_INSTRUCAO } });
+    await planta.apagar();
     await prisma.$disconnect();
   });
 
@@ -105,6 +109,8 @@ describe('execução da OS: checklist por tarefa, concluir e executar (banco rea
       tipo: 'PREVENTIVA',
       prioridade: 'MEDIA',
       origem: 'TAREFA',
+      // As tarefas do teste não têm equipamento: a planta vai informada
+      planta_id: planta.id,
       tarefas_ids: [tarefaComItensId, tarefaSemItensId],
     } as never);
     await programacoes.aprovar(prog.id, {});

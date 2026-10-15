@@ -3,6 +3,7 @@ import { Injectable, NotFoundException, ConflictException, BadRequestException, 
 import { PrismaService, PermissionScopeService, PlantaScope } from '@/core';
 import { CreateAnomaliaDto, UpdateAnomaliaDto, AnomaliaFiltersDto, AnomaliaStatsDto } from './dto';
 import { Prisma } from '@/core';
+import { plantasDosEquipamentos } from '@/core/modules/auth/planta-dos-equipamentos';
 
 type UserCtx = { id: string; role?: string | null; permissions?: string[] } | undefined;
 
@@ -101,17 +102,17 @@ export class AnomaliasService {
     const { localizacao, anexos, instrucoes_ids, ...anomaliaData } = createAnomaliaDto;
     const userId = user?.id;
 
+    const plantaId = await this.plantaDoEquipamento(localizacao?.equipamentoId);
+
     // Validar escopo: se usuario tem scope, a planta da anomalia deve estar nele
     const scope = await this.getScope(user);
-    if (this.scopeService.isScoped(scope)) {
-      const plantaDaAnomalia = await this.resolverPlantaIdDoInput(createAnomaliaDto);
-      if (!plantaDaAnomalia || !scope.includes(plantaDaAnomalia)) {
-        throw new ForbiddenException('Voce nao pode criar anomalia para uma planta fora do seu escopo');
-      }
+    if (this.scopeService.isScoped(scope) && !scope.includes(plantaId)) {
+      throw new ForbiddenException('Voce nao pode criar anomalia para uma planta fora do seu escopo');
     }
 
     const data: Prisma.anomaliasCreateInput = {
       ...anomaliaData,
+      planta: { connect: { id: plantaId } },
       numero: await this.gerarNumero(),
       local: localizacao.local,
       ativo: localizacao.ativo,
@@ -192,19 +193,13 @@ export class AnomaliasService {
       ...(status && { status: status as any }),
       ...(prioridade && { prioridade: prioridade as any }),
       ...(origem && { origem: origem as any }),
-      // ✅ CORRIGIDO: Filtrar por planta através da relação equipamento → unidade → planta
-      ...(planta && !unidade && {
-        equipamento: {
-          unidade: {
-            planta_id: planta
-          }
-        }
-      }),
-      // ✅ Filtrar por unidade (já filtra por planta implicitamente)
+      // A planta é gravada na anomalia (a do equipamento, inclusive componente)
+      ...(planta && !unidade && { planta_id: planta }),
+      // Unidade: a do equipamento ou, no componente (UAR), a do UC pai
       ...(unidade && {
         equipamento: {
-          unidade_id: unidade
-        }
+          OR: [{ unidade_id: unidade }, { equipamento_pai: { unidade_id: unidade } }],
+        },
       }),
       ...(periodo && this.buildPeriodoFilter(periodo))
     };
@@ -310,6 +305,16 @@ export class AnomaliasService {
 
     const { localizacao, anexos, instrucoes_ids, ...updateData } = updateAnomaliaDto;
 
+    // Trocar o equipamento leva a planta junto (e o escopo confere a nova)
+    let plantaNova: string | undefined;
+    if (localizacao?.equipamentoId) {
+      plantaNova = await this.plantaDoEquipamento(localizacao.equipamentoId);
+      const scope = await this.getScope(user);
+      if (this.scopeService.isScoped(scope) && !scope.includes(plantaNova)) {
+        throw new ForbiddenException('Voce nao pode mover a anomalia para uma planta fora do seu escopo');
+      }
+    }
+
     const data: Prisma.anomaliasUpdateInput = {
       ...updateData,
       ...(localizacao && {
@@ -319,6 +324,7 @@ export class AnomaliasService {
           equipamento: { connect: { id: localizacao.equipamentoId } }
         })
       }),
+      ...(plantaNova && { planta: { connect: { id: plantaNova } } }),
       historico: {
         create: {
           acao: 'Anomalia atualizada',
@@ -420,17 +426,18 @@ export class AnomaliasService {
   }
 
   /**
-   * Resolve a planta_id de uma anomalia a partir do equipamentoId informado.
-   * Retorna null se nao houver equipamento ou nao conseguir resolver a planta.
+   * A planta da anomalia é a do equipamento, gravada na anomalia. Antes ela só
+   * servia para conferir o escopo e nunca era gravada; e o componente (UAR), que
+   * não tem unidade, ficava sem planta. É por ela que o técnico enxerga a
+   * anomalia e que a programação dela herda a planta.
    */
-  private async resolverPlantaIdDoInput(dto: CreateAnomaliaDto): Promise<string | null> {
-    const equipamentoId = dto.localizacao?.equipamentoId;
-    if (!equipamentoId) return null;
-    const eq = await this.prisma.equipamentos.findUnique({
-      where: { id: equipamentoId },
-      select: { unidade: { select: { planta_id: true } } },
-    });
-    return eq?.unidade?.planta_id ?? null;
+  private async plantaDoEquipamento(equipamentoId: string | undefined): Promise<string> {
+    if (!equipamentoId?.trim()) {
+      throw new BadRequestException('Informe o equipamento da anomalia: e por ele que a anomalia chega a planta.');
+    }
+    const [planta] = await plantasDosEquipamentos(this.prisma, [equipamentoId]);
+    if (!planta) throw new BadRequestException('O equipamento informado nao existe ou nao esta em nenhuma planta.');
+    return planta;
   }
 
   private buildPeriodoFilter(periodo: string): Prisma.anomaliasWhereInput {

@@ -4,6 +4,7 @@ import { PrismaService, PermissionScopeService, StatusOS, TipoAnexoOS } from '@/
 import { ExecucaoOSService } from './execucao-os.service';
 import { AnexosOSService } from './anexos-os.service';
 import { ProgramacaoOSService } from '../programacao-os/programacao-os.service';
+import { criarPlantaDeTeste } from '../../../test/planta-de-teste';
 
 /**
  * A OS como registro: o que entra nela (anexos, consumo de material, uso de
@@ -30,6 +31,7 @@ describe('trava e anexos da OS (banco real)', () => {
   const autor = { id: AUTOR, role: 'operador', permissions: ['execucao_os.executar'] };
   const fora = { id: FORA_DO_ESCOPO, role: 'operador', permissions: ['execucao_os.executar'] };
   const arquivosCriados: string[] = [];
+  let planta: Awaited<ReturnType<typeof criarPlantaDeTeste>>;
 
   const foto = (nome = 'mancal.jpg') => ({
     originalname: nome,
@@ -57,6 +59,8 @@ describe('trava e anexos da OS (banco real)', () => {
   };
 
   beforeAll(async () => {
+    await limpar();
+    planta = await criarPlantaDeTeste(prisma, 'travaos', '95.000.000/0001-01');
     await prisma.usuarios.upsert({
       where: { id: AUTOR },
       update: { nome: 'Técnico da Trava', deleted_at: null },
@@ -68,6 +72,7 @@ describe('trava e anexos da OS (banco real)', () => {
     await limpar();
     for (const caminho of arquivosCriados) if (fs.existsSync(caminho)) fs.unlinkSync(caminho);
     await prisma.usuarios.deleteMany({ where: { id: AUTOR } });
+    await planta.apagar();
     await prisma.$disconnect();
   });
 
@@ -79,6 +84,7 @@ describe('trava e anexos da OS (banco real)', () => {
       tipo: 'CORRETIVA',
       prioridade: 'MEDIA',
       origem: 'MANUAL',
+      planta_id: planta.id,
     } as never);
     await programacoes.aprovar(prog.id, {});
     const os = await prisma.ordens_servico.findUniqueOrThrow({ where: { programacao_id: prog.id } });

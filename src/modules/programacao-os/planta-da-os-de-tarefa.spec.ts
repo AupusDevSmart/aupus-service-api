@@ -98,10 +98,9 @@ describe('planta da programação e da OS de tarefa (banco real)', () => {
     expect(salva.planta_id?.trim()).toBe(PLANTA_A);
   });
 
-  it('tarefas de duas plantas: a programação fica sem planta (não escolhe uma)', async () => {
-    const prog = await gerar([tarefaUC, tarefaB]);
-
-    expect((await prisma.programacoes_os.findUniqueOrThrow({ where: { id: prog.id } })).planta_id).toBeNull();
+  it('tarefas de duas plantas: recusa, em vez de gravar a programação sem planta (SN-35)', async () => {
+    await expect(gerar([tarefaUC, tarefaB])).rejects.toThrow(/2 plantas/);
+    expect(await prisma.programacoes_os.count({ where: { descricao: { startsWith: PREFIXO } } })).toBe(0);
   });
 
   it('aprovar leva a planta para a OS, e o técnico da planta vê a OS e a programação', async () => {

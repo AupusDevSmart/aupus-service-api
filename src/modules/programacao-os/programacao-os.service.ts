@@ -2,6 +2,7 @@ import { ConflictException, Injectable, Logger, NotFoundException } from '@nestj
 import { Prisma, StatusProgramacaoOS } from '@/core';
 import { plantasDosEquipamentos } from '@/core/modules/auth/planta-dos-equipamentos';
 import { garantirPessoasQuePodemAtuar, PessoasDaPlanta, pessoasQuePodemAtuar } from './pessoas-da-os';
+import { equipamentosDasTarefas, plantaDaProgramacao } from './planta-da-programacao';
 import { PrismaService, PermissionScopeService, ScopedUser } from '@/core';
 import { variantesDeId, variantesDeIds } from '../tarefas/ids';
 import {
@@ -294,10 +295,6 @@ export class ProgramacaoOSService {
   }
 
   async criar(createDto: CreateProgramacaoDto, usuarioId?: string, user?: ScopedUser): Promise<ProgramacaoResponseDto> {
-    // Scope RBAC: planta_id deve estar no escopo
-    if (user && createDto.planta_id) {
-      await this.scopeService.assertPlantaInScope(createDto.planta_id, user);
-    }
     // Limpar IDs (remover espaços em branco)
     if (createDto.veiculo_id) {
       createDto.veiculo_id = createDto.veiculo_id.trim();
@@ -305,6 +302,15 @@ export class ProgramacaoOSService {
 
     // Validar relacionamentos
     await this.validarRelacionamentos(createDto);
+
+    // Toda programação tem planta, a da origem. O escopo confere a planta
+    // resolvida: conferir só a informada deixava programar a anomalia de outra
+    // planta omitindo o campo.
+    createDto.planta_id = await plantaDaProgramacao(this.prisma, {
+      ...createDto,
+      equipamentos_das_tarefas: await equipamentosDasTarefas(this.prisma, createDto.tarefas_ids),
+    });
+    if (user) await this.scopeService.assertPlantaInScope(createDto.planta_id, user);
     await this.escalarPessoas(createDto, createDto.planta_id);
 
     // Gerar código único
@@ -339,7 +345,7 @@ export class ProgramacaoOSService {
           tipo: createDto.tipo,
           prioridade: createDto.prioridade,
           origem: createDto.origem,
-          planta_id: createDto.planta_id?.trim() || null,
+          planta_id: createDto.planta_id,
           equipamento_id: createDto.equipamento_id?.trim() || null,
           anomalia_id: createDto.anomalia_id?.trim() || null,
           plano_manutencao_id: createDto.plano_manutencao_id?.trim() || null,
@@ -461,6 +467,7 @@ export class ProgramacaoOSService {
     if (updateDto.equipamento_id || updateDto.anomalia_id || updateDto.plano_manutencao_id || updateDto.veiculo_id) {
       await this.validarRelacionamentos(updateDto);
     }
+    await this.replanejarPlanta(id, updateDto, user);
     await this.escalarPessoas(updateDto, updateDto.planta_id !== undefined ? updateDto.planta_id : programacao.planta_id);
 
     // Prepare data without undefined fields to avoid Prisma issues
@@ -1317,6 +1324,41 @@ export class ProgramacaoOSService {
     }));
 
     await prisma.ferramentas_programacao_os.createMany({ data: dados });
+  }
+
+  /**
+   * Na edição a planta acompanha a origem. Só recalcula quando a edição mexe na
+   * planta ou na origem; o que não veio no payload vale como está gravado, e as
+   * tarefas, se não vieram, são as do vínculo (equipamento congelado). A planta
+   * gravada só vale quando a origem não tem planta: trocar a anomalia leva a
+   * planta da anomalia nova, e não há como deixar a programação sem planta.
+   */
+  private async replanejarPlanta(id: string, dto: UpdateProgramacaoDto, user?: ScopedUser): Promise<void> {
+    const mexe = [dto.planta_id, dto.anomalia_id, dto.solicitacao_servico_id, dto.dados_origem, dto.equipamento_id, dto.tarefas_ids]
+      .some((campo) => campo !== undefined);
+    if (!mexe) return;
+
+    const atual = await this.prisma.programacoes_os.findUniqueOrThrow({
+      where: { id },
+      select: { planta_id: true, anomalia_id: true, solicitacao_servico_id: true, dados_origem: true, equipamento_id: true },
+    });
+    const equipamentos =
+      dto.tarefas_ids !== undefined
+        ? await equipamentosDasTarefas(this.prisma, dto.tarefas_ids)
+        : (await this.prisma.tarefas_programacao_os.findMany({ where: { programacao_id: id }, select: { equipamento_id: true } }))
+            .map((v) => v.equipamento_id);
+
+    dto.planta_id = await plantaDaProgramacao(this.prisma, {
+      planta_id: dto.planta_id,
+      // Planta vazia não tira a planta (a tela manda '' quando a origem não traz)
+      planta_gravada: atual.planta_id,
+      anomalia_id: dto.anomalia_id !== undefined ? dto.anomalia_id : atual.anomalia_id,
+      solicitacao_servico_id: dto.solicitacao_servico_id !== undefined ? dto.solicitacao_servico_id : atual.solicitacao_servico_id,
+      dados_origem: dto.dados_origem !== undefined ? dto.dados_origem : atual.dados_origem,
+      equipamento_id: dto.equipamento_id !== undefined ? dto.equipamento_id : atual.equipamento_id,
+      equipamentos_das_tarefas: equipamentos,
+    });
+    if (user) await this.scopeService.assertPlantaInScope(dto.planta_id, user);
   }
 
   /**

@@ -184,12 +184,28 @@ export class TarefasSchedulerService {
                 planta_id: true,
               },
             },
+            equipamento_pai: {
+              select: { unidade_id: true, unidade: { select: { id: true, nome: true, planta_id: true } } },
+            },
           },
         },
       },
     });
 
-    return tarefas as any as TarefaElegivel[];
+    // Componente (UAR) não tem unidade: vale a do UC pai. Sem isso as tarefas de
+    // componentes de plantas diferentes caíam no mesmo grupo "sem_unidade", a
+    // preventiva saía misturando plantas e sem os feriados da planta.
+    const comUnidadeEfetiva = tarefas.map(({ equipamento: comPai, ...tarefa }) => {
+      if (!comPai) return { ...tarefa, equipamento: null };
+      const { equipamento_pai: pai, ...equipamento } = comPai;
+      return {
+        ...tarefa,
+        equipamento: equipamento.unidade
+          ? equipamento
+          : { ...equipamento, unidade_id: pai?.unidade_id ?? null, unidade: pai?.unidade ?? null },
+      };
+    });
+    return comUnidadeEfetiva as unknown as TarefaElegivel[];
   }
 
   /**

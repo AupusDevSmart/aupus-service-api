@@ -6,6 +6,7 @@ import { VeiculosService } from '../veiculos/veiculos.service';
 import { ReservasService } from './reservas.service';
 import { ReservasSchedulerService } from './reservas-scheduler.service';
 import { disponibilidadeDasViaturas, diaDe } from './ocupacao-da-viatura';
+import { criarPlantaDeTeste } from '../../../test/planta-de-teste';
 
 /**
  * Reservas de viatura contra Postgres de verdade (docs/SPEC-RESERVAS-DE-VIATURA.md).
@@ -34,6 +35,7 @@ describe('reservas de viatura: conflito de horário e status pelo fluxo da OS (b
   const PREFIXO = 'TESTE-RESERVA-VIATURA';
   const PLACA = 'TST9R01';
   let veiculoId: string;
+  let planta: Awaited<ReturnType<typeof criarPlantaDeTeste>>;
 
   const hoje = () => diaDe(new Date());
   const ontem = () => diaDe(new Date(Date.now() - 86_400_000));
@@ -56,6 +58,8 @@ describe('reservas de viatura: conflito de horário e status pelo fluxo da OS (b
   };
 
   beforeAll(async () => {
+    await limpar();
+    planta = await criarPlantaDeTeste(prisma, 'reservaviatura', '95.000.000/0001-02');
     const antigo = await prisma.veiculo.findFirst({ where: { placa: PLACA } });
     if (antigo) {
       veiculoId = antigo.id;
@@ -84,6 +88,7 @@ describe('reservas de viatura: conflito de horário e status pelo fluxo da OS (b
   afterAll(async () => {
     await limpar();
     await prisma.veiculo.delete({ where: { id: veiculoId } });
+    await planta.apagar();
     await prisma.$disconnect();
   });
 
@@ -94,6 +99,7 @@ describe('reservas de viatura: conflito de horário e status pelo fluxo da OS (b
       tipo: 'CORRETIVA',
       prioridade: 'MEDIA',
       origem: 'MANUAL',
+      planta_id: planta.id,
       necessita_veiculo: true,
       veiculo_id: veiculoId,
       reserva_data_inicio: dia,

@@ -378,6 +378,7 @@ describe('ProgramacaoOSService', () => {
           tipo: 'PREVENTIVA',
           prioridade: 'MEDIA',
           origem: 'PLANO_MANUTENCAO',
+          planta_id: 'planta_1',
           tempo_estimado: 1,
           duracao_estimada: 1,
           tarefas_ids: ['tarefa_1'],
@@ -424,6 +425,7 @@ describe('ProgramacaoOSService', () => {
           tipo: 'PREVENTIVA',
           prioridade: 'MEDIA',
           origem: 'PLANO_MANUTENCAO',
+          planta_id: 'planta_1',
           tempo_estimado: 1,
           duracao_estimada: 1,
           tarefas_ids: ['tarefa_1'],
@@ -446,6 +448,7 @@ describe('ProgramacaoOSService', () => {
       tipo: TipoOS.PREVENTIVA,
       prioridade: PrioridadeOS.MEDIA,
       origem: OrigemOS.PLANO_MANUTENCAO,
+      planta_id: 'clrx1234567890123456789012',
       tempo_estimado: 4.5,
       duracao_estimada: 6.0,
     };
