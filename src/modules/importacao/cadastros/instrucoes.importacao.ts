@@ -55,9 +55,9 @@ export class InstrucoesImportacao implements CadastroImportavel<InstrucaoComList
       ? { ...dados }
       : { ...PADROES_DA_INSTRUCAO_NOVA, ...dados, criado_por: usuario.id };
 
-    // O UpdateInstrucaoDto herda status = ATIVA e ativo = true do Create: sem
-    // eles no payload, editar reativaria a instrução. `ativo` segue o status,
-    // como no PUT /instrucoes/:id/status.
+    // `ativo` segue o status, como no PUT /instrucoes/:id/status, e os dois vão
+    // sempre. Até o SN-12 era também o que impedia editar de reativar: o
+    // UpdateInstrucaoDto herdava status = ATIVA e ativo = true do Create.
     const status = (dados.status as string | undefined) ?? atual?.status ?? 'ATIVA';
     resultado.status = status;
     resultado.ativo = status === 'ATIVA';

@@ -1,6 +1,7 @@
 // src/modules/instrucoes/instrucoes.service.ts
 import { Injectable, NotFoundException, ConflictException, BadRequestException } from '@nestjs/common';
 import { PermissionScopeService, PrismaService, ScopedUser } from '@/core';
+import { equipamentoNasPlantas } from '@/core/modules/auth/planta-dos-equipamentos';
 import { PropagacaoPlanosService } from '../planos-manutencao/propagacao-planos.service';
 import {
   CreateInstrucaoDto,
@@ -35,20 +36,6 @@ export class InstrucoesService {
     private readonly propagacaoService: PropagacaoPlanosService,
     private readonly scopeService: PermissionScopeService,
   ) {}
-
-  /**
-   * Equipamento numa das plantas: a dele, a da unidade ou — componente (UAR),
-   * que não tem unidade — a da unidade do UC pai.
-   */
-  private equipamentoNasPlantas(plantas: string[]): Prisma.equipamentosWhereInput {
-    return {
-      OR: [
-        { planta_id: { in: plantas } },
-        { unidade: { planta_id: { in: plantas } } },
-        { equipamento_pai: { unidade: { planta_id: { in: plantas } } } },
-      ],
-    };
-  }
 
   async criar(createDto: CreateInstrucaoDto): Promise<InstrucaoResponseDto> {
     // Se não foi fornecida TAG, gerar automaticamente
@@ -351,7 +338,7 @@ export class InstrucoesService {
       where.OR = [
         { equipamento_id: null, planta_id: null },
         { planta_id: { in: scope } },
-        { planta_id: null, equipamento: this.equipamentoNasPlantas(scope) },
+        { planta_id: null, equipamento: equipamentoNasPlantas(scope) },
       ];
     }
 
@@ -407,7 +394,7 @@ export class InstrucoesService {
     const where: Prisma.anomalias_instrucoesWhereInput = { instrucao_id: instrucaoId };
     if (this.scopeService.isScoped(scope)) {
       where.anomalia = {
-        OR: [{ planta_id: { in: scope } }, { planta_id: null, equipamento: this.equipamentoNasPlantas(scope) }],
+        OR: [{ planta_id: { in: scope } }, { planta_id: null, equipamento: equipamentoNasPlantas(scope) }],
       };
     }
 

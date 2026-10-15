@@ -44,3 +44,19 @@ export async function plantaDasTarefas(
   const plantas = await plantasDosEquipamentos(prisma, vinculos.map((v) => v.equipamento_id));
   return plantas.length === 1 ? plantas[0] : null;
 }
+
+/**
+ * A regra de `plantaDeCadaEquipamento` como filtro do Prisma, para as listas
+ * no escopo: a planta da unidade; sem unidade, a da unidade do UC pai; sem
+ * nenhuma das duas, a coluna antiga. A coluna só vale sem unidade, porque fica
+ * velha quando o UC muda de planta (SN-12).
+ */
+export function equipamentoNasPlantas(plantas: string[]): Prisma.equipamentosWhereInput {
+  return {
+    OR: [
+      { unidade: { planta_id: { in: plantas } } },
+      { unidade_id: null, equipamento_pai: { unidade: { planta_id: { in: plantas } } } },
+      { unidade_id: null, planta_id: { in: plantas }, OR: [{ equipamento_pai_id: null }, { equipamento_pai: { unidade_id: null } }] },
+    ],
+  };
+}

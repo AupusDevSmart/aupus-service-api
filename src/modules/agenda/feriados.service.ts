@@ -245,8 +245,10 @@ export class FeriadosService {
         }
       });
 
-      // Recriar relacionamentos se necessário
-      if (updateDto.geral === false && updateDto.plantaIds?.length) {
+      // Recriar relacionamentos se necessário. Sem o geral no corpo vale o
+      // gravado: PUT parcial só com as plantas (SN-12).
+      const geral = updateDto.geral ?? feriadoExistente.geral;
+      if (!geral && updateDto.plantaIds?.length) {
         await tx.feriado_plantas.deleteMany({
           where: { feriado_id: id }
         });

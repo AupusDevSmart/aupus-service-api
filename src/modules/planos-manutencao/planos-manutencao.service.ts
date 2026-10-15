@@ -1,6 +1,7 @@
 // src/modules/planos-manutencao/planos-manutencao.service.ts
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { PrismaService, PermissionScopeService, ScopedUser } from '@/core';
+import { equipamentoNasPlantas } from '@/core/modules/auth/planta-dos-equipamentos';
 import {
   CreatePlanoManutencaoDto,
   UpdatePlanoManutencaoDto,
@@ -67,23 +68,14 @@ export class PlanosManutencaoService {
   }
 
   /**
-   * Fragmento `where` para planos de equipamento restringindo ao escopo: a
-   * planta do equipamento, a da unidade dele ou, no componente (UAR), a da
-   * unidade do UC pai.
+   * Fragmento `where` para planos de equipamento restringindo ao escopo, pela
+   * regra única da planta do equipamento (`equipamentoNasPlantas`).
    */
   private async scopeFragment(user?: ScopedUser): Promise<Prisma.planos_manutencaoWhereInput | undefined> {
     const scope = await this.scopeService.getScope(user);
     if (!this.scopeService.isScoped(scope)) return undefined;
     if (scope.length === 0) return { id: '__NEVER__' };
-    return {
-      equipamento: {
-        OR: [
-          { planta_id: { in: scope } },
-          { unidade: { planta_id: { in: scope } } },
-          { equipamento_pai: { unidade: { planta_id: { in: scope } } } },
-        ],
-      },
-    };
+    return { equipamento: equipamentoNasPlantas(scope) };
   }
 
   /**

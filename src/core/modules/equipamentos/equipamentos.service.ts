@@ -23,6 +23,7 @@ import {
 import { ProximoSequencialDto } from './dto/proximo-sequencial.dto';
 import { EQUIPAMENTO_MQTT_CHANGED, EquipamentoMqttChangedPayload } from './events/equipamento-mqtt.events';
 import { PermissionScopeService, ScopedUser } from '../auth/permission-scope.service';
+import { equipamentoNasPlantas } from '../auth/planta-dos-equipamentos';
 
 @Injectable()
 export class EquipamentosService {
@@ -745,11 +746,11 @@ export class EquipamentosService {
       AND: [],
     };
 
-    // Scope RBAC por planta (operador/proprietario veem apenas equipamentos das plantas vinculadas).
-    // Filtro aninhado via unidade.planta_id (equipamentos.planta_id pode estar null).
+    // Scope RBAC por planta (operador/proprietario veem apenas equipamentos das plantas vinculadas),
+    // pela regra unica: so pela unidade, o componente e o equipamento sem unidade sumiam (SN-12)
     const scope = await this.scopeService.getScope(user);
     if (this.scopeService.isScoped(scope)) {
-      where.AND.push({ unidade: { planta_id: { in: scope } } });
+      where.AND.push(equipamentoNasPlantas(scope));
     }
 
     if (search) {
@@ -998,9 +999,9 @@ export class EquipamentosService {
       throw new NotFoundException('Equipamento não encontrado');
     }
 
-    // Scope RBAC: 403 se a planta do equipamento (via unidade) nao esta no escopo do usuario
-    const plantaIdEfetivo = equipamento.unidade?.planta_id ?? equipamento.planta_id ?? null;
-    await this.scopeService.assertPlantaInScope(plantaIdEfetivo, user);
+    // Scope RBAC pela regra unica da planta do equipamento. Antes o componente
+    // (sem unidade) pulava o UC pai e caia no planta_id antigo (SN-12)
+    await this.garantirNoEscopo(id, user);
 
     return {
       ...comNomeDaPosicao(equipamento),
@@ -1276,9 +1277,7 @@ export class EquipamentosService {
       where: {
         classificacao: 'UC',
         deleted_at: null,
-        ...(this.scopeService.isScoped(scope) && {
-          OR: [{ planta_id: { in: scope } }, { unidade: { planta_id: { in: scope } } }],
-        }),
+        ...(this.scopeService.isScoped(scope) && equipamentoNasPlantas(scope)),
       },
       select: {
         id: true,
@@ -1510,7 +1509,7 @@ export class EquipamentosService {
 
   /** Mesmo DELETE+INSERT do `update`, para o lote nao ser o caminho pobre. */
   private async regravarDadosTecnicos(
-    prisma: PrismaService,
+    prisma: Prisma.TransactionClient,
     equipamentoId: string,
     dadosTecnicos?: DadoTecnicoDto[],
   ) {
@@ -1548,61 +1547,72 @@ export class EquipamentosService {
       .map(c => c.id?.trim())
       .filter(Boolean); // Remove undefined/null
 
-    // 2. Identificar componentes a serem excluídos (soft delete)
-    const idsParaExcluir = idsExistentes.filter(id => !idsRecebidos.includes(id));
-
-    if (idsParaExcluir.length > 0) {
-      await this.prisma.equipamentos.updateMany({
-        where: {
-          id: { in: idsParaExcluir },
-        },
-        data: {
-          deleted_at: new Date(),
-        },
-      });
+    // Id que nao e deste UC nao vira update: moveria o componente de outro UC
+    // para este, ou falharia no meio do lote
+    const estranho = idsRecebidos.find(id => !id.startsWith('temp_') && !idsExistentes.includes(id));
+    if (estranho) {
+      throw new BadRequestException(`O componente ${estranho} não é deste equipamento`);
     }
 
-    // 3. Criar/Atualizar componentes
-    const resultados = [];
+    // 2. Identificar componentes a serem excluídos (soft delete)
+    const idsParaExcluir = idsExistentes.filter(id => !idsRecebidos.includes(id));
 
     const tipos = await this.resolverTiposDeEquipamento(
       componentes.map(c => c.tipo_equipamento_id),
     );
 
-    for (const componente of componentes) {
-      const componenteId = componente.id?.trim();
-      const { dados_tecnicos } = componente;
-
-      const campos = this.camposGravaveisDoEquipamento(componente);
-      if (campos.tipo_equipamento_id) {
-        campos.tipo_equipamento_id = tipos.get(String(campos.tipo_equipamento_id).trim());
+    // Tudo ou nada: o apagar rodava fora de transacao, e um erro no meio
+    // deixava componentes apagados e outros ja alterados (revisao do SN-12)
+    const resultados = await this.prisma.$transaction(async (tx) => {
+      if (idsParaExcluir.length > 0) {
+        await tx.equipamentos.updateMany({
+          where: {
+            id: { in: idsParaExcluir },
+          },
+          data: {
+            deleted_at: new Date(),
+          },
+        });
       }
 
-      const baseData = {
-        ...campos,
-        classificacao: 'UAR' as const,
-        equipamento_pai_id: ucId.trim(),
-        unidade_id: equipamentoUC.unidade_id,
-      };
+      // 3. Criar/Atualizar componentes
+      const gravados: equipamentos[] = [];
+      for (const componente of componentes) {
+        const componenteId = componente.id?.trim();
+        const { dados_tecnicos } = componente;
 
-      if (componenteId && !componenteId.startsWith('temp_')) {
-        // Atualizar componente existente
-        const atualizado = await this.prisma.equipamentos.update({
-          where: { id: componenteId },
-          data: baseData,
-        });
-        await this.regravarDadosTecnicos(this.prisma, componenteId, dados_tecnicos);
-        resultados.push(atualizado);
-      } else {
-        // Criar novo componente
-        // nome e criticidade vem do componente: o Partial e porque o lote tambem atualiza
-        const criado = await this.prisma.equipamentos.create({
-          data: baseData as Prisma.equipamentosUncheckedCreateInput,
-        });
-        await this.regravarDadosTecnicos(this.prisma, criado.id.trim(), dados_tecnicos);
-        resultados.push(criado);
+        const campos = this.camposGravaveisDoEquipamento(componente);
+        if (campos.tipo_equipamento_id) {
+          campos.tipo_equipamento_id = tipos.get(String(campos.tipo_equipamento_id).trim());
+        }
+
+        const baseData = {
+          ...campos,
+          classificacao: 'UAR' as const,
+          equipamento_pai_id: ucId.trim(),
+          unidade_id: equipamentoUC.unidade_id,
+        };
+
+        if (componenteId && !componenteId.startsWith('temp_')) {
+          // Atualizar componente existente
+          const atualizado = await tx.equipamentos.update({
+            where: { id: componenteId },
+            data: baseData,
+          });
+          await this.regravarDadosTecnicos(tx, componenteId, dados_tecnicos);
+          gravados.push(atualizado);
+        } else {
+          // Criar novo componente
+          // nome e criticidade vem do componente: o Partial e porque o lote tambem atualiza
+          const criado = await tx.equipamentos.create({
+            data: baseData as Prisma.equipamentosUncheckedCreateInput,
+          });
+          await this.regravarDadosTecnicos(tx, criado.id.trim(), dados_tecnicos);
+          gravados.push(criado);
+        }
       }
-    }
+      return gravados;
+    });
 
     return {
       message: `${resultados.length} componentes processados com sucesso`,

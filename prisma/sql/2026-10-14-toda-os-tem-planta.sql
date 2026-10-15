@@ -26,7 +26,7 @@
 -- Para no meio (nada gravado) também se algo a apagar estiver em uso: OS em
 -- execução, solicitação apontando para o que sai, anomalia que fica e perderia a
 -- programação/OS, programação que fica apontando para anomalia que sai, ou
--- programação de tarefas de mais de uma planta (precisa de decisão manual).
+-- programação ou OS de tarefas de mais de uma planta (precisa de decisão manual).
 --
 -- Prévia (padrão, desfaz tudo no fim):  psql -f 2026-10-14-toda-os-tem-planta.sql
 -- Aplicar:                               psql -v aplicar=1 -f 2026-10-14-toda-os-tem-planta.sql
@@ -64,6 +64,19 @@ LEFT JOIN equipamentos pai ON trim(pai.id) = trim(e.equipamento_pai_id)
 LEFT JOIN unidades up ON trim(up.id) = trim(pai.unidade_id)
 WHERE COALESCE(NULLIF(trim(u.planta_id), ''), NULLIF(trim(up.planta_id), ''), NULLIF(trim(e.planta_id), '')) IS NOT NULL;
 
+-- Planta de cada tarefa de OS e de programação: a do equipamento congelado no
+-- vínculo ou, sem ele, a do equipamento da tarefa viva (ou a planta dela).
+-- Uma regra só para preencher (1b, 1c) e para travar (tarefas de duas plantas).
+CREATE TEMP TABLE planta_das_tarefas ON COMMIT DROP AS
+SELECT v.de, v.id, COALESCE(
+         (SELECT pe.planta_id FROM planta_do_equipamento pe WHERE pe.equipamento_id = trim(v.equipamento_id)),
+         (SELECT pe.planta_id FROM planta_do_equipamento pe WHERE pe.equipamento_id = trim(t.equipamento_id)),
+         NULLIF(trim(t.planta_id), '')) AS planta_id
+FROM (SELECT 'os' AS de, trim(os_id) AS id, equipamento_id, tarefa_id FROM tarefas_os
+      UNION ALL
+      SELECT 'programacao', trim(programacao_id), equipamento_id, tarefa_id FROM tarefas_programacao_os) v
+LEFT JOIN tarefas t ON trim(t.id) = trim(v.tarefa_id);
+
 \echo '== 1a. anomalias que recebem a planta do equipamento'
 UPDATE anomalias a SET planta_id = pe.planta_id
 FROM planta_do_equipamento pe
@@ -78,11 +91,11 @@ RETURNING o.numero_os, 'equipamento' AS de, trim(o.planta_id) AS planta;
 
 UPDATE ordens_servico o SET planta_id = x.planta_id
 FROM (
-  SELECT trim(t.os_id) AS os_id, min(pe.planta_id) AS planta_id
-  FROM tarefas_os t JOIN planta_do_equipamento pe ON pe.equipamento_id = trim(t.equipamento_id)
-  GROUP BY 1 HAVING count(DISTINCT pe.planta_id) = 1
+  SELECT id, min(planta_id) AS planta_id FROM planta_das_tarefas
+  WHERE de = 'os' AND planta_id IS NOT NULL
+  GROUP BY 1 HAVING count(DISTINCT planta_id) = 1
 ) x
-WHERE x.os_id = trim(o.id) AND COALESCE(trim(o.planta_id), '') = ''
+WHERE x.id = trim(o.id) AND COALESCE(trim(o.planta_id), '') = ''
 RETURNING o.numero_os, 'tarefas' AS de, trim(o.planta_id) AS planta;
 
 \echo '== 1c. programacoes que recebem a planta da origem'
@@ -108,23 +121,13 @@ FROM planos_manutencao pm JOIN planta_do_equipamento pe ON pe.equipamento_id = t
 WHERE trim(pm.id) = trim(p.plano_manutencao_id) AND COALESCE(trim(p.planta_id), '') = ''
 RETURNING p.codigo, 'plano' AS de, trim(p.planta_id) AS planta;
 
--- Tarefas: o equipamento congelado no vínculo ou, sem ele, o da tarefa viva (ou a planta dela)
 UPDATE programacoes_os p SET planta_id = x.planta_id
 FROM (
-  SELECT trim(tp.programacao_id) AS programacao_id, min(x2.planta_id) AS planta_id
-  FROM tarefas_programacao_os tp
-  LEFT JOIN tarefas t ON trim(t.id) = trim(tp.tarefa_id)
-  CROSS JOIN LATERAL (
-    SELECT COALESCE(
-      (SELECT pe.planta_id FROM planta_do_equipamento pe WHERE pe.equipamento_id = trim(tp.equipamento_id)),
-      (SELECT pe.planta_id FROM planta_do_equipamento pe WHERE pe.equipamento_id = trim(t.equipamento_id)),
-      NULLIF(trim(t.planta_id), '')
-    ) AS planta_id
-  ) x2
-  WHERE x2.planta_id IS NOT NULL
-  GROUP BY 1 HAVING count(DISTINCT x2.planta_id) = 1
+  SELECT id, min(planta_id) AS planta_id FROM planta_das_tarefas
+  WHERE de = 'programacao' AND planta_id IS NOT NULL
+  GROUP BY 1 HAVING count(DISTINCT planta_id) = 1
 ) x
-WHERE x.programacao_id = trim(p.id) AND COALESCE(trim(p.planta_id), '') = ''
+WHERE x.id = trim(p.id) AND COALESCE(trim(p.planta_id), '') = ''
 RETURNING p.codigo, 'tarefas' AS de, trim(p.planta_id) AS planta;
 
 UPDATE programacoes_os p SET planta_id = trim(o.planta_id)
@@ -215,16 +218,16 @@ BEGIN
 
   SELECT string_agg(p.codigo, ', ') INTO problema
   FROM prog_apagar p
-  WHERE (SELECT count(DISTINCT x.planta_id) FROM (
-           SELECT COALESCE(
-             (SELECT pe.planta_id FROM planta_do_equipamento pe WHERE pe.equipamento_id = trim(tp.equipamento_id)),
-             (SELECT pe.planta_id FROM planta_do_equipamento pe WHERE pe.equipamento_id = trim(t.equipamento_id)),
-             NULLIF(trim(t.planta_id), '')) AS planta_id
-           FROM tarefas_programacao_os tp LEFT JOIN tarefas t ON trim(t.id) = trim(tp.tarefa_id)
-           WHERE trim(tp.programacao_id) = p.id) x
-         WHERE x.planta_id IS NOT NULL) > 1;
+  WHERE (SELECT count(DISTINCT pt.planta_id) FROM planta_das_tarefas pt WHERE pt.de = 'programacao' AND pt.id = p.id) > 1;
   IF problema IS NOT NULL THEN
     RAISE EXCEPTION 'Programacoes com tarefas de mais de uma planta (decidir a planta a mao), nada foi apagado: %', problema;
+  END IF;
+
+  SELECT string_agg(o.numero_os, ', ') INTO problema
+  FROM os_apagar o
+  WHERE (SELECT count(DISTINCT pt.planta_id) FROM planta_das_tarefas pt WHERE pt.de = 'os' AND pt.id = o.id) > 1;
+  IF problema IS NOT NULL THEN
+    RAISE EXCEPTION 'OS com tarefas de mais de uma planta (decidir a planta a mao), nada foi apagado: %', problema;
   END IF;
 
   SELECT string_agg(trim(s.id), ', ') INTO problema

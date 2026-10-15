@@ -241,8 +241,10 @@ export class ConfiguracoesDiasUteisService {
         }
       });
 
-      // Recriar relacionamentos se necessário
-      if (updateDto.geral === false && updateDto.plantaIds?.length) {
+      // Recriar relacionamentos se necessário. Sem o geral no corpo vale o
+      // gravado: PUT parcial só com as plantas (SN-12).
+      const geral = updateDto.geral ?? configuracaoExistente.geral;
+      if (!geral && updateDto.plantaIds?.length) {
         await tx.configuracao_plantas.deleteMany({
           where: { configuracao_id: id }
         });

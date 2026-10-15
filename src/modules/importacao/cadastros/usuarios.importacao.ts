@@ -10,8 +10,9 @@ const MODEL_TYPE = 'App\\Models\\User';
 
 /**
  * Campo do formulário → coluna, para não revalidar o que não mudou. O
- * `status` fica sempre: o UpdateUsuarioDto herda o padrão "Ativo" do
- * CreateUsuarioDto, e sem ele no payload um inativo voltaria a ativo.
+ * `status` vai sempre, mesmo igual: até o SN-12 o UpdateUsuarioDto herdava o
+ * padrão "Ativo" do Create e, sem ele no payload, um inativo voltaria a ativo.
+ * Hoje o Update não tem padrão e mandar o mesmo valor não muda nada.
  */
 const COLUNAS: Record<string, keyof usuarios> = {
   nome: 'nome',

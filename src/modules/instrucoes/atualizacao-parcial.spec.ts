@@ -1,7 +1,10 @@
 import { ValidationPipe } from '@nestjs/common';
 import { PermissionScopeService, PrismaService } from '@/core';
 import { criarPlantaDeTeste } from '../../../test/planta-de-teste';
+import { ConfiguracoesDiasUteisService } from '../agenda/configuracoes-dias-uteis.service';
+import { CreateConfiguracaoDiasUteisDto } from '../agenda/dto/create-configuracao-dias-uteis.dto';
 import { CreateFeriadoDto } from '../agenda/dto/create-feriado.dto';
+import { UpdateConfiguracaoDiasUteisDto } from '../agenda/dto/update-configuracao-dias-uteis.dto';
 import { UpdateFeriadoDto } from '../agenda/dto/update-feriado.dto';
 import { FeriadosService } from '../agenda/feriados.service';
 import { PropagacaoPlanosService } from '../planos-manutencao/propagacao-planos.service';
@@ -22,6 +25,7 @@ describe('PUT parcial não reseta o que não veio (banco real)', () => {
   const prisma = new PrismaService();
   const instrucoes = new InstrucoesService(prisma, {} as PropagacaoPlanosService, new PermissionScopeService(prisma));
   const feriados = new FeriadosService(prisma);
+  const diasUteis = new ConfiguracoesDiasUteisService(prisma);
   const pipe = new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true, transform: true, transformOptions: { enableImplicitConversion: true } });
   const PREFIXO = 'TESTE-PUT-PARCIAL';
 
@@ -30,21 +34,26 @@ describe('PUT parcial não reseta o que não veio (banco real)', () => {
 
   const solicitacoes = new SolicitacoesServicoService(prisma, new PermissionScopeService(prisma), {} as PropostaService);
   let planta: Awaited<ReturnType<typeof criarPlantaDeTeste>>;
+  let outraPlanta: Awaited<ReturnType<typeof criarPlantaDeTeste>>;
 
   const apagar = async () => {
     await prisma.instrucoes.deleteMany({ where: { tag: { startsWith: PREFIXO } } });
     await prisma.feriado_plantas.deleteMany({ where: { feriados: { nome: { startsWith: PREFIXO } } } });
     await prisma.feriados.deleteMany({ where: { nome: { startsWith: PREFIXO } } });
+    await prisma.configuracao_plantas.deleteMany({ where: { configuracoes: { nome: { startsWith: PREFIXO } } } });
+    await prisma.configuracoes_dias_uteis.deleteMany({ where: { nome: { startsWith: PREFIXO } } });
     await prisma.solicitacoes_servico.deleteMany({ where: { titulo: { startsWith: PREFIXO } } });
   };
 
   beforeAll(async () => {
     await apagar();
-    planta = await criarPlantaDeTeste(prisma, 'put parcial', '93.000.000/0001-01');
+    planta = await criarPlantaDeTeste(prisma, 'put parcial', '84.000.000/0001-01');
+    outraPlanta = await criarPlantaDeTeste(prisma, 'put parcial b', '84.000.000/0001-02');
   });
   afterAll(async () => {
     await apagar();
     await planta.apagar();
+    await outraPlanta.apagar();
     await prisma.$disconnect();
   });
 
@@ -105,5 +114,30 @@ describe('PUT parcial não reseta o que não veio (banco real)', () => {
     await feriados.atualizar(id, await corpo(UpdateFeriadoDto, { descricao: 'Natal' }));
 
     expect(await prisma.feriados.findUniqueOrThrow({ where: { id } })).toMatchObject({ geral: true, recorrente: true, descricao: 'Natal' });
+  });
+
+  // Sem o geral no corpo vale o gravado: antes o geral=false herdado do Create
+  // fazia o PUT só com as plantas trocar os vínculos, e depois do SN-12 elas
+  // eram ignoradas com 200.
+  it('feriado não geral: PUT só com as plantas troca as plantas', async () => {
+    const criado = await feriados.criar(
+      await corpo(CreateFeriadoDto, { nome: `${PREFIXO} Padroeiro`, data: '2031-08-17', tipo: 'MUNICIPAL', plantaIds: [planta.id] }),
+    );
+
+    await feriados.atualizar(criado.id, await corpo(UpdateFeriadoDto, { plantaIds: [outraPlanta.id] }));
+
+    const vinculos = await prisma.feriado_plantas.findMany({ where: { feriado_id: criado.id } });
+    expect(vinculos.map((v) => v.planta_id.trim())).toEqual([outraPlanta.id]);
+  });
+
+  it('dias úteis não geral: PUT só com as plantas troca as plantas', async () => {
+    const criada = await diasUteis.criar(
+      await corpo(CreateConfiguracaoDiasUteisDto, { nome: `${PREFIXO} Escala`, sabado: true, plantaIds: [planta.id] }),
+    );
+
+    await diasUteis.atualizar(criada.id, await corpo(UpdateConfiguracaoDiasUteisDto, { plantaIds: [outraPlanta.id] }));
+
+    const vinculos = await prisma.configuracao_plantas.findMany({ where: { configuracao_id: criada.id } });
+    expect(vinculos.map((v) => v.planta_id.trim())).toEqual([outraPlanta.id]);
   });
 });
