@@ -3,7 +3,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { Cron } from '@nestjs/schedule';
 import { Prisma, PrismaService } from '@/core';
 import { ProgramacaoOSService } from '../programacao-os/programacao-os.service';
-import { calcularProximaExecucao } from './periodicidade';
+import { avisoDaPeriodicidade, calcularProximaExecucao, ciclosEquivalentes, modoDaPeriodicidade } from './periodicidade';
 import {
   FUSO_DO_GERADOR,
   HORIZONTE_DIAS,
@@ -49,7 +49,10 @@ export class TarefasSchedulerService {
    */
   @Cron('0 3 * * *', { timeZone: FUSO_DO_GERADOR })
   async handleCron(): Promise<void> {
-    this.logger.log('Iniciando geração automática de programações a partir de tarefas...');
+    // Qual conta vale (SN-54): um valor que não liga nem desliga seguiria em dias calado
+    this.logger.log(`Iniciando geração automática de programações a partir de tarefas (periodicidade ${modoDaPeriodicidade()})...`);
+    const aviso = avisoDaPeriodicidade();
+    if (aviso) this.logger.warn(aviso);
     try {
       const resultado = await this.gerarProgramacoesAutomaticas();
       this.logger.log(
@@ -95,6 +98,7 @@ export class TarefasSchedulerService {
       .map((t) => ({
         ...t,
         proxima_execucao: this.calcularProximaExecucao(t, ultimasExecucoes.get(t.id.trim())),
+        ciclos_equivalentes: ciclosEquivalentes(t, ultimasExecucoes.get(t.id.trim())).map(cicloNoSegundo),
       }))
       .filter((t) => t.proxima_execucao && t.proxima_execucao <= limiteHorizonte);
 
@@ -201,7 +205,7 @@ export class TarefasSchedulerService {
   private async filtrarCiclosJaGerados(tarefas: TarefaElegivel[]): Promise<TarefaElegivel[]> {
     if (tarefas.length === 0) return [];
     const ciclos = await buscarCiclosAbertos(this.prisma, tarefas.map((t) => t.id.trim()));
-    return tarefas.filter((tarefa) => !cicloAberto(ciclos, tarefa.id, tarefa.proxima_execucao));
+    return tarefas.filter((tarefa) => !cicloAberto(ciclos, tarefa.id, tarefa.proxima_execucao, tarefa.ciclos_equivalentes));
   }
 
   /**

@@ -62,6 +62,8 @@ export interface TarefaElegivel {
   /** A planta efetiva (equipamento, unidade, ou unidade do UC pai): a da programação. */
   planta_id: string | null;
   proxima_execucao?: Date;
+  /** O mesmo ciclo pelas duas contas (casa a programação aberta gravada pela outra, SN-54). */
+  ciclos_equivalentes?: Date[];
 }
 
 /**
@@ -71,39 +73,48 @@ export interface TarefaElegivel {
  * banco); `plantas`, às plantas dadas, na consulta (a previsão de quem tem
  * escopo não lê o banco inteiro).
  */
+/**
+ * O que faz uma tarefa ser programada pelo gerador. Num lugar só: o filtro de
+ * atrasadas de GET /tarefas usa o mesmo (sem ele, a tarefa de template, a
+ * inativa e a removida apareciam atrasadas para sempre).
+ */
+export function ondeElegivel(filtro: { equipamentoIds?: string[]; plantas?: string[] } = {}): Prisma.tarefasWhereInput {
+  return {
+    deleted_at: null,
+    // Equipamento excluído não tem mais o que manter: antes a tarefa dele caía
+    // em "falhas" toda madrugada ou saía numa preventiva com equipamento apagado.
+    // Nem o componente de UC excluído: excluir a unidade ou a planta só marca
+    // o equipamento que tem unidade_id, e a UAR (sem unidade) ficava viva
+    equipamento: {
+      deleted_at: null,
+      // AND: os dois filtros são OR, e espalhados na mesma chave um apagaria o outro
+      AND: [
+        { OR: [{ equipamento_pai_id: null }, { equipamento_pai: { deleted_at: null } }] },
+        ...(filtro.plantas ? [equipamentoNasPlantas(variantesDeIds(filtro.plantas))] : []),
+      ],
+    },
+    ativo: true,
+    frequencia: { not: null },
+    // Tarefa de template nao gera OS: ela nao tem equipamento e serve
+    // apenas de molde para as copias.
+    equipamento_id: filtro.equipamentoIds ? { in: variantesDeIds(filtro.equipamentoIds) } : { not: null },
+    // Removida localmente: o usuario tirou a tarefa daquele equipamento.
+    origem_status: { not: 'REMOVIDA' },
+    // So copias vinculadas a equipamento. Tarefa avulsa (sem plano) segue
+    // valendo — e o caso da tarefa criada direto no equipamento.
+    OR: [
+      { plano_manutencao: { plano_origem_id: { not: null }, ativo: true } },
+      { plano_manutencao_id: null },
+    ],
+  };
+}
+
 export async function buscarTarefasElegiveis(
   prisma: PrismaService,
   filtro: { equipamentoIds?: string[]; plantas?: string[] } = {},
 ): Promise<TarefaElegivel[]> {
   const tarefas = await prisma.tarefas.findMany({
-    where: {
-      deleted_at: null,
-      // Equipamento excluído não tem mais o que manter: antes a tarefa dele caía
-      // em "falhas" toda madrugada ou saía numa preventiva com equipamento apagado.
-      // Nem o componente de UC excluído: excluir a unidade ou a planta só marca
-      // o equipamento que tem unidade_id, e a UAR (sem unidade) ficava viva
-      equipamento: {
-        deleted_at: null,
-        // AND: os dois filtros são OR, e espalhados na mesma chave um apagaria o outro
-        AND: [
-          { OR: [{ equipamento_pai_id: null }, { equipamento_pai: { deleted_at: null } }] },
-          ...(filtro.plantas ? [equipamentoNasPlantas(variantesDeIds(filtro.plantas))] : []),
-        ],
-      },
-      ativo: true,
-      frequencia: { not: null },
-      // Tarefa de template nao gera OS: ela nao tem equipamento e serve
-      // apenas de molde para as copias.
-      equipamento_id: filtro.equipamentoIds ? { in: variantesDeIds(filtro.equipamentoIds) } : { not: null },
-      // Removida localmente: o usuario tirou a tarefa daquele equipamento.
-      origem_status: { not: 'REMOVIDA' },
-      // So copias vinculadas a equipamento. Tarefa avulsa (sem plano) segue
-      // valendo — e o caso da tarefa criada direto no equipamento.
-      OR: [
-        { plano_manutencao: { plano_origem_id: { not: null }, ativo: true } },
-        { plano_manutencao_id: null },
-      ],
-    },
+    where: ondeElegivel(filtro),
     include: {
       // A duracao vem da instrucao: a tarefa nao guarda mais esse dado.
       instrucao: {
@@ -286,7 +297,22 @@ export async function buscarCiclosAbertos(prisma: PrismaService, tarefaIds: stri
  * `ciclo_referencia` nao tem ciclo gravado: nesses casos vale o comportamento
  * antigo, de bloquear a tarefa inteira, em vez de arriscar programacao duplicada.
  */
-export function cicloAberto(ciclos: Map<string, ItemAberto>, tarefaId: string, ciclo: Date | null | undefined): ItemAberto | undefined {
+/**
+ * `equivalentes`: o mesmo ciclo pelas duas contas (`ciclosEquivalentes`,
+ * SN-54). A programação aberta pode ter o ciclo gravado pela conta que não é a
+ * da vez — antes de ligar a periodicidade por calendário ou depois de desligar
+ * —, e só pela data da vez o gerador criaria outra para o mesmo vencimento.
+ */
+export function cicloAberto(
+  ciclos: Map<string, ItemAberto>,
+  tarefaId: string,
+  ciclo: Date | null | undefined,
+  equivalentes: (Date | null | undefined)[] = [],
+): ItemAberto | undefined {
   const id = tarefaId.trim();
-  return ciclos.get(chaveCiclo(id, null)) ?? (ciclo ? ciclos.get(chaveCiclo(id, ciclo)) : undefined);
+  for (const candidato of [ciclo, ...equivalentes]) {
+    const aberto = candidato ? ciclos.get(chaveCiclo(id, candidato)) : undefined;
+    if (aberto) return aberto;
+  }
+  return ciclos.get(chaveCiclo(id, null));
 }

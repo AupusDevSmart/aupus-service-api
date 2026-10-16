@@ -1,7 +1,7 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { PermissionScopeService, PrismaService, type ScopedUser } from '@/core';
 import { variantesDeIds } from '../../tarefas/ids';
-import { calcularProximaExecucao, intervaloEmDias } from '../../tarefas/periodicidade';
+import { andaPorMeses, calcularProximaExecucao, ciclosEquivalentes, intervaloEmDias, somarCiclos } from '../../tarefas/periodicidade';
 import {
   HORIZONTE_DIAS,
   buscarCiclosAbertos,
@@ -123,14 +123,15 @@ export class PrevisaoDaAgendaService {
 
     for (const tarefa of tarefas) {
       const regra = tarefa.planta_id ? regraDa(tarefa.planta_id) : undefined;
-      const proxima = calcularProximaExecucao(tarefa, ultimas.get(tarefa.id.trim()));
+      const ultima = ultimas.get(tarefa.id.trim());
+      const proxima = calcularProximaExecucao(tarefa, ultima);
       if (!proxima) continue;
       const intervalo = (intervaloEmDias(tarefa) ?? 0) * DIA_MS;
       if (intervalo <= 0) continue;
 
-      // O ciclo de agora: o que o gerador vai olhar
+      // O ciclo de agora: o que o gerador vai olhar (também pela conta de dias, como ele: SN-54)
       const atual = cicloNoSegundo(proxima);
-      const aberto = visivel(cicloAberto(ciclos, tarefa.id, atual));
+      const aberto = visivel(cicloAberto(ciclos, tarefa.id, atual, ciclosEquivalentes(tarefa, ultima).map(cicloNoSegundo)));
       const situacaoAtual: SituacaoDoCiclo = !tarefa.planta_id ? 'nao_sai' : aberto ? 'programado' : atual.getTime() < agora.getTime() ? 'atrasado' : 'previsto';
       if (atual.getTime() < filtro.inicio.getTime()) {
         const venceu = situacaoAtual === 'atrasado' || (situacaoAtual === 'nao_sai' && atual.getTime() < agora.getTime());
@@ -143,10 +144,21 @@ export class PrevisaoDaAgendaService {
       let feitoEm = maior(atual, agora);
       let ciclo = cicloNoSegundo(calcularProximaExecucao(tarefa, feitoEm) ?? new Date(feitoEm.getTime() + intervalo));
       if (ciclo.getTime() < filtro.inicio.getTime()) {
-        // Pula direto para o período: o caminho até lá é aritmética, não laço
-        const saltos = Math.ceil((filtro.inicio.getTime() - ciclo.getTime()) / intervalo);
-        ciclo = new Date(ciclo.getTime() + saltos * intervalo);
-        feitoEm = new Date(ciclo.getTime() - intervalo);
+        if (andaPorMeses(tarefa)) {
+          // Por calendário, ciclo a ciclo (até 12 por ano): o dia preso no mês
+          // curto (31 -> 28/02 -> 28/03) é o que o gerador faz, e o salto
+          // aritmético voltava ao dia 31 — o mesmo ciclo mudava de dia
+          // conforme a janela que se olhava
+          while (ciclo.getTime() < filtro.inicio.getTime()) {
+            feitoEm = ciclo;
+            ciclo = cicloNoSegundo(somarCiclos(tarefa, ciclo, 1) ?? new Date(ciclo.getTime() + intervalo));
+          }
+        } else {
+          // Em dias fixos o caminho até o período é aritmética, não laço
+          const saltos = Math.ceil((filtro.inicio.getTime() - ciclo.getTime()) / intervalo);
+          ciclo = new Date(ciclo.getTime() + saltos * intervalo);
+          feitoEm = new Date(ciclo.getTime() - intervalo);
+        }
       }
       while (ciclo.getTime() <= filtro.fim.getTime()) {
         const situacao: SituacaoDoCiclo = tarefa.planta_id ? 'previsto' : 'nao_sai';
@@ -154,7 +166,7 @@ export class PrevisaoDaAgendaService {
         const aPartirDe = maior(new Date(ciclo.getTime() - HORIZONTE_DIAS * DIA_MS), feitoEm, agora);
         guardar(this.item(tarefa, ciclo, situacao, undefined, regra, aPartirDe, nomesDasPlantas));
         feitoEm = ciclo;
-        ciclo = new Date(ciclo.getTime() + intervalo);
+        ciclo = cicloNoSegundo(somarCiclos(tarefa, ciclo, 1) ?? new Date(ciclo.getTime() + intervalo));
       }
     }
     itens.sort((a, b) => a.ciclo.getTime() - b.ciclo.getTime() || a.tarefa_nome.localeCompare(b.tarefa_nome));

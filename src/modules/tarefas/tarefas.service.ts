@@ -11,6 +11,8 @@ import {
 import { Prisma } from '@/core';
 import type { tarefas } from '@prisma/client';
 import { PropagacaoPlanosService } from '../planos-manutencao/propagacao-planos.service';
+import { buscarUltimasExecucoes, ondeElegivel } from './ciclos-das-tarefas';
+import { calcularProximaExecucao } from './periodicidade';
 
 /**
  * Tarefa como as consultas deste service a leem. As relacoes dependem do
@@ -171,25 +173,22 @@ export class TarefasService {
     // Se filtrar por tarefas atrasadas, precisamos buscar todas e filtrar depois
     if (status_atrasada === true) {
       const todasTarefas = await this.prisma.tarefas.findMany({
-        where,
+        // Só o que o gerador programa: a de template, a inativa e a removida
+        // nunca vencem (pela base da criação, ficariam atrasadas para sempre)
+        where: { AND: [where, ondeElegivel()] },
         include: this.includeRelacionamentosLista(),
         orderBy
       });
 
-      // Filtrar tarefas atrasadas
+      // Atrasada pela mesma conta do gerador e da previsão (periodicidade.ts),
+      // com a execução real (tarefas_os). A conta própria daqui divergia: só
+      // olhava o cache data_ultima_execucao, ignorava a âncora (a tarefa nunca
+      // executada nunca atrasava) e o setMonth sem teto levava 31/01 a 03/03
       const dataAtual = new Date();
-      const tarefasAtrasadas = todasTarefas.filter(tarefa => {
-        if (!tarefa.data_ultima_execucao) {
-          return false; // Se nunca foi executada, não está atrasada
-        }
-
-        const proximaExecucao = this.calcularProximaExecucao(
-          tarefa.data_ultima_execucao,
-          tarefa.frequencia,
-          tarefa.frequencia_personalizada
-        );
-
-        return proximaExecucao < dataAtual;
+      const ultimas = await buscarUltimasExecucoes(this.prisma, todasTarefas.map((t) => t.id.trim()));
+      const tarefasAtrasadas = todasTarefas.filter((tarefa) => {
+        const proximaExecucao = calcularProximaExecucao(tarefa, ultimas.get(tarefa.id.trim()));
+        return !!proximaExecucao && proximaExecucao < dataAtual;
       });
 
       // Aplicar paginação manual
@@ -826,48 +825,4 @@ export class TarefasService {
   // chama-los, agregaria por campo inexistente. O conteudo hoje e da INSTRUCAO,
   // entao um dashboard por categoria tem de agrupar por `instrucao.categoria`.
 
-  private calcularProximaExecucao(
-    dataUltimaExecucao: Date,
-    frequencia: FrequenciaTarefa | null,
-    frequenciaPersonalizada?: number
-  ): Date {
-    const proximaExecucao = new Date(dataUltimaExecucao);
-
-    switch (frequencia) {
-      case 'DIARIA':
-        proximaExecucao.setDate(proximaExecucao.getDate() + 1);
-        break;
-      case 'SEMANAL':
-        proximaExecucao.setDate(proximaExecucao.getDate() + 7);
-        break;
-      case 'QUINZENAL':
-        proximaExecucao.setDate(proximaExecucao.getDate() + 15);
-        break;
-      case 'MENSAL':
-        proximaExecucao.setMonth(proximaExecucao.getMonth() + 1);
-        break;
-      case 'BIMESTRAL':
-        proximaExecucao.setMonth(proximaExecucao.getMonth() + 2);
-        break;
-      case 'TRIMESTRAL':
-        proximaExecucao.setMonth(proximaExecucao.getMonth() + 3);
-        break;
-      case 'SEMESTRAL':
-        proximaExecucao.setMonth(proximaExecucao.getMonth() + 6);
-        break;
-      case 'ANUAL':
-        proximaExecucao.setFullYear(proximaExecucao.getFullYear() + 1);
-        break;
-      case 'PERSONALIZADA':
-        if (frequenciaPersonalizada && frequenciaPersonalizada > 0) {
-          proximaExecucao.setDate(proximaExecucao.getDate() + frequenciaPersonalizada);
-        }
-        break;
-      default:
-        // Se frequência não for reconhecida, considerar como 30 dias
-        proximaExecucao.setDate(proximaExecucao.getDate() + 30);
-    }
-
-    return proximaExecucao;
-  }
 }
