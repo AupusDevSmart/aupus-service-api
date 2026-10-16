@@ -163,10 +163,13 @@ describe('limite de tentativas e cabeçalhos (HTTP)', () => {
     await redefinir().expect(429);
   });
 
-  it('o refresh não tem limite (o front o chama sozinho)', async () => {
-    for (let i = 0; i < 40; i++) {
-      await request(app.getHttpServer()).post('/api/v1/auth/refresh').send({ refresh_token: 'x' }).expect(200);
-    }
+  it('o refresh aguenta o uso do front (120 por minuto por IP) e para depois', async () => {
+    const renovar = () => request(app.getHttpServer()).post('/api/v1/auth/refresh').set('X-Forwarded-For', '10.0.7.7').send({ refresh_token: 'x' });
+    for (let i = 0; i < 120; i++) await renovar().expect(200);
+
+    await renovar().expect(429);
+    // Outro IP (outra rede) segue renovando
+    await request(app.getHttpServer()).post('/api/v1/auth/refresh').set('X-Forwarded-For', '10.0.7.8').send({ refresh_token: 'x' }).expect(200);
   });
 
   it('os cabeçalhos do helmet saem, com o CORP liberando o front de outro domínio', async () => {

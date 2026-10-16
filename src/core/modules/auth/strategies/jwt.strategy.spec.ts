@@ -43,4 +43,12 @@ describe('JwtStrategy.validate', () => {
     usuarios.findOne.mockRejectedValue(new Error('não existe'));
     await expect(estrategia.validate(token)).rejects.toBeInstanceOf(UnauthorizedException);
   });
+
+  // Mesma assinatura e 7 dias de validade: aceito como acesso, abria qualquer rota (revisão do SN-50)
+  it('token de renovação não dá acesso, nem de usuário ativo', async () => {
+    usuarios.findOne.mockReset().mockResolvedValue({ status: 'Ativo', roles: [{ name: 'admin' }], all_permissions: [] });
+
+    await expect(estrategia.validate({ sub: 'u1', type: 'refresh' } as never)).rejects.toBeInstanceOf(UnauthorizedException);
+    expect(usuarios.findOne).not.toHaveBeenCalled();
+  });
 });

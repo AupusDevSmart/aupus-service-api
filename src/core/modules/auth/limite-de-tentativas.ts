@@ -53,6 +53,15 @@ export const LIMITE_DO_ESQUECI_A_SENHA = {
   email: { limit: 5, ttl: 60 * MINUTO },
 };
 
+/**
+ * Renovar o token: o front chama sozinho (uma vez por hora por aba), então o
+ * teto é folgado e só por IP — o corpo não tem e-mail. Sem nenhum, a rota
+ * pública aceitava pedidos sem fim (revisão do SN-50).
+ */
+export const LIMITE_DA_RENOVACAO = { ip: { limit: 120, ttl: MINUTO } };
+/** Na renovação só conta o IP. */
+export const SO_O_IP = { conta: true, email: true };
+
 /** Redefinir com o token do e-mail: 5 a cada 10 minutos por conta. */
 export const LIMITE_DA_REDEFINICAO = { conta: { limit: 5, ttl: 10 * MINUTO }, ip: { limit: 10, ttl: 10 * MINUTO } };
 

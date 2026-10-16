@@ -13,6 +13,8 @@ export interface PayloadDoJwt {
   nome: string;
   role?: string | null;
   permissions?: string[];
+  /** 'refresh' no token de renovação (7 dias), que só serve para /auth/refresh. */
+  type?: string;
 }
 
 /** O usuário do request (`req.user` / `@CurrentUser()`), como o `validate` o entrega. */
@@ -53,6 +55,11 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
    * Este método é chamado automaticamente pelo Passport após validar o token
    */
   async validate(payload: PayloadDoJwt): Promise<UsuarioAutenticado> {
+    // O token de renovação tem a mesma assinatura e vale 7 dias: aceito aqui, ele
+    // abria qualquer rota e o prazo de 1 h do token de acesso não servia para
+    // nada (achado na revisão do SN-50). O /auth/refresh o lê pelo corpo.
+    if (payload.type === 'refresh') throw new UnauthorizedException('Token de renovação não dá acesso');
+
     // Buscar usuário no banco para garantir que ainda existe e está ativo
     const usuario = await this.usuariosService
       .findOne(payload.sub)

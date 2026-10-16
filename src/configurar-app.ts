@@ -5,7 +5,38 @@ import { ResponseInterceptor } from './common/interceptors/response.interceptor'
 import { HttpExceptionFilter } from './common/filters/http-exception.filter';
 import { LoggingInterceptor } from './common/interceptors/logging.interceptor';
 import { exceptionFactoryEmPortugues } from './common/pipes/mensagens-validacao';
-import { limiteDoCorpo } from './common/middleware/limite-do-corpo';
+import { JwtService } from '@nestjs/jwt';
+import { erroDoParserNoEnvelope, limiteDoCorpo, loginAntesDoCorpo, verificarAntesDoParse } from './common/middleware/limite-do-corpo';
+import { PERMISSIONS_KEY } from './core/modules/auth/decorators/permissions.decorator';
+import { ImportacaoController } from './modules/importacao/importacao.controller';
+
+const IMPORTACAO = '/api/v1/importacao';
+const jwt = new JwtService();
+
+/** As permissões das rotas de importação, lidas dos próprios @Permissions: não há lista a manter. */
+function permissoesDaImportacao(): Set<string> {
+  const prototipo = ImportacaoController.prototype as unknown as Record<string, unknown>;
+  return new Set(
+    Object.getOwnPropertyNames(prototipo).flatMap((metodo) => (Reflect.getMetadata(PERMISSIONS_KEY, prototipo[metodo] as object) as string[] | undefined) ?? []),
+  );
+}
+const PODE_IMPORTAR = permissoesDaImportacao();
+
+/**
+ * Token de acesso (não o de renovação, de 7 dias) de quem tem alguma permissão
+ * de importar: só então os 20 MB são lidos. As permissões do token são as do
+ * login e estão assinadas; o guard confere as de agora depois. O segredo é lido
+ * na hora: o ConfigModule carrega o .env depois deste arquivo ser importado.
+ */
+const podeMandarPlanilha = (token: string) => {
+  try {
+    const conteudo = jwt.verify<{ type?: string; permissions?: unknown }>(token, { secret: process.env.JWT_SECRET });
+    if (conteudo.type === 'refresh') return false;
+    return Array.isArray(conteudo.permissions) && conteudo.permissions.some((nome) => PODE_IMPORTAR.has(String(nome)));
+  } catch {
+    return false;
+  }
+};
 
 /**
  * Tudo o que o app recebe antes de ouvir a porta, menos o Swagger. Fica fora
@@ -53,12 +84,31 @@ export function configurarApp(app: NestExpressApplication): void {
     credentials: true,
   });
 
-  // Antes do parser: as notificações só recebem pedido pequeno (SN-47)
+  // Tamanho do corpo, antes do parser montar o JSON (SN-47, SN-50): as
+  // notificações só recebem pedido pequeno; o resto, 2 MB de JSON (o maior
+  // registro sincronizado com o NexOn tem ~1,3 kB); só a importação, 20 MB.
   app.use('/api/v1/notificacoes', limiteDoCorpo(32 * 1024));
+  app.use(limiteDoCorpo(2 * 1024 * 1024, { soJson: true, exceto: [IMPORTACAO] }));
+  // Os 20 MB da importação só são lidos para quem pode importar
+  app.use(IMPORTACAO, loginAntesDoCorpo(podeMandarPlanilha));
 
   // O padrão do body-parser (100 kB) não cabe uma planilha de cadastro
-  // importada: centenas de registros com as listas de cada um.
-  app.useBodyParser('json', { limit: '20mb' });
+  // importada: centenas de registros com as listas de cada um. Corpo
+  // compactado é recusado (415): o limite acima confere o Content-Length, e
+  // descompactado o pedido passaria dele. Navegador e NexOn não compactam.
+  //
+  // Lista longa, objeto largo, aninhamento ou nós demais: recusado nos bytes,
+  // antes do JSON.parse (o verify roda antes dele). O maior DTO tem 101 campos;
+  // a importação tem o teto do próprio DTO (5.000 registros)
+  app.useBodyParser('json', {
+    limit: '20mb',
+    inflate: false,
+    verify: verificarAntesDoParse(
+      { porLista: 2_000, porObjeto: 200, total: 20_000 },
+      { [IMPORTACAO]: { porLista: 5_000, porObjeto: 200, total: 2_000_000 } },
+    ),
+  });
+  app.use(erroDoParserNoEnvelope);
 
   // ✅ Prefix global da API
   app.setGlobalPrefix('api/v1');

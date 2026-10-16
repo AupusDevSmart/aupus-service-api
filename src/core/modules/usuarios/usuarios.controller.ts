@@ -51,6 +51,7 @@ import { LiberadoSemTrocarSenha } from '../auth/guards/troca-de-senha.guard';
 import { LIMITE_DA_TROCA_DE_SENHA, SEM_CONTADOR_DE_EMAIL } from '../auth/limite-de-tentativas';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { Permissions } from '../auth/decorators/permissions.decorator';
+import { LIMITES_DO_MULTIPART } from '@/common/upload/limites-do-upload.module';
 
 @ApiTags('Usuários')
 @Controller('usuarios')
@@ -245,6 +246,7 @@ export class UsuariosController {
         callback(null, true);
       },
       limits: {
+        ...LIMITES_DO_MULTIPART,
         fileSize: 2 * 1024 * 1024, // 2MB
       },
     }),

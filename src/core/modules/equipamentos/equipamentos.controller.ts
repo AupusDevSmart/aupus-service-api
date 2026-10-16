@@ -38,6 +38,7 @@ import { UserProprietarioId } from '../auth/decorators/user-proprietario.decorat
 import { Permissions } from '../auth/decorators/permissions.decorator';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import type { ScopedUser } from '../auth/permission-scope.service';
+import { LIMITES_DO_MULTIPART } from '@/common/upload/limites-do-upload.module';
 
 @ApiTags('Equipamentos')
 @Controller('equipamentos')
@@ -402,7 +403,7 @@ export class EquipamentosController {
         }
         cb(null, true);
       },
-      limits: { fileSize: 2 * 1024 * 1024 }, // 2MB
+      limits: { ...LIMITES_DO_MULTIPART, fileSize: 2 * 1024 * 1024 }, // 2MB
     }),
   )
   uploadFoto(@Param('id') id: string, @UploadedFile() file: Express.Multer.File) {

@@ -24,7 +24,7 @@ import { ResetPasswordWithTokenDto } from './dto/reset-password.dto';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { CurrentUser } from './decorators/current-user.decorator';
 import { Public } from './decorators/public.decorator';
-import { LIMITE_DA_REDEFINICAO, LIMITE_DO_ESQUECI_A_SENHA, LIMITE_DO_LOGIN, SEM_CONTADOR_DE_EMAIL } from './limite-de-tentativas';
+import { LIMITE_DA_REDEFINICAO, LIMITE_DA_RENOVACAO, LIMITE_DO_ESQUECI_A_SENHA, LIMITE_DO_LOGIN, SEM_CONTADOR_DE_EMAIL, SO_O_IP } from './limite-de-tentativas';
 import type { UsuarioAutenticado } from './strategies/jwt.strategy';
 
 /**
@@ -64,6 +64,9 @@ export class AuthController {
    * Renova o access_token usando o refresh_token
    */
   @Public()
+  @UseGuards(ThrottlerGuard)
+  @Throttle(LIMITE_DA_RENOVACAO)
+  @SkipThrottle(SO_O_IP)
   @Post('refresh')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Renova o access token' })

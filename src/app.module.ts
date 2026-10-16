@@ -22,6 +22,7 @@ import { ProgramacaoOSModule } from './modules/programacao-os/programacao-os.mod
 import { ExecucaoOSModule } from './modules/execucao-os/execucao-os.module';
 import { UploadsModule } from './modules/uploads/uploads.module';
 import { NotificacoesModule } from './modules/notificacoes/notificacoes.module';
+import { LimitesDoUploadModule } from './common/upload/limites-do-upload.module';
 import { DashboardModule } from './modules/dashboard/dashboard.module';
 import { SolicitacoesServicoModule } from './modules/solicitacoes-servico/solicitacoes-servico.module';
 import { InstrucoesModule } from './modules/instrucoes/instrucoes.module';
@@ -92,6 +93,7 @@ import {
     DashboardModule,
     UploadsModule,
     NotificacoesModule,
+    LimitesDoUploadModule,
   ],
   controllers: [AppController],
   providers: [

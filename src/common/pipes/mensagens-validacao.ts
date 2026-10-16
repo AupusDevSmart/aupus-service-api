@@ -132,8 +132,10 @@ export function errosPorCampo(erros: ValidationError[], prefixo = ''): ErroDeCam
       }
     }
 
+    // Laço, não spread: com dezenas de milhares de erros o spread estourava a
+    // pilha e o 400 virava 500 (revisão do SN-50)
     if (erro.children?.length) {
-      lista.push(...errosPorCampo(erro.children, campo));
+      for (const filho of errosPorCampo(erro.children, campo)) lista.push(filho);
     }
   }
 
@@ -144,7 +146,13 @@ export function errosPorCampo(erros: ValidationError[], prefixo = ''): ErroDeCam
  * Entregue ao ValidationPipe global. Mantém o formato de array que o front já
  * sabe ler (`formatApiError` junta com "; ").
  */
+/** Mais que isto não ajuda ninguém a corrigir, e 975 mil frases davam 35 MB de resposta (revisão do SN-50). */
+const FRASES_NO_ERRO = 200;
+
 export function exceptionFactoryEmPortugues(erros: ValidationError[]) {
   const frases = errosPorCampo(erros).map((e) => e.mensagem);
-  return new BadRequestException(frases.length > 0 ? frases : ['Dados inválidos.']);
+  if (frases.length === 0) return new BadRequestException(['Dados inválidos.']);
+  const mostradas = frases.slice(0, FRASES_NO_ERRO);
+  if (frases.length > FRASES_NO_ERRO) mostradas.push(`e mais ${frases.length - FRASES_NO_ERRO} erros`);
+  return new BadRequestException(mostradas);
 }
