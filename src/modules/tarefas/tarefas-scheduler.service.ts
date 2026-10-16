@@ -4,10 +4,9 @@ import { Cron } from '@nestjs/schedule';
 import { Prisma, PrismaService } from '@/core';
 import { ProgramacaoOSService } from '../programacao-os/programacao-os.service';
 import { calcularProximaExecucao } from './periodicidade';
-import { variantesDeIds } from './ids';
+import { HORIZONTE_DIAS, buscarCiclosAbertos, buscarTarefasElegiveis, buscarUltimasExecucoes, cicloAberto, type TarefaElegivel } from './ciclos-das-tarefas';
 import { PrioridadeDaPreventiva, prioridadePelaCriticidade } from './prioridade-pela-criticidade';
 import { proximoDiaUtil, regraDeDiasUteis } from '../agenda/dias-uteis';
-import { plantaDeCadaEquipamento } from '@/core/modules/auth/planta-dos-equipamentos';
 import { Sentry } from '../../config/sentry.config';
 
 /** `dados_origem` e Json: so um objeto recebe as chaves da geracao automatica. */
@@ -17,38 +16,6 @@ function ehObjetoJson(valor: unknown): valor is Prisma.JsonObject {
 
 /** Janela de agrupamento em dias */
 const JANELA_AGRUPAMENTO_DIAS = 14;
-
-/** Horizonte de antecedência em dias */
-const HORIZONTE_DIAS = 60;
-
-interface TarefaElegivel {
-  id: string;
-  nome: string;
-  tag: string;
-  criticidade: number | null;
-  frequencia: string | null;
-  frequencia_personalizada: number | null;
-  data_ultima_execucao: Date | null;
-  data_ancora: Date | null;
-  created_at: Date;
-  // A duracao vem da instrucao: a tarefa nao guarda mais esse dado.
-  instrucao: { tempo_estimado: number; duracao_estimada: Prisma.Decimal } | null;
-  equipamento_id: string;
-  equipamento: {
-    id: string;
-    nome: string;
-    criticidade: string;
-    unidade_id: string | null;
-    unidade: {
-      id: string;
-      nome: string;
-      planta_id: string | null;
-    } | null;
-  };
-  /** A planta efetiva (equipamento, unidade, ou unidade do UC pai): a da programação. */
-  planta_id: string | null;
-  proxima_execucao?: Date;
-}
 
 /** Grupo que o cron não conseguiu programar: aparece no retorno e no resumo. */
 export interface FalhaDaGeracao {
@@ -91,9 +58,11 @@ export class TarefasSchedulerService {
   }
 
   /**
-   * Método principal - pode ser chamado via cron ou endpoint manual
+   * Método principal - pode ser chamado via cron ou endpoint manual.
+   * `agora` e `equipamentoIds` existem para o teste que confere a previsão da
+   * agenda contra o gerador (SN-51): o cron e a rota manual não os passam.
    */
-  async gerarProgramacoesAutomaticas(): Promise<{
+  async gerarProgramacoesAutomaticas(opcoes: { agora?: Date; equipamentoIds?: string[] } = {}): Promise<{
     programacoesCriadas: number;
     tarefasProcessadas: number;
     tarefasIgnoradas: number;
@@ -101,15 +70,15 @@ export class TarefasSchedulerService {
     falhas: FalhaDaGeracao[];
   }> {
     // 1. Buscar tarefas elegíveis
-    const tarefas = await this.buscarTarefasElegiveis();
+    const tarefas = await buscarTarefasElegiveis(this.prisma, { equipamentoIds: opcoes.equipamentoIds });
     this.logger.log(`Encontradas ${tarefas.length} tarefas ativas com frequência definida`);
 
     // 2. Calcular próxima execução e filtrar por horizonte
-    const hoje = new Date();
+    const hoje = opcoes.agora ?? new Date();
     const limiteHorizonte = new Date(hoje.getTime() + HORIZONTE_DIAS * 24 * 60 * 60 * 1000);
 
     // Ultima execucao efetiva vem do historico de OS, nao do campo cache
-    const ultimasExecucoes = await this.buscarUltimasExecucoes(tarefas.map((t) => t.id.trim()));
+    const ultimasExecucoes = await buscarUltimasExecucoes(this.prisma, tarefas.map((t) => t.id.trim()));
 
     const tarefasDentroHorizonte = tarefas
       .map((t) => ({
@@ -189,111 +158,6 @@ export class TarefasSchedulerService {
   }
 
   /**
-   * Busca tarefas ATIVAS de planos ATIVOS com frequência definida
-   */
-  private async buscarTarefasElegiveis(): Promise<TarefaElegivel[]> {
-    const tarefas = await this.prisma.tarefas.findMany({
-      where: {
-        deleted_at: null,
-        ativo: true,
-        frequencia: { not: null },
-        // Tarefa de template nao gera OS: ela nao tem equipamento e serve
-        // apenas de molde para as copias.
-        equipamento_id: { not: null },
-        // Removida localmente: o usuario tirou a tarefa daquele equipamento.
-        origem_status: { not: 'REMOVIDA' },
-        // So copias vinculadas a equipamento. Tarefa avulsa (sem plano) segue
-        // valendo — e o caso da tarefa criada direto no equipamento.
-        OR: [
-          { plano_manutencao: { plano_origem_id: { not: null }, ativo: true } },
-          { plano_manutencao_id: null },
-        ],
-      },
-      include: {
-        // A duracao vem da instrucao: a tarefa nao guarda mais esse dado.
-        instrucao: {
-          select: { tempo_estimado: true, duracao_estimada: true },
-        },
-        equipamento: {
-          select: {
-            id: true,
-            nome: true,
-            criticidade: true,
-            unidade_id: true,
-            unidade: {
-              select: {
-                id: true,
-                nome: true,
-                planta_id: true,
-              },
-            },
-            equipamento_pai: {
-              select: { unidade_id: true, unidade: { select: { id: true, nome: true, planta_id: true } } },
-            },
-          },
-        },
-      },
-    });
-
-    // Componente (UAR) não tem unidade: vale a do UC pai. Sem isso as tarefas de
-    // componentes de plantas diferentes caíam no mesmo grupo "sem_unidade", a
-    // preventiva saía misturando plantas e sem os feriados da planta.
-    const comUnidadeEfetiva = tarefas.map(({ equipamento: comPai, ...tarefa }) => {
-      if (!comPai) return { ...tarefa, equipamento: null };
-      const { equipamento_pai: pai, ...equipamento } = comPai;
-      return {
-        ...tarefa,
-        equipamento: equipamento.unidade
-          ? equipamento
-          : { ...equipamento, unidade_id: pai?.unidade_id ?? null, unidade: pai?.unidade ?? null },
-      };
-    });
-    const plantas = await plantaDeCadaEquipamento(this.prisma, comUnidadeEfetiva.map((t) => t.equipamento_id));
-    return comUnidadeEfetiva.map((t) => ({ ...t, planta_id: plantas.get(t.equipamento_id?.trim()) ?? null }));
-  }
-
-  /**
-   * Ultima execucao EFETIVA por tarefa, lida do historico de OS.
-   *
-   * O campo `tarefas.data_ultima_execucao` e cache: ele e escrito na
-   * finalizacao da OS e pode ficar defasado se algo falhar no caminho. A fonte
-   * da verdade e `tarefas_os.data_conclusao` das tarefas que foram realmente
-   * concluidas em OS finalizadas — tarefa pendente ou cancelada dentro de uma
-   * OS finalizada nao conta como executada.
-   *
-   * Uma query agregada para todas as tarefas, sem N+1.
-   */
-  private async buscarUltimasExecucoes(tarefaIds: string[]): Promise<Map<string, Date>> {
-    if (tarefaIds.length === 0) return new Map();
-
-    const vinculos = await this.prisma.tarefas_os.findMany({
-      where: {
-        // As duas formas do id: Char(26) e blank-padded, o id da tarefa tem 25.
-        // Sem isto o cron nao enxergava execucao nenhuma e tratava toda tarefa
-        // antiga como se nunca tivesse rodado.
-        tarefa_id: { in: variantesDeIds(tarefaIds) },
-        status: 'CONCLUIDA',
-        data_conclusao: { not: null },
-        ordem_servico: { status: 'FINALIZADA' },
-      },
-      select: { tarefa_id: true, data_conclusao: true },
-    });
-
-    const ultimas = new Map<string, Date>();
-    for (const vinculo of vinculos) {
-      const id = vinculo.tarefa_id?.trim();
-      if (!id || !vinculo.data_conclusao) continue;
-
-      const atual = ultimas.get(id);
-      if (!atual || vinculo.data_conclusao > atual) {
-        ultimas.set(id, vinculo.data_conclusao);
-      }
-    }
-
-    return ultimas;
-  }
-
-  /**
    * Calcula a data da próxima execução com base na frequência
    */
 
@@ -311,71 +175,20 @@ export class TarefasSchedulerService {
     return calcularProximaExecucao(tarefa, ultimaExecucao);
   }
 
-  private chaveCiclo(tarefaId: string, ciclo?: Date | null): string {
-    return `${tarefaId}|${ciclo ? ciclo.getTime() : 'sem-ciclo'}`;
-  }
-
   /**
-   * Descarta as tarefas cujo ciclo atual ja tem item ABERTO.
+   * Descarta as tarefas cujo ciclo atual ja tem item ABERTO (regra em
+   * ciclos-das-tarefas.ts, a mesma da previsão da agenda).
    *
    * A pergunta antiga era "essa tarefa tem alguma OS ativa?", o que dava dois
    * problemas: OS cancelada liberava a tarefa na mesma hora e o cron recriava a
    * programacao toda madrugada; e tarefa nao concluida numa OS finalizada
    * sumia, porque quem a segurava era o campo de ultima execucao, escrito
    * indevidamente para todas.
-   *
-   * Agora o bloqueio e por ciclo e so vale enquanto ha item aberto. OS
-   * finalizada ou cancelada nao bloqueia: quem move o ciclo adiante e a execucao
-   * efetiva (finalizada) ou a ancora (cancelada). Tarefa que nao foi concluida
-   * volta ao pool no MESMO ciclo, como atrasada — e assim que entra numa
-   * programacao nova, esta fica PENDENTE e segura as geracoes seguintes.
    */
   private async filtrarCiclosJaGerados(tarefas: TarefaElegivel[]): Promise<TarefaElegivel[]> {
     if (tarefas.length === 0) return [];
-
-    const tarefaIds = tarefas.map((t) => t.id.trim());
-
-    const [vinculosProgramacao, vinculosOS] = await Promise.all([
-      this.prisma.tarefas_programacao_os.findMany({
-        where: {
-          tarefa_id: { in: variantesDeIds(tarefaIds) },
-          programacao: {
-            is: {
-              status: { in: ['PENDENTE', 'APROVADA'] },
-              deletado_em: null,
-            },
-          },
-        },
-        select: { tarefa_id: true, ciclo_referencia: true },
-      }),
-      this.prisma.tarefas_os.findMany({
-        where: {
-          tarefa_id: { in: variantesDeIds(tarefaIds) },
-          ordem_servico: {
-            status: { in: ['PENDENTE', 'EM_EXECUCAO', 'PAUSADA', 'EXECUTADA', 'AUDITADA'] },
-          },
-        },
-        select: { tarefa_id: true, ciclo_referencia: true },
-      }),
-    ]);
-
-    const ciclosAbertos = new Set<string>();
-    for (const vinculo of [...vinculosProgramacao, ...vinculosOS]) {
-      const id = vinculo.tarefa_id?.trim();
-      if (!id) continue;
-      ciclosAbertos.add(this.chaveCiclo(id, vinculo.ciclo_referencia));
-    }
-
-    return tarefas.filter((tarefa) => {
-      const id = tarefa.id.trim();
-
-      // Vinculos anteriores a esta versao nao tem ciclo gravado. Nesses casos
-      // vale o comportamento antigo: bloqueia a tarefa inteira, em vez de
-      // arriscar gerar programacao duplicada.
-      if (ciclosAbertos.has(this.chaveCiclo(id, null))) return false;
-
-      return !ciclosAbertos.has(this.chaveCiclo(id, tarefa.proxima_execucao));
-    });
+    const ciclos = await buscarCiclosAbertos(this.prisma, tarefas.map((t) => t.id.trim()));
+    return tarefas.filter((tarefa) => !cicloAberto(ciclos, tarefa.id, tarefa.proxima_execucao));
   }
 
   /**

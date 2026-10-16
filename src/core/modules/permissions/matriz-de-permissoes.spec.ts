@@ -193,6 +193,8 @@ const JORNADAS: [string, string, string[]][] = [
   ['ler comentários da solicitação', 'GET /solicitacoes-servico/:id/comentarios', TODOS],
   ['editar o próprio comentário na solicitação', 'PATCH /solicitacoes-servico/:id/comentarios/:comentarioId', TODOS],
   ['ler comentários da OS', 'GET /execucao-os/:id/comentarios', TODOS],
+  // Agenda (SN-51): a previsão das preventivas, nas plantas de cada um
+  ['ver a previsão da agenda', 'GET /agenda/previsao', TODOS],
   ['comentar na OS', 'POST /execucao-os/:id/comentarios', EXECUTAM],
   ['editar o próprio comentário na OS', 'PATCH /execucao-os/:id/comentarios/:comentarioId', EXECUTAM],
   ['excluir o próprio comentário na OS', 'DELETE /execucao-os/:id/comentarios/:comentarioId', EXECUTAM],

@@ -2,6 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { PrismaService } from '@/core';
 import { TarefasSchedulerService } from './tarefas-scheduler.service';
 import { ProgramacaoOSService } from '../programacao-os/programacao-os.service';
+import { buscarUltimasExecucoes } from './ciclos-das-tarefas';
 
 /**
  * Cobre o agendamento reescrito no PR3. Cada caso aqui corresponde a um defeito
@@ -244,7 +245,7 @@ describe('TarefasSchedulerService', () => {
     it('so considera tarefa CONCLUIDA em OS FINALIZADA', async () => {
       mockPrismaService.tarefas_os.findMany.mockResolvedValue([]);
 
-      await service['buscarUltimasExecucoes'](['tarefa_1']);
+      await buscarUltimasExecucoes(mockPrismaService as unknown as PrismaService, ['tarefa_1']);
 
       const where = mockPrismaService.tarefas_os.findMany.mock.calls[0][0].where;
       expect(where.status).toBe('CONCLUIDA');
@@ -260,7 +261,7 @@ describe('TarefasSchedulerService', () => {
         { tarefa_id: 'tarefa_1', data_conclusao: recente },
       ]);
 
-      const mapa = await service['buscarUltimasExecucoes'](['tarefa_1']);
+      const mapa = await buscarUltimasExecucoes(mockPrismaService as unknown as PrismaService, ['tarefa_1']);
 
       expect(mapa.get('tarefa_1')).toEqual(recente);
     });
