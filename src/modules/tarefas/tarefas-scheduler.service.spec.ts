@@ -17,10 +17,14 @@ describe('TarefasSchedulerService', () => {
 
   const mockPrismaService = {
     tarefas: { findMany: jest.fn(), update: jest.fn() },
-    tarefas_os: { findMany: jest.fn() },
+    // findMany: ciclos abertos; groupBy: a última execução (agregada no banco)
+    tarefas_os: { findMany: jest.fn(), groupBy: jest.fn() },
     tarefas_programacao_os: { findMany: jest.fn(), updateMany: jest.fn() },
     programacoes_os: { update: jest.fn() },
-    configuracoes_dias_uteis: { findFirst: jest.fn() },
+    // A regra de dias úteis (regrasDeDiasUteis): vínculos da planta, configurações e feriados
+    configuracoes_dias_uteis: { findMany: jest.fn() },
+    configuracao_plantas: { findMany: jest.fn() },
+    feriado_plantas: { findMany: jest.fn() },
     feriados: { findMany: jest.fn() },
     // A planta de cada equipamento (plantaDeCadaEquipamento)
     $queryRaw: jest.fn(),
@@ -40,9 +44,12 @@ describe('TarefasSchedulerService', () => {
     service = module.get<TarefasSchedulerService>(TarefasSchedulerService);
 
     mockPrismaService.tarefas_os.findMany.mockResolvedValue([]);
+    mockPrismaService.tarefas_os.groupBy.mockResolvedValue([]);
     mockPrismaService.tarefas_programacao_os.findMany.mockResolvedValue([]);
     mockProgramacaoService.criarDeTarefas.mockResolvedValue({ id: 'prog_1', codigo: 'PRG-001' });
-    mockPrismaService.configuracoes_dias_uteis.findFirst.mockResolvedValue(null);
+    mockPrismaService.configuracoes_dias_uteis.findMany.mockResolvedValue([]);
+    mockPrismaService.configuracao_plantas.findMany.mockResolvedValue([]);
+    mockPrismaService.feriado_plantas.findMany.mockResolvedValue([]);
     mockPrismaService.feriados.findMany.mockResolvedValue([]);
     mockPrismaService.$queryRaw.mockResolvedValue([]);
   });
@@ -169,7 +176,9 @@ describe('TarefasSchedulerService', () => {
     const gerar = () => service['criarProgramacaoParaCluster']([tarefaDoDomingo] as never, 'Unidade 1', 'un_1');
 
     it('a programacao gerada cai no proximo dia util da planta (antes saia no domingo e no feriado)', async () => {
-      mockPrismaService.feriados.findMany.mockResolvedValue([{ data: new Date('2026-10-19T00:00:00Z'), recorrente: false, nome: 'Feriado' }]);
+      // O feriado é só da planta da tarefa
+      mockPrismaService.feriado_plantas.findMany.mockResolvedValue([{ feriado_id: 'fer_1', planta_id: 'pl_1' }]);
+      mockPrismaService.feriados.findMany.mockResolvedValue([{ id: 'fer_1', geral: false, data: new Date('2026-10-19T00:00:00Z'), recorrente: false, nome: 'Feriado' }]);
 
       await gerar();
 
@@ -177,8 +186,8 @@ describe('TarefasSchedulerService', () => {
         expect.objectContaining({ data_hora_programada: '2026-10-20T13:00:00.000Z' }),
         undefined,
       );
-      const where = mockPrismaService.feriados.findMany.mock.calls[0][0].where;
-      expect(where.OR).toContainEqual({ feriado_plantas: { some: { planta_id: 'pl_1' } } });
+      const where = mockPrismaService.feriado_plantas.findMany.mock.calls[0][0].where;
+      expect(where.planta_id.in).toContain('pl_1');
     });
 
     it('o ciclo de referencia continua sendo a data prevista, e a ajustada fica registrada na origem', async () => {
@@ -243,11 +252,9 @@ describe('TarefasSchedulerService', () => {
 
   describe('ultima execucao efetiva', () => {
     it('so considera tarefa CONCLUIDA em OS FINALIZADA', async () => {
-      mockPrismaService.tarefas_os.findMany.mockResolvedValue([]);
-
       await buscarUltimasExecucoes(mockPrismaService as unknown as PrismaService, ['tarefa_1']);
 
-      const where = mockPrismaService.tarefas_os.findMany.mock.calls[0][0].where;
+      const where = mockPrismaService.tarefas_os.groupBy.mock.calls[0][0].where;
       expect(where.status).toBe('CONCLUIDA');
       expect(where.ordem_servico.status).toBe('FINALIZADA');
     });
@@ -256,9 +263,10 @@ describe('TarefasSchedulerService', () => {
       const antiga = new Date('2026-01-10T00:00:00Z');
       const recente = new Date('2026-06-10T00:00:00Z');
 
-      mockPrismaService.tarefas_os.findMany.mockResolvedValue([
-        { tarefa_id: 'tarefa_1', data_conclusao: antiga },
-        { tarefa_id: 'tarefa_1', data_conclusao: recente },
+      // As duas formas do id (com e sem o espaço do Char(26)) chegam em grupos separados
+      mockPrismaService.tarefas_os.groupBy.mockResolvedValue([
+        { tarefa_id: 'tarefa_1', _max: { data_conclusao: antiga } },
+        { tarefa_id: 'tarefa_1 ', _max: { data_conclusao: recente } },
       ]);
 
       const mapa = await buscarUltimasExecucoes(mockPrismaService as unknown as PrismaService, ['tarefa_1']);
@@ -303,6 +311,17 @@ describe('TarefasSchedulerService', () => {
       ]);
 
       const result = await service['filtrarCiclosJaGerados']([tarefa(ciclo)] as never);
+
+      expect(result).toHaveLength(0);
+    });
+
+    // TIMESTAMP(0) arredonda: o ciclo calculado depois de uma conclusão com
+    // milissegundos não casava com o gravado, e a mesma programação nascia toda noite
+    it('ciclo com milissegundos casa com o gravado no segundo', async () => {
+      const gravado = new Date('2026-09-01T10:00:01Z');
+      mockPrismaService.tarefas_programacao_os.findMany.mockResolvedValue([{ tarefa_id: 'tarefa_1', ciclo_referencia: gravado }]);
+
+      const result = await service['filtrarCiclosJaGerados']([tarefa(new Date('2026-09-01T10:00:00.640Z'))] as never);
 
       expect(result).toHaveLength(0);
     });

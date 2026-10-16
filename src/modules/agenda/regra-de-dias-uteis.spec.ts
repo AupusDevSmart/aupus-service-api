@@ -1,5 +1,5 @@
 import { PrismaService } from '@/core';
-import { regraDeDiasUteis, proximoDiaUtil } from './dias-uteis';
+import { regraDeDiasUteis, regrasDeDiasUteis, proximoDiaUtil } from './dias-uteis';
 
 /**
  * De onde vem a regra de cada planta, contra Postgres de verdade: a
@@ -97,6 +97,16 @@ describe('regraDeDiasUteis (banco real)', () => {
   it('id com o espaço do Char(26) dá a mesma regra', async () => {
     const r = await regraDeDiasUteis(prisma, `${PLANTA_X}`.padEnd(26, ' '));
     expect(nomes(r)).toHaveLength(2);
+  });
+
+  // A previsão carrega as regras de todas as plantas de uma vez (SN-52): tem de dar o mesmo que uma a uma
+  it('em lote, cada planta recebe a mesma regra que teria sozinha; planta de fora fica com a geral', async () => {
+    const regraDa = await regrasDeDiasUteis(prisma, [PLANTA_X, `${PLANTA_Y}`.padEnd(26, ' ')]);
+
+    expect(regraDa(PLANTA_X)).toEqual(await regraDeDiasUteis(prisma, PLANTA_X));
+    expect(regraDa(PLANTA_Y)).toEqual(await regraDeDiasUteis(prisma, PLANTA_Y));
+    expect(regraDa('outraplanta')).toEqual(await regraDeDiasUteis(prisma, null));
+    expect(regraDa(null)).toEqual(await regraDeDiasUteis(prisma, null));
   });
 
   it('domingo 18/10 vai para terça na Y (segunda é feriado geral) e para quarta na X (terça é feriado dela)', async () => {

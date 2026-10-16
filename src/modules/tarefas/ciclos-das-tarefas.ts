@@ -1,5 +1,5 @@
 import type { Prisma, PrismaService } from '@/core';
-import { plantaDeCadaEquipamento } from '@/core/modules/auth/planta-dos-equipamentos';
+import { equipamentoNasPlantas, plantaDeCadaEquipamento } from '@/core/modules/auth/planta-dos-equipamentos';
 import { variantesDeIds } from './ids';
 
 /**
@@ -11,6 +11,29 @@ import { variantesDeIds } from './ids';
 
 /** O gerador cria a programação do ciclo que vence até este tanto de dias à frente. */
 export const HORIZONTE_DIAS = 60;
+
+/** O fuso da rodada do gerador (@Cron) e da regra de dias úteis: Brasília, sem horário de verão. */
+export const FUSO_DO_GERADOR = 'America/Sao_Paulo';
+const UMA_HORA = 3_600_000;
+const UM_DIA = 24 * UMA_HORA;
+
+/**
+ * O ciclo no segundo, como o Postgres o guarda: `ciclo_referencia` é
+ * TIMESTAMP(0) e ARREDONDA os milissegundos. A data de conclusão da OS tem
+ * milissegundos, então o ciclo calculado depois dela também tinha — e não
+ * casava com o gravado: o gerador não via o ciclo aberto e criava a mesma
+ * programação toda madrugada (achado na revisão do SN-51). Toda conta de
+ * ciclo passa por aqui antes de comparar ou gravar.
+ */
+export const cicloNoSegundo = (ciclo: Date): Date => new Date(Math.round(ciclo.getTime() / 1000) * 1000);
+
+/** A primeira rodada do gerador (todo dia às 3h de Brasília) em ou depois do instante. */
+export function proximaRodadaDoGerador(instante: Date): Date {
+  // Brasília é UTC-3 fixo: 3h de lá são 6h UTC
+  const diaEmBrasilia = Math.floor((instante.getTime() - 3 * UMA_HORA) / UM_DIA) * UM_DIA;
+  const rodada = diaEmBrasilia + 6 * UMA_HORA;
+  return new Date(rodada >= instante.getTime() ? rodada : rodada + UM_DIA);
+}
 
 export interface TarefaElegivel {
   id: string;
@@ -42,14 +65,31 @@ export interface TarefaElegivel {
 }
 
 /**
- * Tarefas ATIVAS de planos ATIVOS com frequência definida. `equipamentoIds`
- * restringe aos equipamentos dados (a previsão de um equipamento; o gerador
- * rodado num teste sem tocar o resto do banco).
+ * Tarefas ATIVAS de planos ATIVOS com frequência definida, de equipamento que
+ * não foi excluído. `equipamentoIds` restringe aos equipamentos dados (a
+ * previsão de um equipamento; o gerador rodado num teste sem tocar o resto do
+ * banco); `plantas`, às plantas dadas, na consulta (a previsão de quem tem
+ * escopo não lê o banco inteiro).
  */
-export async function buscarTarefasElegiveis(prisma: PrismaService, filtro: { equipamentoIds?: string[] } = {}): Promise<TarefaElegivel[]> {
+export async function buscarTarefasElegiveis(
+  prisma: PrismaService,
+  filtro: { equipamentoIds?: string[]; plantas?: string[] } = {},
+): Promise<TarefaElegivel[]> {
   const tarefas = await prisma.tarefas.findMany({
     where: {
       deleted_at: null,
+      // Equipamento excluído não tem mais o que manter: antes a tarefa dele caía
+      // em "falhas" toda madrugada ou saía numa preventiva com equipamento apagado.
+      // Nem o componente de UC excluído: excluir a unidade ou a planta só marca
+      // o equipamento que tem unidade_id, e a UAR (sem unidade) ficava viva
+      equipamento: {
+        deleted_at: null,
+        // AND: os dois filtros são OR, e espalhados na mesma chave um apagaria o outro
+        AND: [
+          { OR: [{ equipamento_pai_id: null }, { equipamento_pai: { deleted_at: null } }] },
+          ...(filtro.plantas ? [equipamentoNasPlantas(variantesDeIds(filtro.plantas))] : []),
+        ],
+      },
       ativo: true,
       frequencia: { not: null },
       // Tarefa de template nao gera OS: ela nao tem equipamento e serve
@@ -116,12 +156,15 @@ export async function buscarTarefasElegiveis(prisma: PrismaService, filtro: { eq
  * concluidas em OS finalizadas — tarefa pendente ou cancelada dentro de uma
  * OS finalizada nao conta como executada.
  *
- * Uma query agregada para todas as tarefas, sem N+1.
+ * Agregado no banco (a maior por tarefa): o historico cresce para sempre, e a
+ * previsao roda a cada pedido, nao so de madrugada.
  */
 export async function buscarUltimasExecucoes(prisma: PrismaService, tarefaIds: string[]): Promise<Map<string, Date>> {
   if (tarefaIds.length === 0) return new Map();
 
-  const vinculos = await prisma.tarefas_os.findMany({
+  const vinculos = await prisma.tarefas_os.groupBy({
+    by: ['tarefa_id'],
+    _max: { data_conclusao: true },
     where: {
       // As duas formas do id: Char(26) e blank-padded, o id da tarefa tem 25.
       // Sem isto o cron nao enxergava execucao nenhuma e tratava toda tarefa
@@ -131,31 +174,43 @@ export async function buscarUltimasExecucoes(prisma: PrismaService, tarefaIds: s
       data_conclusao: { not: null },
       ordem_servico: { status: 'FINALIZADA' },
     },
-    select: { tarefa_id: true, data_conclusao: true },
   });
 
   const ultimas = new Map<string, Date>();
   for (const vinculo of vinculos) {
     const id = vinculo.tarefa_id?.trim();
-    if (!id || !vinculo.data_conclusao) continue;
+    const data = vinculo._max.data_conclusao;
+    if (!id || !data) continue;
 
+    // As duas formas do id (com e sem espaço) caem na mesma tarefa: fica a maior
     const atual = ultimas.get(id);
-    if (!atual || vinculo.data_conclusao > atual) {
-      ultimas.set(id, vinculo.data_conclusao);
-    }
+    if (!atual || data > atual) ultimas.set(id, data);
   }
 
   return ultimas;
 }
 
-export const chaveCiclo = (tarefaId: string, ciclo?: Date | null): string => `${tarefaId}|${ciclo ? ciclo.getTime() : 'sem-ciclo'}`;
+export const chaveCiclo = (tarefaId: string, ciclo?: Date | null): string => `${tarefaId}|${ciclo ? cicloNoSegundo(ciclo).getTime() : 'sem-ciclo'}`;
 
 /** O item que segura o ciclo: a programação ainda não aprovada ou a OS que nasceu dela. */
 export interface ItemAberto {
   programacao_id: string | null;
   os_id: string | null;
-  status: string;
+  /** null quando quem pede não pode ver o registro. */
+  status: string | null;
+  /** A data marcada no registro (a da OS, se já há): é a que vale, não a estimada. */
+  data_programada: Date | null;
+  /** A planta do registro: quem tem escopo só vê o registro da planta dele. */
+  planta_id: string | null;
 }
+
+/**
+ * A data da programação: `data_hora_programada` vem do gerador; a do formulário
+ * vai para `data_previsao_inicio` (o campo da hora segue comentado na tela).
+ * É a mesma escolha que a aprovação faz ao criar a OS.
+ */
+export const dataDaProgramacao = (p: { data_hora_programada: Date | null; data_previsao_inicio: Date | null }): Date | null =>
+  p.data_hora_programada ?? p.data_previsao_inicio;
 
 /**
  * Os ciclos que ja tem item ABERTO, por `chaveCiclo`.
@@ -180,7 +235,12 @@ export async function buscarCiclosAbertos(prisma: PrismaService, tarefaIds: stri
           },
         },
       },
-      select: { tarefa_id: true, ciclo_referencia: true, programacao_id: true, programacao: { select: { status: true } } },
+      select: {
+        tarefa_id: true,
+        ciclo_referencia: true,
+        programacao_id: true,
+        programacao: { select: { status: true, data_hora_programada: true, data_previsao_inicio: true, planta_id: true } },
+      },
     }),
     prisma.tarefas_os.findMany({
       where: {
@@ -189,7 +249,7 @@ export async function buscarCiclosAbertos(prisma: PrismaService, tarefaIds: stri
           status: { in: ['PENDENTE', 'EM_EXECUCAO', 'PAUSADA', 'EXECUTADA', 'AUDITADA'] },
         },
       },
-      select: { tarefa_id: true, ciclo_referencia: true, os_id: true, ordem_servico: { select: { status: true } } },
+      select: { tarefa_id: true, ciclo_referencia: true, os_id: true, ordem_servico: { select: { status: true, data_hora_programada: true, planta_id: true } } },
     }),
   ]);
 
@@ -197,14 +257,26 @@ export async function buscarCiclosAbertos(prisma: PrismaService, tarefaIds: stri
   for (const v of vinculosProgramacao) {
     const id = v.tarefa_id?.trim();
     if (!id) continue;
-    ciclos.set(chaveCiclo(id, v.ciclo_referencia), { programacao_id: v.programacao_id?.trim() ?? null, os_id: null, status: v.programacao?.status ?? 'PENDENTE' });
+    ciclos.set(chaveCiclo(id, v.ciclo_referencia), {
+      programacao_id: v.programacao_id?.trim() ?? null,
+      os_id: null,
+      status: v.programacao?.status ?? 'PENDENTE',
+      data_programada: v.programacao ? dataDaProgramacao(v.programacao) : null,
+      planta_id: v.programacao?.planta_id?.trim() ?? null,
+    });
   }
   // A OS vale mais que a programação de onde saiu: é ela que a pessoa abre
   for (const v of vinculosOS) {
     const id = v.tarefa_id?.trim();
     if (!id) continue;
     const chave = chaveCiclo(id, v.ciclo_referencia);
-    ciclos.set(chave, { programacao_id: ciclos.get(chave)?.programacao_id ?? null, os_id: v.os_id?.trim() ?? null, status: v.ordem_servico?.status ?? 'PENDENTE' });
+    ciclos.set(chave, {
+      programacao_id: ciclos.get(chave)?.programacao_id ?? null,
+      os_id: v.os_id?.trim() ?? null,
+      status: v.ordem_servico?.status ?? 'PENDENTE',
+      data_programada: v.ordem_servico?.data_hora_programada ?? ciclos.get(chave)?.data_programada ?? null,
+      planta_id: v.ordem_servico?.planta_id?.trim() ?? ciclos.get(chave)?.planta_id ?? null,
+    });
   }
   return ciclos;
 }

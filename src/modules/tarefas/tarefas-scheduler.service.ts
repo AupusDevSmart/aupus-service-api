@@ -4,7 +4,16 @@ import { Cron } from '@nestjs/schedule';
 import { Prisma, PrismaService } from '@/core';
 import { ProgramacaoOSService } from '../programacao-os/programacao-os.service';
 import { calcularProximaExecucao } from './periodicidade';
-import { HORIZONTE_DIAS, buscarCiclosAbertos, buscarTarefasElegiveis, buscarUltimasExecucoes, cicloAberto, type TarefaElegivel } from './ciclos-das-tarefas';
+import {
+  FUSO_DO_GERADOR,
+  HORIZONTE_DIAS,
+  buscarCiclosAbertos,
+  buscarTarefasElegiveis,
+  buscarUltimasExecucoes,
+  cicloAberto,
+  cicloNoSegundo,
+  type TarefaElegivel,
+} from './ciclos-das-tarefas';
 import { PrioridadeDaPreventiva, prioridadePelaCriticidade } from './prioridade-pela-criticidade';
 import { proximoDiaUtil, regraDeDiasUteis } from '../agenda/dias-uteis';
 import { Sentry } from '../../config/sentry.config';
@@ -34,9 +43,11 @@ export class TarefasSchedulerService {
   ) {}
 
   /**
-   * Cron: todo dia às 3h da manhã
+   * Cron: todo dia às 3h da manhã de Brasília. O fuso vai explícito: sem ele a
+   * rodada seguia o fuso do servidor (UTC em produção, 0h de Brasília) e a
+   * previsão da agenda não tinha como dizer o dia certo.
    */
-  @Cron('0 3 * * *')
+  @Cron('0 3 * * *', { timeZone: FUSO_DO_GERADOR })
   async handleCron(): Promise<void> {
     this.logger.log('Iniciando geração automática de programações a partir de tarefas...');
     try {
@@ -172,7 +183,9 @@ export class TarefasSchedulerService {
    * anterior para todas.
    */
   private calcularProximaExecucao(tarefa: TarefaElegivel, ultimaExecucao?: Date): Date | null {
-    return calcularProximaExecucao(tarefa, ultimaExecucao);
+    // No segundo: é como o ciclo fica gravado (ver cicloNoSegundo)
+    const proxima = calcularProximaExecucao(tarefa, ultimaExecucao);
+    return proxima ? cicloNoSegundo(proxima) : null;
   }
 
   /**
@@ -307,15 +320,16 @@ export class TarefasSchedulerService {
     if (resultado?.id) {
       for (const tarefa of cluster) {
         if (!tarefa.proxima_execucao) continue;
+        // Vínculo sem ciclo bloqueia a tarefa inteira (vale o comportamento
+        // antigo) e o cancelamento não move a âncora: não pode passar calado
         try {
-          await this.prisma.tarefas_programacao_os.updateMany({
+          const { count } = await this.prisma.tarefas_programacao_os.updateMany({
             where: { programacao_id: resultado.id, tarefa_id: tarefa.id },
             data: { ciclo_referencia: tarefa.proxima_execucao },
           });
+          if (count === 0) this.logger.error(`Ciclo de referência não marcado: tarefa ${tarefa.id} sem vínculo na programação ${resultado.codigo}`);
         } catch (error) {
-          this.logger.warn(
-            `Falha ao marcar ciclo de referencia da tarefa ${tarefa.id}: ${error.message}`,
-          );
+          this.logger.error(`Falha ao marcar ciclo de referencia da tarefa ${tarefa.id}: ${error.message}`);
         }
       }
     }

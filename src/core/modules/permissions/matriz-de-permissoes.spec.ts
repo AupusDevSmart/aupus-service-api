@@ -195,6 +195,7 @@ const JORNADAS: [string, string, string[]][] = [
   ['ler comentários da OS', 'GET /execucao-os/:id/comentarios', TODOS],
   // Agenda (SN-51): a previsão das preventivas, nas plantas de cada um
   ['ver a previsão da agenda', 'GET /agenda/previsao', TODOS],
+  ['ver o calendário de manutenção', 'GET /agenda/eventos', TODOS],
   ['comentar na OS', 'POST /execucao-os/:id/comentarios', EXECUTAM],
   ['editar o próprio comentário na OS', 'PATCH /execucao-os/:id/comentarios/:comentarioId', EXECUTAM],
   ['excluir o próprio comentário na OS', 'DELETE /execucao-os/:id/comentarios/:comentarioId', EXECUTAM],
