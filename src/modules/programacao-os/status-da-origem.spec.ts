@@ -90,6 +90,12 @@ describe('status da origem acompanha programacao e OS (banco real)', () => {
       select: { id: true },
     });
     const osIds = oss.map((o) => o.id);
+    const origens = [
+      ...(await prisma.anomalias.findMany({ where: { descricao: { startsWith: PREFIXO } }, select: { id: true } })),
+      ...(await prisma.solicitacoes_servico.findMany({ where: { titulo: { startsWith: PREFIXO } }, select: { id: true } })),
+    ].map((o) => o.id.trim());
+    // Os eventos de aviso (SN-47) que as mudanças de status deixaram
+    await prisma.notificacoes_eventos.deleteMany({ where: { entidade_id: { in: [...ids, ...osIds, ...origens].map((i) => i.trim()) } } });
     await prisma.historico_os.deleteMany({ where: { os_id: { in: osIds } } });
     await prisma.checklist_atividades_os.deleteMany({ where: { os_id: { in: osIds } } });
     await prisma.ordens_servico.deleteMany({ where: { id: { in: osIds } } });
@@ -321,6 +327,48 @@ describe('status da origem acompanha programacao e OS (banco real)', () => {
       const sol = await solicitacao(solId);
       expect(sol?.status).toBe('REGISTRADA');
       expect(sol?.programacao_os_id).toBeNull();
+    });
+  });
+
+  // SN-47: cada mudança de status deixa, na mesma transação, o evento que vira
+  // aviso — e cancelar a programação aprovada avisa uma vez só.
+  describe('avisos de mudança de status', () => {
+    const eventos = async (id: string) =>
+      (await prisma.notificacoes_eventos.findMany({ where: { entidade_id: id.trim() }, orderBy: { id: 'asc' } })).map((e) => e.evento);
+
+    it('criar, aprovar e finalizar avisam cada passo da programação, da OS e da anomalia', async () => {
+      const anomaliaId = await novaAnomalia('avisos');
+      const prog = await programarAnomalia(anomaliaId);
+      await programacoes.aprovar(prog.id, {});
+      const os = await osDaProgramacao(prog.id);
+      await prisma.ordens_servico.update({ where: { id: os!.id }, data: { status: 'AUDITADA' } });
+      await execucoes.finalizar(os!.id, {} as never);
+
+      expect(await eventos(prog.id)).toEqual(['programacao.criada', 'programacao.aprovada']);
+      expect(await eventos(os!.id)).toEqual(['os.finalizada']);
+      expect(await eventos(anomaliaId)).toEqual(['anomalia.programada', 'anomalia.finalizada']);
+    });
+
+    it('cancelar a programação aprovada avisa "OS cancelada" uma vez, sem "programação cancelada"', async () => {
+      const anomaliaId = await novaAnomalia('avisos-cancelar');
+      const prog = await programarAnomalia(anomaliaId);
+      await programacoes.aprovar(prog.id, {});
+      const os = await osDaProgramacao(prog.id);
+
+      await programacoes.cancelar(prog.id, { motivo_cancelamento: 'teste' });
+
+      expect(await eventos(prog.id)).toEqual(['programacao.criada', 'programacao.aprovada']);
+      expect(await eventos(os!.id)).toEqual(['os.cancelada']);
+      expect(await eventos(anomaliaId)).toEqual(['anomalia.programada', 'anomalia.reaberta']);
+    });
+
+    it('cancelar a programação pendente avisa "programação cancelada"', async () => {
+      const anomaliaId = await novaAnomalia('avisos-pendente');
+      const prog = await programarAnomalia(anomaliaId);
+
+      await programacoes.cancelar(prog.id, { motivo_cancelamento: 'teste' });
+
+      expect(await eventos(prog.id)).toEqual(['programacao.criada', 'programacao.cancelada']);
     });
   });
 });

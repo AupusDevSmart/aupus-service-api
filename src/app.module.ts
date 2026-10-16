@@ -21,6 +21,7 @@ import { ReservasModule } from './modules/reservas/reservas.module';
 import { ProgramacaoOSModule } from './modules/programacao-os/programacao-os.module';
 import { ExecucaoOSModule } from './modules/execucao-os/execucao-os.module';
 import { UploadsModule } from './modules/uploads/uploads.module';
+import { NotificacoesModule } from './modules/notificacoes/notificacoes.module';
 import { DashboardModule } from './modules/dashboard/dashboard.module';
 import { SolicitacoesServicoModule } from './modules/solicitacoes-servico/solicitacoes-servico.module';
 import { InstrucoesModule } from './modules/instrucoes/instrucoes.module';
@@ -90,6 +91,7 @@ import {
     ImportacaoModule,
     DashboardModule,
     UploadsModule,
+    NotificacoesModule,
   ],
   controllers: [AppController],
   providers: [

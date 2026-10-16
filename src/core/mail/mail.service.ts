@@ -3,6 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import * as nodemailer from 'nodemailer';
 import { getWelcomeEmailHtml } from './templates/welcome.template';
 import { getPasswordResetEmailHtml } from './templates/password-reset.template';
+import { getNotificacaoEmailHtml } from './templates/notificacao.template';
 
 @Injectable()
 export class MailService implements OnModuleInit {
@@ -41,6 +42,24 @@ export class MailService implements OnModuleInit {
     });
 
     this.logger.log(`Mail service initialized (${host}:${port})`);
+  }
+
+  /**
+   * E-mail de uma notificação (SN-47). Ao contrário dos outros envios, LANÇA o
+   * erro (inclusive SMTP não configurado): quem chama é a fila, que grava o
+   * motivo e tenta de novo — engolir aqui faria o envio constar como feito.
+   */
+  async enviarNotificacao(to: string, titulo: string, descricao: string, link: string | null): Promise<void> {
+    if (!this.transporter) throw new Error('SMTP não configurado');
+    // Só caminho do próprio front ("/execucao-os?..."): "//outro.com" grudado no
+    // FRONTEND_URL ainda viraria outro host em alguns clientes
+    const url = link && link.startsWith('/') && !link.startsWith('//') ? `${this.frontendUrl}${link}` : null;
+    await this.transporter.sendMail({
+      from: this.fromAddress,
+      to,
+      subject: titulo,
+      html: getNotificacaoEmailHtml(titulo, descricao, url, this.frontendUrl),
+    });
   }
 
   async sendWelcomeEmail(to: string, nome: string, senhaTemporaria: string): Promise<void> {

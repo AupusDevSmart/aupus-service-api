@@ -54,6 +54,10 @@ async function backupDatabase() {
     'model_has_permissions',
     'model_has_roles',
     'notificacoes',
+    // SN-47: depois de notificacoes (os envios a referenciam; o TRUNCATE CASCADE dela os apaga)
+    'notificacoes_envios',
+    'notificacoes_eventos',
+    'notificacoes_preferencias',
     'oportunidades',
     'organizacao_usuario',
     'organizacoes',

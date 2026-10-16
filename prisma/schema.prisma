@@ -584,17 +584,76 @@ model model_has_roles {
   @@index([model_id, model_type], map: "model_has_roles_model_id_model_type_index")
 }
 
+/// SN-47: o aviso de cada usuário (o sininho). As colunas evento/entidade/
+/// entidade_id/planta_id/lida_em vieram de prisma/sql/2026-10-16-notificacoes.sql.
 model notificacoes {
-  id         String    @id @db.Char(26)
-  usuario_id String    @db.Char(26)
-  titulo     String    @db.VarChar(255)
-  descricao  String?
-  lida       Boolean   @default(false)
-  tipo       String    @default("info") @db.VarChar(255)
-  link       String?   @db.VarChar(255)
-  created_at DateTime? @db.Timestamp(0)
-  updated_at DateTime? @db.Timestamp(0)
-  usuarios   usuarios  @relation(fields: [usuario_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "notificacoes_usuario_id_foreign")
+  id          String                @id @db.Char(26)
+  usuario_id  String                @db.Char(26)
+  titulo      String                @db.VarChar(255)
+  descricao   String?
+  lida        Boolean               @default(false)
+  tipo        String                @default("info") @db.VarChar(255)
+  link        String?               @db.VarChar(255)
+  created_at  DateTime?             @db.Timestamp(0)
+  updated_at  DateTime?             @db.Timestamp(0)
+  evento      String?               @db.VarChar(60)
+  entidade    String?               @db.VarChar(30)
+  entidade_id String?               @db.VarChar(36)
+  planta_id   String?               @db.Char(26)
+  lida_em     DateTime?             @db.Timestamp(0)
+  usuarios    usuarios              @relation(fields: [usuario_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "notificacoes_usuario_id_foreign")
+  envios      notificacoes_envios[]
+
+  @@index([usuario_id, lida, created_at(sort: Desc)], map: "notificacoes_usuario_lida_idx")
+}
+
+/// SN-47: o evento de mudança de status, gravado na MESMA transação dela; o
+/// processador (modules/notificacoes) o transforma em notificações.
+model notificacoes_eventos {
+  id            BigInt    @id @default(autoincrement())
+  evento        String    @db.VarChar(60)
+  entidade      String    @db.VarChar(30)
+  entidade_id   String    @db.VarChar(36)
+  ator_id       String?   @db.Char(26)
+  criado_em     DateTime  @db.Timestamp(0)
+  processado_em DateTime? @db.Timestamp(0)
+  erro          String?
+
+  /// O índice real é PARCIAL (WHERE processado_em IS NULL) e vive no SQL — o
+  /// Prisma não expressa índice parcial. Sem ele a busca dos pendentes, a cada
+  /// 15 s, percorreria todos os eventos já processados.
+  @@index([id], map: "notificacoes_eventos_pendentes_idx")
+}
+
+/// SN-47: a fila do e-mail (e do WhatsApp, quando houver), com nova tentativa.
+model notificacoes_envios {
+  id                BigInt       @id @default(autoincrement())
+  notificacao_id    String       @db.Char(26)
+  canal             String       @db.VarChar(20)
+  destino           String       @db.VarChar(255)
+  status            String       @default("pendente") @db.VarChar(20)
+  tentativas        Int          @default(0)
+  proxima_tentativa DateTime     @db.Timestamp(0)
+  erro              String?
+  enviado_em        DateTime?    @db.Timestamp(0)
+  criado_em         DateTime     @db.Timestamp(0)
+  notificacao       notificacoes @relation(fields: [notificacao_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  /// Parcial no SQL (WHERE status = 'pendente'), como o de cima.
+  @@index([proxima_tentativa], map: "notificacoes_envios_fila_idx")
+  @@index([notificacao_id], map: "notificacoes_envios_notificacao_idx")
+}
+
+/// SN-47: o que cada um quer por e-mail. Sem linha vale o padrão do evento.
+model notificacoes_preferencias {
+  usuario_id    String   @db.Char(26)
+  evento        String   @db.VarChar(60)
+  canal         String   @db.VarChar(20)
+  ativo         Boolean
+  atualizado_em DateTime @db.Timestamp(0)
+  usuario       usuarios @relation(fields: [usuario_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@id([usuario_id, evento, canal])
 }
 
 model oportunidades {
@@ -959,6 +1018,7 @@ model usuarios {
   historico_manutencoes_atualizadas                                historico_manutencoes[]  @relation("historico_manutencoes_atualizado_por")
   historico_manutencoes_criadas                                    historico_manutencoes[]  @relation("historico_manutencoes_criado_por")
   notificacoes                                                     notificacoes[]
+  notificacoes_preferencias notificacoes_preferencias[]
   ordens_servico_responsavel                                       ordens_servico[]         @relation("ordens_servico_responsavel")
   programacoes_os_responsavel                                      programacoes_os[]        @relation("programacoes_os_responsavel")
   tecnicos_os                                                      tecnicos_os[]            @relation("tecnicos_os_tecnico")

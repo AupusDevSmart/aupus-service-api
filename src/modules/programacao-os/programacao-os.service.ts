@@ -23,6 +23,8 @@ import {
   programarOrigem,
 } from '../../common/helpers/status-da-origem';
 import { avancarAncoraDosCiclos, cancelarOS } from '../execucao-os/cancelar-os';
+import type { Evento } from '../notificacoes/catalogo';
+import { registrarNotificacao } from '../notificacoes/registrar-notificacao';
 import {
   AdicionarTarefasDto,
   AJUSTES_DA_PROGRAMACAO_DA_SOLICITACAO,
@@ -85,6 +87,18 @@ type ReservaComVeiculo = Prisma.reserva_veiculoGetPayload<{ include: { veiculo: 
 type TarefaParaSnapshot = Prisma.tarefasGetPayload<{
   include: { instrucao: { select: { tag: true; nome: true; descricao: true } } };
 }>;
+
+/**
+ * A ação do histórico que é mudança de status da programação e o evento que ela
+ * avisa (SN-47). Finalizar não avisa daqui: no caminho de verdade a programação
+ * finaliza junto com a OS (que avisa os.finalizada); o finalizar à mão só
+ * existe para programação antiga sem OS.
+ */
+const EVENTO_DA_ACAO_DA_PROGRAMACAO: Partial<Record<string, Evento>> = {
+  CRIACAO: 'programacao.criada',
+  APROVACAO: 'programacao.aprovada',
+  CANCELAMENTO: 'programacao.cancelada',
+};
 
 @Injectable()
 export class ProgramacaoOSService {
@@ -1520,6 +1534,12 @@ export class ProgramacaoOSService {
   ): Promise<void> {
     // Use a instância fornecida (pode ser this.prisma ou uma transação)
     const prismaClient: Prisma.TransactionClient = prismaOrTransaction || this.prisma;
+
+    // A mudança de status avisa quem precisa saber (SN-47), na mesma transação.
+    // Cancelar a programação APROVADA passa pelo cancelarOS, que avisa "OS
+    // cancelada" — e não por aqui, então não há aviso dobrado.
+    const evento = EVENTO_DA_ACAO_DA_PROGRAMACAO[acao];
+    if (evento) await registrarNotificacao(prismaClient, { evento, entidade: 'programacao_os', entidadeId: programacaoId, atorId: usuarioId });
 
     // O nome vem do id quando ha id: as chamadas passavam 'Sistema' como autor
     // e o usuarioId de verdade ao lado, entao a trilha guardava quem foi mas

@@ -3,6 +3,7 @@ import { Prisma } from '@prisma/client';
 import { liberarOrigem, nomeDoAutor, origemDaProgramacao } from '../../common/helpers/status-da-origem';
 import { devolverViatura } from '../reservas/ocupacao-da-viatura';
 import { variantesDeIds } from '../tarefas/ids';
+import { registrarNotificacao } from '../notificacoes/registrar-notificacao';
 
 type Tx = Prisma.TransactionClient;
 
@@ -90,6 +91,8 @@ export async function cancelarOS(
       status_novo: 'CANCELADA',
     },
   });
+  // Pelas duas portas (cancelar a OS ou a programação aprovada): um aviso só (SN-47)
+  await registrarNotificacao(tx, { evento: 'os.cancelada', entidade: 'ordem_servico', entidadeId: os.id, atorId: dados.usuarioId });
 
   const vinculos = await tx.tarefas_os.findMany({
     where: { os_id: os.id, tarefa_id: { not: null }, ciclo_referencia: { not: null } },

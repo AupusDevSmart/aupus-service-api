@@ -145,6 +145,10 @@ describe('ExecucaoOSService', () => {
     historico_os: {
       create: jest.fn(),
     },
+    /** Toda mudança de status grava o evento da notificação na mesma transação (SN-47). */
+    notificacoes_eventos: {
+      create: jest.fn(),
+    },
     /**
      * `registrarHistorico` busca o nome de quem agiu para gravar junto do
      * evento; sem o modelo, toda escrita que registra historico morria aqui.

@@ -4,6 +4,7 @@ import { PrismaService, PermissionScopeService, PlantaScope } from '@/core';
 import { CreateAnomaliaDto, UpdateAnomaliaDto, AnomaliaFiltersDto, AnomaliaStatsDto } from './dto';
 import { Prisma } from '@/core';
 import { plantasDosEquipamentos } from '@/core/modules/auth/planta-dos-equipamentos';
+import { registrarNotificacao } from '../notificacoes/registrar-notificacao';
 
 export type UserCtx = { id: string; role?: string | null; permissions?: string[] } | undefined;
 
@@ -133,7 +134,11 @@ export class AnomaliasService {
       }
     };
 
-    const anomalia = await this.prisma.anomalias.create({
+    // Registrada avisa quem programa (SN-47): o evento e as instruções gravam
+    // junto com a anomalia. Instrução inválida desfaz tudo — antes a anomalia
+    // ficava criada (e avisada) com o usuário vendo o erro, e ele criava de novo.
+    const anomalia = await this.prisma.$transaction(async (tx) => {
+      const criada = await tx.anomalias.create({
       data,
       include: {
         planta: true,
@@ -163,15 +168,13 @@ export class AnomaliasService {
           orderBy: { created_at: 'desc' }
         }
       }
+      });
+      if (instrucoes_ids && instrucoes_ids.length > 0) await this.associarInstrucoes(tx, criada.id, instrucoes_ids);
+      await registrarNotificacao(tx, { evento: 'anomalia.registrada', entidade: 'anomalia', entidadeId: criada.id, atorId: userId });
+      return criada;
     });
 
-    // Associar instruções se fornecidas
-    if (instrucoes_ids && instrucoes_ids.length > 0) {
-      await this.associarInstrucoes(anomalia.id, instrucoes_ids);
-      return this.findOne(anomalia.id);
-    }
-
-    return anomalia;
+    return instrucoes_ids && instrucoes_ids.length > 0 ? this.findOne(anomalia.id) : anomalia;
   }
 
   async findAll(filters: AnomaliaFiltersDto, user?: UserCtx) {
@@ -346,20 +349,23 @@ export class AnomaliasService {
       }
     };
 
-    await this.prisma.anomalias.update({
-      where: { id },
-      data,
-    });
-
-    // Atualizar instruções vinculadas se fornecidas
-    if (instrucoes_ids !== undefined) {
-      await this.prisma.anomalias_instrucoes.deleteMany({
-        where: { anomalia_id: id },
+    // Numa transação: as instruções eram apagadas antes de conferir as novas, e
+    // uma instrução inexistente deixava a anomalia sem nenhuma (achado no SN-47)
+    await this.prisma.$transaction(async (tx) => {
+      await tx.anomalias.update({
+        where: { id },
+        data,
       });
-      if (instrucoes_ids && instrucoes_ids.length > 0) {
-        await this.associarInstrucoes(id, instrucoes_ids);
+
+      if (instrucoes_ids !== undefined) {
+        await tx.anomalias_instrucoes.deleteMany({
+          where: { anomalia_id: id },
+        });
+        if (instrucoes_ids && instrucoes_ids.length > 0) {
+          await this.associarInstrucoes(tx, id, instrucoes_ids);
+        }
       }
-    }
+    });
 
     return this.findOne(id);
   }
@@ -576,8 +582,8 @@ export class AnomaliasService {
     });
   }
 
-  private async associarInstrucoes(anomaliaId: string, instrucoesIds: string[]) {
-    const instrucoes = await this.prisma.instrucoes.findMany({
+  private async associarInstrucoes(tx: Prisma.TransactionClient, anomaliaId: string, instrucoesIds: string[]) {
+    const instrucoes = await tx.instrucoes.findMany({
       where: {
         id: { in: instrucoesIds },
         deleted_at: null
@@ -590,7 +596,7 @@ export class AnomaliasService {
 
     // Criar associações uma a uma para que o Prisma gere os IDs via @default(cuid())
     for (const instrucaoId of instrucoesIds) {
-      await this.prisma.anomalias_instrucoes.create({
+      await tx.anomalias_instrucoes.create({
         data: {
           anomalia_id: anomaliaId,
           instrucao_id: instrucaoId,

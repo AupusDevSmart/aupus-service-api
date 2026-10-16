@@ -747,8 +747,12 @@ export class UsuariosService {
         throw new NotFoundException('Usuário não encontrado');
       }
 
-      // Buscar role do usuário com suas permissões
+      // Buscar role do usuário com suas permissões. Com mais de um papel (dado
+      // legado), vale o de menor id: a mesma regra de quem recebe notificação
+      // (notificacoes/registro-da-notificacao.ts). Sem ordem, o papel — e com
+      // ele o escopo por planta — dependia do plano do Postgres.
       const userRole = await this.prisma.model_has_roles.findFirst({
+        orderBy: { role_id: 'asc' },
         where: {
           model_id: userId,
           model_type: 'App\\Models\\User'

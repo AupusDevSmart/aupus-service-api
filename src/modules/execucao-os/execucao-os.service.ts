@@ -44,6 +44,8 @@ import { cancelarOS } from './cancelar-os';
 import { exigirOSAlteravel } from './os-alteravel';
 import { variantesDeId, variantesDeIds } from '../tarefas/ids';
 import { devolverViatura } from '../reservas/ocupacao-da-viatura';
+import type { Evento } from '../notificacoes/catalogo';
+import { registrarNotificacao } from '../notificacoes/registrar-notificacao';
 
 /**
  * Nome da tarefa dentro de uma OS, sem depender da tarefa viva.
@@ -149,6 +151,17 @@ type OSComDetalhes = Prisma.ordens_servicoGetPayload<{
     reserva_veiculo: { include: { veiculo: { select: { id: true; placa: true; modelo: true; marca: true } } } };
   };
 }>;
+
+/** A ação do histórico que é mudança de status da OS e o evento que ela avisa (SN-47). */
+const EVENTO_DA_ACAO_DA_OS: Partial<Record<string, Evento>> = {
+  INICIO_EXECUCAO: 'os.iniciada',
+  PAUSA: 'os.pausada',
+  RETOMADA: 'os.retomada',
+  EXECUCAO: 'os.executada',
+  AUDITORIA: 'os.auditada',
+  REABERTURA: 'os.reaberta',
+  FINALIZACAO: 'os.finalizada',
+};
 
 @Injectable()
 export class ExecucaoOSService {
@@ -1625,6 +1638,11 @@ export class ExecucaoOSService {
     statusAnterior?: StatusOS,
     statusNovo?: StatusOS,
   ): Promise<void> {
+    // A mudança de status avisa quem precisa saber (SN-47), na mesma transação
+    // do histórico: se ela desfaz, o aviso some junto
+    const evento = EVENTO_DA_ACAO_DA_OS[acao];
+    if (evento) await registrarNotificacao(prisma, { evento, entidade: 'ordem_servico', entidadeId: osId, atorId: usuarioId });
+
     let autor = usuario;
 
     if (usuarioId) {

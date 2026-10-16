@@ -46,6 +46,7 @@ describe('execução da OS: checklist por tarefa, concluir e executar (banco rea
     const osIds = oss.map((o) => o.id);
     await prisma.checklist_atividades_os.deleteMany({ where: { os_id: { in: osIds } } });
     await prisma.registros_tempo_os.deleteMany({ where: { os_id: { in: osIds } } });
+    await prisma.notificacoes_eventos.deleteMany({ where: { entidade_id: { in: [...ids, ...osIds].map((i) => i.trim()) } } });
     await prisma.historico_os.deleteMany({ where: { os_id: { in: osIds } } });
     await prisma.tarefas_os.deleteMany({ where: { os_id: { in: osIds } } });
     await prisma.ordens_servico.deleteMany({ where: { id: { in: osIds } } });
@@ -213,5 +214,23 @@ describe('execução da OS: checklist por tarefa, concluir e executar (banco rea
     } as never);
 
     await expect(execucoes.reabrirTarefa(osId, semItens.id)).rejects.toBeInstanceOf(ConflictException);
+  });
+
+  it('cada mudança de status da programação e da OS vira evento de notificação (SN-47)', async () => {
+    const { osId, comItens, semItens } = await osEmExecucao();
+    await execucoes.concluirTarefa(osId, semItens.id, {} as never);
+    await execucoes.executar(osId, {
+      resultado_servico: 'ok',
+      tarefas_nao_feitas: [{ id: comItens.id, motivo: 'x' }],
+    } as never);
+
+    const os = await prisma.ordens_servico.findUniqueOrThrow({ where: { id: osId }, select: { programacao_id: true } });
+    const eventosDe = (entidade: string, id: string) =>
+      prisma.notificacoes_eventos
+        .findMany({ where: { entidade, entidade_id: id.trim() }, orderBy: { id: 'asc' } })
+        .then((eventos) => eventos.map((e) => e.evento));
+    // Concluir tarefa e marcar checklist não é mudança de status: não avisa ninguém
+    expect(await eventosDe('ordem_servico', osId)).toEqual(['os.iniciada', 'os.executada']);
+    expect(await eventosDe('programacao_os', os.programacao_id)).toEqual(['programacao.criada', 'programacao.aprovada']);
   });
 });

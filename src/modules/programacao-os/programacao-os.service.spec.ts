@@ -160,6 +160,10 @@ describe('ProgramacaoOSService', () => {
     historico_os: {
       create: jest.fn(),
     },
+    /** Toda mudança de status grava o evento da notificação na mesma transação (SN-47). */
+    notificacoes_eventos: {
+      create: jest.fn(),
+    },
     ordens_servico: {
       create: jest.fn(),
       count: jest.fn(),

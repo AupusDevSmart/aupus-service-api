@@ -5,6 +5,7 @@ import { ResponseInterceptor } from './common/interceptors/response.interceptor'
 import { HttpExceptionFilter } from './common/filters/http-exception.filter';
 import { LoggingInterceptor } from './common/interceptors/logging.interceptor';
 import { exceptionFactoryEmPortugues } from './common/pipes/mensagens-validacao';
+import { limiteDoCorpo } from './common/middleware/limite-do-corpo';
 
 /**
  * Tudo o que o app recebe antes de ouvir a porta, menos o Swagger. Fica fora
@@ -51,6 +52,9 @@ export function configurarApp(app: NestExpressApplication): void {
     allowedHeaders: ['Content-Type', 'Authorization', 'x-xsrf-token'],
     credentials: true,
   });
+
+  // Antes do parser: as notificações só recebem pedido pequeno (SN-47)
+  app.use('/api/v1/notificacoes', limiteDoCorpo(32 * 1024));
 
   // O padrão do body-parser (100 kB) não cabe uma planilha de cadastro
   // importada: centenas de registros com as listas de cada um.

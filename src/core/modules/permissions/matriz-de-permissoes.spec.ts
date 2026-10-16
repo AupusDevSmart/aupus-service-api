@@ -35,6 +35,13 @@ const SO_LOGADO = [
   'POST /usuarios/:id/check-permission',
   'POST /usuarios/:id/check-permissions',
   'GET /usuarios/:usuarioId/plantas-operadas',
+  // As próprias notificações e preferências: o service filtra pelo usuário logado (SN-47)
+  'GET /notificacoes',
+  'GET /notificacoes/nao-lidas/contagem',
+  'GET /notificacoes/preferencias',
+  'PUT /notificacoes/preferencias',
+  'PATCH /notificacoes/lidas',
+  'PATCH /notificacoes/:id/lida',
   // Catálogos que os formulários usam
   'GET /usuarios/available/permissions',
   'GET /usuarios/available/permissions/grouped',

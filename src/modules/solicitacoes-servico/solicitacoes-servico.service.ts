@@ -21,6 +21,7 @@ import { Prisma, type solicitacoes_servico, type comentarios_solicitacao_servico
 // Import the enum from Prisma
 import { StatusSolicitacaoServico } from '@/core';
 import { comDataNecessidadeNormalizada } from './data-necessidade';
+import { registrarNotificacao } from '../notificacoes/registrar-notificacao';
 
 @Injectable()
 export class SolicitacoesServicoService {
@@ -234,6 +235,8 @@ export class SolicitacoesServicoService {
           solicitante: { select: { id: true, nome: true, email: true } },
         },
       });
+      // Aberta avisa quem programa (SN-47), na mesma transação
+      await registrarNotificacao(prisma, { evento: 'solicitacao.aberta', entidade: 'solicitacao_servico', entidadeId: solicitacao.id, atorId: usuarioId });
 
       // Buscar a planta manualmente apenas se não estiver deletada
       const planta = await prisma.plantas.findFirst({
@@ -747,96 +750,6 @@ export class SolicitacoesServicoService {
       porPrioridade: prioridadeMap,
       porTipo: tipoMap,
     };
-  }
-
-  /**
-   * Marcar solicitação como programada
-   */
-  async marcarComoProgramada(
-    id: string,
-    programacao_os_id: string,
-  ): Promise<void> {
-    await this.prisma.$transaction(async (prisma) => {
-      await prisma.solicitacoes_servico.update({
-        where: { id },
-        data: {
-          status: StatusSolicitacaoServico.PROGRAMADA,
-          programacao_os_id,
-        },
-      });
-
-      await this.registrarHistorico(
-        prisma,
-        id,
-        'PROGRAMACAO',
-        'Sistema',
-        null,
-        `Programação OS gerada: ${programacao_os_id}`,
-        StatusSolicitacaoServico.REGISTRADA,
-        StatusSolicitacaoServico.PROGRAMADA,
-      );
-    });
-  }
-
-  /**
-   * Marcar solicitação como finalizada
-   */
-  async marcarComoFinalizada(
-    id: string,
-    ordem_servico_id?: string,
-  ): Promise<void> {
-    await this.prisma.$transaction(async (prisma) => {
-      const updateData: Prisma.solicitacoes_servicoUncheckedUpdateInput = {
-        status: StatusSolicitacaoServico.FINALIZADA,
-      };
-      if (ordem_servico_id) {
-        updateData.ordem_servico_id = ordem_servico_id;
-      }
-
-      await prisma.solicitacoes_servico.update({
-        where: { id },
-        data: updateData,
-      });
-
-      await this.registrarHistorico(
-        prisma,
-        id,
-        'FINALIZACAO',
-        'Sistema',
-        null,
-        ordem_servico_id ? `OS finalizada: ${ordem_servico_id}` : 'Solicitação finalizada',
-        StatusSolicitacaoServico.PROGRAMADA,
-        StatusSolicitacaoServico.FINALIZADA,
-      );
-    });
-  }
-
-  /**
-   * Voltar solicitação para registrada (quando programação OS é rejeitada)
-   */
-  async voltarParaRegistrada(
-    id: string,
-  ): Promise<void> {
-    await this.prisma.$transaction(async (prisma) => {
-      await prisma.solicitacoes_servico.update({
-        where: { id },
-        data: {
-          status: StatusSolicitacaoServico.REGISTRADA,
-          programacao_os_id: null,
-        },
-      });
-
-      await this.registrarHistorico(
-        prisma,
-        id,
-        'RETORNO_REGISTRADA',
-        'Sistema',
-        null,
-        'Programação OS rejeitada - solicitação retornou para registrada',
-        StatusSolicitacaoServico.PROGRAMADA,
-        StatusSolicitacaoServico.REGISTRADA,
-      );
-    });
   }
 
   /**

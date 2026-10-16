@@ -1,5 +1,6 @@
 import { ConflictException, NotFoundException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
+import { registrarNotificacao } from '../../modules/notificacoes/registrar-notificacao';
 
 /**
  * O status da ORIGEM da OS (anomalia ou solicitacao de servico) acompanha a
@@ -96,6 +97,7 @@ export async function programarOrigem(
           status_novo: 'PROGRAMADA',
         },
       });
+      await registrarNotificacao(tx, { evento: 'anomalia.programada', entidade: 'anomalia', entidadeId: origem.anomaliaId, atorId: contexto.usuarioId });
     } else if (exigir) {
       const atual = await tx.anomalias.findFirst({
         where: { id: origem.anomaliaId, deleted_at: null },
@@ -126,6 +128,7 @@ export async function programarOrigem(
           status_novo: 'PROGRAMADA',
         },
       });
+      await registrarNotificacao(tx, { evento: 'solicitacao.programada', entidade: 'solicitacao_servico', entidadeId: origem.solicitacaoId, atorId: contexto.usuarioId });
     } else if (exigir) {
       const atual = await tx.solicitacoes_servico.findFirst({
         where: { id: origem.solicitacaoId, deleted_at: null },
@@ -166,6 +169,7 @@ export async function liberarOrigem(
           status_novo: 'REGISTRADA',
         },
       });
+      await registrarNotificacao(tx, { evento: 'anomalia.reaberta', entidade: 'anomalia', entidadeId: origem.anomaliaId, atorId: contexto.usuarioId });
     }
   }
 
@@ -186,6 +190,7 @@ export async function liberarOrigem(
           status_novo: 'REGISTRADA',
         },
       });
+      await registrarNotificacao(tx, { evento: 'solicitacao.reaberta', entidade: 'solicitacao_servico', entidadeId: origem.solicitacaoId, atorId: contexto.usuarioId });
     }
   }
 }
@@ -218,6 +223,7 @@ export async function finalizarOrigem(
           status_novo: 'FINALIZADA',
         },
       });
+      await registrarNotificacao(tx, { evento: 'anomalia.finalizada', entidade: 'anomalia', entidadeId: origem.anomaliaId, atorId: contexto.usuarioId });
     }
   }
 
@@ -242,6 +248,7 @@ export async function finalizarOrigem(
           status_novo: 'FINALIZADA',
         },
       });
+      await registrarNotificacao(tx, { evento: 'solicitacao.finalizada', entidade: 'solicitacao_servico', entidadeId: origem.solicitacaoId, atorId: contexto.usuarioId });
     }
   }
 }
