@@ -1,4 +1,5 @@
 import { Injectable, NotFoundException, ConflictException, BadRequestException, Logger } from '@nestjs/common';
+import { equipamentoEComponentes, ordemDasPlantas, ordemDoEquipamento, periodoDoFiltro } from '../../common/helpers/filtros-da-os';
 import { PrismaService, PermissionScopeService, ScopedUser } from '@/core';
 import {
   OSFiltersDto,
@@ -181,13 +182,8 @@ export class ExecucaoOSService {
     const scope = await this.scopeService.getScope(user);
     if (!this.scopeService.isScoped(scope)) return undefined;
     if (scope.length === 0) return { id: '__NEVER__' };
-    return {
-      OR: [
-        { planta_id: { in: scope } },
-        { planta_id: null, equipamento: { unidade: { planta_id: { in: scope } } } },
-        { planta_id: null, equipamento: { equipamento_pai: { unidade: { planta_id: { in: scope } } } } },
-      ],
-    };
+    // A mesma regra do filtro de planta (filtros-da-os)
+    return ordemDasPlantas(scope);
   }
 
   async listar(filters: OSFiltersDto, user?: ScopedUser): Promise<ListarOSResponseDto> {
@@ -237,19 +233,18 @@ export class ExecucaoOSService {
       where.responsavel = { contains: responsavel, mode: 'insensitive' };
     }
 
-    if (planta_id) {
-      where.planta_id = planta_id;
-    }
 
-    if (data_inicio || data_fim) {
-      where.data_hora_programada = {};
-      if (data_inicio) {
-        where.data_hora_programada.gte = new Date(data_inicio);
-      }
-      if (data_fim) {
-        where.data_hora_programada.lte = new Date(data_fim);
-      }
-    }
+    // Dia de Brasília inteiro: o fim antes era meia-noite UTC e a OS do último dia ficava de fora
+    const periodo = periodoDoFiltro(data_inicio, data_fim);
+    if (periodo) where.data_hora_programada = periodo;
+
+    // O equipamento e os componentes, pela regra da instalação da OS (SN-55)
+    const equipamentos = await equipamentoEComponentes(this.prisma, filters.equipamento_id);
+    const doEquipamento: Prisma.ordens_servicoWhereInput[] = equipamentos
+      ? [equipamentos.length ? ordemDoEquipamento(equipamentos) : { id: '__NEVER__' }]
+      : [];
+    // A planta pela mesma regra do escopo: a da OS ou, na antiga sem planta, a do equipamento
+    if (planta_id?.trim()) doEquipamento.push(ordemDasPlantas([planta_id.trim()]));
 
     if (atrasadas) {
       const hoje = new Date();
@@ -259,6 +254,8 @@ export class ExecucaoOSService {
         { status: { notIn: [StatusOS.FINALIZADA, StatusOS.CANCELADA] } },
       ];
     }
+    // AND: a busca já usa o OR de cima
+    if (doEquipamento.length) where.AND = [...((where.AND as Prisma.ordens_servicoWhereInput[] | undefined) ?? []), ...doEquipamento];
 
     // Scope RBAC
     const scopeFragment = await this.scopeFragment(user);

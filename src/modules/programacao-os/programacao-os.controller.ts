@@ -113,7 +113,9 @@ export class ProgramacaoOSController {
   async buscarPorUnidade(
     @Param('unidadeId') unidadeId: string,
     @CurrentUser() user?: ScopedUser,
-    @Query() filters?: Partial<ProgramacaoFiltersDto>,
+    // O DTO de verdade: Partial<> vira Object em runtime e o ValidationPipe não validava nada
+    // (?equipamento_id[]=a derrubava com 500, limit chegava como texto)
+    @Query() filters?: ProgramacaoFiltersDto,
   ): Promise<ListarProgramacoesResponseDto> {
     return this.programacaoOSService.buscarPorUnidade(unidadeId, filters, user);
   }

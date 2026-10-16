@@ -1,4 +1,4 @@
-import { IsOptional, IsEnum, IsDateString, IsString, IsNumber, Min, Length, MaxLength } from 'class-validator';
+import { IsOptional, IsEnum, IsDateString, IsString, IsNumber, Min, Length, MaxLength, Max } from 'class-validator';
 import { Type } from 'class-transformer';
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { StatusProgramacaoOS, TipoOS, PrioridadeOS, OrigemOS } from '@/core';
@@ -16,6 +16,8 @@ export class ProgramacaoFiltersDto {
   @Type(() => Number)
   @IsNumber()
   @Min(1)
+  // A tela pede até 100; sem teto, ?limit=100000 trazia a tabela inteira com os includes
+  @Max(100)
   limit?: number = 10;
 
   @ApiPropertyOptional({ description: 'Busca em descrição, local, ativo' })
@@ -46,8 +48,15 @@ export class ProgramacaoFiltersDto {
   @ApiPropertyOptional({ description: 'ID da planta' })
   @IsOptional()
   @IsString()
-  @Length(26, 26)
+  // Sem @Length(26): ids antigos têm 25 caracteres (cuid); o service casa as duas formas
+  @MaxLength(26)
   planta_id?: string;
+
+  @ApiPropertyOptional({ description: 'O equipamento e os componentes dele, pela regra da instalação da OS (tarefa, anomalia, solicitação)' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(26)
+  equipamento_id?: string;
 
   @ApiPropertyOptional({ description: 'ID da unidade' })
   @IsOptional()

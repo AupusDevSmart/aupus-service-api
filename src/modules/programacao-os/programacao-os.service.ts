@@ -1,4 +1,12 @@
 import { BadRequestException, ConflictException, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import {
+  equipamentoEComponentes,
+  periodoDoFiltro,
+  programacaoDaUnidade,
+  programacaoDasPlantas,
+  programacaoDoEquipamento,
+  programacaoNaData,
+} from '../../common/helpers/filtros-da-os';
 import { Prisma, StatusProgramacaoOS, PrioridadeOS, type TipoOS, type programacoes_os, type tarefas_programacao_os } from '@/core';
 import { plantasDosEquipamentos } from '@/core/modules/auth/planta-dos-equipamentos';
 import { garantirPessoasQuePodemAtuar, PessoasDaPlanta, pessoasQuePodemAtuar } from './pessoas-da-os';
@@ -114,12 +122,8 @@ export class ProgramacaoOSService {
     const scope = await this.scopeService.getScope(user);
     if (!this.scopeService.isScoped(scope)) return undefined;
     if (scope.length === 0) return { id: '__NEVER__' };
-    return {
-      OR: [
-        { planta_id: { in: scope } },
-        { equipamento: { unidade: { planta_id: { in: scope } } } },
-      ],
-    };
+    // A mesma regra do filtro de planta (filtros-da-os)
+    return programacaoDasPlantas(scope);
   }
 
   async listar(filters: ProgramacaoFiltersDto, user?: ScopedUser): Promise<ListarProgramacoesResponseDto> {
@@ -176,35 +180,33 @@ export class ProgramacaoOSService {
       where.solicitacao_servico_id = { in: variantesDeIds([filters.solicitacao_servico_id.trim()]) };
     }
 
-    if (planta_id) {
-      where.planta_id = planta_id;
-    }
-
-    if (unidade_id) {
-      where.equipamento = {
-        unidade_id: unidade_id
-      };
-    }
 
     if (criado_por_id) {
       where.criado_por_id = criado_por_id;
     }
 
-    if (data_inicio || data_fim) {
-      where.criado_em = {};
-      if (data_inicio) {
-        where.criado_em.gte = new Date(data_inicio);
-      }
-      if (data_fim) {
-        where.criado_em.lte = new Date(data_fim + 'T23:59:59.999Z');
-      }
-    }
+    // AND: a busca já usa o OR de cima, e cada filtro abaixo é outro OR
+    const e: Prisma.programacoes_osWhereInput[] = [];
 
-    // Scope RBAC
+    // A planta pela mesma regra do escopo: a da programação ou a do equipamento
+    if (planta_id?.trim()) e.push(programacaoDasPlantas([planta_id.trim()]));
+
+    // A instalação pela regra da instalação da OS (só pela coluna, perdia quase todas)
+    if (unidade_id?.trim()) e.push(await programacaoDaUnidade(this.prisma, unidade_id));
+
+    // O período é o da data da programação (SN-55), não o da criação: é o que a
+    // lista mostra e o que o calendário usa
+    const periodo = periodoDoFiltro(data_inicio, data_fim);
+    if (periodo) e.push(programacaoNaData(periodo));
+
+    // O equipamento e os componentes, pela regra da instalação da OS
+    const equipamentos = await equipamentoEComponentes(this.prisma, filters.equipamento_id);
+    if (equipamentos) e.push(equipamentos.length ? programacaoDoEquipamento(equipamentos) : { id: '__NEVER__' });
+
+    // Scope RBAC (antes sobrescrevia o AND)
     const scopeFragment = await this.scopeFragment(user);
-    if (scopeFragment) {
-      where.AND = [scopeFragment];
-    }
+    if (scopeFragment) e.push(scopeFragment);
+    if (e.length) where.AND = e;
 
     // Contar total
     const total = await this.prisma.programacoes_os.count({ where });
@@ -332,7 +334,7 @@ export class ProgramacaoOSService {
     return this.mapearParaDetalhes(programacao, reserva, instalacoes.get(programacao.id) ?? []);
   }
 
-  async buscarPorUnidade(unidadeId: string, filters?: Partial<ProgramacaoFiltersDto>, user?: ScopedUser): Promise<ListarProgramacoesResponseDto> {
+  async buscarPorUnidade(unidadeId: string, filters?: ProgramacaoFiltersDto, user?: ScopedUser): Promise<ListarProgramacoesResponseDto> {
     // Verificar se unidade existe e esta no escopo
     await this.verificarUnidadeExiste(unidadeId);
     if (user) await this.scopeService.assertEntityInScope('unidade', unidadeId, user);

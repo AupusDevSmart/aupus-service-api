@@ -2,6 +2,7 @@ import { BadRequestException, Injectable } from '@nestjs/common';
 import type { TipoOS } from '@prisma/client';
 import { PermissionScopeService, Prisma, PrismaService, type ScopedUser } from '@/core';
 import { instalacoesDasOrdens, instalacoesDasProgramacoes } from '../../../common/helpers/instalacao-da-os';
+import { equipamentoEComponentes, ordemDoEquipamento, programacaoDoEquipamento, programacaoNaData } from '../../../common/helpers/filtros-da-os';
 import { dataDaProgramacao } from '../../tarefas/ciclos-das-tarefas';
 import { variantesDeIds } from '../../tarefas/ids';
 import { PrevisaoDaAgendaService, type CicloPrevisto } from '../previsao/previsao-da-agenda.service';
@@ -120,7 +121,7 @@ export class EventosDaAgendaService {
     const vazio: CalendarioDaAgenda = { eventos: [], atrasados_antes: 0, sem_data: 0, opcoes };
     const plantas = this.plantasPedidas(escopo, filtro.plantaId);
     if (plantas && plantas.length === 0) return vazio;
-    const equipamentos = await this.equipamentosPedidos(filtro.equipamentoId);
+    const equipamentos = await equipamentoEComponentes(this.prisma, filtro.equipamentoId);
     if (equipamentos && equipamentos.length === 0) return vazio;
 
     // Sem usuário é chamada interna (e o teste): vê tudo
@@ -246,30 +247,17 @@ export class EventosDaAgendaService {
     return [pedida];
   }
 
-  /** O equipamento e os componentes dele (as OS das UARs também são dele). null = sem filtro. */
-  private async equipamentosPedidos(equipamentoId?: string): Promise<string[] | null> {
-    const id = equipamentoId?.trim();
-    if (!id) return null;
-    const variantes = variantesDeIds([id]);
-    const lista = await this.prisma.equipamentos.findMany({
-      where: { OR: [{ id: { in: variantes } }, { equipamento_pai_id: { in: variantes } }] },
-      select: { id: true },
-    });
-    return lista.map((e) => e.id.trim());
-  }
-
-  /** Planta, tipo e equipamento (o da OS quase nunca vem na coluna: vem congelado nas tarefas). */
+  /** Planta, tipo e equipamento (pela regra da instalação da OS: a tarefa congelada, a anomalia, a solicitação). */
   private ondeDaOS(
     filtro: FiltroDaAgenda,
     onde: { plantas: string[] | null; equipamentos: string[] | null },
     extra: Prisma.ordens_servicoWhereInput,
   ): Prisma.ordens_servicoWhereInput {
-    const ids = onde.equipamentos ? variantesDeIds(onde.equipamentos) : null;
     return {
       deletado_em: null,
       ...(onde.plantas ? { planta_id: { in: variantesDeIds(onde.plantas) } } : {}),
       ...(filtro.tipo ? { tipo: filtro.tipo } : {}),
-      ...(ids ? { OR: [{ equipamento_id: { in: ids } }, { tarefas_os: { some: { equipamento_id: { in: ids } } } }] } : {}),
+      ...(onde.equipamentos ? ordemDoEquipamento(onde.equipamentos) : {}),
       ...extra,
     };
   }
@@ -283,19 +271,13 @@ export class EventosDaAgendaService {
     onde: { plantas: string[] | null; equipamentos: string[] | null },
     quando: Prisma.DateTimeFilter | null,
   ): Prisma.programacoes_osWhereInput {
-    const ids = onde.equipamentos ? variantesDeIds(onde.equipamentos) : null;
     return {
       deletado_em: null,
       status: 'PENDENTE',
       ...(onde.plantas ? { planta_id: { in: variantesDeIds(onde.plantas) } } : {}),
       ...(filtro.tipo ? { tipo: filtro.tipo } : {}),
       // AND: a data e o equipamento são OR, e na mesma chave um apagaria o outro
-      AND: [
-        quando
-          ? { OR: [{ data_hora_programada: quando }, { data_hora_programada: null, data_previsao_inicio: quando }] }
-          : { data_hora_programada: null, data_previsao_inicio: null },
-        ...(ids ? [{ OR: [{ equipamento_id: { in: ids } }, { tarefas_programacao: { some: { equipamento_id: { in: ids } } } }] }] : []),
-      ],
+      AND: [programacaoNaData(quando), ...(onde.equipamentos ? [programacaoDoEquipamento(onde.equipamentos)] : [])],
     };
   }
 
