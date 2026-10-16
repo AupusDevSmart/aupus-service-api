@@ -1,6 +1,11 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '@/core';
+import { PAPEIS_DA_EQUIPE } from '@/core/modules/permissions/matriz-de-permissoes';
 import { EVENTOS, ehEvento, type Evento } from './catalogo';
+
+/** Evento que só avisa a equipe (o comentário interno) nem aparece nas preferências de quem não é dela. */
+const visivelPara = (evento: Evento, papel?: string | null) =>
+  !('soEquipe' in EVENTOS[evento] && EVENTOS[evento].soEquipe) || (!!papel && PAPEIS_DA_EQUIPE.includes(papel));
 
 export interface PreferenciaDeNotificacao {
   evento: Evento;
@@ -59,16 +64,20 @@ export class NotificacoesService {
   }
 
   /** Cada evento do catálogo com o que a pessoa escolheu para o e-mail (sem escolha, o padrão). */
-  async preferencias(usuarioId: string): Promise<PreferenciaDeNotificacao[]> {
+  async preferencias(usuarioId: string, papel?: string | null): Promise<PreferenciaDeNotificacao[]> {
     const salvas = await this.prisma.notificacoes_preferencias.findMany({ where: { usuario_id: usuarioId.trim(), canal: 'email' } });
     const escolha = new Map(salvas.map((p) => [p.evento, p.ativo]));
-    return (Object.keys(EVENTOS) as Evento[]).map((evento) => {
+    return (Object.keys(EVENTOS) as Evento[]).filter((evento) => visivelPara(evento, papel)).map((evento) => {
       const d = EVENTOS[evento];
       return { evento, grupo: d.grupo, nome: d.nome, acao: d.acao, email: escolha.get(evento) ?? d.acao };
     });
   }
 
-  async salvarPreferencias(usuarioId: string, escolhas: { evento: string; email: boolean }[]): Promise<PreferenciaDeNotificacao[]> {
+  async salvarPreferencias(
+    usuarioId: string,
+    escolhas: { evento: string; email: boolean }[],
+    papel?: string | null,
+  ): Promise<PreferenciaDeNotificacao[]> {
     const desconhecido = escolhas.find((e) => !ehEvento(e.evento));
     if (desconhecido) throw new BadRequestException(`Evento desconhecido: ${desconhecido.evento}`);
     const id = usuarioId.trim();
@@ -81,6 +90,6 @@ export class NotificacoesService {
         }),
       ),
     );
-    return this.preferencias(id);
+    return this.preferencias(id, papel);
   }
 }

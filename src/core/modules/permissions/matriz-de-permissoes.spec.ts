@@ -189,6 +189,13 @@ const JORNADAS: [string, string, string[]][] = [
   ['ver solicitações', 'GET /solicitacoes-servico', TODOS],
   ['abrir solicitação', 'POST /solicitacoes-servico', TODOS],
   ['comentar na solicitação', 'POST /solicitacoes-servico/:id/comentarios', TODOS],
+  // Comentários (SN-48): o cliente lê na OS, mas não escreve
+  ['ler comentários da solicitação', 'GET /solicitacoes-servico/:id/comentarios', TODOS],
+  ['editar o próprio comentário na solicitação', 'PATCH /solicitacoes-servico/:id/comentarios/:comentarioId', TODOS],
+  ['ler comentários da OS', 'GET /execucao-os/:id/comentarios', TODOS],
+  ['comentar na OS', 'POST /execucao-os/:id/comentarios', EXECUTAM],
+  ['editar o próprio comentário na OS', 'PATCH /execucao-os/:id/comentarios/:comentarioId', EXECUTAM],
+  ['excluir o próprio comentário na OS', 'DELETE /execucao-os/:id/comentarios/:comentarioId', EXECUTAM],
   ['editar solicitação', 'PATCH /solicitacoes-servico/:id', PLANEJAM],
   ['programar a partir da solicitação', 'POST /solicitacoes-servico/:id/gerar-programacao-os', PLANEJAM],
   ['ver anomalias', 'GET /anomalias', TODOS],

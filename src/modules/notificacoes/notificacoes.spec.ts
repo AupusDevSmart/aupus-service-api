@@ -349,6 +349,17 @@ describe('notificações (banco real)', () => {
     });
   });
 
+  describe('preferências', () => {
+    it('o aviso que só vai à equipe (comentário interno) não aparece nas preferências do cliente', async () => {
+      const doCliente = (await servico.preferencias(CLIENTE_A, 'proprietario')).map((p) => p.evento);
+      const doGerente = (await servico.preferencias(GERENTE, 'gerente')).map((p) => p.evento);
+
+      expect(doCliente).not.toContain('os.comentario_interno');
+      expect(doCliente).toContain('os.comentario');
+      expect(doGerente).toContain('os.comentario_interno');
+    });
+  });
+
   describe('as minhas notificações', () => {
     it('cada um só vê e marca as próprias', async () => {
       await disparar('programacao.criada', 'programacao_os', PROG_A);

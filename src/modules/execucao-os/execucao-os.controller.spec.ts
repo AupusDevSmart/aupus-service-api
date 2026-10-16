@@ -511,9 +511,11 @@ describe('ExecucaoOSController', () => {
 
       mockExecucaoOSService.buscarPorId.mockResolvedValue(mockOSDetalhes);
 
-      const result = await controller.gerarRelatorio(id);
+      const usuario = { id: 'tecnico', role: 'operador' };
+      const result = await controller.gerarRelatorio(id, usuario);
 
-      expect(execucaoService.buscarPorId).toHaveBeenCalledWith(id);
+      // Com o escopo de quem pede: sem ele a rota dizia se a OS de outra planta existe (revisão do SN-48)
+      expect(execucaoService.buscarPorId).toHaveBeenCalledWith(id, usuario);
       expect(result).toEqual({
         message: 'Relatório em desenvolvimento',
         os_id: id,

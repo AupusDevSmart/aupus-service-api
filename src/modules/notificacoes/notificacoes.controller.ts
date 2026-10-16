@@ -6,6 +6,7 @@ import { ListarNotificacoesDto, SalvarPreferenciasDto } from './notificacoes.dto
 
 interface UsuarioLogado {
   id: string;
+  role?: string | null;
 }
 
 /**
@@ -33,13 +34,13 @@ export class NotificacoesController {
   @Get('preferencias')
   @ApiOperation({ summary: 'O que recebo por e-mail, evento a evento' })
   preferencias(@CurrentUser() usuario: UsuarioLogado) {
-    return this.servico.preferencias(usuario.id);
+    return this.servico.preferencias(usuario.id, usuario.role);
   }
 
   @Put('preferencias')
   @ApiOperation({ summary: 'Escolher o que recebo por e-mail' })
   salvarPreferencias(@Body() dto: SalvarPreferenciasDto, @CurrentUser() usuario: UsuarioLogado) {
-    return this.servico.salvarPreferencias(usuario.id, dto.preferencias);
+    return this.servico.salvarPreferencias(usuario.id, dto.preferencias, usuario.role);
   }
 
   @Patch('lidas')

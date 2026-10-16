@@ -14,9 +14,8 @@ import {
   SolicitacaoResponseDto,
   ListarSolicitacoesResponseDto,
   SolicitacaoStatsDto,
-  AdicionarComentarioDto,
 } from './dto';
-import { Prisma, type solicitacoes_servico, type comentarios_solicitacao_servico } from '@/core';
+import { Prisma, type solicitacoes_servico } from '@/core';
 
 // Import the enum from Prisma
 import { StatusSolicitacaoServico } from '@/core';
@@ -379,7 +378,6 @@ export class SolicitacoesServicoService {
         },
         _count: {
           select: {
-            comentarios: true,
             anexos: true,
           },
         },
@@ -466,9 +464,8 @@ export class SolicitacoesServicoService {
         historico: {
           orderBy: { data: 'desc' },
         },
-        comentarios: {
-          orderBy: { created_at: 'desc' },
-        },
+        // Os comentários vêm só por GET :id/comentarios (SN-48), que esconde o
+        // interno do cliente; aqui iam todos, com o interno
         tarefas: {
           include: {
             tarefa: {
@@ -661,51 +658,6 @@ export class SolicitacoesServicoService {
     });
 
     this.logger.log(`Solicitação ${solicitacao.numero} removida`);
-  }
-
-  /**
-   * Adicionar comentário
-   */
-  async adicionarComentario(
-    id: string,
-    dto: AdicionarComentarioDto,
-    user?: ScopedUser,
-  ): Promise<comentarios_solicitacao_servico> {
-    // No escopo de quem comenta: antes comentava na solicitação de qualquer planta (SN-40)
-    const solicitacao = await this.findOne(id, user);
-
-    // O autor é quem está logado, com o nome do cadastro: o que vem no corpo
-    // só vale sem usuário (chamada interna). Antes qualquer um comentava em
-    // nome de outro.
-    const autorId = user?.id?.trim();
-    const autor = autorId
-      ? (await this.prisma.usuarios.findUnique({ where: { id: autorId }, select: { nome: true } }))?.nome
-      : undefined;
-
-    const comentario = await this.prisma.comentarios_solicitacao_servico.create({
-      data: {
-        solicitacao_id: id,
-        comentario: dto.comentario,
-        autor: autor ?? dto.usuario_nome,
-        autor_id: autorId ?? dto.usuario_id,
-      },
-    });
-
-    this.logger.log(`Comentário adicionado à solicitação ${solicitacao.numero}`);
-    return comentario;
-  }
-
-  /**
-   * Listar comentários
-   */
-  async listarComentarios(id: string, user?: ScopedUser): Promise<comentarios_solicitacao_servico[]> {
-    // No escopo de quem lê (SN-40)
-    await this.findOne(id, user);
-
-    return await this.prisma.comentarios_solicitacao_servico.findMany({
-      where: { solicitacao_id: id },
-      orderBy: { created_at: 'desc' },
-    });
   }
 
   /**

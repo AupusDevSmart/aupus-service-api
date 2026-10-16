@@ -62,6 +62,20 @@ export const LIMITE_DA_RENOVACAO = { ip: { limit: 120, ttl: MINUTO } };
 /** Na renovação só conta o IP. */
 export const SO_O_IP = { conta: true, email: true };
 
+/**
+ * Comentar (SN-48): cada comentário avisa os envolvidos e quem programa. 20
+ * por minuto por conta é folga para conversa e trava o laço que encheria o
+ * sininho (e o e-mail) da equipe.
+ */
+export const LIMITE_DE_COMENTARIOS = {
+  conta: {
+    limit: 20,
+    ttl: MINUTO,
+    getTracker: (req: Record<string, unknown>) => `comentario|${String((req.user as { id?: unknown } | undefined)?.id ?? '').trim()}`,
+  },
+  ip: { limit: 120, ttl: MINUTO },
+};
+
 /** Redefinir com o token do e-mail: 5 a cada 10 minutos por conta. */
 export const LIMITE_DA_REDEFINICAO = { conta: { limit: 5, ttl: 10 * MINUTO }, ip: { limit: 10, ttl: 10 * MINUTO } };
 

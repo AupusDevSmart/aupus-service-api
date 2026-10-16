@@ -39,6 +39,12 @@ export interface DefinicaoDoEvento {
   titulo: (r: Registro) => string;
   /** Complemento da descrição, quando o evento tem algo a dizer além do resumo. */
   nota?: string;
+  /**
+   * Só avisa a equipe (PAPEIS_DA_EQUIPE: lista de quem pode, tirada da matriz),
+   * nem como envolvido nem pela permissão: o comentário interno (SN-48) não pode
+   * nem ser anunciado ao cliente, a conta sem papel ou a papel legado.
+   */
+  soEquipe?: boolean;
 }
 
 const NA_PROGRAMACAO: DefinicaoDoEvento['grupo'] = 'Programações';
@@ -125,6 +131,24 @@ export const EVENTOS = {
   'solicitacao.reaberta': {
     grupo: NA_ORIGEM, nome: 'Solicitação de volta à fila', acao: true, permissao: 'programacao_os.manage', envolvidos: ['criador'],
     titulo: (r) => `${r.rotulo} voltou para a fila`,
+  },
+  // Comentários (SN-48). O aviso não leva o texto do comentário, só o registro
+  'os.comentario': {
+    grupo: NA_OS, nome: 'Comentário na OS', acao: false, envolvidos: ['responsavel', 'tecnicos', 'criador', 'cliente'],
+    titulo: (r) => `Novo comentário na ${r.rotulo}`,
+  },
+  'os.comentario_interno': {
+    grupo: NA_OS, nome: 'Comentário interno na OS', acao: false, envolvidos: ['responsavel', 'tecnicos', 'criador'], soEquipe: true,
+    titulo: (r) => `Novo comentário interno na ${r.rotulo}`,
+  },
+  'solicitacao.comentario': {
+    grupo: NA_ORIGEM, nome: 'Comentário na solicitação', acao: false, permissao: 'programacao_os.manage', envolvidos: ['criador', 'cliente'],
+    titulo: (r) => `Novo comentário na ${r.rotulo}`,
+  },
+  'solicitacao.comentario_interno': {
+    grupo: NA_ORIGEM, nome: 'Comentário interno na solicitação', acao: false, permissao: 'programacao_os.manage', envolvidos: ['criador'],
+    soEquipe: true,
+    titulo: (r) => `Novo comentário interno na ${r.rotulo}`,
   },
 } satisfies Record<string, DefinicaoDoEvento>;
 

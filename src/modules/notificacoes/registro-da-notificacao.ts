@@ -2,6 +2,7 @@ import { Prisma } from '@prisma/client';
 import type { PrismaService } from '@/core';
 import { origemDaProgramacao } from '../../common/helpers/status-da-origem';
 import type { Entidade, Envolvido, Registro } from './catalogo';
+import { PAPEIS_DA_EQUIPE } from '@/core/modules/permissions/matriz-de-permissoes';
 
 const MODEL_TYPE = 'App\\Models\\User';
 
@@ -129,7 +130,7 @@ export function lerRegistro(prisma: PrismaService, entidade: string, id: string)
  */
 export async function destinatarios(
   prisma: PrismaService,
-  alvo: { permissao?: string; envolvidos: string[]; plantaId: string | null; atorId: string | null },
+  alvo: { permissao?: string; envolvidos: string[]; plantaId: string | null; atorId: string | null; soEquipe?: boolean },
 ): Promise<{ id: string; email: string | null }[]> {
   const envolvidos = [...new Set(alvo.envolvidos.map((i) => i.trim()).filter(Boolean))];
   if (!alvo.permissao && envolvidos.length === 0) return [];
@@ -148,6 +149,7 @@ export async function destinatarios(
       )`
     : Prisma.sql`false`;
   const planta = alvo.plantaId?.trim() ?? '';
+  const soEquipe = alvo.soEquipe ? Prisma.sql`AND papel.name IN (${Prisma.join([...PAPEIS_DA_EQUIPE])})` : Prisma.empty;
 
   return prisma.$queryRaw<{ id: string; email: string | null }[]>`
     SELECT trim(u.id) AS id, u.email
@@ -160,6 +162,7 @@ export async function destinatarios(
     WHERE u.deleted_at IS NULL AND u.status = 'Ativo' AND coalesce(u.is_active, false)
       AND trim(u.id) <> ${alvo.atorId?.trim() ?? ''}
       AND (${porEnvolvimento} OR ${porPermissao})
+      ${soEquipe}
       AND (
         papel.name IS NULL OR papel.name NOT IN ('operador', 'proprietario')
         OR (papel.name = 'operador' AND EXISTS (

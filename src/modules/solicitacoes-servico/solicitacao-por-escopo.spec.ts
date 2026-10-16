@@ -58,7 +58,6 @@ describe('solicitação: proposta e comentários no escopo (banco real)', () => 
         data: { numero: `${PREFIXO}-A`, titulo: `${PREFIXO} A`, descricao: 'x', tipo: 'INSPECAO', planta_id: PLANTA_A, solicitante_nome: 'x', local: 'x' },
       })
     ).id;
-    await prisma.comentarios_solicitacao_servico.create({ data: { solicitacao_id: solicitacaoA, comentario: 'primeiro', autor: 'Cliente A', autor_id: DONO_A } });
   });
 
   afterAll(async () => {
@@ -73,30 +72,7 @@ describe('solicitação: proposta e comentários no escopo (banco real)', () => 
     });
   });
 
-  describe('GET /solicitacoes-servico/:id/comentarios', () => {
-    it('o cliente da planta lê; o técnico de outra planta é recusado (403)', async () => {
-      expect((await controller.listarComentarios(solicitacaoA, comoCliente)).map((c) => c.comentario)).toContain('primeiro');
-      await expect(controller.listarComentarios(solicitacaoA, comoTecnicoB)).rejects.toBeInstanceOf(ForbiddenException);
-    });
-  });
-
-  describe('POST /solicitacoes-servico/:id/comentarios', () => {
-    it('o técnico de outra planta não comenta (403) e nada é gravado', async () => {
-      await expect(
-        controller.adicionarComentario(solicitacaoA, { comentario: 'intruso', usuario_nome: 'Técnico B' }, comoTecnicoB),
-      ).rejects.toBeInstanceOf(ForbiddenException);
-      expect(await prisma.comentarios_solicitacao_servico.count({ where: { solicitacao_id: solicitacaoA, comentario: 'intruso' } })).toBe(0);
-    });
-
-    it('o autor é quem está logado, com o nome do cadastro (o do corpo não vale)', async () => {
-      const comentario = await controller.adicionarComentario(
-        solicitacaoA,
-        { comentario: 'em nome de outro', usuario_nome: 'Gerente de Mentira', usuario_id: DONO_B },
-        comoCliente,
-      );
-      expect([comentario.autor, comentario.autor_id?.trim()]).toEqual(['Cliente A', DONO_A]);
-    });
-  });
+  // Comentários (escopo, autor, interno): modules/comentarios/comentarios.spec.ts (SN-48)
 
   describe('GET /solicitacoes-servico/:id/programacao-os', () => {
     it('o técnico de outra planta é recusado (403)', async () => {

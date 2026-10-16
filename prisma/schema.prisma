@@ -2049,6 +2049,7 @@ model ordens_servico {
   procedimentos_seguidos       String?                   @map("procedimentos_seguidos")
   anexos                       anexos_os[]
   checklist_atividades         checklist_atividades_os[]
+  comentarios                  comentarios_os[]
   ferramentas                  ferramentas_os[]
   historico                    historico_os[]
   itens_orcamento              itens_orcamento_os[]
@@ -2826,6 +2827,22 @@ model comentarios_solicitacao_servico {
 
   @@index([solicitacao_id])
   @@map("comentarios_solicitacao_servico")
+}
+
+/// SN-48: comentários da OS, coluna por coluna como os da solicitação (privado = interno, o cliente não vê).
+model comentarios_os {
+  id         String         @id @default(cuid())
+  os_id      String
+  comentario String
+  autor      String
+  autor_id   String?
+  privado    Boolean        @default(false)
+  created_at DateTime       @default(now()) @db.Timestamp(6)
+  updated_at DateTime       @default(now()) @db.Timestamp(6)
+  deleted_at DateTime?      @db.Timestamp(6)
+  os         ordens_servico @relation(fields: [os_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([os_id])
 }
 
 model tarefas_solicitacoes {

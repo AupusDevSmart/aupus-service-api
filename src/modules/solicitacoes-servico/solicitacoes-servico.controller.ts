@@ -25,7 +25,7 @@ import {
   ApiConsumes,
   ApiBody,
 } from '@nestjs/swagger';
-import { Permissions, ScopedUser, StatusSolicitacaoServico, type comentarios_solicitacao_servico } from '@/core';
+import { Permissions, ScopedUser, StatusSolicitacaoServico } from '@/core';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { Response } from 'express';
 import { SolicitacoesServicoService } from './solicitacoes-servico.service';
@@ -37,7 +37,6 @@ import {
   SolicitacaoResponseDto,
   ListarSolicitacoesResponseDto,
   SolicitacaoStatsDto,
-  AdicionarComentarioDto,
   GerarProgramacaoOSDto,
 } from './dto';
 
@@ -165,35 +164,7 @@ export class SolicitacoesServicoController {
     await this.solicitacoesService.remove(id, usuarioId);
   }
 
-  // =================== COMENTÁRIOS ===================
-
-  @Post(':id/comentarios')
-  // Quem abriu a solicitação também comenta (no escopo dele)
-  @Permissions('solicitacoes.manage', 'solicitacoes.create')
-  @ApiOperation({ summary: 'Adicionar comentário à solicitação' })
-  @ApiParam({ name: 'id', description: 'ID da solicitação' })
-  @ApiResponse({
-    status: HttpStatus.CREATED,
-    description: 'Comentário adicionado com sucesso',
-  })
-  async adicionarComentario(
-    @Param('id') id: string,
-    @Body() dto: AdicionarComentarioDto,
-    @Request() req?: RequisicaoAutenticada,
-  ): Promise<comentarios_solicitacao_servico> {
-    return this.solicitacoesService.adicionarComentario(id, dto, req?.user);
-  }
-
-  @Get(':id/comentarios')
-  @ApiOperation({ summary: 'Listar comentários da solicitação' })
-  @ApiParam({ name: 'id', description: 'ID da solicitação' })
-  @ApiResponse({
-    status: HttpStatus.OK,
-    description: 'Lista de comentários',
-  })
-  async listarComentarios(@Param('id') id: string, @Request() req?: RequisicaoAutenticada): Promise<comentarios_solicitacao_servico[]> {
-    return this.solicitacoesService.listarComentarios(id, req?.user);
-  }
+  // Comentários: ComentariosDaSolicitacaoController (modules/comentarios, SN-48)
 
   // =================== GERAÇÃO DE OS ===================
 

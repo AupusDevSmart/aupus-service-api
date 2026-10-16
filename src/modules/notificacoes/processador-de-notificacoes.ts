@@ -120,6 +120,7 @@ export class ProcessadorDeNotificacoes {
       envolvidos: definicao.envolvidos.flatMap((papel) => registro.pessoas[papel]),
       plantaId: registro.plantaId,
       atorId: evento.ator_id,
+      soEquipe: 'soEquipe' in definicao && definicao.soEquipe === true,
     });
     if (quem.length === 0) return [];
 

@@ -514,9 +514,10 @@ export class ExecucaoOSController {
     status: HttpStatus.OK,
     description: 'Relatório gerado',
   })
-  async gerarRelatorio(@Param('id') id: string) {
+  async gerarRelatorio(@Param('id') id: string, @CurrentUser() user?: Solicitante) {
     // TODO: Implementar geração de relatório PDF
-    const os = await this.execucaoOSService.buscarPorId(id.trim());
+    // Com o escopo de quem pede: sem ele, a rota dizia se a OS de outra planta existe
+    await this.execucaoOSService.buscarPorId(id.trim(), user);
     return { message: 'Relatório em desenvolvimento', os_id: id.trim() };
   }
 }

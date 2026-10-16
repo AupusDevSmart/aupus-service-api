@@ -10,7 +10,6 @@ import {
   type equipamentos,
   type anexos_solicitacao_servico,
   type historico_solicitacao_servico,
-  type comentarios_solicitacao_servico,
 } from '@/core';
 
 /** Tarefa ou instrução vinculada, achatada com a ordem e a observação do vínculo */
@@ -148,9 +147,6 @@ export class SolicitacaoResponseDto {
 
   @ApiPropertyOptional()
   historico?: historico_solicitacao_servico[];
-
-  @ApiPropertyOptional()
-  comentarios?: comentarios_solicitacao_servico[];
 
   @ApiPropertyOptional({
     description: 'Tarefas associadas à solicitação',

@@ -210,3 +210,10 @@ export const PAPEL_POR_NOME: Record<string, PapelDef> = Object.fromEntries(PAPEI
 export function permissoesDoPapel(nome: string | null | undefined): string[] {
   return (nome && PAPEL_POR_NOME[nome]?.permissoes) || [];
 }
+
+/**
+ * Os papéis da equipe: todos os da matriz menos o cliente. Lista de quem PODE
+ * (SN-48): o comentário interno só aparece para estes — papel legado, nulo ou
+ * fora da matriz não vê, em vez de ver por não ser "proprietario".
+ */
+export const PAPEIS_DA_EQUIPE: readonly string[] = PAPEIS.filter((papel) => papel.name !== 'proprietario').map((papel) => papel.name);
