@@ -100,6 +100,18 @@ describe('cadastro por id e listas no escopo da planta (banco real)', () => {
   });
 
   describe('equipamentos', () => {
+    // O equipamento aparece pelo nome da posição: a busca tem de achar por ele também
+    it('GET /equipamentos?search: acha pelo nome da posição, que é o nome que a lista mostra', async () => {
+      await prisma.equipamentos.update({ where: { id: UC_A }, data: { ativo_funcional_id: POSICAO_A } });
+      try {
+        const achados = await equipamentosService.findAll({ search: 'inversor 1', page: 1, limit: 50 }, admin);
+
+        expect(achados.data.find((e) => e.id.trim() === UC_A)).toMatchObject({ nome: 'Inversor 1', nome_proprio: 'Inversor A' });
+      } finally {
+        await prisma.equipamentos.update({ where: { id: UC_A }, data: { ativo_funcional_id: null } });
+      }
+    });
+
     it('GET /equipamentos/ucs-disponiveis: só as UCs do escopo', async () => {
       const ucs = async (user: { id: string; role: string }) =>
         (await equipamentos.findEquipamentosUC(user)).map((e) => e.id.trim()).filter((id) => [UC_A, UC_B].includes(id)).sort();

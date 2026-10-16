@@ -761,6 +761,9 @@ export class EquipamentosService {
         { modelo: { contains: search, mode: 'insensitive' } },
         { numero_serie: { contains: search, mode: 'insensitive' } },
         { localizacao: { contains: search, mode: 'insensitive' } },
+        // A lista mostra o equipamento pelo nome da POSIÇÃO (comNomeDaPosicao):
+        // sem isto, quem digitava o nome que estava vendo não achava nada
+        { ativo_funcional: { nome: { contains: search, mode: 'insensitive' } } },
       ];
     }
 
