@@ -1,5 +1,6 @@
-import { ForbiddenException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException } from '@nestjs/common';
 import { PermissionScopeService, PrismaService } from '@/core';
+import { TarefasService } from '../tarefas/tarefas.service';
 import { PlanosManutencaoService } from './planos-manutencao.service';
 import { PropagacaoPlanosService } from './propagacao-planos.service';
 
@@ -12,6 +13,7 @@ import { PropagacaoPlanosService } from './propagacao-planos.service';
 describe('planos vinculados pelo escopo da planta (banco real)', () => {
   const prisma = new PrismaService();
   const planos = new PlanosManutencaoService(prisma, new PermissionScopeService(prisma), new PropagacaoPlanosService(prisma));
+  const tarefas = new TarefasService(prisma, new PermissionScopeService(prisma), new PropagacaoPlanosService(prisma));
 
   const ID = (s: string) => `testeplanoescopo${s}`.padEnd(26, '0').slice(0, 26);
   const DONO_A = ID('donoa');
@@ -145,9 +147,55 @@ describe('planos vinculados pelo escopo da planta (banco real)', () => {
       await expect(planos.consultarPropagacoes(templateId, { id: TECNICO_B, role: 'operador' })).resolves.toEqual([]);
     });
 
+    // SN-53: a prévia sem equipamento olhava só se o plano tinha origem, e o
+    // antigo não tem: mostraria as tarefas do equipamento de outra planta
+    it('a prévia dos primeiros vencimentos recusa o plano antigo de equipamento (não é template)', async () => {
+      const hoje = new Date(Date.now() - 3 * 3_600_000).toISOString().slice(0, 10);
+
+      await expect(planos.primeirosVencimentosDoVinculo(antigoAId, { data_inicio: hoje }, { id: TECNICO_B, role: 'operador' })).rejects.toBeInstanceOf(
+        BadRequestException,
+      );
+      await expect(planos.primeirosVencimentosDoVinculo(copiaAId, { data_inicio: hoje }, { id: TECNICO_B, role: 'operador' })).rejects.toBeInstanceOf(
+        BadRequestException,
+      );
+    });
+
     it('o template se abre para o técnico (antes dava 404: o escopo procurava o equipamento que ele não tem)', async () => {
       expect((await planos.buscarPorId(templateId, false, { id: TECNICO_B, role: 'operador' })).nome).toBe(`${PREFIXO} template`);
       await expect(planos.buscarPorId(copiaAId, false, { id: TECNICO_B, role: 'operador' })).rejects.toBeInstanceOf(ForbiddenException);
+    });
+  });
+
+  // Criar tarefa não recebia o usuário: sem escopo, e o autor vinha do corpo (SN-53)
+  describe('criar tarefa na cópia de um equipamento', () => {
+    let instrucaoId = '';
+    beforeAll(async () => {
+      instrucaoId = (
+        await prisma.instrucoes.create({
+          data: {
+            tag: `${PREFIXO}-INSTR`, nome: 'Instrução escopo', descricao: 'x', categoria: 'LIMPEZA', tipo_manutencao: 'PREVENTIVA',
+            condicao_ativo: 'QUALQUER', criticidade: 3, duracao_estimada: 1, tempo_estimado: 10, updated_at: new Date(),
+          },
+        })
+      ).id;
+    });
+    afterAll(async () => {
+      await prisma.tarefas.deleteMany({ where: { instrucao_id: instrucaoId } });
+      await prisma.instrucoes.deleteMany({ where: { id: instrucaoId } });
+    });
+
+    const nova = (plano: string) => ({ plano_manutencao_id: plano, nome: 'Tarefa escopo', instrucao_id: instrucaoId, criticidade: 3, frequencia: 'MENSAL', criado_por: TECNICO_B });
+
+    it('o técnico de outra planta não cria tarefa no plano desta', async () => {
+      await expect(tarefas.criar(nova(copiaAId) as never, { id: TECNICO_B, role: 'operador' })).rejects.toBeInstanceOf(ForbiddenException);
+      expect(await prisma.tarefas.count({ where: { instrucao_id: instrucaoId } })).toBe(0);
+    });
+
+    it('quem cria é o autor, não o que veio no corpo', async () => {
+      const criada = await tarefas.criar(nova(copiaAId) as never, { id: DONO_A, role: 'proprietario' });
+
+      const gravada = await prisma.tarefas.findFirst({ where: { id: criada.id }, select: { criado_por: true } });
+      expect(gravada?.criado_por?.trim()).toBe(DONO_A);
     });
   });
 });

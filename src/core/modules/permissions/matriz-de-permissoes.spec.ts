@@ -186,6 +186,8 @@ const JORNADAS: [string, string, string[]][] = [
   ['desfazer a associação de anomalia e instrução (SN-40)', 'DELETE /instrucoes/:id/anomalias/:anomaliaId', PLANEJAM],
   ['ler planos de manutenção', 'GET /planos-manutencao', TODOS],
   ['criar plano de manutenção', 'POST /planos-manutencao', PLANEJAM],
+  // SN-53: o primeiro vencimento de cada tarefa, antes de vincular (quem vincula)
+  ['ver os primeiros vencimentos antes de vincular', 'GET /planos-manutencao/:id/primeiros-vencimentos', PLANEJAM],
   ['ver solicitações', 'GET /solicitacoes-servico', TODOS],
   ['abrir solicitação', 'POST /solicitacoes-servico', TODOS],
   ['comentar na solicitação', 'POST /solicitacoes-servico/:id/comentarios', TODOS],

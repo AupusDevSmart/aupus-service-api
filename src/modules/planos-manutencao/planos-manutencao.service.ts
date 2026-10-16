@@ -1,7 +1,7 @@
 // src/modules/planos-manutencao/planos-manutencao.service.ts
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { PrismaService, PermissionScopeService, ScopedUser } from '@/core';
-import { equipamentoNasPlantas } from '@/core/modules/auth/planta-dos-equipamentos';
+import { equipamentoNasPlantas, plantaDeCadaEquipamento } from '@/core/modules/auth/planta-dos-equipamentos';
 import {
   CreatePlanoManutencaoDto,
   UpdatePlanoManutencaoDto,
@@ -24,6 +24,9 @@ import type { equipamentos, planos_manutencao, tarefas } from '@prisma/client';
 import { PropagacaoPlanosService } from './propagacao-planos.service';
 import { categoriaDoEquipamento } from './categoria-do-equipamento';
 import { planoAHerdar, mapearAjustesParaCopia, aplicarDatasHerdadas } from './heranca-de-plano';
+import { ancoraDoInicio, primeirosVencimentos } from './primeiros-vencimentos';
+import type { PrimeirosVencimentosDto, PrimeirosVencimentosQueryDto } from './dto/primeiros-vencimentos.dto';
+import { regraDeDiasUteis } from '../agenda/dias-uteis';
 
 /**
  * Plano como as consultas deste service o leem. As relacoes variam com o
@@ -658,10 +661,53 @@ export class PlanosManutencaoService {
     };
   }
 
-  async vincularEquipamento(dto: VincularPlanoDto, user?: ScopedUser): Promise<VincularPlanoResponseDto> {
-    const equipamentoId = dto.equipamento_id.trim();
-    const planoId = dto.plano_id.trim();
+  /**
+   * O primeiro vencimento de cada tarefa se o vínculo começar na data dada
+   * (SN-53), antes de confirmar. Com equipamento, as mesmas checagens do
+   * vínculo e os dias úteis da planta dele; sem (no cadastro), só o vencimento.
+   */
+  async primeirosVencimentosDoVinculo(planoId: string, dto: PrimeirosVencimentosQueryDto, user?: ScopedUser): Promise<PrimeirosVencimentosDto> {
+    const ancora = ancoraDoInicio(dto.data_inicio);
+    if (!dto.equipamento_id?.trim()) {
+      const template = await this.templateParaVincular(planoId);
+      return { ancora, com_planta: null, tarefas: primeirosVencimentos(template.tarefas, ancora, undefined) };
+    }
+    const { equipamento, template } = await this.paraVincular(dto.equipamento_id, planoId, user);
+    // A mesma planta que o gerador usa: só a da unidade dizia "sem planta" ao UC antigo com planta na coluna
+    const planta = (await plantaDeCadaEquipamento(this.prisma, [equipamento.id])).get(equipamento.id.trim()) ?? null;
+    const regra = planta ? await regraDeDiasUteis(this.prisma, planta) : undefined;
+    return { ancora, com_planta: !!planta, tarefas: primeirosVencimentos(template.tarefas, ancora, regra) };
+  }
 
+  /**
+   * O template que se vincula, com as tarefas. Não pode ser a cópia de outro
+   * equipamento nem o plano antigo de equipamento (sem origem, mas de uma
+   * planta): a prévia sem equipamento mostraria as tarefas dele a quem não vê a planta.
+   */
+  private async templateParaVincular(planoId: string) {
+    const template = await this.prisma.planos_manutencao.findFirst({
+      where: { id: planoId.trim(), deleted_at: null },
+      include: {
+        tarefas: {
+          where: { deleted_at: null },
+          orderBy: { ordem: 'asc' }
+        }
+      }
+    });
+
+    if (!template) {
+      throw new NotFoundException('Plano de manutenção não encontrado');
+    }
+
+    if (template.plano_origem_id || template.equipamento_id) {
+      throw new BadRequestException('Só é possível vincular um plano template, não uma cópia de outro equipamento');
+    }
+    return template;
+  }
+
+  /** O que o vínculo confere: escopo, UC, template, e a categoria do equipamento igual à do plano. */
+  private async paraVincular(equipamentoIdPedido: string, planoId: string, user?: ScopedUser) {
+    const equipamentoId = equipamentoIdPedido.trim();
     if (user) await this.scopeService.assertEntityInScope('equipamento', equipamentoId, user);
 
     const equipamento = await this.prisma.equipamentos.findFirst({
@@ -684,23 +730,7 @@ export class PlanosManutencaoService {
       );
     }
 
-    const template = await this.prisma.planos_manutencao.findFirst({
-      where: { id: planoId, deleted_at: null },
-      include: {
-        tarefas: {
-          where: { deleted_at: null },
-          orderBy: { ordem: 'asc' }
-        }
-      }
-    });
-
-    if (!template) {
-      throw new NotFoundException('Plano de manutenção não encontrado');
-    }
-
-    if (template.plano_origem_id) {
-      throw new BadRequestException('Só é possível vincular um plano template, não uma cópia de outro equipamento');
-    }
+    const template = await this.templateParaVincular(planoId);
 
     const categoriaEquipamento = await this.categoriaDoEquipamento(equipamentoId);
     if (!categoriaEquipamento) {
@@ -712,6 +742,14 @@ export class PlanosManutencaoService {
     if (categoriaEquipamento !== template.categoria_id?.trim()) {
       throw new BadRequestException('O plano pertence a outra categoria de equipamento');
     }
+    return { equipamento, template };
+  }
+
+  async vincularEquipamento(dto: VincularPlanoDto, user?: ScopedUser): Promise<VincularPlanoResponseDto> {
+    const equipamentoId = dto.equipamento_id.trim();
+    // A data de início vira a âncora (SN-53); sem ela (a herança, a planilha), o instante do vínculo, como antes
+    const ancora = dto.data_inicio ? ancoraDoInicio(dto.data_inicio) : new Date();
+    const { equipamento, template } = await this.paraVincular(equipamentoId, dto.plano_id, user);
 
     const previa = await this.previaDesvinculo(equipamentoId);
 
@@ -758,7 +796,7 @@ export class PlanosManutencaoService {
             planta_id: equipamento.unidade?.planta_id ?? null,
             tarefa_origem_id: tarefaTemplate.id,
             origem_status: 'HERDADA',
-            data_ancora: new Date(),
+            data_ancora: ancora,
             tag,
             nome: tarefaTemplate.nome,
             frequencia: tarefaTemplate.frequencia,

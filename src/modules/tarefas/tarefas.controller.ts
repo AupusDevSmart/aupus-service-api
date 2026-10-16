@@ -67,9 +67,10 @@ export class TarefasController {
     description: 'TAG ou ordem já existe' 
   })
   async criar(
-    @Body() createDto: CreateTarefaDto
+    @Body() createDto: CreateTarefaDto,
+    @CurrentUser() user?: ScopedUser,
   ): Promise<TarefaResponseDto> {
-    return this.tarefasService.criar(createDto);
+    return this.tarefasService.criar(createDto, user);
   }
 
   @Get()

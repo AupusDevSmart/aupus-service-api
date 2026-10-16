@@ -1,6 +1,7 @@
 // src/modules/planos-manutencao/dto/vincular-plano.dto.ts
-import { IsString, IsNotEmpty, IsOptional } from 'class-validator';
-import { ApiProperty } from '@nestjs/swagger';
+import { IsString, IsNotEmpty, IsOptional, Matches } from 'class-validator';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { FORMATO_DO_DIA } from '../../agenda/dia-do-calendario';
 
 export class VincularPlanoDto {
   @ApiProperty({ description: 'ID do equipamento (precisa ser UC)' })
@@ -16,6 +17,15 @@ export class VincularPlanoDto {
   @IsString()
   @IsOptional()
   criado_por?: string;
+
+  @ApiPropertyOptional({
+    example: '2026-05-10',
+    description: 'O dia em que o plano começa a contar (Brasília): vira a âncora das tarefas. Sem ele, o instante do vínculo',
+  })
+  @IsOptional()
+  @IsString()
+  @Matches(FORMATO_DO_DIA, { message: 'data_inicio deve ser uma data AAAA-MM-DD' })
+  data_inicio?: string;
 }
 
 export class VincularPlanoResponseDto {

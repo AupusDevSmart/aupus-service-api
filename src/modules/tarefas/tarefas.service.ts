@@ -66,20 +66,22 @@ export class TarefasService {
     };
   }
 
-  async criar(createDto: CreateTarefaDto): Promise<TarefaResponseDto> {
+  /**
+   * `user` vem da rota: a tarefa na cópia de um equipamento só nas plantas de
+   * quem cria, e o autor é quem está logado (o do corpo deixava gravar em nome
+   * de outro). Sem ele (a planilha), o autor que quem chama manda.
+   */
+  async criar(createDto: CreateTarefaDto, user?: ScopedUser): Promise<TarefaResponseDto> {
     let plano = null;
     let equipamento_id = null;
     let planta_id = null;
-
-    // O conteudo da tarefa vem da instrucao; a tarefa guarda so o vinculo,
-    // a periodicidade e a criticidade daquele plano.
-    const instrucao = await this.verificarInstrucaoExiste(createDto.instrucao_id);
 
     // Se tem plano, verificar se existe e está ativo
     if (createDto.plano_manutencao_id) {
       plano = await this.verificarPlanoExiste(createDto.plano_manutencao_id);
       equipamento_id = plano.equipamento_id;
       planta_id = plano.equipamento?.unidade?.planta_id ?? null;
+      if (user && equipamento_id) await this.scopeService.assertEntityInScope('equipamento', equipamento_id.trim(), user);
 
       if (createDto.ordem === undefined || createDto.ordem === null) {
         createDto.ordem = await this.proximaOrdem(createDto.plano_manutencao_id);
@@ -90,6 +92,10 @@ export class TarefasService {
       // Tarefa independente - ordem não é obrigatória
       createDto.ordem = null;
     }
+
+    // O conteudo da tarefa vem da instrucao; a tarefa guarda so o vinculo,
+    // a periodicidade e a criticidade daquele plano.
+    const instrucao = await this.verificarInstrucaoExiste(createDto.instrucao_id);
 
     // Se não foi fornecida TAG, gerar automaticamente
     if (!createDto.tag) {
@@ -125,7 +131,7 @@ export class TarefasService {
           // A ancora so faz sentido na copia, que e quem gera OS
           data_ancora: equipamento_id ? new Date() : null,
           ativo: true,
-          criado_por: createDto.criado_por
+          criado_por: user?.id ?? createDto.criado_por
         }
       });
 

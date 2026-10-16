@@ -14,6 +14,7 @@ import {
 import { ApiTags, ApiOperation, ApiResponse, ApiParam, ApiQuery } from '@nestjs/swagger';
 import { Permissions, CurrentUser, ScopedUser } from '@/core';
 import { PlanosManutencaoService } from './planos-manutencao.service';
+import { PrimeirosVencimentosDto, PrimeirosVencimentosQueryDto } from './dto/primeiros-vencimentos.dto';
 import {
   CreatePlanoManutencaoDto,
   UpdatePlanoManutencaoDto,
@@ -275,10 +276,29 @@ export class PlanosManutencaoController {
     @Body() dto: VincularPlanoDto,
     @CurrentUser() user?: ScopedUser,
   ): Promise<VincularPlanoResponseDto> {
+    // O autor é quem está logado: o do corpo deixava gravar a cópia em nome de outro
     return this.planosManutencaoService.vincularEquipamento(
-      { ...dto, criado_por: dto.criado_por || user?.id },
+      { ...dto, criado_por: user?.id },
       user,
     );
+  }
+
+  @Get(':id/primeiros-vencimentos')
+  @Permissions('manutencao.manage')
+  @ApiOperation({
+    summary: 'O primeiro vencimento de cada tarefa se o plano for vinculado a partir da data dada',
+    description:
+      'Pela mesma conta do gerador de preventivas. Com equipamento_id, as checagens do vínculo e os dias úteis da planta; ' +
+      'sem ele (no cadastro do equipamento), só o vencimento.',
+  })
+  @ApiParam({ name: 'id', description: 'ID do plano template' })
+  @ApiResponse({ status: HttpStatus.OK, type: PrimeirosVencimentosDto })
+  async primeirosVencimentos(
+    @Param('id') id: string,
+    @Query() dto: PrimeirosVencimentosQueryDto,
+    @CurrentUser() user?: ScopedUser,
+  ): Promise<PrimeirosVencimentosDto> {
+    return this.planosManutencaoService.primeirosVencimentosDoVinculo(id, dto, user);
   }
 
   @Post('herdar')
@@ -298,7 +318,7 @@ export class PlanosManutencaoController {
     @CurrentUser() user?: ScopedUser,
   ): Promise<HerdarPlanoResponseDto> {
     return this.planosManutencaoService.herdarPlano(
-      { ...dto, criado_por: dto.criado_por || user?.id },
+      { ...dto, criado_por: user?.id },
       user,
     );
   }
