@@ -28,6 +28,8 @@ describe('telefoneE164', () => {
     ['8 dígitos sem DDD', '99998888'],
     ['DDD começando em 0', '0299998888'],
     ['celular de 11 dígitos sem o 9', '62899998888'],
+    ['celular com um dígito a menos (fixo começa de 2 a 5)', '(62) 9999-9888'],
+    ['fixo começando em 1', '6213334444'],
     ['+55 com dígitos de menos', '+55629999'],
     ['internacional longo demais', '+1234567890123456'],
   ])('%s é inválido', (_caso, entrada) => {

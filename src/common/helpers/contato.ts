@@ -5,7 +5,7 @@
  * `null` para o que não é telefone.
  *
  * Brasil (o padrão, sem código do país):
- * - 10 dígitos: DDD + fixo;
+ * - 10 dígitos: DDD + fixo, que começa de 2 a 5;
  * - 11 dígitos: DDD + celular, que começa com 9.
  * Outro país: `+` (ou `00`) e de 8 a 15 dígitos.
  */
@@ -29,9 +29,12 @@ function internacional(digitos: string): string | null {
   return /^[1-9]\d{7,14}$/.test(digitos) ? `+${digitos}` : null;
 }
 
-/** DDD (11 a 99, sem zero) + fixo de 8 dígitos ou celular de 9 começando em 9. */
+/**
+ * DDD (11 a 99, sem zero) + fixo de 8 dígitos começando de 2 a 5, ou celular de
+ * 9 começando em 9. Fixo começando em 9 é celular com um dígito a menos.
+ */
 function brasileiro(nacional: string): string | null {
-  const valido = /^[1-9][1-9](?:\d{8}|9\d{8})$/.test(nacional);
+  const valido = /^[1-9][1-9](?:[2-5]\d{7}|9\d{8})$/.test(nacional);
   return valido ? `+55${nacional}` : null;
 }
 

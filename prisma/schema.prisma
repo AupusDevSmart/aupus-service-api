@@ -920,6 +920,7 @@ model usuarios {
   concessionaria_atual_id                                          String?                  @db.Char(26)
   organizacao_atual_id                                             String?                  @db.Char(26)
   nome                                                             String                   @db.VarChar(255)
+  /// Sem caixa: o indice unico usuarios_email_lower_unique em lower(email) existe so no SQL (SN-46; ver TABELAS-FORA-DO-SCHEMA.md)
   email                                                            String                   @unique(map: "usuarios_email_unique") @db.VarChar(255)
   telefone                                                         String?                  @db.VarChar(20)
   instagram                                                        String?                  @db.VarChar(255)

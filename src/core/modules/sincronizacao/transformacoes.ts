@@ -17,17 +17,6 @@ type DadosDoEquipamento = Record<string, unknown> & {
 };
 
 /**
- * O que este backend faz com um registro que acabou de chegar do outro produto.
- *
- * Existe nos dois backends com conteudo DIFERENTE, e e o unico arquivo assim no
- * modulo. E de proposito: cada lado conhece so a propria forma. Um tradutor
- * unico que soubesse dos dois schemas voltaria a acoplar os dois produtos, que
- * e exatamente o que a separacao desfez.
- *
- * Aqui, no Service, o unico caso e o equipamento: ele chega do NexOn sem
- * posicao, porque la posicao nao existe.
- */
-/**
  * Antes de gravar o que chegou: o contato do usuário no padrão deste banco
  * (SN-46). O NexOn manda o telefone e o e-mail como guarda; aqui o telefone é
  * E.164 (o que não é telefone chega vazio) e o e-mail não tem caixa. Só mexe
@@ -42,6 +31,17 @@ export function antesDeGravar(recurso: Recurso, dados: Record<string, unknown>):
   }
 }
 
+/**
+ * O que este backend faz com um registro que acabou de chegar do outro produto.
+ *
+ * Existe nos dois backends com conteudo DIFERENTE, e e o unico arquivo assim no
+ * modulo. E de proposito: cada lado conhece so a propria forma. Um tradutor
+ * unico que soubesse dos dois schemas voltaria a acoplar os dois produtos, que
+ * e exatamente o que a separacao desfez.
+ *
+ * Aqui, no Service, o unico caso depois de gravar e o equipamento: ele chega do NexOn sem
+ * posicao, porque la posicao nao existe.
+ */
 export async function aoReceber(
   tx: Tx,
   recurso: Recurso,

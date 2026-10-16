@@ -264,6 +264,35 @@ describe('sincronizacao (banco real)', () => {
       });
     });
 
+    // Antes: P2002 no upsert, 500, e o worker do outro lado repetindo para
+    // sempre (só dependencia_ausente o faz tentar de novo de propósito).
+    it('e-mail que já é de outra conta viva: conflito_email, nada gravado, auditado', async () => {
+      const ID_LOCAL = 'TESTESYNCCONTATOLOCAL0001';
+      await prisma.usuarios.deleteMany({ where: { id: ID_LOCAL } });
+      await prisma.usuarios.create({ data: { id: ID_LOCAL, nome: 'Daqui', email: 'conflito.sync@exemplo.local' } });
+      try {
+        const r = await receber('1', { email: 'Conflito.Sync@Exemplo.local' });
+
+        expect(r.resultado).toBe('conflito_email');
+        expect(await prisma.usuarios.findUnique({ where: { id: ID_USUARIO } })).toBeNull();
+        expect(await prisma.sincronizacao_auditoria.count({ where: { registro_id: ID_USUARIO, resultado: 'conflito_email' } })).toBe(1);
+      } finally {
+        await prisma.usuarios.deleteMany({ where: { id: ID_LOCAL } });
+      }
+    });
+
+    it('e-mail de conta excluída: o e-mail dela é liberado e o usuário chega', async () => {
+      const ID_LOCAL = 'TESTESYNCCONTATOEXCL00001';
+      await prisma.usuarios.deleteMany({ where: { id: ID_LOCAL } });
+      await prisma.usuarios.create({ data: { id: ID_LOCAL, nome: 'Excluída', email: 'liberar.sync@exemplo.local', deleted_at: new Date() } });
+      try {
+        expect((await receber('1', { email: 'liberar.sync@exemplo.local' })).resultado).toBe('aplicado');
+        expect((await prisma.usuarios.findUnique({ where: { id: ID_LOCAL } }))?.email).toMatch(/^deleted_/);
+      } finally {
+        await prisma.usuarios.deleteMany({ where: { id: ID_LOCAL } });
+      }
+    });
+
     it('o que não é telefone chega vazio, em vez de entrar fora do padrão', async () => {
       await receber('1', { telefone: 'werwe' });
 

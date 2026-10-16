@@ -58,4 +58,46 @@ describe('e-mail sem caixa (banco real)', () => {
 
     await expect(service.update('testeemailsemcaixabia00001', { email: `ANA${DOMINIO}` }, chefe)).rejects.toBeInstanceOf(ConflictException);
   });
+
+  // O mode: 'insensitive' do Prisma vira ILIKE sem escapar: % e _ no e-mail
+  // eram curinga. O login e o "esqueci" achavam conta sem saber o endereço, e
+  // cada padrão escapava do contador por conta do SN-38 (revisão de segurança).
+  it('curinga no e-mail não acha a conta de ninguém', async () => {
+    await usuario('testeemailsemcaixaana00001', `ana${DOMINIO}`);
+
+    expect(await service.findByEmail(`%${DOMINIO}`)).toBeNull();
+    expect(await service.findByEmail(`an_${DOMINIO}`)).toBeNull();
+  });
+
+  it('e-mail com _ não dá 409 falso por outro parecido', async () => {
+    await usuario('testeemailsemcaixaaba00001', `aba${DOMINIO}`);
+
+    await expect(
+      service.create({ nome: 'A_A', email: `a_a${DOMINIO}`, status: UsuarioStatus.ATIVO, roleNames: ['operador'] }, chefe),
+    ).resolves.toMatchObject({ email: `a_a${DOMINIO}` });
+  });
+
+  it('perfil: trocar o próprio e-mail para o de outra pessoa com outra caixa: 409', async () => {
+    await usuario('testeemailsemcaixaana00001', `ana${DOMINIO}`);
+    await usuario('testeemailsemcaixabia00001', `bia${DOMINIO}`);
+
+    await expect(service.atualizarPerfil('testeemailsemcaixabia00001', { email: `ANA${DOMINIO}` })).rejects.toBeInstanceOf(ConflictException);
+  });
+
+  // O índice usuarios_email_lower_unique só existe no SQL (o Prisma não modela
+  // índice por expressão). Um aupus_test refeito sem ele passaria pelos testes
+  // acima, que conferem o service: este confere o banco.
+  it('o banco recusa a mesma conta com outra caixa (índice sem caixa)', async () => {
+    await usuario('testeemailsemcaixaana00001', `ana${DOMINIO}`);
+
+    await expect(usuario('testeemailsemcaixaana00002', `ANA${DOMINIO}`)).rejects.toMatchObject({ code: 'P2002' });
+  });
+
+  it('a busca da lista acha o telefone em E.164 pelo número com máscara', async () => {
+    await prisma.usuarios.create({ data: { id: 'testeemailsemcaixatel00001', nome: 'Com telefone', email: `tel${DOMINIO}`, telefone: '+5562998887766' } });
+
+    const { data } = await service.findAll({ search: '(62) 99888-7766', page: 1, limit: 10 } as never);
+
+    expect(data.map((u: { id: string }) => u.id.trim())).toContain('testeemailsemcaixatel00001');
+  });
 });

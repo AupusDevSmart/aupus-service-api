@@ -21,7 +21,10 @@ export type Resultado =
   | 'aplicado'
   | 'ignorado_versao'
   | 'ignorado_duplicado'
-  | 'dependencia_ausente';
+  | 'dependencia_ausente'
+  // O e-mail do usuário que chegou já é de outra conta viva aqui (SN-46). O
+  // remetente marca como entregue (só dependencia_ausente o faz repetir).
+  | 'conflito_email';
 
 @Injectable()
 export class SincronizacaoService {
@@ -86,6 +89,15 @@ export class SincronizacaoService {
         const { dados, ignorados } = filtrarParaEsteBanco(recurso, evento.payload);
         delete dados.id;
         antesDeGravar(recurso, dados);
+
+        if (recurso === 'usuarios' && typeof dados.email === 'string') {
+          const dona = await this.emailDeOutraConta(tx, dados.email, id);
+          if (dona) {
+            const detalhe = `o e-mail já é da conta ${dona} neste banco`;
+            await this.auditar(tx, evento, 'conflito_email', detalhe);
+            return { resultado: 'conflito_email' as const, detalhe };
+          }
+        }
 
         await delegatePorNome(tx, recurso).upsert({
           where: { id },
@@ -161,6 +173,25 @@ export class SincronizacaoService {
 
       const existe = await delegatePorNome(tx, dep.tabela).findFirst({ where: { id: alvo }, select: { id: true } });
       if (!existe) return `${dep.comoChamar} (${dep.campo}=${alvo}) não existe neste sistema`;
+    }
+    return null;
+  }
+
+  /**
+   * O e-mail do usuário que chegou já é de outra conta aqui, sem caixa (SN-46)?
+   * Viva: devolve o id dela, e o evento vira conflito auditado — antes era P2002
+   * no upsert, 500, e o worker do outro lado repetia para sempre. Excluída: o
+   * e-mail dela é liberado (`deleted_<id>_<email>`), como no cadastro. Roda
+   * dentro da transação que já marca a escrita como replicação (não volta).
+   */
+  private async emailDeOutraConta(tx: Prisma.TransactionClient, email: string, id: string): Promise<string | null> {
+    const outras = await tx.$queryRaw<{ id: string; email: string; deleted_at: Date | null }[]>`
+      SELECT id, email, deleted_at FROM usuarios
+      WHERE lower(email) = lower(${email}) AND trim(id) <> ${id.trim()}`;
+    const viva = outras.find((o) => !o.deleted_at);
+    if (viva) return viva.id.trim();
+    for (const excluida of outras) {
+      await tx.usuarios.update({ where: { id: excluida.id }, data: { email: `deleted_${excluida.id.trim()}_${excluida.email}` } });
     }
     return null;
   }

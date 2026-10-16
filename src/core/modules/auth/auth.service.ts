@@ -402,7 +402,9 @@ export class AuthService {
       .findByEmail(dto.email.trim())
       .catch(() => null);
 
-    if (!usuario) {
+    // A mesma regra do "esqueci": conta excluída ou inativa não troca a senha,
+    // nem com um token emitido enquanto estava ativa (revisão do SN-46)
+    if (!usuario || usuario.status !== 'Ativo' || !usuario.is_active || usuario.deleted_at) {
       throw new BadRequestException('Token inválido ou expirado');
     }
 

@@ -1,4 +1,4 @@
-import { ForbiddenException, UnauthorizedException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, UnauthorizedException } from '@nestjs/common';
 import type { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcryptjs';
 import type { MailService } from '../../mail/mail.service';
@@ -66,5 +66,32 @@ describe('validateUser não diz quem existe', () => {
 
     expect(usuario).toMatchObject({ id: 'u1' });
     expect(usuario).not.toHaveProperty('senha');
+  });
+});
+
+/**
+ * Redefinir a senha segue a regra do "esqueci" (SN-46, revisão de segurança):
+ * conta excluída ou inativa não troca a senha, mesmo com um token emitido
+ * enquanto ela estava ativa. O findByEmail sem caixa pode devolver a excluída.
+ */
+describe('resetPassword só de conta ativa', () => {
+  const tokens = { findUnique: jest.fn(), delete: jest.fn() };
+  const findByEmail = jest.fn();
+  const auth = new AuthService(
+    { findByEmail } as unknown as UsuariosService,
+    {} as JwtService,
+    { password_reset_tokens: tokens } as unknown as PrismaService,
+    {} as MailService,
+  );
+  const pedido = { email: 'ana@teste.com', token: 't', novaSenha: 'NovaSenha1', confirmarSenha: 'NovaSenha1' };
+
+  it.each([
+    ['excluída', { status: 'Ativo', is_active: true, deleted_at: new Date() }],
+    ['inativa', { status: 'Inativo', is_active: true, deleted_at: null }],
+  ])('conta %s: token inválido, sem chegar ao token', async (_caso, estado) => {
+    findByEmail.mockResolvedValueOnce({ id: 'u1', email: 'ana@teste.com', ...estado });
+
+    await expect(auth.resetPassword(pedido)).rejects.toBeInstanceOf(BadRequestException);
+    expect(tokens.findUnique).not.toHaveBeenCalled();
   });
 });

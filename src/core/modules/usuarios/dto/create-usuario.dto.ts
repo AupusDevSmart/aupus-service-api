@@ -154,7 +154,7 @@ export class CreateUsuarioDto {
   })
   @IsOptional()
   @IsString()
-  @Length(26, 26)
+  @Length(25, 26)
   concessionariaAtualId?: string;
 
   @ApiPropertyOptional({ 
@@ -163,7 +163,7 @@ export class CreateUsuarioDto {
   })
   @IsOptional()
   @IsString()
-  @Length(26, 26)
+  @Length(25, 26)
   organizacaoAtualId?: string;
 
   @ApiPropertyOptional({
@@ -172,7 +172,8 @@ export class CreateUsuarioDto {
   })
   @IsOptional()
   @IsString()
-  @Length(36, 36)
+  // id de 25 (cuid antigo) ou 26 caracteres: pedia 36 e recusava todo gerente (revisão do SN-46)
+  @Length(25, 26)
   managerId?: string;
 
   @ApiPropertyOptional({
@@ -181,7 +182,7 @@ export class CreateUsuarioDto {
   })
   @IsOptional()
   @IsString()
-  @Length(26, 26)
+  @Length(25, 26)
   createdBy?: string;
 
   // ============================================================================

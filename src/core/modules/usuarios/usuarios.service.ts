@@ -185,11 +185,15 @@ export class UsuariosService {
 
     // Filtro de busca
     if (search) {
+      // O telefone está em E.164 (SN-46): "99999-8888" ou "(62) 9999" acham
+      // pelos dígitos
+      const digitos = search.replace(/\D/g, '');
       grupos.push({
         OR: [
           { nome: { contains: search, mode: 'insensitive' } },
           { email: { contains: search, mode: 'insensitive' } },
           { telefone: { contains: search, mode: 'insensitive' } },
+          ...(digitos.length >= 4 ? [{ telefone: { contains: digitos } }] : []),
           { cpf_cnpj: { contains: search, mode: 'insensitive' } },
         ]
       });
@@ -278,17 +282,46 @@ export class UsuariosService {
   }
 
   /**
+   * As contas com este e-mail, sem caixa (SN-46): as vivas antes das excluídas,
+   * o id desempata. SQL com `lower(email) = lower(...)` (usa o índice
+   * usuarios_email_lower_unique) e não o `mode: 'insensitive'` do Prisma: ele
+   * vira ILIKE sem escapar, e `%` e `_` no e-mail eram curinga — o login e o
+   * "esqueci" achavam conta sem saber o endereço (revisão de segurança).
+   */
+  private contasPorEmail(email: string, semEsta?: string): Promise<{ id: string; email: string; deleted_at: Date | null }[]> {
+    return this.prisma.$queryRaw<{ id: string; email: string; deleted_at: Date | null }[]>`
+      SELECT id, email, deleted_at FROM usuarios
+      WHERE lower(email) = lower(${email.trim()})
+      ${semEsta ? Prisma.sql`AND trim(id) <> ${semEsta.trim()}` : Prisma.empty}
+      ORDER BY (deleted_at IS NOT NULL), id`;
+  }
+
+  /**
+   * E-mail que outra conta usa: viva, 409; excluída, o e-mail dela é liberado
+   * (`deleted_<id>_<email>`) para o novo ficar com ele — o índice sem caixa
+   * não deixaria os dois. Vale no cadastro, na edição e no perfil.
+   */
+  private async liberarOuRecusarEmail(email: string, semEsta?: string): Promise<void> {
+    const outras = await this.contasPorEmail(email, semEsta);
+    if (outras.some((o) => !o.deleted_at)) throw new ConflictException('Email já está em uso');
+    // Todas as excluídas: com o dado de antes do saneamento podem ser mais de uma
+    for (const excluida of outras) {
+      await this.prisma.usuarios.update({
+        where: { id: excluida.id },
+        data: { email: `deleted_${excluida.id.trim()}_${excluida.email}` },
+      });
+    }
+  }
+
+  /**
    * Busca usuário por email (usado para autenticação)
    * Retorna o usuário com a senha para validação
    */
   async findByEmail(email: string) {
     try {
-      // Sem caixa: `Ana@` e `ana@` são o mesmo login (SN-46). A conta viva
-      // vem antes da excluída, se as duas existirem.
-      const usuario = await this.prisma.usuarios.findFirst({
-        where: { email: { equals: email.trim(), mode: 'insensitive' } },
-        orderBy: { deleted_at: { sort: 'desc', nulls: 'first' } },
-      });
+      // Sem caixa: `Ana@` e `ana@` são o mesmo login (SN-46)
+      const [conta] = await this.contasPorEmail(email);
+      const usuario = conta ? await this.prisma.usuarios.findUnique({ where: { id: conta.id } }) : null;
 
       return usuario; // Retorna null se não encontrar
     } catch (error) {
@@ -322,23 +355,9 @@ export class UsuariosService {
       const extras = pedidas ? await this.semAsDoPapel(pedidas, papel.id) : [];
       if (solicitante) this.exigirPodeDarExtras(solicitante, extras.map((p) => p.name));
 
-      // Verificar se email já existe, sem caixa (SN-46)
+      // E-mail repetido, sem caixa (SN-46)
       data.email = normalizarEmail(data.email) as string;
-      const existingUser = await this.prisma.usuarios.findFirst({
-        where: { email: { equals: data.email, mode: 'insensitive' } },
-      });
-
-      if (existingUser) {
-        if (existingUser.deleted_at) {
-          // Liberar o email do registro soft-deleted para permitir reutilização
-          await this.prisma.usuarios.update({
-            where: { id: existingUser.id },
-            data: { email: `deleted_${existingUser.id}_${existingUser.email}` },
-          });
-        } else {
-          throw new ConflictException('Email já está em uso');
-        }
-      }
+      await this.liberarOuRecusarEmail(data.email);
 
       if (creatingUserId) data.createdBy = creatingUserId;
 
@@ -458,17 +477,7 @@ export class UsuariosService {
       // Verificar email duplicado
       if (data.email && data.email !== usuario.email) {
         data.email = normalizarEmail(data.email) as string;
-        const existingUser = await this.prisma.usuarios.findFirst({
-          where: {
-            email: { equals: data.email, mode: 'insensitive' },
-            deleted_at: null,
-            id: { not: id },
-          },
-        });
-
-        if (existingUser) {
-          throw new ConflictException('Email já está em uso');
-        }
+        await this.liberarOuRecusarEmail(data.email, id);
       }
 
       // Preparar dados para atualização
@@ -519,10 +528,9 @@ export class UsuariosService {
     if (!usuario) throw new NotFoundException('Usuário não encontrado');
 
     if (data.email && data.email !== usuario.email) {
-      const outro = await this.prisma.usuarios.findFirst({
-        where: { email: data.email, deleted_at: null, id: { not: id } },
-      });
-      if (outro) throw new ConflictException('Email já está em uso');
+      // A mesma regra do cadastro: sem caixa (antes esta checagem ficou exata)
+      data.email = normalizarEmail(data.email) as string;
+      await this.liberarOuRecusarEmail(data.email, id);
     }
 
     const atualizado = await this.prisma.usuarios.update({

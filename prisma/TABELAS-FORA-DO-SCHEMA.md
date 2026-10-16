@@ -50,6 +50,14 @@ criados pelo mesmo caminho.
 Nao ha razao tecnica para a diferenca; e acidente. Enquanto durar, o diff trata
 irmaos de formas opostas: preserva um e propoe dropar os outros dois.
 
+## Indice fora do schema: `usuarios_email_lower_unique`
+
+Criado por `prisma/sql/2026-10-16-contato-padronizado.sql` (SN-46): `CREATE UNIQUE INDEX
+usuarios_email_lower_unique ON usuarios (lower(email))`. Impede `Ana@x` e `ana@x` como duas
+contas. O Prisma nao modela indice por expressao, entao o `migrate diff` vai propor
+`DROP INDEX usuarios_email_lower_unique` — **remover essa linha** do diff. O spec
+`usuarios/email-sem-caixa.spec.ts` falha se o `aupus_test` for refeito sem ele.
+
 ## Por que nao estao modeladas
 
 O SQL foi escrito a mao, direto no servidor, e o codigo as acessa por

@@ -164,6 +164,8 @@ describe('UsuariosService - Testes Completos com Roles e Permissions', () => {
     mockMailService.sendWelcomeEmail.mockResolvedValue(undefined);
     (bcrypt.hash as jest.Mock).mockResolvedValue('hashed-password');
     (bcrypt.compare as jest.Mock).mockResolvedValue(true);
+    // E-mail sem dono por padrão (a checagem é por SQL desde o SN-46)
+    mockPrismaService.$queryRaw.mockResolvedValue([]);
   });
 
   // ============================================================================
@@ -293,7 +295,8 @@ describe('UsuariosService - Testes Completos com Roles e Permissions', () => {
       };
 
       mockPrismaService.roles.findFirst.mockResolvedValue(rolesMock[0]);
-      mockPrismaService.usuarios.findFirst.mockResolvedValue(usuarioMock);
+      // A checagem de e-mail é por SQL, sem caixa (SN-46): acha uma conta viva
+      mockPrismaService.$queryRaw.mockResolvedValueOnce([{ id: usuarioMock.id, email: 'existente@teste.com', deleted_at: null }]);
 
       await expect(service.create(createDto)).rejects.toThrow(ConflictException);
     });
