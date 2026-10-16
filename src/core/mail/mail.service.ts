@@ -34,6 +34,9 @@ export class MailService implements OnModuleInit {
       host,
       port,
       secure,
+      // Sem TLS desde a conexão (587), exige o STARTTLS antes do login: era
+      // oportunista, e sem ele a senha do SMTP ia em texto claro (SN-39)
+      requireTLS: !secure,
       auth: { user, pass },
     });
 
