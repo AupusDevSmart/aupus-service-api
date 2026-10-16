@@ -8,6 +8,7 @@ import {
   HttpException,
   Logger
 } from '@nestjs/common';
+import { normalizarEmail } from '../../../common/helpers/contato';
 import { Prisma, roles, usuarios } from '@prisma/client';
 // Builtins do Node, sem efeito colateral na carga: nao ha por que adia-los com
 // require() dentro da funcao, que alem de esconder a dependencia obriga o TS a
@@ -282,8 +283,11 @@ export class UsuariosService {
    */
   async findByEmail(email: string) {
     try {
-      const usuario = await this.prisma.usuarios.findUnique({
-        where: { email },
+      // Sem caixa: `Ana@` e `ana@` são o mesmo login (SN-46). A conta viva
+      // vem antes da excluída, se as duas existirem.
+      const usuario = await this.prisma.usuarios.findFirst({
+        where: { email: { equals: email.trim(), mode: 'insensitive' } },
+        orderBy: { deleted_at: { sort: 'desc', nulls: 'first' } },
       });
 
       return usuario; // Retorna null se não encontrar
@@ -318,9 +322,10 @@ export class UsuariosService {
       const extras = pedidas ? await this.semAsDoPapel(pedidas, papel.id) : [];
       if (solicitante) this.exigirPodeDarExtras(solicitante, extras.map((p) => p.name));
 
-      // Verificar se email já existe
+      // Verificar se email já existe, sem caixa (SN-46)
+      data.email = normalizarEmail(data.email) as string;
       const existingUser = await this.prisma.usuarios.findFirst({
-        where: { email: data.email },
+        where: { email: { equals: data.email, mode: 'insensitive' } },
       });
 
       if (existingUser) {
@@ -452,9 +457,10 @@ export class UsuariosService {
 
       // Verificar email duplicado
       if (data.email && data.email !== usuario.email) {
+        data.email = normalizarEmail(data.email) as string;
         const existingUser = await this.prisma.usuarios.findFirst({
           where: {
-            email: data.email,
+            email: { equals: data.email, mode: 'insensitive' },
             deleted_at: null,
             id: { not: id },
           },

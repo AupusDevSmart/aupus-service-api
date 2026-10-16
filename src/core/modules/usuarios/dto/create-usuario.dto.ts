@@ -12,6 +12,7 @@ import {
 } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
+import { EmailNormalizado, TelefoneE164 } from '../../../../common/decorators/contato';
 
 export enum UsuarioStatus {
   ATIVO = 'Ativo',
@@ -66,6 +67,7 @@ export class CreateUsuarioDto {
     description: 'Email do usuário',
     example: 'joao.silva@email.com'
   })
+  @EmailNormalizado()
   @IsEmail()
   @IsNotEmpty()
   @Length(5, 255)
@@ -73,12 +75,11 @@ export class CreateUsuarioDto {
 
   @ApiPropertyOptional({ 
     description: 'Telefone do usuário',
-    example: '(11) 99999-9999'
+    example: '+5511999999999',
+    // aceita com máscara; é gravado em E.164 (SN-46)
   })
-  @IsOptional()
-  @IsString()
-  @Length(10, 20)
-  telefone?: string;
+  @TelefoneE164()
+  telefone?: string | null;
 
   @ApiPropertyOptional({ 
     description: 'Instagram do usuário',

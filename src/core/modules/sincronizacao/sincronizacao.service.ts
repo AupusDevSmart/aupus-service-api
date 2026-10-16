@@ -4,7 +4,7 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { comoReplicacao } from './outbox.service';
 import type { Prisma } from '@prisma/client';
 import { DEPENDENCIAS, Recurso, delegatePorNome, filtrarParaEsteBanco } from './recursos';
-import { aoReceber } from './transformacoes';
+import { antesDeGravar, aoReceber } from './transformacoes';
 import { resolverCadeia } from './cadeia-de-dependencias';
 
 export interface EventoRecebido {
@@ -85,6 +85,7 @@ export class SincronizacaoService {
 
         const { dados, ignorados } = filtrarParaEsteBanco(recurso, evento.payload);
         delete dados.id;
+        antesDeGravar(recurso, dados);
 
         await delegatePorNome(tx, recurso).upsert({
           where: { id },

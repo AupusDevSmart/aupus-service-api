@@ -1,4 +1,5 @@
 import type { Prisma } from '@prisma/client';
+import { normalizarEmail, telefoneE164 } from '../../../common/helpers/contato';
 import { Recurso } from './recursos';
 
 type Tx = Prisma.TransactionClient;
@@ -26,6 +27,21 @@ type DadosDoEquipamento = Record<string, unknown> & {
  * Aqui, no Service, o unico caso e o equipamento: ele chega do NexOn sem
  * posicao, porque la posicao nao existe.
  */
+/**
+ * Antes de gravar o que chegou: o contato do usuário no padrão deste banco
+ * (SN-46). O NexOn manda o telefone e o e-mail como guarda; aqui o telefone é
+ * E.164 (o que não é telefone chega vazio) e o e-mail não tem caixa. Só mexe
+ * no que veio no payload.
+ */
+export function antesDeGravar(recurso: Recurso, dados: Record<string, unknown>): void {
+  if (recurso !== 'usuarios') return;
+  if ('email' in dados) dados.email = normalizarEmail(dados.email);
+  if ('telefone' in dados) {
+    const texto = typeof dados.telefone === 'string' ? dados.telefone : '';
+    dados.telefone = texto.trim() ? telefoneE164(texto) : null;
+  }
+}
+
 export async function aoReceber(
   tx: Tx,
   recurso: Recurso,

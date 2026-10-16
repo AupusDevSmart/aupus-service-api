@@ -1,5 +1,6 @@
 import { IsEmail, IsNotEmpty, IsString, MinLength } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
+import { EmailNormalizado } from '../../../../common/decorators/contato';
 
 /**
  * DTO para requisição de login
@@ -9,6 +10,7 @@ export class LoginDto {
     example: 'usuario@example.com',
     description: 'Email do usuário',
   })
+  @EmailNormalizado()
   @IsEmail({}, { message: 'Email inválido' })
   @IsNotEmpty({ message: 'Email é obrigatório' })
   email: string;

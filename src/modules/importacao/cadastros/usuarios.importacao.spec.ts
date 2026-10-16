@@ -197,7 +197,8 @@ describe('Importação de usuários (banco real)', () => {
       false,
       admin,
     );
-    expect(telefoneNovoCurto.erros[0].mensagem).toBe('telefone deve ter ao menos 10 caracteres.');
+    // Regra do SN-46: telefone novo tem de ser telefone (E.164)
+    expect(telefoneNovoCurto.erros[0].mensagem).toBe('Telefone inválido: informe o DDD e o número, como (62) 99999-8888');
   });
 
   it('proprietário não enxerga usuário que não criou: é "não encontrado"', async () => {

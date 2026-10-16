@@ -234,4 +234,40 @@ describe('sincronizacao (banco real)', () => {
       expect(ignorados.sort()).toEqual(['campo_que_nao_existe', 'role', 'senha']);
     });
   });
+
+  // Cada lado guarda o contato no próprio padrão (SN-46): o NexOn manda como
+  // tem, e aqui o telefone vira E.164 e o e-mail perde a caixa ao chegar.
+  describe('contato que chega do outro lado', () => {
+    const ID_USUARIO = 'TESTESYNCCONTATO000000001';
+    const limparUsuario = async () => {
+      for (const tabela of ['sincronizacao_outbox', 'sincronizacao_auditoria', 'sincronizacao_vinculos']) {
+        await prisma.$executeRawUnsafe(`DELETE FROM ${tabela} WHERE registro_id = $1`, ID_USUARIO);
+      }
+      await prisma.usuarios.deleteMany({ where: { id: ID_USUARIO } });
+    };
+    const receber = (versao: string, contato: Record<string, unknown>) =>
+      service.aplicar({
+        recurso: 'usuarios', registro_id: ID_USUARIO, operacao: 'upsert', versao, origem: 'nexon',
+        payload: { id: ID_USUARIO, nome: 'Do NexOn', email: 'fulano.sync@exemplo.local', ...contato },
+      });
+
+    beforeEach(limparUsuario);
+    afterAll(limparUsuario);
+
+    it('telefone com máscara e e-mail com caixa são gravados padronizados', async () => {
+      const r = await receber('1', { email: ' Fulano.Sync@Exemplo.LOCAL ', telefone: '(62) 99999-8888' });
+
+      expect(r.resultado).toBe('aplicado');
+      expect(await prisma.usuarios.findUnique({ where: { id: ID_USUARIO } })).toMatchObject({
+        email: 'fulano.sync@exemplo.local',
+        telefone: '+5562999998888',
+      });
+    });
+
+    it('o que não é telefone chega vazio, em vez de entrar fora do padrão', async () => {
+      await receber('1', { telefone: 'werwe' });
+
+      expect((await prisma.usuarios.findUnique({ where: { id: ID_USUARIO } }))?.telefone).toBeNull();
+    });
+  });
 });

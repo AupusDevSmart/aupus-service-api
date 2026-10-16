@@ -1,11 +1,13 @@
 import { IsEmail, IsNotEmpty, IsString, MinLength } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
+import { EmailNormalizado } from '../../../../common/decorators/contato';
 
 /**
  * DTO para concluir a redefinicao de senha via token enviado por email.
  */
 export class ResetPasswordWithTokenDto {
   @ApiProperty({ description: 'Email da conta' })
+  @EmailNormalizado()
   @IsEmail({}, { message: 'Email invalido' })
   @IsNotEmpty({ message: 'Email e obrigatorio' })
   email: string;
