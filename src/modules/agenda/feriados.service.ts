@@ -88,41 +88,45 @@ export class FeriadosService {
     return this.buscarPorId(feriado.id);
   }
 
+  /**
+   * O ano (e o mês) do filtro. O recorrente vale todo ano no mesmo dia e mês,
+   * mas fica gravado com o ano em que foi cadastrado: pelo intervalo do ano só,
+   * o Natal de 2024 sumia de 2026. O fim do mês é o dia 1 do seguinte (o dia 31
+   * fixo levava abril até 01/05). Mês sem ano é recusado, em vez de ignorado.
+   */
+  private async periodoDoFiltro(ano?: number, mes?: number): Promise<Prisma.feriadosWhereInput | null> {
+    if (mes && !ano) throw new BadRequestException('Para filtrar por mês, escolha também o ano');
+    if (!ano) return null;
+    const de = new Date(Date.UTC(ano, mes ? mes - 1 : 0, 1));
+    const ate = new Date(Date.UTC(mes ? ano : ano + 1, mes ? mes : 0, 1));
+    const doPeriodo: Prisma.feriadosWhereInput = { data: { gte: de, lt: ate } };
+    if (!mes) return { OR: [doPeriodo, { recorrente: true }] };
+    const recorrentesDoMes = await this.prisma.$queryRaw<{ id: string }[]>`
+      SELECT id FROM feriados WHERE recorrente = true AND EXTRACT(MONTH FROM data) = ${mes}`;
+    return { OR: [doPeriodo, { id: { in: recorrentesDoMes.map((f) => f.id) } }] };
+  }
+
   async buscarTodos(queryDto: QueryFeriadosDto): Promise<PaginatedResponse<FeriadoResponseDto>> {
     const { page, limit, search, tipo, plantaId, ano, mes, geral, recorrente, orderBy, orderDirection } = queryDto;
 
     const skip = (page - 1) * limit;
 
-    // Construir filtros
+    // Construir filtros. Busca, planta e período são OR cada um: no AND, para
+    // um não apagar o outro (com a planta escolhida, a busca sumia calada)
+    const e: Prisma.feriadosWhereInput[] = [];
+    if (search) {
+      e.push({ OR: [{ nome: { contains: search, mode: 'insensitive' } }, { descricao: { contains: search, mode: 'insensitive' } }] });
+    }
+    if (plantaId) e.push({ OR: [{ geral: true }, { feriado_plantas: { some: { planta_id: plantaId } } }] });
+    const periodo = await this.periodoDoFiltro(ano, mes);
+    if (periodo) e.push(periodo);
+
     const where: Prisma.feriadosWhereInput = {
       ativo: true,
-      ...(search && {
-        OR: [
-          { nome: { contains: search, mode: 'insensitive' } },
-          { descricao: { contains: search, mode: 'insensitive' } }
-        ]
-      }),
       ...(tipo && { tipo }),
       ...(geral !== undefined && { geral }),
       ...(recorrente !== undefined && { recorrente }),
-      ...(ano && {
-        data: {
-          gte: new Date(`${ano}-01-01`),
-          lte: new Date(`${ano}-12-31`)
-        }
-      }),
-      ...(mes && ano && {
-        data: {
-          gte: new Date(`${ano}-${mes.toString().padStart(2, '0')}-01`),
-          lte: new Date(`${ano}-${mes.toString().padStart(2, '0')}-31`)
-        }
-      }),
-      ...(plantaId && {
-        OR: [
-          { geral: true },
-          { feriado_plantas: { some: { planta_id: plantaId } } }
-        ]
-      })
+      ...(e.length && { AND: e }),
     };
 
     // Ordenação

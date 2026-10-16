@@ -98,23 +98,20 @@ export class ConfiguracoesDiasUteisService {
     const skip = (page - 1) * limit;
 
     // Construir filtros
+    // Busca e planta são OR cada uma: no AND, para uma não apagar a outra
+    // (com a planta escolhida, a busca sumia calada)
+    const e: Prisma.configuracoes_dias_uteisWhereInput[] = [];
+    if (search) {
+      e.push({ OR: [{ nome: { contains: search, mode: 'insensitive' } }, { descricao: { contains: search, mode: 'insensitive' } }] });
+    }
+    if (plantaId) e.push({ OR: [{ geral: true }, { configuracao_plantas: { some: { planta_id: plantaId } } }] });
+
     const where: Prisma.configuracoes_dias_uteisWhereInput = {
       ativo: true,
-      ...(search && {
-        OR: [
-          { nome: { contains: search, mode: 'insensitive' } },
-          { descricao: { contains: search, mode: 'insensitive' } }
-        ]
-      }),
       ...(geral !== undefined && { geral }),
       ...(sabado !== undefined && { sabado }),
       ...(domingo !== undefined && { domingo }),
-      ...(plantaId && {
-        OR: [
-          { geral: true },
-          { configuracao_plantas: { some: { planta_id: plantaId } } }
-        ]
-      })
+      ...(e.length && { AND: e }),
     };
 
     // Ordenação
