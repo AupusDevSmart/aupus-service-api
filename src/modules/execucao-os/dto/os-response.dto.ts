@@ -630,6 +630,15 @@ export class OrdemServicoResponseDto {
   @ApiPropertyOptional({ description: 'Minutos parado (retorno menos parada)', nullable: true })
   minutos_parado?: number | null;
 
+  @ApiPropertyOptional({ description: 'HH real: soma das horas trabalhadas registradas (null enquanto ninguém registrou)', nullable: true })
+  hh_real?: number | null;
+
+  @ApiPropertyOptional({ description: 'HH estimado: soma das horas estimadas da equipe' })
+  hh_estimado?: number;
+
+  @ApiPropertyOptional({ description: 'Minutos de trabalho do início ao fim, sem as pausas (em andamento, até agora)', nullable: true })
+  tempo_efetivo_minutos?: number | null;
+
   @ApiPropertyOptional({ description: 'O sintoma da falha', nullable: true })
   falha_sintoma?: string | null;
 

@@ -25,6 +25,7 @@ import {
 import { FileInterceptor } from '@nestjs/platform-express';
 import { Response } from 'express';
 import { ExecucaoOSService } from './execucao-os.service';
+import type { PessoasDaOS } from './horas-da-execucao';
 import { AnexosOSService, type Solicitante } from './anexos-os.service';
 import {
   OSFiltersDto,
@@ -227,6 +228,17 @@ export class ExecucaoOSController {
   ): Promise<{ message: string }> {
     await this.execucaoOSService.registrarFerramentas(id.trim(), dto, user?.id, user);
     return { message: 'Uso de ferramentas registrado' };
+  }
+
+  @Get(':id/pessoas')
+  @Permissions('execucao_os.manage', 'execucao_os.executar')
+  @ApiOperation({
+    summary: 'Quem pode entrar na execução',
+    description: 'Equipe da planta da OS e apoio (planejador, gerente, administrador): quem pode registrar horas sem estar escalado (SN-61)',
+  })
+  @ApiParam({ name: 'id', description: 'ID da OS' })
+  async pessoas(@Param('id') id: string, @CurrentUser() user?: Solicitante): Promise<PessoasDaOS> {
+    return this.execucaoOSService.pessoasQuePodemAtuar(id.trim(), user);
   }
 
   @Get(':id/tarefas')

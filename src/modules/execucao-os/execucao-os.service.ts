@@ -36,6 +36,7 @@ import {
   type reserva_veiculo,
   type tarefas_os,
   type tecnicos_os,
+  type historico_os,
   type veiculo,
 } from '@/core';
 import { gerarNumeroOS } from '../../common/helpers/numeracao-os';
@@ -44,6 +45,9 @@ import { finalizarOrigem, origemDaProgramacao } from '../../common/helpers/statu
 import { cancelarOS } from './cancelar-os';
 import { exigirOSAlteravel } from './os-alteravel';
 import { dadosDaOS, dadosDeFalha, equipamentoDaCorretiva, minutosParado, mudancasNaFalha } from './dados-de-falha';
+import { MARCOS_DO_TEMPO, emCentavos, gravacaoDasHoras, horasDaEquipe, minutosEfetivos } from './horas-da-execucao';
+import { pessoasQuePodemAtuar } from '@/modules/programacao-os/pessoas-da-os';
+import type { PessoasDaOS } from './horas-da-execucao';
 import { fotosDosItens, gravacoesDoChecklist, leituraDoItem, pendenciaDaTarefa, travarItensDoChecklist, travarTarefa } from './itens-do-checklist';
 import { anexoParaResposta } from './anexos-os.service';
 import { variantesDeId, variantesDeIds } from '../tarefas/ids';
@@ -96,6 +100,7 @@ type OSParaResposta = ordens_servico & {
   planta?: Pick<plantas, 'id' | 'nome'> | null;
   equipamento?: Pick<equipamentos, 'id' | 'nome' | 'tipo_equipamento' | 'fabricante' | 'modelo'> | null;
   reserva_veiculo?: ReservaDaOS | null;
+  historico?: Pick<historico_os, 'acao' | 'data'>[];
 };
 
 /** A OS com tudo o que `buscarPorId` inclui */
@@ -312,6 +317,8 @@ export class ExecucaoOSService {
             },
           },
         },
+        // SN-61: só os marcos que param e retomam o trabalho, para o tempo efetivo
+        historico: { where: { acao: { in: MARCOS_DO_TEMPO } }, select: { acao: true, data: true } },
       },
       orderBy: { [sortBy]: sortOrder },
       skip: (page - 1) * limit,
@@ -556,6 +563,22 @@ export class ExecucaoOSService {
     const instalacoes = await instalacoesDasOrdens(this.prisma, [os.id]);
 
     return this.mapearParaDetalhes(os, instalacoes.get(os.id) ?? []);
+  }
+
+  /**
+   * Quem pode registrar horas sem estar escalado (SN-61): a regra de quem é
+   * escalado na programação (SN-31), na planta da OS. Rota da OS porque o
+   * técnico de campo, que executa, não tem a da programação.
+   */
+  async pessoasQuePodemAtuar(id: string, user?: ScopedUser): Promise<PessoasDaOS> {
+    if (user) await this.scopeService.assertEntityInScope('ordem_servico', id, user);
+    const os = await this.prisma.ordens_servico.findFirst({ where: { id, deletado_em: null }, select: { planta_id: true } });
+    if (!os) throw new NotFoundException('Ordem de serviço não encontrada');
+    // Só id e nome: quem executa é o menor papel interno, e e-mail (o login) e
+    // papel de todo o apoio (quem é administrador) não servem à tela
+    const { equipe, apoio } = await pessoasQuePodemAtuar(this.prisma, os.planta_id);
+    const soNome = ({ id: pessoaId, nome }: { id: string; nome: string }) => ({ id: pessoaId, nome });
+    return { equipe: equipe.map(soNome), apoio: apoio.map(soNome) };
   }
 
   async iniciar(id: string, dto: IniciarExecucaoDto, usuarioId?: string, user?: ScopedUser): Promise<void> {
@@ -1145,12 +1168,6 @@ export class ExecucaoOSService {
 
     const dataHoraFim = dto.data_hora_fim_real ? new Date(dto.data_hora_fim_real) : new Date();
 
-    const tempoRealExecucao = this.calcularTempoExecucao(
-      os.data_hora_inicio_real ? new Date(os.data_hora_inicio_real) : null,
-      dataHoraFim
-    );
-
-    const custoReal = await this.calcularCustoReal(id, dto);
     // SN-60: na corretiva, se parou, sintoma, causa e ação (400 sem eles)
     const falha = dadosDeFalha(os.tipo, dto);
     const mudancaNaFalha = os.falha_sintoma || os.parada_inicio ? mudancasNaFalha(dadosDaOS(os), falha) : null;
@@ -1162,9 +1179,11 @@ export class ExecucaoOSService {
     // D2: executar não bloqueia por tarefa pendente, mas exige o motivo de cada
     // uma. Não fazer uma tarefa é comum (a equipe viaja e não consegue); o que
     // não pode é ela sumir sem registro.
+    // Na ordem do id: dois "Executar" travam as mesmas tarefas na mesma ordem (sem deadlock)
     const pendentes = await this.prisma.tarefas_os.findMany({
       where: { os_id: id, status: 'PENDENTE' },
       include: { tarefa: true },
+      orderBy: { id: 'asc' },
     });
     const motivos = new Map(
       (dto.tarefas_nao_feitas ?? [])
@@ -1177,6 +1196,8 @@ export class ExecucaoOSService {
         `Informe por que estas tarefas não foram feitas: ${semMotivo.map(nomeDaTarefa).join(', ')}`,
       );
     }
+    // Lido antes: dentro da transação, pelo this.prisma, ocupava uma segunda conexão do pool
+    const autor = await this.nomeDoUsuario(usuarioId);
 
 
     await this.prisma.$transaction(async (prisma) => {
@@ -1199,7 +1220,6 @@ export class ExecucaoOSService {
         data: {
           status: StatusOS.EXECUTADA,
           data_hora_fim_real: dataHoraFim,
-          custo_real: custoReal,
           ...falha,
           ...(equipamentoDaFalha && { equipamento_id: equipamentoDaFalha }),
           resultado_servico: dto.resultado_servico,
@@ -1220,30 +1240,47 @@ export class ExecucaoOSService {
         throw new ConflictException('A OS já não está em execução (executada por outra pessoa agora há pouco?): recarregue a tela.');
       }
 
+      // SN-61: as horas de cada técnico (toda linha da equipe) e quem entrou na
+      // hora. Lidas depois da trava do status: no toque duplo, o segundo
+      // "Executar" via a equipe já com quem o primeiro acrescentou e pedia as
+      // horas dele, em vez de dizer que a OS já tinha sido executada
+      const equipe = await prisma.tecnicos_os.findMany({ where: { os_id: id }, orderBy: [{ created_at: 'asc' }, { id: 'asc' }] });
+      const horas = await gravacaoDasHoras(prisma, os.planta_id, equipe, dto);
+      for (const { id: tecnicoId, data } of horas.atualizacoes) {
+        await prisma.tecnicos_os.update({ where: { id: tecnicoId }, data });
+      }
+      if (horas.novos.length > 0) {
+        await prisma.tecnicos_os.createMany({ data: horas.novos.map((n) => ({ ...n, os_id: id })) });
+      }
+
       // Atualizar materiais consumidos
       if (dto.materiais_consumidos && dto.materiais_consumidos.length > 0) {
         for (const material of dto.materiais_consumidos) {
-          await prisma.materiais_os.update({
-            where: { id: material.id },
+          // Com os_id, como no registrarMateriais: o id de um material de outra
+          // OS (até de outra planta) era gravado por esta rota
+          const { count } = await prisma.materiais_os.updateMany({
+            where: { id: material.id, os_id: id },
             data: {
               quantidade_consumida: material.quantidade_consumida,
               observacoes: material.observacoes,
             },
           });
+          if (count === 0) throw new NotFoundException(`Material ${material.id} não pertence a esta OS`);
         }
       }
 
       // Atualizar ferramentas utilizadas
       if (dto.ferramentas_utilizadas && dto.ferramentas_utilizadas.length > 0) {
         for (const ferramenta of dto.ferramentas_utilizadas) {
-          await prisma.ferramentas_os.update({
-            where: { id: ferramenta.id },
+          const { count } = await prisma.ferramentas_os.updateMany({
+            where: { id: ferramenta.id, os_id: id },
             data: {
               condicao_depois: ferramenta.condicao_depois,
               observacoes: ferramenta.observacoes,
               utilizada: true,
             },
           });
+          if (count === 0) throw new NotFoundException(`Ferramenta ${ferramenta.id} não pertence a esta OS`);
         }
       }
 
@@ -1263,12 +1300,15 @@ export class ExecucaoOSService {
             km_final: dto.km_final,
             observacoes_finalizacao: dto.observacoes_veiculo,
             data_finalizacao: dataHoraFim,
-            finalizado_por: await this.nomeDoUsuario(usuarioId),
+            finalizado_por: autor,
             finalizado_por_id: usuarioId,
           },
         });
         await devolverViatura(prisma, reserva.veiculo_id, dto.km_final);
       }
+
+      // O custo sai do que acabou de ser gravado: as horas reais e o consumo de material
+      await prisma.ordens_servico.update({ where: { id }, data: { custo_real: await this.calcularCustoReal(prisma, id) } });
 
       await this.registrarHistorico(
         prisma,
@@ -1282,6 +1322,12 @@ export class ExecucaoOSService {
       );
       // Reexecutar depois de reabrir: o auditor vê o que mudou na falha
       if (mudancaNaFalha) await this.registrarHistorico(prisma, id, 'DADOS_DE_FALHA', 'Sistema', usuarioId, mudancaNaFalha);
+      if (horas.resumo) await this.registrarHistorico(prisma, id, 'HORAS_TRABALHADAS', 'Sistema', usuarioId, horas.resumo);
+    }, {
+      // Até 100 linhas da equipe, tarefas, materiais e a viatura; e no toque
+      // duplo o segundo espera a trava da OS no próprio relógio (P2028 = 500, não 409)
+      timeout: 15000,
+      maxWait: 15000,
     });
   }
 
@@ -1613,17 +1659,6 @@ export class ExecucaoOSService {
     await prisma.checklist_atividades_os.createMany({ data: dados });
   }
 
-  private calcularTempoExecucao(
-    dataHoraInicio?: Date | null,
-    dataHoraFim?: Date,
-  ): number | null {
-    if (!dataHoraInicio || !dataHoraFim) {
-      return null;
-    }
-
-    return Math.round((dataHoraFim.getTime() - dataHoraInicio.getTime()) / (1000 * 60)); // em minutos
-  }
-
   /**
    * Percentual de itens concluidos do checklist da OS, arredondado.
    * Sem itens devolve null — 0% diria que nada foi feito, quando na verdade
@@ -1639,33 +1674,37 @@ export class ExecucaoOSService {
     return Math.round((concluidas / total) * 100);
   }
 
-  private async calcularCustoReal(osId: string, dto: ExecutarOSDto): Promise<number> {
-    // Buscar materiais consumidos
-    const materiais = await this.prisma.materiais_os.findMany({
+  /**
+   * Material consumido mais mão de obra. Lido na transação do executar, depois
+   * de gravar: antes era calculado antes dela, com as horas estimadas e o
+   * consumo de material de antes do pedido.
+   */
+  private async calcularCustoReal(prisma: Prisma.TransactionClient, osId: string): Promise<Prisma.Decimal> {
+    const materiais = await prisma.materiais_os.findMany({
       where: { os_id: osId },
     });
 
-    // Buscar técnicos
-    const tecnicos = await this.prisma.tecnicos_os.findMany({
+    const tecnicos = await prisma.tecnicos_os.findMany({
       where: { os_id: osId },
     });
 
-    let custoTotal = 0;
+    // Em Decimal, cada parcela arredondada como o custo da linha (SN-61): em
+    // float, 0,5 h x R$ 2,01 gravava 1,00 na linha e 1,01 no custo da OS
+    let custoTotal = new Prisma.Decimal(0);
 
-    // Calcular custo dos materiais realmente consumidos
-    materiais.forEach(material => {
+    // Material realmente consumido
+    for (const material of materiais) {
       if (material.custo_unitario && material.quantidade_consumida) {
-        custoTotal += Number(material.custo_unitario) * Number(material.quantidade_consumida);
+        custoTotal = custoTotal.add(emCentavos(material.custo_unitario.mul(material.quantidade_consumida)));
       }
-    });
+    }
 
-    // Calcular custo dos técnicos (usar horas trabalhadas se disponível)
-    tecnicos.forEach(tecnico => {
+    // Mão de obra: a estimada só para OS executada antes do SN-61, sem horas registradas
+    for (const tecnico of tecnicos) {
       if (tecnico.custo_hora) {
-        const horas = tecnico.horas_trabalhadas || tecnico.horas_estimadas;
-        custoTotal += Number(tecnico.custo_hora) * Number(horas);
+        custoTotal = custoTotal.add(emCentavos(tecnico.custo_hora.mul(tecnico.horas_trabalhadas ?? tecnico.horas_estimadas)));
       }
-    });
+    }
 
     return custoTotal;
   }
@@ -1838,6 +1877,14 @@ export class ExecucaoOSService {
       parada_inicio: os.parada_inicio,
       parada_fim: os.parada_fim,
       minutos_parado: minutosParado(os),
+      // SN-61: o HH real é a soma das horas registradas; o tempo efetivo, sem as
+      // pausas (em andamento, até agora: o painel do Executar parte dele)
+      ...horasDaEquipe(os.tecnicos ?? []),
+      tempo_efetivo_minutos: minutosEfetivos(
+        os.data_hora_inicio_real,
+        os.data_hora_fim_real ?? (os.status === StatusOS.EM_EXECUCAO || os.status === StatusOS.PAUSADA ? new Date() : null),
+        os.historico ?? [],
+      ),
       falha_sintoma: os.falha_sintoma,
       falha_causa: os.falha_causa,
       falha_acao: os.falha_acao,

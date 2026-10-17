@@ -173,6 +173,8 @@ const JORNADAS: [string, string, string[]][] = [
   ['marcar o checklist', 'PATCH /execucao-os/:id/checklist', EXECUTAM],
   ['anexar foto na OS', 'POST /execucao-os/:id/anexos', EXECUTAM],
   ['executar a OS', 'PATCH /execucao-os/:id/executar', EXECUTAM],
+  // SN-61: quem trabalhou sem estar escalado (o técnico de campo não tem a rota da programação)
+  ['registrar quem entrou na execução', 'GET /execucao-os/:id/pessoas', EXECUTAM],
   ['auditar a OS', 'PATCH /execucao-os/:id/auditar', PLANEJAM],
   ['finalizar a OS', 'PATCH /execucao-os/:id/finalizar', GERENCIAM],
   ['cancelar a OS', 'PATCH /execucao-os/:id/cancelar', PLANEJAM],

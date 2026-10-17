@@ -335,6 +335,38 @@ export class TarefaNaoFeitaDto {
   motivo: string;
 }
 
+export class HorasDoTecnicoDto {
+  @ApiProperty({ description: 'ID da linha do técnico na OS (tecnicos_os.id)' })
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(30)
+  id: string;
+
+  @ApiProperty({ description: 'Horas trabalhadas, até 2 casas (0 se não trabalhou)', example: 3.5 })
+  @VazioEhNulo()
+  @IsNumber()
+  @Min(0)
+  @Max(999.99)
+  @CasasDecimais(2)
+  horas: number;
+}
+
+export class TecnicoExtraDto {
+  @ApiProperty({ description: 'ID do usuário que entrou na execução sem estar escalado' })
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(30)
+  tecnico_id: string;
+
+  @ApiProperty({ description: 'Horas trabalhadas, até 2 casas', example: 2 })
+  @VazioEhNulo()
+  @IsNumber()
+  @Min(0)
+  @Max(999.99)
+  @CasasDecimais(2)
+  horas: number;
+}
+
 export class ExecutarOSDto {
   @ApiPropertyOptional({
     description: 'Tarefas pendentes que não foram feitas, cada uma com o motivo. Toda tarefa ainda pendente precisa estar aqui.',
@@ -345,6 +377,29 @@ export class ExecutarOSDto {
   @ValidateNested({ each: true })
   @Type(() => TarefaNaoFeitaDto)
   tarefas_nao_feitas?: TarefaNaoFeitaDto[];
+
+  // SN-61: as horas reais. Toda linha da equipe precisa estar aqui (0 = não foi)
+  @ApiPropertyOptional({
+    description: 'Horas trabalhadas de cada técnico da OS. Obrigatório para toda linha da equipe (0 se não trabalhou).',
+    type: [HorasDoTecnicoDto],
+  })
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(100)
+  @ValidateNested({ each: true })
+  @Type(() => HorasDoTecnicoDto)
+  horas_dos_tecnicos?: HorasDoTecnicoDto[];
+
+  @ApiPropertyOptional({
+    description: 'Quem trabalhou sem estar escalado: usuário que pode atuar na planta e as horas',
+    type: [TecnicoExtraDto],
+  })
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(50)
+  @ValidateNested({ each: true })
+  @Type(() => TecnicoExtraDto)
+  tecnicos_extras?: TecnicoExtraDto[];
 
   @ApiPropertyOptional({ description: 'Data e hora de fim real', example: '2025-02-15T17:00:00Z' })
   @IsOptional()
