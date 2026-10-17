@@ -323,8 +323,14 @@ export class ExecucaoOSService {
         },
         // SN-61: só os marcos que param e retomam o trabalho, para o tempo efetivo
         historico: { where: { acao: { in: MARCOS_DO_TEMPO } }, select: { acao: true, data: true } },
+        // SN-63: a exportação da lista leva a planta e o equipamento; sem eles a
+        // listagem devolvia os dois indefinidos e as colunas saíam vazias
+        planta: { select: { id: true, nome: true } },
+        equipamento: { select: { id: true, nome: true, tipo_equipamento: true, fabricante: true, modelo: true } },
       },
-      orderBy: { [sortBy]: sortOrder },
+      // Desempate pelo id: com o mesmo criado_em, a ordem entre páginas não era
+      // garantida, e a exportação (que lê todas) perdia ou repetia OS
+      orderBy: [{ [sortBy]: sortOrder }, { id: 'asc' }],
       skip: (page - 1) * limit,
       take: limit,
     });

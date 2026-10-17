@@ -337,7 +337,8 @@ describe('horas ao executar a OS (banco real)', () => {
 
     const { data } = await execucoes.listar({ planta_id: PLANTA, limit: 50 } as never);
 
-    expect(data.find((o) => o.id === osId)).toMatchObject({ hh_real: 3.5, hh_estimado: 8 });
+    // SN-63: a planta vem na listagem (a exportação a lê de lá)
+    expect(data.find((o) => o.id === osId)).toMatchObject({ hh_real: 3.5, hh_estimado: 8, planta: { nome: `${PREFIXO} planta` } });
   });
 
   it('reexecutar com as mesmas horas não repete a trilha; quem entrou na hora já é da equipe', async () => {
