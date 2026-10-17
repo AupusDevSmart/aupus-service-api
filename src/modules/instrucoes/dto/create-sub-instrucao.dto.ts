@@ -76,6 +76,11 @@ export class CreateSubInstrucaoDto {
   @IsIn(TIPOS_DE_PASSO, { message: 'O tipo do passo é VERIFICACAO ou LEITURA.' })
   tipo?: TipoDePasso;
 
+  /** O item da OS só é marcado com uma foto dele (SN-59). Vazio = não, no service */
+  @IsOptional()
+  @IsBoolean()
+  exige_foto?: boolean;
+
   @IsOptional()
   @IsString()
   @MaxLength(20)

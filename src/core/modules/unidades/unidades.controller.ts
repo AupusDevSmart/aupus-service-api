@@ -42,6 +42,7 @@ import { UserProprietarioId } from '../auth/decorators/user-proprietario.decorat
 import { Permissions } from '../auth/decorators/permissions.decorator';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import type { ScopedUser } from '../auth/permission-scope.service';
+import { cabecalhosDoDownload } from '@/common/upload/tipo-do-arquivo';
 
 @ApiTags('unidades')
 @Controller('unidades')
@@ -68,11 +69,8 @@ export class UnidadesController {
     await this.unidadesService.garantirNoEscopo(anexo.unidade_id, user);
     const caminho = await this.anexosService.obterCaminhoArquivo(anexoId);
 
-    res.setHeader('Content-Type', anexo.mime_type);
-    res.setHeader(
-      'Content-Disposition',
-      `attachment; filename="${encodeURIComponent(anexo.nome_original)}"`,
-    );
+    // Tipo pela extensão, não o que o cliente declarou no upload (revisão do SN-59)
+    res.set(cabecalhosDoDownload(anexo.nome_original));
     res.sendFile(path.resolve(caminho));
   }
 

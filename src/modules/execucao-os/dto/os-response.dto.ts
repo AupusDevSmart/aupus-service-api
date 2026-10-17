@@ -256,6 +256,9 @@ export class ChecklistAtividadeResponseDto {
   @ApiProperty({ description: 'Leitura fora da faixa (conta valor x faixa)' })
   fora_da_faixa: boolean;
 
+  @ApiProperty({ description: 'O item só é marcado com uma foto dele (SN-59)' })
+  exige_foto: boolean;
+
   @ApiProperty({ description: 'Data de criação' })
   created_at: Date;
 
@@ -288,9 +291,6 @@ export class AnexoOSResponseDto {
   @ApiPropertyOptional({ description: 'Descrição do anexo' })
   descricao?: string;
 
-  @ApiProperty({ description: 'Caminho do arquivo' })
-  caminho_s3: string;
-
   @ApiPropertyOptional({ description: 'URL de download' })
   url_download?: string;
 
@@ -308,6 +308,12 @@ export class AnexoOSResponseDto {
 
   @ApiPropertyOptional({ description: 'Data de exclusão' })
   deletado_em?: Date | null;
+
+  @ApiPropertyOptional({ description: 'A tarefa da OS que o anexo prova (SN-59)', nullable: true })
+  tarefa_os_id: string | null;
+
+  @ApiPropertyOptional({ description: 'O item do checklist que o anexo prova (SN-59)', nullable: true })
+  checklist_item_id: string | null;
 }
 
 export class RegistroTempoOSResponseDto {

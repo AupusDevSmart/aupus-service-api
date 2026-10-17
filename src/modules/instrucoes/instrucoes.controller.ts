@@ -30,6 +30,7 @@ import {
   DashboardInstrucoesDto,
   AnexoInstrucaoDetalhesDto
 } from './dto';
+import { cabecalhosDoDownload } from '@/common/upload/tipo-do-arquivo';
 
 @ApiTags('Instrucoes')
 @Controller('instrucoes')
@@ -264,8 +265,8 @@ export class InstrucoesController {
     const anexo = await this.anexosInstrucoesService.buscarAnexo(anexoId);
     const caminhoArquivo = await this.anexosInstrucoesService.obterCaminhoArquivo(anexoId);
 
-    res.setHeader('Content-Type', anexo.content_type || 'application/octet-stream');
-    res.setHeader('Content-Disposition', `attachment; filename="${anexo.nome}"`);
+    // Tipo pela extensão, não o que o cliente declarou no upload (revisão do SN-59)
+    res.set(cabecalhosDoDownload(anexo.nome));
 
     if (anexo.tamanho) {
       res.setHeader('Content-Length', anexo.tamanho);

@@ -39,6 +39,7 @@ import { Permissions } from '../auth/decorators/permissions.decorator';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import type { ScopedUser } from '../auth/permission-scope.service';
 import { LIMITES_DO_MULTIPART } from '@/common/upload/limites-do-upload.module';
+import { cabecalhosDoDownload } from '@/common/upload/tipo-do-arquivo';
 
 @ApiTags('Equipamentos')
 @Controller('equipamentos')
@@ -167,8 +168,8 @@ export class EquipamentosController {
     const caminho = await this.anexosService.obterCaminhoArquivo(anexoId);
 
     res.set({
-      'Content-Type': anexo.mime_type,
-      'Content-Disposition': `attachment; filename="${encodeURIComponent(anexo.nome_original)}"`,
+      // Tipo pela extensão, não o que o cliente declarou no upload (revisão do SN-59)
+      ...cabecalhosDoDownload(anexo.nome_original),
       'Content-Length': anexo.tamanho.toString(),
     });
 

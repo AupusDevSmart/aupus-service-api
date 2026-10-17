@@ -11,6 +11,8 @@ export interface EtapaDaInstrucao {
   tempo_estimado: number | null;
   /** SN-58: VERIFICACAO ou LEITURA, com unidade e faixa */
   tipo: string;
+  /** SN-59: o item da OS só é marcado com uma foto dele */
+  exige_foto: boolean;
   unidade: string | null;
   valor_minimo: number | null;
   valor_maximo: number | null;
@@ -42,6 +44,7 @@ export async function comEtapas<T extends ComInstrucao>(
           ordem: true,
           tempo_estimado: true,
           tipo: true,
+          exige_foto: true,
           unidade: true,
           valor_minimo: true,
           valor_maximo: true,

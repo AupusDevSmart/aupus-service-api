@@ -48,6 +48,7 @@ import {
 } from './dto';
 import { TipoAnexoOS } from '@/core';
 import * as fs from 'fs';
+import { cabecalhosDoDownload } from '@/common/upload/tipo-do-arquivo';
 
 @ApiTags('Execução OS')
 @Controller('execucao-os')
@@ -325,7 +326,10 @@ export class ExecucaoOSController {
     @Query('tipo') tipo: TipoAnexoOS,
     @CurrentUser() user?: Solicitante,
   ): Promise<AnexoOSResponseDto> {
-    return this.anexosOSService.uploadAnexo(id.trim(), file, tipo, dto.descricao, dto.fase_execucao, user);
+    return this.anexosOSService.uploadAnexo(id.trim(), file, tipo, dto.descricao, dto.fase_execucao, user, {
+      tarefa_os_id: dto.tarefa_os_id,
+      checklist_item_id: dto.checklist_item_id,
+    });
   }
 
   @Get(':id/anexos')
@@ -385,10 +389,9 @@ export class ExecucaoOSController {
 
     const file = fs.createReadStream(caminhoArquivo);
 
-    res.set({
-      'Content-Type': anexo.mime_type,
-      'Content-Disposition': `attachment; filename="${anexo.nome_original}"`,
-    });
+    // Tipo pela extensão: o mime gravado veio do cliente, e um SVG mandado como
+    // "foto.png" voltava como SVG e rodava script na tela (revisão do SN-59)
+    res.set(cabecalhosDoDownload(anexo.nome_original));
 
     return new StreamableFile(file);
   }

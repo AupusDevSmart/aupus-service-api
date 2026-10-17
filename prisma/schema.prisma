@@ -2143,6 +2143,8 @@ model tarefas_os {
   tarefa               tarefas?       @relation(fields: [tarefa_id], references: [id])
   /// Itens do checklist que pertencem a esta tarefa (SPEC-EXECUCAO-DA-OS, D4)
   checklist            checklist_atividades_os[]
+  /// SN-59: as fotos da tarefa (e as dos itens dela)
+  anexos               anexos_os[]
 
   @@index([os_id])
   @@index([tarefa_id])
@@ -2284,10 +2286,14 @@ model checklist_atividades_os {
   valor_minimo     Decimal?       @map("valor_minimo") @db.Decimal(14, 4)
   valor_maximo     Decimal?       @map("valor_maximo") @db.Decimal(14, 4)
   valor_lido       Decimal?       @map("valor_lido") @db.Decimal(14, 4)
+  /// SN-59: congelado do passo; o item só é marcado com uma foto dele
+  exige_foto       Boolean        @default(false) @map("exige_foto")
   created_at       DateTime       @default(now()) @map("created_at")
   updated_at       DateTime       @updatedAt @map("updated_at")
   ordem_servico    ordens_servico @relation(fields: [os_id], references: [id], onDelete: Cascade)
   tarefa_os        tarefas_os?    @relation(fields: [tarefa_os_id], references: [id], onDelete: SetNull)
+  /// SN-59: as fotos que provam o item
+  anexos           anexos_os[]
 
   @@index([os_id])
   @@index([ordem])
@@ -2311,12 +2317,19 @@ model anexos_os {
   uploaded_by    String?        @map("uploaded_by") @db.VarChar(255)
   uploaded_by_id String?        @map("uploaded_by_id") @db.Char(26)
   deletado_em    DateTime?      @map("deletado_em")
+  /// SN-59: a tarefa ou o item do checklist que o anexo prova; os dois nulos = anexo geral da OS
+  tarefa_os_id      String?        @map("tarefa_os_id")
+  checklist_item_id String?        @map("checklist_item_id")
   ordem_servico  ordens_servico @relation(fields: [os_id], references: [id], onDelete: Cascade)
+  tarefa_os         tarefas_os?              @relation(fields: [tarefa_os_id], references: [id], onDelete: SetNull)
+  checklist_item    checklist_atividades_os? @relation(fields: [checklist_item_id], references: [id], onDelete: SetNull)
 
   @@index([os_id])
   @@index([tipo])
   @@index([uploaded_at])
   @@index([deletado_em])
+  @@index([tarefa_os_id])
+  @@index([checklist_item_id])
   @@map("anexos_os")
 }
 
@@ -2919,6 +2932,8 @@ model sub_instrucoes {
   unidade        String?    @db.VarChar(20)
   valor_minimo   Decimal?   @db.Decimal(14, 4)
   valor_maximo   Decimal?   @db.Decimal(14, 4)
+  /// SN-59: o item da OS só é marcado com uma foto dele
+  exige_foto     Boolean    @default(false)
   created_at     DateTime   @default(now()) @db.Timestamp(0)
   updated_at     DateTime   @updatedAt @db.Timestamp(0)
   instrucao      instrucoes @relation(fields: [instrucao_id], references: [id], onDelete: Cascade)

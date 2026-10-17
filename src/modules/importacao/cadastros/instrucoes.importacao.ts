@@ -135,7 +135,7 @@ export class InstrucoesImportacao implements CadastroImportavel<InstrucaoComList
       ativo: i.ativo,
       // A sequência conta, o número da ordem não: a importação renumera 1..n, e
       // uma ordem antiga com buraco (1, 3, 4) não é mudança de ninguém.
-      passos: passos.map((p) => [p.descricao, p.obrigatoria, p.tempo_estimado, p.tipo, p.unidade, numero(p.valor_minimo), numero(p.valor_maximo)]),
+      passos: passos.map((p) => [p.descricao, p.obrigatoria, p.tempo_estimado, p.tipo, p.unidade, numero(p.valor_minimo), numero(p.valor_maximo), p.exige_foto]),
       // Linha do catálogo: nome, categoria e unidade são cópia do cadastro do
       // recurso, que o service refaz a cada gravação — cópia velha não é
       // mudança de quem importa. Linha livre (antiga): tudo conta.

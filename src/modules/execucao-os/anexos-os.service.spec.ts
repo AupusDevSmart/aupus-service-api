@@ -4,6 +4,7 @@ import { PermissionScopeService, PrismaService } from '@/core';
 import { NotFoundException, BadRequestException, ConflictException } from '@nestjs/common';
 import { TipoAnexoOS } from '@/core';
 import * as fs from 'fs';
+import { conteudoDe } from '../../../test/arquivo-de-teste';
 
 // Mock do módulo fs
 jest.mock('fs');
@@ -43,7 +44,7 @@ describe('AnexosOSService', () => {
     originalname: 'motor_foto.jpg',
     mimetype: 'image/jpeg',
     size: 1024000,
-    buffer: Buffer.from('fake file content'),
+    buffer: conteudoDe('motor.jpg'),
   };
 
   const mockPrismaService = {
@@ -58,7 +59,11 @@ describe('AnexosOSService', () => {
       findFirst: jest.fn(),
       create: jest.fn(),
       update: jest.fn(),
+      count: jest.fn().mockResolvedValue(0),
     },
+    // Excluir roda numa transação (a última foto do item que exige foto, SN-59)
+    $transaction: jest.fn((fn: (tx: unknown) => unknown) => fn(mockPrismaService)),
+    $queryRaw: jest.fn().mockResolvedValue([]),
   };
 
   beforeEach(async () => {
@@ -236,6 +241,7 @@ describe('AnexosOSService', () => {
           ...mockFile,
           originalname: `arquivo.${tipo}`,
           mimetype: `application/${tipo}`,
+          buffer: conteudoDe(`arquivo.${tipo}`),
         };
 
         await expect(service.uploadAnexo(
@@ -373,6 +379,7 @@ describe('AnexosOSService', () => {
           const mockArquivo = {
             ...mockFile,
             originalname: arquivo.nome,
+            buffer: conteudoDe(arquivo.nome),
           };
 
           // A validação interna deve aceitar a extensão
@@ -435,6 +442,7 @@ describe('AnexosOSService', () => {
           const arquivo = {
             ...mockFile,
             originalname: `arquivo.${tipo}`,
+            buffer: conteudoDe(`arquivo.${tipo}`),
           };
 
           await expect(service.uploadAnexo(
@@ -513,13 +521,14 @@ describe('AnexosOSService', () => {
         mime_type: mockAnexoData.mime_type,
         tamanho: Number(mockAnexoData.tamanho),
         descricao: mockAnexoData.descricao,
-        caminho_s3: mockAnexoData.caminho_s3,
         url_download: mockAnexoData.url_download,
         fase_execucao: mockAnexoData.fase_execucao,
         uploaded_at: mockAnexoData.uploaded_at,
         uploaded_by: mockAnexoData.uploaded_by,
         uploaded_by_id: mockAnexoData.uploaded_by_id,
         deletado_em: mockAnexoData.deletado_em,
+        tarefa_os_id: null,
+        checklist_item_id: null,
       });
     });
   });

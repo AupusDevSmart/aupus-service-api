@@ -43,7 +43,8 @@ import { Instalacao, instalacoesDasOrdens } from '../../common/helpers/instalaca
 import { finalizarOrigem, origemDaProgramacao } from '../../common/helpers/status-da-origem';
 import { cancelarOS } from './cancelar-os';
 import { exigirOSAlteravel } from './os-alteravel';
-import { gravacoesDoChecklist, leituraDoItem, pendenciaDaTarefa, travarItensDoChecklist, travarTarefa } from './itens-do-checklist';
+import { fotosDosItens, gravacoesDoChecklist, leituraDoItem, pendenciaDaTarefa, travarItensDoChecklist, travarTarefa } from './itens-do-checklist';
+import { anexoParaResposta } from './anexos-os.service';
 import { variantesDeId, variantesDeIds } from '../tarefas/ids';
 import { devolverViatura } from '../reservas/ocupacao-da-viatura';
 import type { Evento } from '../notificacoes/catalogo';
@@ -894,8 +895,10 @@ export class ExecucaoOSService {
       const ids = await travarItensDoChecklist(prisma, id, dto.atividades.map((a) => a.id));
       const itens = await prisma.checklist_atividades_os.findMany({
         where: { os_id: id, id: { in: ids } },
-        select: { id: true, atividade: true, tipo: true, concluida: true, valor_lido: true, tarefa_os_id: true },
+        select: { id: true, atividade: true, tipo: true, concluida: true, valor_lido: true, tarefa_os_id: true, exige_foto: true },
       });
+      // As fotos dos itens (SN-59): o que exige foto só é marcado com uma
+      const fotos = await fotosDosItens(prisma, id, itens.filter((i) => i.exige_foto).map((i) => i.id));
       const idsDasTarefas = [...new Set(itens.map((i) => i.tarefa_os_id?.trim()).filter((t): t is string => !!t))];
       const tarefas = idsDasTarefas.length
         ? await prisma.tarefas_os.findMany({
@@ -904,7 +907,7 @@ export class ExecucaoOSService {
           })
         : [];
 
-      for (const { id: itemId, data } of gravacoesDoChecklist(dto.atividades, itens, tarefas, { autor, usuarioId })) {
+      for (const { id: itemId, data } of gravacoesDoChecklist(dto.atividades, itens, tarefas, { autor, usuarioId }, fotos)) {
         // updateMany com os_id: item de outra OS não é alterado por engano
         await prisma.checklist_atividades_os.updateMany({ where: { id: itemId, os_id: id }, data });
       }
@@ -1528,6 +1531,7 @@ export class ExecucaoOSService {
             unidade: true,
             valor_minimo: true,
             valor_maximo: true,
+            exige_foto: true,
           },
         })
       : [];
@@ -1578,6 +1582,8 @@ export class ExecucaoOSService {
           unidade: sub.unidade,
           valor_minimo: sub.valor_minimo,
           valor_maximo: sub.valor_maximo,
+          // O item que exige foto só é marcado com uma foto dele (SN-59)
+          exige_foto: sub.exige_foto,
         });
       }
     }
@@ -1997,26 +2003,11 @@ export class ExecucaoOSService {
         concluida_por_id: c.concluida_por_id,
         tarefa_os_id: c.tarefa_os_id ?? null,
         ...leituraDoItem(c),
+        exige_foto: c.exige_foto,
         created_at: c.created_at,
         updated_at: c.updated_at,
       })) || [],
-      anexos: os.anexos?.map((a) => ({
-        id: a.id,
-        os_id: a.os_id,
-        nome: a.nome,
-        nome_original: a.nome_original,
-        tipo: a.tipo,
-        mime_type: a.mime_type,
-        tamanho: Number(a.tamanho),
-        descricao: a.descricao,
-        caminho_s3: a.caminho_s3,
-        url_download: a.url_download,
-        fase_execucao: a.fase_execucao,
-        uploaded_at: a.uploaded_at,
-        uploaded_by: a.uploaded_by,
-        uploaded_by_id: a.uploaded_by_id,
-        deletado_em: a.deletado_em,
-      })) || [],
+      anexos: os.anexos?.map(anexoParaResposta) || [],
       registros_tempo: os.registros_tempo?.map((r) => ({
         id: r.id,
         os_id: r.os_id,

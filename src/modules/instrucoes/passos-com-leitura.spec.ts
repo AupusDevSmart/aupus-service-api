@@ -95,6 +95,23 @@ describe('passo de leitura na instrução (banco real)', () => {
     ]);
   });
 
+  it('o passo pode exigir foto (SN-59); vazio é não', async () => {
+    const atual = (await prisma.instrucoes.findFirstOrThrow({ where: { tag: `${PREFIXO}-1` } })).id;
+
+    await instrucoes.atualizar(
+      atual,
+      await corpo(UpdateInstrucaoDto, {
+        sub_instrucoes: [{ descricao: 'Fotografar o disjuntor', exige_foto: true }, { descricao: 'Limpar' }],
+      }),
+    );
+
+    const lida = await instrucoes.buscarPorId(atual);
+    expect(lida.sub_instrucoes!.map((p) => [p.descricao, p.exige_foto])).toEqual([
+      ['Fotografar o disjuntor', true],
+      ['Limpar', false],
+    ]);
+  });
+
   it('trocar a leitura por verificação na edição tira a unidade e a faixa', async () => {
     const atual = (await prisma.instrucoes.findFirstOrThrow({ where: { tag: `${PREFIXO}-1` } })).id;
 

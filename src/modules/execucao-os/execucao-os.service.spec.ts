@@ -498,7 +498,7 @@ describe('ExecucaoOSService', () => {
       mockPrismaService.ordens_servico.findFirst.mockResolvedValue({ ...mockOSData, status: StatusOS.EM_EXECUCAO });
       mockPrismaService.checklist_atividades_os.updateMany.mockResolvedValue({ count: 1 });
       mockPrismaService.checklist_atividades_os.findMany.mockResolvedValue([
-        { id: checklistDto.atividades[0].id, atividade: 'Item', tipo: 'VERIFICACAO', concluida: false, valor_lido: null, tarefa_os_id: null },
+        { id: checklistDto.atividades[0].id, atividade: 'Item', tipo: 'VERIFICACAO', concluida: false, valor_lido: null, tarefa_os_id: null, exige_foto: false },
       ]);
       mockPrismaService.historico_os.create.mockResolvedValue({});
 
@@ -607,7 +607,7 @@ describe('ExecucaoOSService', () => {
       // A tarefa travada ainda pendente
       // Template (a trava) ou Prisma.Sql (a instalação da OS): o texto está nos dois
       mockPrismaService.$queryRaw.mockImplementation((sql: unknown) =>
-        Promise.resolve(JSON.stringify(sql).includes('FOR UPDATE') ? [{ status: 'PENDENTE' }] : []),
+        Promise.resolve(/FOR (NO KEY )?UPDATE/.test(JSON.stringify(sql)) ? [{ status: 'PENDENTE' }] : []),
       );
       mockPrismaService.tarefas_os.findFirst.mockResolvedValue(mockTarefaData);
       mockPrismaService.tarefas_os.update.mockResolvedValue({});

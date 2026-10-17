@@ -24,6 +24,7 @@ import {
   UpdateDocumentacaoVeiculoDto,
   DocumentacaoVeiculoResponseDto
 } from './dto';
+import { cabecalhosDoDownload } from '@/common/upload/tipo-do-arquivo';
 
 @ApiTags('Documentação de Veículos')
 @Controller('veiculos/:veiculoId/documentacao')
@@ -128,10 +129,9 @@ export class DocumentacaoVeiculosController {
     const documentacao = await this.documentacaoService.buscarPorId(documentacaoId);
 
     const nomeDownload = documentacao.nomeArquivoOriginal || documentacao.nomeArquivo || 'documento';
-    const mimeType = documentacao.mimeType || 'application/octet-stream';
 
-    res.setHeader('Content-Disposition', `attachment; filename="${nomeDownload}"`);
-    res.setHeader('Content-Type', mimeType);
+    // Tipo pela extensão, não o que o cliente declarou no upload (revisão do SN-59)
+    res.set(cabecalhosDoDownload(nomeDownload));
 
     res.sendFile(caminhoArquivo);
   }

@@ -3,6 +3,7 @@ import { ExecucaoOSController } from './execucao-os.controller';
 import { ExecucaoOSService } from './execucao-os.service';
 import { AnexosOSService } from './anexos-os.service';
 import { Response } from 'express';
+import { cabecalhosDoDownload } from '@/common/upload/tipo-do-arquivo';
 import { StreamableFile } from '@nestjs/common';
 import { StatusOS, TipoOS, PrioridadeOS, OrigemOS, CondicaoOS, TipoAnexoOS } from '@/core';
 import {
@@ -394,7 +395,9 @@ describe('ExecucaoOSController', () => {
           tipo,
           dto.descricao,
           dto.fase_execucao,
-          undefined
+          undefined,
+          // SN-59: a tarefa ou o item que o anexo prova
+          { tarefa_os_id: undefined, checklist_item_id: undefined },
         );
         expect(result).toEqual(mockAnexoResponse);
       });
@@ -449,10 +452,9 @@ describe('ExecucaoOSController', () => {
 
         expect(anexosService.buscarAnexo).toHaveBeenCalledWith(id, anexoId, undefined);
         expect(anexosService.obterCaminhoArquivo).toHaveBeenCalledWith(id, anexoId, undefined);
-        expect(mockResponse.set).toHaveBeenCalledWith({
-          'Content-Type': mockAnexoResponse.mime_type,
-          'Content-Disposition': `attachment; filename="${mockAnexoResponse.nome_original}"`,
-        });
+        // Tipo pela extensão do nome, não o mime gravado (revisão do SN-59)
+        expect(mockResponse.set).toHaveBeenCalledWith(cabecalhosDoDownload(mockAnexoResponse.nome_original));
+        expect(mockResponse.set).toHaveBeenCalledWith(expect.objectContaining({ 'Content-Type': 'image/jpeg', 'X-Content-Type-Options': 'nosniff' }));
         expect(result).toBeInstanceOf(StreamableFile);
       });
     });

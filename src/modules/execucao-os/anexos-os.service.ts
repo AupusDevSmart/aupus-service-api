@@ -1,12 +1,46 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException, ConflictException, Logger } from '@nestjs/common';
 import { PermissionScopeService, PrismaService, TipoAnexoOS, anexos_os } from '@/core';
 import { AnexoOSResponseDto } from './dto';
 import { exigirOSAlteravel } from './os-alteravel';
+import { conferirConteudo, extensaoDe, tipoPelaExtensao } from '@/common/upload/tipo-do-arquivo';
 import * as path from 'path';
 import * as fs from 'fs';
 
 /** Quem pede: o usuário do JWT. Sem ele (chamada interna), o escopo não se aplica. */
 export type Solicitante = { id: string; role?: string | null; permissions?: string[] };
+
+/** O que o anexo prova (SN-59). Os dois vazios: o anexo geral da OS. */
+export type DestinoDoAnexo = { tarefa_os_id?: string; checklist_item_id?: string };
+
+/**
+ * A foto que conta para o item que exige foto: imagem, não documento. O mime é
+ * o que o servidor tira da extensão (e confere no conteúdo) ao receber, sempre
+ * em minúscula — o filtro `startsWith` das consultas e este dizem o mesmo.
+ */
+export const PREFIXO_DE_FOTO = 'image/';
+export const ehFoto = (mime: string | null | undefined) => !!mime && mime.startsWith(PREFIXO_DE_FOTO);
+
+/** O anexo como a API devolve, na listagem e dentro da OS (antes o mapa era escrito duas vezes). */
+export function anexoParaResposta(anexo: anexos_os): AnexoOSResponseDto {
+  return {
+    id: anexo.id,
+    os_id: anexo.os_id,
+    nome: anexo.nome,
+    nome_original: anexo.nome_original,
+    tipo: anexo.tipo,
+    mime_type: anexo.mime_type,
+    tamanho: Number(anexo.tamanho),
+    descricao: anexo.descricao,
+    url_download: anexo.url_download,
+    fase_execucao: anexo.fase_execucao,
+    uploaded_at: anexo.uploaded_at,
+    uploaded_by: anexo.uploaded_by,
+    uploaded_by_id: anexo.uploaded_by_id,
+    deletado_em: anexo.deletado_em,
+    tarefa_os_id: anexo.tarefa_os_id?.trim() ?? null,
+    checklist_item_id: anexo.checklist_item_id?.trim() ?? null,
+  };
+}
 
 /**
  * Anexos da OS: as fotos (antes, durante, depois) e os documentos que provam o
@@ -16,6 +50,8 @@ export type Solicitante = { id: string; role?: string | null; permissions?: stri
  */
 @Injectable()
 export class AnexosOSService {
+  private readonly logger = new Logger(AnexosOSService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly scopeService: PermissionScopeService,
@@ -32,6 +68,7 @@ export class AnexosOSService {
     descricao?: string,
     faseExecucao?: string,
     solicitante?: Solicitante,
+    destino: DestinoDoAnexo = {},
   ): Promise<AnexoOSResponseDto> {
     const os = await this.osVisivel(osId, solicitante);
     exigirOSAlteravel(os.status);
@@ -39,28 +76,70 @@ export class AnexosOSService {
       throw new BadRequestException(`Tipo de anexo inválido. Use: ${Object.values(TipoAnexoOS).join(', ')}`);
     }
     this.validarArquivo(file);
+    // O conteúdo tem de ser o da extensão: o PDF renomeado para ".jpg" contava
+    // como foto, e o SVG renomeado para ".png" era o vetor de script
+    conferirConteudo(file.originalname, file.buffer);
+    // Antes de gravar o arquivo: destino de outra OS não deixa arquivo solto no disco
+    const vinculo = await this.destinoNaOS(os.id, destino);
 
+    const autor = await this.nomeDe(solicitante?.id);
     const nomeArquivo = this.gerarNomeUnico(file.originalname);
     const caminhoLocal = await this.salvarArquivoLocal(file, nomeArquivo);
 
+    // O registro falhando, o arquivo sai do disco: antes ficava solto, sem linha
+    // no banco e sem log (texto longo demais numa coluna, a API nova antes do SQL)
     const anexo = await this.prisma.anexos_os.create({
       data: {
         nome: nomeArquivo,
         nome_original: file.originalname,
         tipo,
-        mime_type: file.mimetype,
+        // Pela extensão, não o Content-Type que o cliente declara (revisão do SN-59)
+        mime_type: tipoPelaExtensao(file.originalname),
         tamanho: file.size,
         descricao,
         caminho_s3: caminhoLocal,
         url_download: `/anexos-os/${nomeArquivo}`,
         fase_execucao: faseExecucao ?? os.status,
-        uploaded_by: await this.nomeDe(solicitante?.id),
+        uploaded_by: autor,
         uploaded_by_id: solicitante?.id,
         ordem_servico: { connect: { id: os.id } },
+        ...(vinculo.tarefa_os_id && { tarefa_os: { connect: { id: vinculo.tarefa_os_id } } }),
+        ...(vinculo.checklist_item_id && { checklist_item: { connect: { id: vinculo.checklist_item_id } } }),
       },
+    }).catch((erro: unknown) => {
+      try {
+        fs.unlinkSync(caminhoLocal);
+      } catch (erroAoApagar) {
+        this.logger.error(`Anexo sem registro ficou no disco: ${caminhoLocal}`, erroAoApagar instanceof Error ? erroAoApagar.stack : String(erroAoApagar));
+      }
+      throw erro;
     });
 
-    return this.mapearParaResponse(anexo);
+    return anexoParaResposta(anexo);
+  }
+
+  /**
+   * O destino do anexo, conferido nesta OS: item e tarefa de outra OS são 404.
+   * Do item vem a tarefa dele — a foto do item também é da tarefa, e a tela
+   * agrupa assim; mandar uma tarefa que não é a do item é 400.
+   */
+  private async destinoNaOS(osId: string, destino: DestinoDoAnexo): Promise<{ tarefa_os_id: string | null; checklist_item_id: string | null }> {
+    const itemId = destino.checklist_item_id?.trim() || null;
+    const tarefaId = destino.tarefa_os_id?.trim() || null;
+
+    if (itemId) {
+      const item = await this.prisma.checklist_atividades_os.findFirst({ where: { id: itemId, os_id: osId }, select: { id: true, tarefa_os_id: true } });
+      if (!item) throw new NotFoundException('Item do checklist não encontrado nesta OS');
+      // O id como o banco guarda vai no connect; aparado, só na comparação
+      if (tarefaId && tarefaId !== item.tarefa_os_id?.trim()) throw new BadRequestException('O item do checklist não é dessa tarefa');
+      return { tarefa_os_id: item.tarefa_os_id, checklist_item_id: item.id };
+    }
+    if (tarefaId) {
+      const tarefa = await this.prisma.tarefas_os.findFirst({ where: { id: tarefaId, os_id: osId }, select: { id: true } });
+      if (!tarefa) throw new NotFoundException('Tarefa não encontrada nesta OS');
+      return { tarefa_os_id: tarefa.id, checklist_item_id: null };
+    }
+    return { tarefa_os_id: null, checklist_item_id: null };
   }
 
   async listarAnexosOS(osId: string, solicitante?: Solicitante): Promise<AnexoOSResponseDto[]> {
@@ -71,12 +150,12 @@ export class AnexosOSService {
       orderBy: { uploaded_at: 'desc' },
     });
 
-    return anexos.map((anexo) => this.mapearParaResponse(anexo));
+    return anexos.map(anexoParaResposta);
   }
 
   async buscarAnexo(osId: string, anexoId: string, solicitante?: Solicitante): Promise<AnexoOSResponseDto> {
     const os = await this.osVisivel(osId, solicitante);
-    return this.mapearParaResponse(await this.anexoDaOS(os.id, anexoId));
+    return anexoParaResposta(await this.anexoDaOS(os.id, anexoId));
   }
 
   async removerAnexo(osId: string, anexoId: string, solicitante?: Solicitante): Promise<void> {
@@ -84,14 +163,35 @@ export class AnexosOSService {
     const anexo = await this.anexoDaOS(os.id, anexoId);
     exigirOSAlteravel(os.status);
 
-    await this.prisma.anexos_os.update({
-      where: { id: anexo.id },
-      data: { deletado_em: new Date() },
+    await this.prisma.$transaction(async (tx) => {
+      // A última foto do item marcado que exige foto não sai: o item ficaria
+      // feito sem a prova. O item travado (FOR UPDATE, como no PATCH do
+      // checklist): marcar e excluir ao mesmo tempo esperam um pelo outro
+      if (anexo.checklist_item_id && ehFoto(anexo.mime_type)) {
+        const [item] = await tx.$queryRaw<Array<{ atividade: string; exige_foto: boolean; concluida: boolean }>>`
+          SELECT atividade, exige_foto, concluida FROM checklist_atividades_os
+           WHERE id = ${anexo.checklist_item_id} AND os_id = ${os.id} FOR NO KEY UPDATE`;
+        if (item?.exige_foto && item.concluida) {
+          const outras = await tx.anexos_os.count({
+            where: { checklist_item_id: anexo.checklist_item_id, deletado_em: null, id: { not: anexo.id }, mime_type: { startsWith: PREFIXO_DE_FOTO } },
+          });
+          if (outras === 0) {
+            throw new ConflictException(`Desmarque o item "${item.atividade}" antes de excluir a última foto dele.`);
+          }
+        }
+      }
+
+      await tx.anexos_os.update({
+        where: { id: anexo.id },
+        data: { deletado_em: new Date() },
+      });
     });
   }
 
+  /** O caminho no disco vem do banco: a resposta da API não o leva mais (revisão do SN-59). */
   async obterCaminhoArquivo(osId: string, anexoId: string, solicitante?: Solicitante): Promise<string> {
-    const anexo = await this.buscarAnexo(osId, anexoId, solicitante);
+    const os = await this.osVisivel(osId, solicitante);
+    const anexo = await this.anexoDaOS(os.id, anexoId);
 
     if (!fs.existsSync(anexo.caminho_s3)) {
       throw new NotFoundException('Arquivo não encontrado no sistema de arquivos');
@@ -130,7 +230,7 @@ export class AnexosOSService {
       throw new BadRequestException('Arquivo é obrigatório');
     }
 
-    const extensao = this.extrairExtensao(file.originalname);
+    const extensao = extensaoDe(file.originalname);
     if (!this.TIPOS_PERMITIDOS.includes(extensao)) {
       throw new BadRequestException(
         `Tipo de arquivo não permitido. Tipos aceitos: ${this.TIPOS_PERMITIDOS.join(', ')}`
@@ -144,9 +244,6 @@ export class AnexosOSService {
     }
   }
 
-  private extrairExtensao(nomeArquivo: string): string {
-    return path.extname(nomeArquivo).toLowerCase().substring(1);
-  }
 
   private gerarNomeUnico(nomeOriginal: string): string {
     const timestamp = Date.now();
@@ -169,25 +266,5 @@ export class AnexosOSService {
     fs.writeFileSync(caminhoCompleto, file.buffer);
 
     return caminhoCompleto;
-  }
-
-  private mapearParaResponse(anexo: anexos_os): AnexoOSResponseDto {
-    return {
-      id: anexo.id,
-      os_id: anexo.os_id,
-      nome: anexo.nome,
-      nome_original: anexo.nome_original,
-      tipo: anexo.tipo,
-      mime_type: anexo.mime_type,
-      tamanho: Number(anexo.tamanho),
-      descricao: anexo.descricao,
-      caminho_s3: anexo.caminho_s3,
-      url_download: anexo.url_download,
-      fase_execucao: anexo.fase_execucao,
-      uploaded_at: anexo.uploaded_at,
-      uploaded_by: anexo.uploaded_by,
-      uploaded_by_id: anexo.uploaded_by_id,
-      deletado_em: anexo.deletado_em,
-    };
   }
 }

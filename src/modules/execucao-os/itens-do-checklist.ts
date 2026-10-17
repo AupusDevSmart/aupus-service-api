@@ -2,6 +2,7 @@ import { BadRequestException, ConflictException, NotFoundException } from '@nest
 import type { Prisma, PrismaClient, checklist_atividades_os } from '@prisma/client';
 import { comVirgula, descreverFaixa, foraDaFaixa, numeroOuNulo } from '@/common/helpers/leitura';
 import type { AtividadeChecklistDto } from './dto';
+import { PREFIXO_DE_FOTO } from './anexos-os.service';
 
 /**
  * O checklist da OS durante a execução (SPEC-EXECUCAO-DA-OS e SN-58).
@@ -12,7 +13,8 @@ import type { AtividadeChecklistDto } from './dto';
  * porque o desvio precisa de explicação no relatório.
  */
 
-type ItemGravado = Pick<checklist_atividades_os, 'id' | 'atividade' | 'tipo' | 'concluida' | 'valor_lido' | 'tarefa_os_id'>;
+// `exige_foto` obrigatório: quem esquecer de selecioná-lo não pula a regra da foto calado
+type ItemGravado = Pick<checklist_atividades_os, 'id' | 'atividade' | 'tipo' | 'concluida' | 'valor_lido' | 'tarefa_os_id' | 'exige_foto'>;
 type TarefaDoItem = { id: string; status: string; nome_snapshot: string | null };
 
 type ItemDaTarefa = Pick<
@@ -87,6 +89,8 @@ export function gravacoesDoChecklist(
   itens: ItemGravado[],
   tarefas: TarefaDoItem[],
   quem: { autor: string; usuarioId?: string | null },
+  /** Quantas fotos tem cada item que exige foto (SN-59) */
+  fotos: Map<string, number> = new Map(),
   agora = new Date(),
 ): Array<{ id: string; data: Prisma.checklist_atividades_osUpdateManyMutationInput }> {
   const itemPorId = new Map(itens.map((i) => [i.id.trim(), i]));
@@ -109,6 +113,9 @@ export function gravacoesDoChecklist(
     if (!mudanca) return { id: item.id, data: { observacoes: pedido.observacoes, updated_at: agora } };
 
     const { concluida, valor_lido } = mudanca;
+    if (concluida && item.exige_foto && !fotos.get(item.id.trim())) {
+      throw new ConflictException(`Fotografe o item ${nomeDoItem(item)} antes de marcá-lo.`);
+    }
     const mudou =
       concluida !== item.concluida || (valor_lido !== undefined && valor_lido !== numeroOuNulo(item.valor_lido));
     const carimbo = !mudou
@@ -145,16 +152,34 @@ export async function travarItensDoChecklist(tx: Transacao, osId: string, pedido
      WHERE t.os_id = ${osId}
        AND t.id IN (SELECT c.tarefa_os_id FROM checklist_atividades_os c WHERE c.os_id = ${osId} AND c.id = ANY(${ids}::text[]))
      ORDER BY t.id
-       FOR UPDATE`;
+       FOR NO KEY UPDATE`;
   await tx.$queryRaw`
-    SELECT id FROM checklist_atividades_os WHERE os_id = ${osId} AND id = ANY(${ids}::text[]) ORDER BY id FOR UPDATE`;
+    SELECT id FROM checklist_atividades_os WHERE os_id = ${osId} AND id = ANY(${ids}::text[]) ORDER BY id FOR NO KEY UPDATE`;
   return ids;
+}
+
+/**
+ * Fotos (imagem, não documento) de cada item, sem as excluídas. Lida depois de
+ * travar os itens: a exclusão da foto trava o item antes de contar (anexos-os).
+ */
+export async function fotosDosItens(
+  tx: Pick<PrismaClient, 'anexos_os'>,
+  osId: string,
+  itemIds: string[],
+): Promise<Map<string, number>> {
+  if (itemIds.length === 0) return new Map();
+  const grupos = await tx.anexos_os.groupBy({
+    by: ['checklist_item_id'],
+    where: { os_id: osId, checklist_item_id: { in: itemIds }, deletado_em: null, mime_type: { startsWith: PREFIXO_DE_FOTO } },
+    _count: { _all: true },
+  });
+  return new Map(grupos.map((g) => [g.checklist_item_id!.trim(), g._count._all]));
 }
 
 /** Trava a tarefa da OS e devolve o status dela no momento (ou null, se não é desta OS). */
 export async function travarTarefa(tx: Transacao, osId: string, tarefaOsId: string): Promise<string | null> {
   const [linha] = await tx.$queryRaw<Array<{ status: string }>>`
-    SELECT status FROM tarefas_os WHERE id = ${tarefaOsId} AND os_id = ${osId} FOR UPDATE`;
+    SELECT status FROM tarefas_os WHERE id = ${tarefaOsId} AND os_id = ${osId} FOR NO KEY UPDATE`;
   return linha?.status ?? null;
 }
 

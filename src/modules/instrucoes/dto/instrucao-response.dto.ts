@@ -23,6 +23,8 @@ export class SubInstrucaoResponseDto {
   ordem?: number;
   /** SN-58: VERIFICACAO ou LEITURA; unidade e faixa só na leitura */
   tipo: string;
+  /** SN-59: o item da OS só é marcado com uma foto dele */
+  exige_foto: boolean;
   unidade?: string | null;
   valor_minimo?: number | null;
   valor_maximo?: number | null;

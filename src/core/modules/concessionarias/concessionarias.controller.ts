@@ -28,6 +28,7 @@ import {
 } from './dto';
 import { Response } from 'express';
 import * as fs from 'fs';
+import { cabecalhosDoDownload } from '@/common/upload/tipo-do-arquivo';
 
 @ApiTags('Concessionárias')
 @Controller('concessionarias')
@@ -166,8 +167,8 @@ export class ConcessionariasController {
 
     // Configurar headers para download
     res.set({
-      'Content-Type': anexo.mime_type,
-      'Content-Disposition': `attachment; filename="${anexo.nome_original}"`,
+      // Tipo pela extensão, não o que o cliente declarou no upload (revisão do SN-59)
+      ...cabecalhosDoDownload(anexo.nome_original),
       'Content-Length': anexo.tamanho.toString(),
     });
 

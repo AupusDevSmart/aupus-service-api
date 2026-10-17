@@ -463,7 +463,20 @@ export class CancelarOSDto {
   observacoes?: string;
 }
 
+/** Onde o anexo prova alguma coisa (SN-59): sem os dois, é o anexo geral da OS */
 export class AdicionarAnexoDto {
+  @ApiPropertyOptional({ description: 'A tarefa da OS que o anexo prova (tarefas_os.id)' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(30)
+  tarefa_os_id?: string;
+
+  @ApiPropertyOptional({ description: 'O item do checklist que o anexo prova; a tarefa vem dele' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(30)
+  checklist_item_id?: string;
+
   @ApiPropertyOptional({ description: 'Descrição do anexo' })
   @IsOptional()
   @IsString()
@@ -472,5 +485,7 @@ export class AdicionarAnexoDto {
   @ApiPropertyOptional({ description: 'Fase da execução', enum: ['antes', 'durante', 'depois'] })
   @IsOptional()
   @IsString()
+  // A coluna é VarChar(50): passando, o create dava 500 com o arquivo já no disco
+  @MaxLength(50)
   fase_execucao?: string;
 }

@@ -5,6 +5,7 @@ import { ExecucaoOSService } from './execucao-os.service';
 import { AnexosOSService } from './anexos-os.service';
 import { ProgramacaoOSService } from '../programacao-os/programacao-os.service';
 import { criarPlantaDeTeste } from '../../../test/planta-de-teste';
+import { arquivoDeTeste } from '../../../test/arquivo-de-teste';
 
 /**
  * A OS como registro: o que entra nela (anexos, consumo de material, uso de
@@ -33,12 +34,9 @@ describe('trava e anexos da OS (banco real)', () => {
   const arquivosCriados: string[] = [];
   let planta: Awaited<ReturnType<typeof criarPlantaDeTeste>>;
 
-  const foto = (nome = 'mancal.jpg') => ({
-    originalname: nome,
-    mimetype: 'image/jpeg',
-    size: 4,
-    buffer: Buffer.from('jpeg'),
-  });
+  const foto = (nome = 'mancal.jpg') => arquivoDeTeste(nome, 'image/jpeg');
+  // O caminho no disco não está mais na resposta (revisão do SN-59): vem do banco
+  const caminhoDe = async (anexoId: string) => (await prisma.anexos_os.findUniqueOrThrow({ where: { id: anexoId } })).caminho_s3;
 
   const limpar = async () => {
     const progs = await prisma.programacoes_os.findMany({ where: { descricao: { startsWith: PREFIXO } }, select: { id: true } });
@@ -100,7 +98,7 @@ describe('trava e anexos da OS (banco real)', () => {
 
   const enviar = async (osId: string, tipo: TipoAnexoOS = TipoAnexoOS.FOTO_ANTES, nome?: string) => {
     const anexo = await anexos.uploadAnexo(osId, foto(nome), tipo, 'Antes da troca', undefined, autor);
-    arquivosCriados.push(anexo.caminho_s3);
+    arquivosCriados.push(await caminhoDe(anexo.id));
     return anexo;
   };
 
@@ -210,7 +208,7 @@ describe('trava e anexos da OS (banco real)', () => {
       await anexos.removerAnexo(osId, anexo.id, autor);
 
       expect(await anexos.listarAnexosOS(osId, autor)).toHaveLength(0);
-      expect(fs.existsSync(anexo.caminho_s3)).toBe(true);
+      expect(fs.existsSync(await caminhoDe(anexo.id))).toBe(true);
     });
 
     it('o anexo de uma OS não é encontrado pela outra', async () => {
