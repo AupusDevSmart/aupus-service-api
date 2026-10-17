@@ -47,10 +47,15 @@ export async function cancelarOS(
 
   const autor = await nomeDoAutor(tx, dados.usuarioId);
 
-  await tx.ordens_servico.update({
-    where: { id: os.id },
+  // Com a trava do status: cancelar junto com o finalizar esperava o commit e
+  // sobrescrevia a FINALIZADA (a OS cancelada ficava com o código gravado)
+  const cancelada = await tx.ordens_servico.updateMany({
+    where: { id: os.id, status: { notIn: ['FINALIZADA', 'CANCELADA'] } },
     data: { status: 'CANCELADA', motivo_cancelamento: dados.motivo },
   });
+  if (cancelada.count === 0) {
+    throw new ConflictException('A OS foi finalizada ou cancelada agora há pouco: recarregue a tela.');
+  }
 
   // A reserva pode estar só na programação (aprovação antiga que não a
   // vinculou à OS): as duas são lidas, senão a viatura ficava presa.

@@ -169,6 +169,9 @@ const ADMINISTRAM = ['admin', 'super_admin'];
 const JORNADAS: [string, string, string[]][] = [
   ['ver o painel', 'GET /dashboard/manutencao', TODOS],
   ['ver uma OS (e baixar o PDF)', 'GET /execucao-os/:id', TODOS],
+  // SN-62: o conteúdo do PDF e a conferência do código — o cliente baixa e confere os da planta dele
+  ['baixar o PDF da OS', 'GET /execucao-os/:id/relatorio', TODOS],
+  ['conferir o código do PDF', 'GET /execucao-os/conferencia', TODOS],
   ['iniciar a OS', 'PATCH /execucao-os/:id/iniciar', EXECUTAM],
   ['marcar o checklist', 'PATCH /execucao-os/:id/checklist', EXECUTAM],
   ['anexar foto na OS', 'POST /execucao-os/:id/anexos', EXECUTAM],

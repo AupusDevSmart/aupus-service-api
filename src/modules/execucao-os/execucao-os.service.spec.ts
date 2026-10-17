@@ -1,5 +1,14 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { ExecucaoOSService } from './execucao-os.service';
+
+// O conteudo e o codigo da OS finalizada (SN-62) leem o banco inteiro da OS: a
+// conta de verdade esta em verificacao-da-os.spec.ts, contra o Postgres
+jest.mock('./verificacao-da-os', () => ({
+  ...jest.requireActual('./verificacao-da-os'),
+  // Devolve os anexos sem arquivo no disco (nenhum)
+  gravarCodigoDeVerificacao: jest.fn().mockResolvedValue([]),
+  somasDosAnexosSemSoma: jest.fn().mockResolvedValue(new Map()),
+}));
 import { PrismaService, PermissionScopeService } from '@/core';
 import { NotFoundException, ConflictException } from '@nestjs/common';
 import { StatusOS, CondicaoOS, TipoOS, PrioridadeOS, OrigemOS } from '@/core';
@@ -72,6 +81,8 @@ describe('ExecucaoOSService', () => {
       findUnique: jest.fn(),
       create: jest.fn(),
       update: jest.fn(),
+      // O executar e o finalizar conferem o status na gravacao (count 0 = 409)
+      updateMany: jest.fn().mockResolvedValue({ count: 1 }),
       count: jest.fn(),
       groupBy: jest.fn(),
     },
@@ -165,7 +176,12 @@ describe('ExecucaoOSService', () => {
      * quatro origens e precisa de UNION com DISTINCT, que o Prisma nao
      * expressa. Sem o mock, `listar` e `buscarPorId` derrubavam a suite.
      */
-    $queryRaw: jest.fn().mockResolvedValue([]),
+    // A OS travada (FOR SHARE, SN-62) devolve o status dela; o resto, nada
+    $queryRaw: jest.fn((sql: unknown) =>
+      Promise.resolve(JSON.stringify(sql).includes('FOR SHARE') ? [{ status: 'EM_EXECUCAO' }] : []),
+    ),
+    // As somas dos anexos de antes do SN-62, lidas antes da transação do finalizar
+    anexos_os: { findMany: jest.fn().mockResolvedValue([]) },
   };
 
   beforeEach(async () => {
@@ -308,6 +324,8 @@ describe('ExecucaoOSService', () => {
           id: 'clrx1234567890123456789012',
           deletado_em: null,
         },
+        // O conteúdo da finalização (JSONB) só serve ao relatório e à conferência
+        omit: { conteudo_finalizado: true },
         include: expect.any(Object),
       });
 
@@ -725,8 +743,8 @@ describe('ExecucaoOSService', () => {
 
       await service.finalizar('clrx1234567890123456789012', finalizarDto, 'user123');
 
-      expect(mockPrismaService.ordens_servico.update).toHaveBeenCalledWith({
-        where: { id: 'clrx1234567890123456789012' },
+      expect(mockPrismaService.ordens_servico.updateMany).toHaveBeenCalledWith({
+        where: { id: 'clrx1234567890123456789012', status: StatusOS.AUDITADA },
         data: expect.objectContaining({
           status: StatusOS.FINALIZADA,
           finalizado_por_id: 'user123',
@@ -830,8 +848,9 @@ describe('ExecucaoOSService', () => {
 
       await service.cancelar('clrx1234567890123456789012', cancelarDto, 'user123');
 
-      expect(mockPrismaService.ordens_servico.update).toHaveBeenCalledWith({
-        where: { id: 'clrx1234567890123456789012' },
+      // Com a trava do status: cancelar junto com o finalizar sobrescrevia a FINALIZADA
+      expect(mockPrismaService.ordens_servico.updateMany).toHaveBeenCalledWith({
+        where: { id: 'clrx1234567890123456789012', status: { notIn: ['FINALIZADA', 'CANCELADA'] } },
         data: {
           status: StatusOS.CANCELADA,
           motivo_cancelamento: cancelarDto.motivo_cancelamento,
@@ -894,7 +913,7 @@ describe('ExecucaoOSService', () => {
   });
 
   describe('métodos auxiliares', () => {
-    describe('calcularTempoExecucao', () => {
+    describe('finalizar com e sem início', () => {
       it('deve finalizar OS auditada com tempo de execução', async () => {
         const finalizarDto: FinalizarOSDto = {
           observacoes: 'Concluído',
@@ -924,8 +943,8 @@ describe('ExecucaoOSService', () => {
 
         await service.finalizar('clrx1234567890123456789012', finalizarDto, 'user123');
 
-        expect(mockPrismaService.ordens_servico.update).toHaveBeenCalledWith({
-          where: { id: 'clrx1234567890123456789012' },
+        expect(mockPrismaService.ordens_servico.updateMany).toHaveBeenCalledWith({
+          where: { id: 'clrx1234567890123456789012', status: StatusOS.AUDITADA },
           data: expect.objectContaining({
             status: 'FINALIZADA',
           }),
@@ -961,8 +980,8 @@ describe('ExecucaoOSService', () => {
 
         await service.finalizar('clrx1234567890123456789012', finalizarDto, 'user123');
 
-        expect(mockPrismaService.ordens_servico.update).toHaveBeenCalledWith({
-          where: { id: 'clrx1234567890123456789012' },
+        expect(mockPrismaService.ordens_servico.updateMany).toHaveBeenCalledWith({
+          where: { id: 'clrx1234567890123456789012', status: StatusOS.AUDITADA },
           data: expect.objectContaining({
             status: 'FINALIZADA',
           }),
@@ -970,8 +989,8 @@ describe('ExecucaoOSService', () => {
       });
     });
 
-    describe('calcularCustoReal', () => {
-      it('deve calcular custo real incluindo materiais e técnicos', async () => {
+    describe('finalizar grava quem finalizou', () => {
+      it('com o id de quem finalizou', async () => {
         const finalizarDto: FinalizarOSDto = {
           observacoes: 'Concluído',
         };
@@ -999,8 +1018,8 @@ describe('ExecucaoOSService', () => {
 
         await service.finalizar('clrx1234567890123456789012', finalizarDto, 'user123');
 
-        expect(mockPrismaService.ordens_servico.update).toHaveBeenCalledWith({
-          where: { id: 'clrx1234567890123456789012' },
+        expect(mockPrismaService.ordens_servico.updateMany).toHaveBeenCalledWith({
+          where: { id: 'clrx1234567890123456789012', status: StatusOS.AUDITADA },
           data: expect.objectContaining({
             status: 'FINALIZADA',
             finalizado_por_id: 'user123',

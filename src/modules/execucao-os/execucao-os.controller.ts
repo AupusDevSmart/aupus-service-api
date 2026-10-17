@@ -9,11 +9,14 @@ import {
   Query,
   HttpStatus,
   UseInterceptors,
+  UseGuards,
   UploadedFile,
   Res,
   StreamableFile,
 } from '@nestjs/common';
 import { CurrentUser, Permissions } from '@/core';
+import { SkipThrottle, Throttle, ThrottlerGuard } from '@nestjs/throttler';
+import { LIMITE_DO_PDF_DA_OS, SEM_CONTADOR_DE_EMAIL } from '@/core/modules/auth/limite-de-tentativas';
 import {
   ApiTags,
   ApiOperation,
@@ -26,6 +29,7 @@ import { FileInterceptor } from '@nestjs/platform-express';
 import { Response } from 'express';
 import { ExecucaoOSService } from './execucao-os.service';
 import type { PessoasDaOS } from './horas-da-execucao';
+import type { ConferenciaDoCodigo, RelatorioDaOS } from './verificacao-da-os';
 import { AnexosOSService, type Solicitante } from './anexos-os.service';
 import {
   OSFiltersDto,
@@ -83,6 +87,21 @@ export class ExecucaoOSController {
   @ApiQuery({ name: 'atrasadas', required: false, description: 'Filtrar apenas OS atrasadas' })
   async listar(@Query() filters: OSFiltersDto, @CurrentUser() user?: Solicitante): Promise<ListarOSResponseDto> {
     return this.execucaoOSService.listar(filters, user);
+  }
+
+  // Antes de ':id': senão "conferencia" seria lido como o id de uma OS
+  @Get('conferencia')
+  @UseGuards(ThrottlerGuard)
+  @Throttle(LIMITE_DO_PDF_DA_OS)
+  @SkipThrottle(SEM_CONTADOR_DE_EMAIL)
+  @ApiOperation({
+    summary: 'Conferir o código de verificação do PDF',
+    description:
+      'Leva à OS finalizada que tem o código e refaz a conta sobre o conteúdo de agora: confere se nada mudou desde a finalização; senão diz em quê (SN-62). Fora do escopo, o código não é encontrado.',
+  })
+  @ApiQuery({ name: 'codigo', required: true, description: 'O código do PDF (64 caracteres; espaços e traços são ignorados)' })
+  async conferir(@Query('codigo') codigo: string, @CurrentUser() user?: Solicitante): Promise<ConferenciaDoCodigo> {
+    return this.execucaoOSService.conferirCodigo(codigo ?? '', user);
   }
 
   @Get(':id')
@@ -520,19 +539,21 @@ export class ExecucaoOSController {
   }
 
   @Get(':id/relatorio')
+  @UseGuards(ThrottlerGuard)
+  @Throttle(LIMITE_DO_PDF_DA_OS)
+  @SkipThrottle(SEM_CONTADOR_DE_EMAIL)
   @ApiOperation({
-    summary: 'Gerar relatório de execução',
-    description: 'Gera relatório completo da execução da OS',
+    summary: 'Conteúdo do PDF da OS',
+    description:
+      'A partir de executada. Finalizada: o conteúdo gravado na finalização e o código de verificação (SN-62). Antes disso, o conteúdo de agora, como prévia, sem código.',
   })
   @ApiParam({ name: 'id', description: 'ID da OS' })
   @ApiResponse({
     status: HttpStatus.OK,
     description: 'Relatório gerado',
   })
-  async gerarRelatorio(@Param('id') id: string, @CurrentUser() user?: Solicitante) {
-    // TODO: Implementar geração de relatório PDF
-    // Com o escopo de quem pede: sem ele, a rota dizia se a OS de outra planta existe
-    await this.execucaoOSService.buscarPorId(id.trim(), user);
-    return { message: 'Relatório em desenvolvimento', os_id: id.trim() };
+  async gerarRelatorio(@Param('id') id: string, @CurrentUser() user?: Solicitante): Promise<RelatorioDaOS> {
+    // O conteúdo do PDF (SN-62): o finalizado, com o código; antes, a prévia. O PDF é montado no navegador
+    return this.execucaoOSService.relatorio(id.trim(), user);
   }
 }

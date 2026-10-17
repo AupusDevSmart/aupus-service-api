@@ -630,6 +630,12 @@ export class OrdemServicoResponseDto {
   @ApiPropertyOptional({ description: 'Minutos parado (retorno menos parada)', nullable: true })
   minutos_parado?: number | null;
 
+  @ApiPropertyOptional({ description: 'Quando a OS foi finalizada (SN-62)', nullable: true })
+  finalizada_em?: Date | null;
+
+  @ApiPropertyOptional({ description: 'SHA-256 do conteúdo gravado na finalização, impresso no PDF (SN-62)', nullable: true })
+  codigo_verificacao?: string | null;
+
   @ApiPropertyOptional({ description: 'HH real: soma das horas trabalhadas registradas (null enquanto ninguém registrou)', nullable: true })
   hh_real?: number | null;
 

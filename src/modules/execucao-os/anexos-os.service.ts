@@ -1,7 +1,8 @@
 import { Injectable, NotFoundException, BadRequestException, ConflictException, Logger } from '@nestjs/common';
 import { PermissionScopeService, PrismaService, TipoAnexoOS, anexos_os } from '@/core';
 import { AnexoOSResponseDto } from './dto';
-import { exigirOSAlteravel } from './os-alteravel';
+import { createHash } from 'node:crypto';
+import { exigirOSAlteravel, travarOSAlteravel } from './os-alteravel';
 import { conferirConteudo, extensaoDe, tipoPelaExtensao } from '@/common/upload/tipo-do-arquivo';
 import * as path from 'path';
 import * as fs from 'fs';
@@ -87,8 +88,12 @@ export class AnexosOSService {
     const caminhoLocal = await this.salvarArquivoLocal(file, nomeArquivo);
 
     // O registro falhando, o arquivo sai do disco: antes ficava solto, sem linha
-    // no banco e sem log (texto longo demais numa coluna, a API nova antes do SQL)
-    const anexo = await this.prisma.anexos_os.create({
+    // no banco e sem log (texto longo demais numa coluna, a API nova antes do SQL).
+    // Com a OS travada e o status conferido de novo: o finalizar no meio deixava
+    // o anexo fora do conteúdo que o código de verificação prova (SN-62)
+    const anexo = await this.prisma.$transaction(async (tx) => {
+      await travarOSAlteravel(tx, os.id);
+      return tx.anexos_os.create({
       data: {
         nome: nomeArquivo,
         nome_original: file.originalname,
@@ -102,10 +107,14 @@ export class AnexosOSService {
         fase_execucao: faseExecucao ?? os.status,
         uploaded_by: autor,
         uploaded_by_id: solicitante?.id,
+        // SN-62: a soma do arquivo, do buffer que acabou de ser gravado. O finalizar
+        // e o PDF usam esta; só a conferência relê o disco
+        sha256: createHash('sha256').update(file.buffer).digest('hex'),
         ordem_servico: { connect: { id: os.id } },
         ...(vinculo.tarefa_os_id && { tarefa_os: { connect: { id: vinculo.tarefa_os_id } } }),
         ...(vinculo.checklist_item_id && { checklist_item: { connect: { id: vinculo.checklist_item_id } } }),
       },
+      });
     }).catch((erro: unknown) => {
       try {
         fs.unlinkSync(caminhoLocal);
@@ -164,6 +173,9 @@ export class AnexosOSService {
     exigirOSAlteravel(os.status);
 
     await this.prisma.$transaction(async (tx) => {
+      // A OS primeiro (SN-62): excluir durante o finalizar tirava o anexo depois
+      // de ele entrar no conteúdo
+      await travarOSAlteravel(tx, os.id);
       // A última foto do item marcado que exige foto não sai: o item ficaria
       // feito sem a prova. O item travado (FOR UPDATE, como no PATCH do
       // checklist): marcar e excluir ao mesmo tempo esperam um pelo outro

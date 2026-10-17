@@ -76,6 +76,20 @@ export const LIMITE_DE_COMENTARIOS = {
   ip: { limit: 120, ttl: MINUTO },
 };
 
+/**
+ * O PDF e a conferência do código da OS (SN-62): cada pedido relê a OS inteira
+ * e a conferência soma os arquivos do disco. 10 por minuto por pessoa é folga
+ * para quem baixa e confere, e trava o laço que pesaria no disco de todos.
+ */
+export const LIMITE_DO_PDF_DA_OS = {
+  conta: {
+    limit: 10,
+    ttl: MINUTO,
+    getTracker: (req: Record<string, unknown>) => `pdf-da-os|${String((req.user as { id?: unknown } | undefined)?.id ?? '').trim()}`,
+  },
+  ip: { limit: 60, ttl: MINUTO },
+};
+
 /** Redefinir com o token do e-mail: 5 a cada 10 minutos por conta. */
 export const LIMITE_DA_REDEFINICAO = { conta: { limit: 5, ttl: 10 * MINUTO }, ip: { limit: 10, ttl: 10 * MINUTO } };
 

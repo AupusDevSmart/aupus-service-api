@@ -2054,6 +2054,11 @@ model ordens_servico {
   falha_sintoma                String?                   @map("falha_sintoma")
   falha_causa                  String?                   @map("falha_causa")
   falha_acao                   String?                   @map("falha_acao")
+  /// SN-62: a finalização grava o conteúdo registrado e o SHA-256 dele; conferir
+  /// refaz a conta sobre o que está no sistema e diz se ainda é o mesmo
+  finalizada_em                DateTime?                 @map("finalizada_em") @db.Timestamp(0)
+  codigo_verificacao           String?                   @unique @map("codigo_verificacao") @db.Char(64)
+  conteudo_finalizado          Json?                     @map("conteudo_finalizado")
   anexos                       anexos_os[]
   checklist_atividades         checklist_atividades_os[]
   comentarios                  comentarios_os[]
@@ -2324,6 +2329,9 @@ model anexos_os {
   uploaded_by    String?        @map("uploaded_by") @db.VarChar(255)
   uploaded_by_id String?        @map("uploaded_by_id") @db.Char(26)
   deletado_em    DateTime?      @map("deletado_em")
+  /// SN-62: o SHA-256 do arquivo, calculado no upload (o arquivo nunca é
+  /// sobrescrito). Finalizar e o PDF usam este; conferir relê o disco
+  sha256         String?        @db.Char(64)
   /// SN-59: a tarefa ou o item do checklist que o anexo prova; os dois nulos = anexo geral da OS
   tarefa_os_id      String?        @map("tarefa_os_id")
   checklist_item_id String?        @map("checklist_item_id")

@@ -63,7 +63,10 @@ describe('AnexosOSService', () => {
     },
     // Excluir roda numa transação (a última foto do item que exige foto, SN-59)
     $transaction: jest.fn((fn: (tx: unknown) => unknown) => fn(mockPrismaService)),
-    $queryRaw: jest.fn().mockResolvedValue([]),
+    // A OS travada (FOR SHARE) devolve o status dela; as outras consultas, nada
+    $queryRaw: jest.fn((sql: unknown) =>
+      Promise.resolve(/FROM ordens_servico[\s\S]*FOR SHARE/.test(JSON.stringify(sql)) ? [{ status: 'EM_EXECUCAO' }] : []),
+    ),
   };
 
   beforeEach(async () => {
@@ -136,6 +139,8 @@ describe('AnexosOSService', () => {
           fase_execucao: 'antes',
           uploaded_by: 'João Silva',
           uploaded_by_id: 'user123',
+          // SN-62: a soma do arquivo, gravada no upload
+          sha256: expect.stringMatching(/^[0-9a-f]{64}$/),
         }),
       });
 

@@ -43,9 +43,10 @@ import { gerarNumeroOS } from '../../common/helpers/numeracao-os';
 import { Instalacao, instalacoesDasOrdens } from '../../common/helpers/instalacao-da-os';
 import { finalizarOrigem, origemDaProgramacao } from '../../common/helpers/status-da-origem';
 import { cancelarOS } from './cancelar-os';
-import { exigirOSAlteravel } from './os-alteravel';
+import { exigirOSAlteravel, travarOSAlteravel } from './os-alteravel';
 import { dadosDaOS, dadosDeFalha, equipamentoDaCorretiva, minutosParado, mudancasNaFalha } from './dados-de-falha';
 import { MARCOS_DO_TEMPO, emCentavos, gravacaoDasHoras, horasDaEquipe, minutosEfetivos } from './horas-da-execucao';
+import { conferirCodigo, gravarCodigoDeVerificacao, relatorioDaOS, somasDosAnexosSemSoma, type ConferenciaDoCodigo, type RelatorioDaOS } from './verificacao-da-os';
 import { pessoasQuePodemAtuar } from '@/modules/programacao-os/pessoas-da-os';
 import type { PessoasDaOS } from './horas-da-execucao';
 import { fotosDosItens, gravacoesDoChecklist, leituraDoItem, pendenciaDaTarefa, travarItensDoChecklist, travarTarefa } from './itens-do-checklist';
@@ -80,7 +81,7 @@ type ReservaDaOS = reserva_veiculo & { veiculo: Pick<veiculo, 'id' | 'placa' | '
  * A OS como `mapearParaResponse` a lê. A listagem e o detalhe incluem relações
  * diferentes; o tipo é o que as duas têm em comum.
  */
-type OSParaResposta = ordens_servico & {
+type OSParaResposta = Omit<ordens_servico, 'conteudo_finalizado'> & {
   tarefas_os?: Array<
     tarefas_os & {
       tarefa?: {
@@ -105,6 +106,7 @@ type OSParaResposta = ordens_servico & {
 
 /** A OS com tudo o que `buscarPorId` inclui */
 type OSComDetalhes = Prisma.ordens_servicoGetPayload<{
+  omit: { conteudo_finalizado: true };
   include: {
     programacao: {
       include: {
@@ -278,6 +280,8 @@ export class ExecucaoOSService {
     // Buscar dados
     const ordens = await this.prisma.ordens_servico.findMany({
       where,
+      // O conteúdo da finalização (JSONB, dezenas de kB) só serve ao relatório e à conferência
+      omit: { conteudo_finalizado: true },
       include: {
         tarefas_os: {
           include: {
@@ -418,6 +422,7 @@ export class ExecucaoOSService {
         id,
         deletado_em: null,
       },
+      omit: { conteudo_finalizado: true },
       include: {
         programacao: {
           include: {
@@ -949,6 +954,8 @@ export class ExecucaoOSService {
     exigirOSAlteravel(os.status);
 
     await this.prisma.$transaction(async (prisma) => {
+      // SN-62: gravado durante o finalizar, ficava fora do conteúdo da OS finalizada
+      await travarOSAlteravel(prisma, id);
       for (const material of dto.materiais) {
         // updateMany com os_id: o id de um material de outra OS não altera aquela OS
         const { count } = await prisma.materiais_os.updateMany({
@@ -979,6 +986,7 @@ export class ExecucaoOSService {
     exigirOSAlteravel(os.status);
 
     await this.prisma.$transaction(async (prisma) => {
+      await travarOSAlteravel(prisma, id);
       for (const ferramenta of dto.ferramentas) {
         const { count } = await prisma.ferramentas_os.updateMany({
           where: { id: ferramenta.id, os_id: id },
@@ -1353,8 +1361,9 @@ export class ExecucaoOSService {
     }
 
     await this.prisma.$transaction(async (prisma) => {
-      await prisma.ordens_servico.update({
-        where: { id },
+      // O status conferido na gravação (como no executar e no finalizar)
+      const auditada = await prisma.ordens_servico.updateMany({
+        where: { id, status: StatusOS.EXECUTADA },
         data: {
           status: StatusOS.AUDITADA,
           avaliacao_qualidade: dto.avaliacao_qualidade,
@@ -1364,6 +1373,9 @@ export class ExecucaoOSService {
           data_aprovacao: new Date(),
         },
       });
+      if (auditada.count === 0) {
+        throw new ConflictException('A OS já não está executada (auditada por outra pessoa agora há pouco?): recarregue a tela.');
+      }
 
       await this.registrarHistorico(
         prisma,
@@ -1387,13 +1399,18 @@ export class ExecucaoOSService {
     }
 
     await this.prisma.$transaction(async (prisma) => {
-      await prisma.ordens_servico.update({
-        where: { id },
+      // Com a trava do status: reabrir junto com o finalizar esperava o commit e
+      // sobrescrevia a FINALIZADA, deixando a OS em execução com o código gravado
+      const reaberta = await prisma.ordens_servico.updateMany({
+        where: { id, status: StatusOS.AUDITADA },
         data: {
           status: StatusOS.EM_EXECUCAO,
           data_hora_fim_real: null,
         },
       });
+      if (reaberta.count === 0) {
+        throw new ConflictException('A OS já não está auditada (finalizada ou reaberta agora há pouco?): recarregue a tela.');
+      }
 
       await this.registrarHistorico(
         prisma,
@@ -1429,15 +1446,26 @@ export class ExecucaoOSService {
       }
     }
 
+    // Os anexos de antes do SN-62 não têm a soma gravada: lidos do disco aqui,
+    // fora da transação (que segura a OS, a programação, a origem e as tarefas)
+    const somasAntigas = await somasDosAnexosSemSoma(this.prisma, id);
+
     await this.prisma.$transaction(async (prisma) => {
-      await prisma.ordens_servico.update({
-        where: { id },
+      // O status conferido na gravação: dois "Finalizar" juntos passavam os
+      // dois e contavam a execução de cada tarefa duas vezes no plano
+      const finalizada = await prisma.ordens_servico.updateMany({
+        where: { id, status: StatusOS.AUDITADA },
         data: {
           status: StatusOS.FINALIZADA,
           finalizado_por: nomeFinalizador,
           finalizado_por_id: usuarioId,
+          // No segundo, para baixo: a coluna é TIMESTAMP(0) e arredondaria
+          finalizada_em: new Date(Math.floor(Date.now() / 1000) * 1000),
         },
       });
+      if (finalizada.count === 0) {
+        throw new ConflictException('A OS já não está auditada (finalizada por outra pessoa agora há pouco?): recarregue a tela.');
+      }
 
       await this.registrarHistorico(
         prisma,
@@ -1511,9 +1539,37 @@ export class ExecucaoOSService {
         where: { os_id: id, tarefa_id: { not: null } },
       });
 
+      // SN-62: o conteúdo registrado e o código dele, por último — depois de
+      // tudo o que a finalização grava na OS. É dele que sai o PDF
+      const semArquivo = await gravarCodigoDeVerificacao(prisma, id, somasAntigas);
+      // Arquivo que não estava no disco fica no conteúdo sem soma: a trilha diz qual
+      if (semArquivo.length > 0) {
+        await this.registrarHistorico(
+          prisma, id, 'ANEXO_SEM_ARQUIVO', 'Sistema', usuarioId,
+          `Finalizada com anexo sem arquivo no servidor (sem soma no código de verificação): ${semArquivo.join(', ')}`,
+        );
+      }
+
       this.logger.log(
         `OS ${id} finalizada: ${tarefasConcluidas.length} de ${totalVinculos} tarefas concluídas tiveram a execução registrada`,
       );
+    }, {
+      // No toque duplo o segundo espera a trava da OS no próprio relógio
+      timeout: 15000,
+      maxWait: 15000,
+    });
+  }
+
+  /** O conteúdo do PDF da OS (SN-62): o finalizado, com o código; antes de finalizar, o de agora, como prévia. */
+  async relatorio(id: string, user?: ScopedUser): Promise<RelatorioDaOS> {
+    if (user) await this.scopeService.assertEntityInScope('ordem_servico', id, user);
+    return relatorioDaOS(this.prisma, id);
+  }
+
+  /** Confere um código de verificação: a OS dele, e se o conteúdo de agora ainda é o finalizado. */
+  async conferirCodigo(codigo: string, user?: ScopedUser): Promise<ConferenciaDoCodigo> {
+    return conferirCodigo(this.prisma, codigo, async (osId) => {
+      if (user) await this.scopeService.assertEntityInScope('ordem_servico', osId, user);
     });
   }
 
@@ -1990,6 +2046,9 @@ export class ExecucaoOSService {
       programado_por_id: os.programado_por_id,
       finalizado_por: os.finalizado_por,
       finalizado_por_id: os.finalizado_por_id,
+      // SN-62: quando foi finalizada e o código do PDF (o conteúdo vem pelo relatório)
+      finalizada_em: os.finalizada_em,
+      codigo_verificacao: os.codigo_verificacao?.trim() || null,
       aprovado_por: os.aprovado_por,
       aprovado_por_id: os.aprovado_por_id,
       data_aprovacao: os.data_aprovacao,

@@ -1,4 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
+import { LimiteDeTentativasModule } from '@/core/modules/auth/limite-de-tentativas';
 import { ExecucaoOSController } from './execucao-os.controller';
 import { ExecucaoOSService } from './execucao-os.service';
 import { AnexosOSService } from './anexos-os.service';
@@ -101,6 +102,8 @@ describe('ExecucaoOSController', () => {
     cancelarTarefa: jest.fn(),
     finalizar: jest.fn(),
     cancelar: jest.fn(),
+    relatorio: jest.fn(),
+    conferirCodigo: jest.fn(),
   };
 
   const mockAnexosOSService = {
@@ -113,6 +116,8 @@ describe('ExecucaoOSController', () => {
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
+      // O limite do PDF e da conferência (SN-62) usa o ThrottlerGuard
+      imports: [LimiteDeTentativasModule],
       controllers: [ExecucaoOSController],
       providers: [
         {
@@ -508,20 +513,28 @@ describe('ExecucaoOSController', () => {
   });
 
   describe('gerarRelatorio', () => {
-    it('deve gerar relatório de execução', async () => {
+    it('devolve o conteúdo do PDF, com o escopo de quem pede (SN-62)', async () => {
       const id = 'clrx1234567890123456789012';
-
-      mockExecucaoOSService.buscarPorId.mockResolvedValue(mockOSDetalhes);
+      const relatorio = { os_id: id, numero_os: 'OS-1', status: 'FINALIZADA', codigo: 'a'.repeat(64), previa: false };
+      mockExecucaoOSService.relatorio.mockResolvedValue(relatorio);
 
       const usuario = { id: 'tecnico', role: 'operador' };
-      const result = await controller.gerarRelatorio(id, usuario);
+      const result = await controller.gerarRelatorio(` ${id} `, usuario);
 
       // Com o escopo de quem pede: sem ele a rota dizia se a OS de outra planta existe (revisão do SN-48)
-      expect(execucaoService.buscarPorId).toHaveBeenCalledWith(id, usuario);
-      expect(result).toEqual({
-        message: 'Relatório em desenvolvimento',
-        os_id: id,
-      });
+      expect(mockExecucaoOSService.relatorio).toHaveBeenCalledWith(id, usuario);
+      expect(result).toBe(relatorio);
+    });
+  });
+
+  describe('conferir', () => {
+    it('passa o código e quem confere (o escopo decide se o código existe)', async () => {
+      const usuario = { id: 'cliente', role: 'proprietario' };
+      mockExecucaoOSService.conferirCodigo.mockResolvedValue({ confere: true });
+
+      await controller.conferir('abc', usuario);
+
+      expect(mockExecucaoOSService.conferirCodigo).toHaveBeenCalledWith('abc', usuario);
     });
   });
 });
