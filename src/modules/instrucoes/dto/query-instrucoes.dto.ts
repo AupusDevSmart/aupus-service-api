@@ -1,11 +1,12 @@
 // src/modules/instrucoes/dto/query-instrucoes.dto.ts
 import { IsOptional, IsEnum, IsString, IsInt, Min, Max, IsBoolean } from 'class-validator';
-import { Transform, Type } from 'class-transformer';
+import { Type } from 'class-transformer';
 import {
   StatusTarefa,
   CategoriaTarefa,
   TipoManutencao
 } from '@/core';
+import { BooleanoDoTexto } from '@/common/decorators/booleano';
 
 export class QueryInstrucoesDto {
   @IsOptional()
@@ -17,11 +18,7 @@ export class QueryInstrucoesDto {
   status?: StatusTarefa;
 
   @IsOptional()
-  @Transform(({ value }) => {
-    if (value === 'true' || value === true) return true;
-    if (value === 'false' || value === false) return false;
-    return undefined;
-  })
+  @BooleanoDoTexto()
   @IsBoolean()
   ativo?: boolean;
 

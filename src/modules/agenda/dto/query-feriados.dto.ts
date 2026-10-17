@@ -1,7 +1,8 @@
 import { IsOptional, IsString, IsInt, Min, Max, IsIn, IsEnum, IsBoolean } from 'class-validator';
-import { Type, Transform } from 'class-transformer';
+import { Type } from 'class-transformer';
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { TipoFeriado } from './create-feriado.dto';
+import { BooleanoDoTexto } from '@/common/decorators/booleano';
 
 export class QueryFeriadosDto {
   @ApiPropertyOptional({ example: 1, minimum: 1, description: 'Página atual' })
@@ -62,11 +63,7 @@ export class QueryFeriadosDto {
     description: 'Filtrar apenas feriados gerais (true) ou específicos (false)'
   })
   @IsOptional()
-  @Transform(({ value }) => {
-    if (value === 'true') return true;
-    if (value === 'false') return false;
-    return value;
-  })
+  @BooleanoDoTexto()
   @IsBoolean()
   geral?: boolean;
 
@@ -75,11 +72,7 @@ export class QueryFeriadosDto {
     description: 'Filtrar apenas feriados recorrentes'
   })
   @IsOptional()
-  @Transform(({ value }) => {
-    if (value === 'true') return true;
-    if (value === 'false') return false;
-    return value;
-  })
+  @BooleanoDoTexto()
   @IsBoolean()
   recorrente?: boolean;
 

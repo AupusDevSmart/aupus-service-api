@@ -1,8 +1,9 @@
 // src/modules/usuarios/dto/usuario-query.dto.ts - NOVO ARQUIVO
 import { IsOptional, IsString, IsNumber, IsEnum, IsArray, IsBoolean } from 'class-validator';
-import { Type, Transform } from 'class-transformer';
+import { Type } from 'class-transformer';
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { UsuarioStatus, Permissao } from './create-usuario.dto';
+import { BooleanoDoTexto } from '@/common/decorators/booleano';
 
 export class UsuarioQueryDto {
   @ApiPropertyOptional({ 
@@ -104,7 +105,7 @@ export class UsuarioQueryDto {
     default: false
   })
   @IsOptional()
-  @Transform(({ value }) => value === 'true' || value === true)
+  @BooleanoDoTexto()
   @IsBoolean()
   includeInactive?: boolean = false;
 

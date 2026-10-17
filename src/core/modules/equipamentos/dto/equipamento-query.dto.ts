@@ -1,6 +1,7 @@
 import { IsOptional, IsString, IsInt, Min, Max, IsIn, IsBoolean } from 'class-validator';
-import { Type, Transform } from 'class-transformer';
+import { Type } from 'class-transformer';
 import { ApiPropertyOptional } from '@nestjs/swagger';
+import { BooleanoDoTexto } from '@/common/decorators/booleano';
 
 export class EquipamentoQueryDto {
   @ApiPropertyOptional({ example: 1, minimum: 1, description: 'Página atual' })
@@ -50,11 +51,7 @@ export class EquipamentoQueryDto {
     type: Boolean
   })
   @IsOptional()
-  @Transform(({ value }) => {
-    if (value === 'true') return true;
-    if (value === 'false') return false;
-    return value;
-  })
+  @BooleanoDoTexto()
   @IsBoolean()
   semDiagrama?: boolean;
 
@@ -83,11 +80,7 @@ export class EquipamentoQueryDto {
     type: Boolean
   })
   @IsOptional()
-  @Transform(({ value }) => {
-    if (value === 'true') return true;
-    if (value === 'false') return false;
-    return value;
-  })
+  @BooleanoDoTexto()
   @IsBoolean()
   mqtt_habilitado?: boolean;
 
@@ -97,11 +90,7 @@ export class EquipamentoQueryDto {
     type: Boolean
   })
   @IsOptional()
-  @Transform(({ value }) => {
-    if (value === 'true') return true;
-    if (value === 'false') return false;
-    return value;
-  })
+  @BooleanoDoTexto()
   @IsBoolean()
   semPlano?: boolean;
 
@@ -111,11 +100,7 @@ export class EquipamentoQueryDto {
     type: Boolean
   })
   @IsOptional()
-  @Transform(({ value }) => {
-    if (value === 'true') return true;
-    if (value === 'false') return false;
-    return value;
-  })
+  @BooleanoDoTexto()
   @IsBoolean()
   ocultarVirtuais?: boolean;
 

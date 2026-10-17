@@ -1,7 +1,8 @@
 // src/modules/planos-manutencao/dto/query-planos.dto.ts
 import { IsOptional, IsEnum, IsString, IsInt, IsBoolean, Min, Max } from 'class-validator';
-import { Type, Transform } from 'class-transformer';
+import { Type } from 'class-transformer';
 import { ApiPropertyOptional } from '@nestjs/swagger';
+import { BooleanoDoTexto } from '@/common/decorators/booleano';
 
 export class QueryPlanosDto {
   @ApiPropertyOptional({ description: 'Busca em nome, descrição ou equipamento' })
@@ -21,7 +22,7 @@ export class QueryPlanosDto {
     description: 'Lista os planos vinculados a equipamento, em vez dos templates',
   })
   @IsOptional()
-  @Transform(({ value }) => value === true || value === 'true')
+  @BooleanoDoTexto()
   @IsBoolean()
   vinculados?: boolean;
 

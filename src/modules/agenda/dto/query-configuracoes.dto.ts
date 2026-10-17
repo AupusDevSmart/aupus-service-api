@@ -1,6 +1,7 @@
 import { IsOptional, IsString, IsInt, Min, Max, IsIn, IsBoolean } from 'class-validator';
-import { Type, Transform } from 'class-transformer';
+import { Type } from 'class-transformer';
 import { ApiPropertyOptional } from '@nestjs/swagger';
+import { BooleanoDoTexto } from '@/common/decorators/booleano';
 
 export class QueryConfiguracoesDto {
   @ApiPropertyOptional({ example: 1, minimum: 1, description: 'Página atual' })
@@ -36,11 +37,7 @@ export class QueryConfiguracoesDto {
     description: 'Filtrar apenas configurações gerais (true) ou específicas (false)'
   })
   @IsOptional()
-  @Transform(({ value }) => {
-    if (value === 'true') return true;
-    if (value === 'false') return false;
-    return value;
-  })
+  @BooleanoDoTexto()
   @IsBoolean()
   geral?: boolean;
 
@@ -49,11 +46,7 @@ export class QueryConfiguracoesDto {
     description: 'Filtrar configurações que incluem sábado como dia útil'
   })
   @IsOptional()
-  @Transform(({ value }) => {
-    if (value === 'true') return true;
-    if (value === 'false') return false;
-    return value;
-  })
+  @BooleanoDoTexto()
   @IsBoolean()
   sabado?: boolean;
 
@@ -62,11 +55,7 @@ export class QueryConfiguracoesDto {
     description: 'Filtrar configurações que incluem domingo como dia útil'
   })
   @IsOptional()
-  @Transform(({ value }) => {
-    if (value === 'true') return true;
-    if (value === 'false') return false;
-    return value;
-  })
+  @BooleanoDoTexto()
   @IsBoolean()
   domingo?: boolean;
 

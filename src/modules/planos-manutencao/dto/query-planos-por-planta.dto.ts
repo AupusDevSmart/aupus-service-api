@@ -1,9 +1,10 @@
 import { IsOptional, IsInt, Min, Max, IsBoolean } from 'class-validator';
-import { Transform, Type } from 'class-transformer';
+import { Type } from 'class-transformer';
+import { BooleanoDoTexto } from '@/common/decorators/booleano';
 
 export class QueryPlanosPorPlantaDto {
   @IsOptional()
-  @Transform(({ value }) => value === 'true')
+  @BooleanoDoTexto()
   @IsBoolean()
   incluir_tarefas?: boolean = false;
 

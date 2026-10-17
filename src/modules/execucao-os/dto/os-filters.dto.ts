@@ -2,6 +2,7 @@ import { IsOptional, IsEnum, IsDateString, IsString, IsNumber, IsBoolean, Min, M
 import { Type } from 'class-transformer';
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { StatusOS, TipoOS, PrioridadeOS } from '@/core';
+import { BooleanoDoTexto } from '@/common/decorators/booleano';
 
 export class OSFiltersDto {
   @ApiPropertyOptional({ description: 'Página', example: 1 })
@@ -70,7 +71,7 @@ export class OSFiltersDto {
 
   @ApiPropertyOptional({ description: 'Filtrar apenas OS atrasadas' })
   @IsOptional()
-  @Type(() => Boolean)
+  @BooleanoDoTexto()
   @IsBoolean()
   atrasadas?: boolean;
 

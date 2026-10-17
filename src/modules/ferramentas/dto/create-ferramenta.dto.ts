@@ -16,6 +16,7 @@ import {
 } from 'class-validator';
 import { Transform } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { BooleanoDoTexto } from '@/common/decorators/booleano';
 
 export enum StatusFerramenta {
   DISPONIVEL = 'disponivel',
@@ -64,7 +65,7 @@ export class CreateFerramentaDto {
 
   @ApiProperty({ example: true })
   @IsBoolean()
-  @Transform(({ value }) => value === 'true' || value === true)
+  @BooleanoDoTexto()
   necessita_calibracao: boolean;
 
   @ApiPropertyOptional({ example: '2024-12-15' })

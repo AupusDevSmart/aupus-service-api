@@ -1,7 +1,8 @@
 import { IsOptional, IsString, IsInt, Min, Max, IsIn, IsEnum, IsBoolean } from 'class-validator';
-import { Type, Transform } from 'class-transformer';
+import { Type } from 'class-transformer';
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { StatusVeiculo, TipoVeiculo, TipoCombustivel } from '@/core';
+import { BooleanoDoTexto } from '@/common/decorators/booleano';
 
 export class QueryVeiculosDto {
   @ApiPropertyOptional({ example: 1, minimum: 1, description: 'Página atual' })
@@ -72,11 +73,7 @@ export class QueryVeiculosDto {
     description: 'Filtrar apenas veículos ativos'
   })
   @IsOptional()
-  @Transform(({ value }) => {
-    if (value === 'true') return true;
-    if (value === 'false') return false;
-    return value;
-  })
+  @BooleanoDoTexto()
   @IsBoolean()
   ativo?: boolean = true;
 
@@ -113,11 +110,7 @@ export class QueryVeiculosDto {
     description: 'Incluir apenas veículos disponíveis (sem reservas ativas)'
   })
   @IsOptional()
-  @Transform(({ value }) => {
-    if (value === 'true') return true;
-    if (value === 'false') return false;
-    return value;
-  })
+  @BooleanoDoTexto()
   @IsBoolean()
   apenasDisponiveis?: boolean;
 

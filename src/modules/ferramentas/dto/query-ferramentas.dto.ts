@@ -2,9 +2,10 @@
 // src/modules/ferramentas/dto/query-ferramentas.dto.ts
 // ===============================
 import { IsOptional, IsString, IsEnum, IsBoolean, Min, Max } from 'class-validator';
-import { Transform, Type } from 'class-transformer';
+import { Type } from 'class-transformer';
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { StatusFerramenta } from './create-ferramenta.dto';
+import { BooleanoDoTexto } from '@/common/decorators/booleano';
 
 export class QueryFerramentasDto {
   @ApiPropertyOptional({ example: 1, minimum: 1 })
@@ -37,7 +38,7 @@ export class QueryFerramentasDto {
 
   @ApiPropertyOptional({ example: true })
   @IsOptional()
-  @Transform(({ value }) => value === 'true')
+  @BooleanoDoTexto()
   @IsBoolean()
   necessita_calibracao?: boolean;
 
@@ -53,7 +54,7 @@ export class QueryFerramentasDto {
 
   @ApiPropertyOptional({ example: true })
   @IsOptional()
-  @Transform(({ value }) => value === 'true')
+  @BooleanoDoTexto()
   @IsBoolean()
   calibracao_vencida?: boolean;
 

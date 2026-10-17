@@ -13,6 +13,7 @@ import {
 import { Type, Transform } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional, PartialType } from '@nestjs/swagger';
 import { CasasDecimais } from '@/common/decorators/numero';
+import { BooleanoDoTexto } from '@/common/decorators/booleano';
 
 /**
  * No banco o enum se chama TipoRecurso e continua assim: o nome do TIPO nao
@@ -83,7 +84,7 @@ export class QueryRecursosDto {
 
   @ApiPropertyOptional({ description: 'Só os ativos. Sem isso, vêm todos.' })
   @IsOptional()
-  @Transform(({ value }) => value === true || value === 'true')
+  @BooleanoDoTexto()
   @IsBoolean()
   apenas_ativos?: boolean;
 
