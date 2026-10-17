@@ -43,6 +43,7 @@ import { Instalacao, instalacoesDasOrdens } from '../../common/helpers/instalaca
 import { finalizarOrigem, origemDaProgramacao } from '../../common/helpers/status-da-origem';
 import { cancelarOS } from './cancelar-os';
 import { exigirOSAlteravel } from './os-alteravel';
+import { dadosDaOS, dadosDeFalha, equipamentoDaCorretiva, minutosParado, mudancasNaFalha } from './dados-de-falha';
 import { fotosDosItens, gravacoesDoChecklist, leituraDoItem, pendenciaDaTarefa, travarItensDoChecklist, travarTarefa } from './itens-do-checklist';
 import { anexoParaResposta } from './anexos-os.service';
 import { variantesDeId, variantesDeIds } from '../tarefas/ids';
@@ -122,6 +123,7 @@ type OSComDetalhes = Prisma.ordens_servicoGetPayload<{
       select: {
         id: true;
         descricao: true;
+        data: true;
         prioridade: true;
         status: true;
         local: true;
@@ -433,6 +435,8 @@ export class ExecucaoOSService {
           select: {
             id: true,
             descricao: true,
+            // SN-60: a tela usa como início da parada na corretiva
+            data: true,
             prioridade: true,
             status: true,
             local: true,
@@ -1147,6 +1151,13 @@ export class ExecucaoOSService {
     );
 
     const custoReal = await this.calcularCustoReal(id, dto);
+    // SN-60: na corretiva, se parou, sintoma, causa e ação (400 sem eles)
+    const falha = dadosDeFalha(os.tipo, dto);
+    const mudancaNaFalha = os.falha_sintoma || os.parada_inicio ? mudancasNaFalha(dadosDaOS(os), falha) : null;
+    // O equipamento que parou fica na OS: a coluna quase nunca vinha preenchida, e
+    // o MTBF por equipamento da Fase 6 não teria de onde ler
+    const equipamentoDaFalha =
+      os.tipo === 'CORRETIVA' && !os.equipamento_id?.trim() ? await equipamentoDaCorretiva(this.prisma, id, os.anomalia_id) : null;
 
     // D2: executar não bloqueia por tarefa pendente, mas exige o motivo de cada
     // uma. Não fazer uma tarefa é comum (a equipe viaja e não consegue); o que
@@ -1181,12 +1192,16 @@ export class ExecucaoOSService {
         );
       }
 
-      await prisma.ordens_servico.update({
-        where: { id },
+      // O status conferido de novo na gravação: dois "Executar" juntos (toque
+      // duplo, dois aparelhos) passavam os dois, e o segundo regravava calado
+      const executada = await prisma.ordens_servico.updateMany({
+        where: { id, status: { in: [StatusOS.EM_EXECUCAO, StatusOS.PAUSADA] } },
         data: {
           status: StatusOS.EXECUTADA,
           data_hora_fim_real: dataHoraFim,
           custo_real: custoReal,
+          ...falha,
+          ...(equipamentoDaFalha && { equipamento_id: equipamentoDaFalha }),
           resultado_servico: dto.resultado_servico,
           problemas_encontrados: dto.problemas_encontrados,
           recomendacoes: dto.recomendacoes,
@@ -1201,6 +1216,9 @@ export class ExecucaoOSService {
           custos_adicionais: dto.custos_adicionais,
         },
       });
+      if (executada.count === 0) {
+        throw new ConflictException('A OS já não está em execução (executada por outra pessoa agora há pouco?): recarregue a tela.');
+      }
 
       // Atualizar materiais consumidos
       if (dto.materiais_consumidos && dto.materiais_consumidos.length > 0) {
@@ -1262,6 +1280,8 @@ export class ExecucaoOSService {
         os.status,
         StatusOS.EXECUTADA,
       );
+      // Reexecutar depois de reabrir: o auditor vê o que mudou na falha
+      if (mudancaNaFalha) await this.registrarHistorico(prisma, id, 'DADOS_DE_FALHA', 'Sistema', usuarioId, mudancaNaFalha);
     });
   }
 
@@ -1814,6 +1834,13 @@ export class ExecucaoOSService {
       motivo_cancelamento: os.motivo_cancelamento,
       resultado_servico: os.resultado_servico,
       problemas_encontrados: os.problemas_encontrados,
+      // SN-60: os dados de falha
+      parada_inicio: os.parada_inicio,
+      parada_fim: os.parada_fim,
+      minutos_parado: minutosParado(os),
+      falha_sintoma: os.falha_sintoma,
+      falha_causa: os.falha_causa,
+      falha_acao: os.falha_acao,
       recomendacoes: os.recomendacoes,
       proxima_manutencao: os.proxima_manutencao,
       avaliacao_qualidade: os.avaliacao_qualidade,

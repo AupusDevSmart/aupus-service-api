@@ -19,6 +19,9 @@ import { criarPlantaDeTeste } from '../../../test/planta-de-teste';
  *
  * Roda com `npx jest --runInBand src/modules/reservas/reservas-de-viatura`.
  */
+/** A OS do teste é corretiva: sintoma, causa e ação, sem parada (SN-60) */
+const semParada = { equipamento_parou: false, falha_sintoma: 'Ruído', falha_causa: 'Folga', falha_acao: 'Reapertado' };
+
 describe('reservas de viatura: conflito de horário e status pelo fluxo da OS (banco real)', () => {
   const prisma = new PrismaService();
   const scope = {
@@ -225,7 +228,7 @@ describe('reservas de viatura: conflito de horário e status pelo fluxo da OS (b
       expect(await reservaDa(prog.id)).toMatchObject({ status: 'ativa', km_inicial: 1200 });
       expect((await prisma.veiculo.findUniqueOrThrow({ where: { id: veiculoId } })).status).toBe('em_uso');
 
-      await execucoes.executar(osId, { resultado_servico: 'ok', km_final: 1260 } as never);
+      await execucoes.executar(osId, { resultado_servico: 'ok', km_final: 1260, ...semParada } as never);
 
       expect(await reservaDa(prog.id)).toMatchObject({ status: 'finalizada', km_final: 1260 });
       const veiculo = await prisma.veiculo.findUniqueOrThrow({ where: { id: veiculoId } });
@@ -237,7 +240,7 @@ describe('reservas de viatura: conflito de horário e status pelo fluxo da OS (b
       const osId = await aprovarEIniciar(prog.id, 1200);
 
       await expect(
-        execucoes.executar(osId, { resultado_servico: 'ok', km_final: 1100 } as never),
+        execucoes.executar(osId, { resultado_servico: 'ok', km_final: 1100, ...semParada } as never),
       ).rejects.toBeInstanceOf(BadRequestException);
     });
 

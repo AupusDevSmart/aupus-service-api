@@ -17,6 +17,7 @@ import {
 import { Type } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { LIMITE_DA_LEITURA } from '@/common/helpers/leitura';
+import { InstanteComFuso } from '@/common/decorators/instante';
 import { CasasDecimais, VazioEhNulo } from '@/common/decorators/numero';
 
 export class ReservaVeiculoDto {
@@ -355,15 +356,50 @@ export class ExecutarOSDto {
   @IsNotEmpty()
   resultado_servico: string;
 
+  // SN-60: os dados de falha. Na corretiva, dizer se parou; sintoma, causa e
+  // ação obrigatórios; a parada, se parou (regra em dados-de-falha.ts)
+  @ApiPropertyOptional({ description: 'O equipamento parou? Obrigatório na corretiva' })
+  @IsOptional()
+  @IsBoolean()
+  equipamento_parou?: boolean;
+
+  @ApiPropertyOptional({ description: 'Quando o equipamento parou (ISO com fuso)' })
+  @IsOptional()
+  @InstanteComFuso()
+  parada_inicio?: string;
+
+  @ApiPropertyOptional({ description: 'Quando o equipamento voltou a funcionar (ISO com fuso)' })
+  @IsOptional()
+  @InstanteComFuso()
+  parada_fim?: string;
+
+  @ApiPropertyOptional({ description: 'O sintoma: o que se viu (até 2000 caracteres)' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(2000)
+  falha_sintoma?: string;
+
+  @ApiPropertyOptional({ description: 'A causa da falha (até 2000 caracteres)' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(2000)
+  falha_causa?: string;
+
+  @ApiPropertyOptional({ description: 'A ação tomada (até 2000 caracteres)' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(2000)
+  falha_acao?: string;
+
   @ApiPropertyOptional({ description: 'Problemas encontrados durante a execução' })
   @IsOptional()
   @IsString()
-  problemas_encontrados?: string;
+  problemas_encontrados?: string | null;
 
   @ApiPropertyOptional({ description: 'Recomendações para futuras manutenções' })
   @IsOptional()
   @IsString()
-  recomendacoes?: string;
+  recomendacoes?: string | null;
 
   @ApiPropertyOptional({ description: 'Data sugerida para próxima manutenção', example: '2025-08-15' })
   @IsOptional()
@@ -413,7 +449,7 @@ export class ExecutarOSDto {
   @ApiPropertyOptional({ description: 'Incidentes de segurança ocorridos' })
   @IsOptional()
   @IsString()
-  incidentes_seguranca?: string;
+  incidentes_seguranca?: string | null;
 
   @ApiPropertyOptional({ description: 'Custos adicionais não planejados' })
   @IsOptional()

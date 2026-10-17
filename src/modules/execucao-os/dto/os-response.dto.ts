@@ -621,6 +621,24 @@ export class OrdemServicoResponseDto {
   @ApiPropertyOptional({ description: 'Problemas encontrados' })
   problemas_encontrados?: string;
 
+  @ApiPropertyOptional({ description: 'Quando o equipamento parou (SN-60)', nullable: true })
+  parada_inicio?: Date | null;
+
+  @ApiPropertyOptional({ description: 'Quando o equipamento voltou a funcionar (SN-60)', nullable: true })
+  parada_fim?: Date | null;
+
+  @ApiPropertyOptional({ description: 'Minutos parado (retorno menos parada)', nullable: true })
+  minutos_parado?: number | null;
+
+  @ApiPropertyOptional({ description: 'O sintoma da falha', nullable: true })
+  falha_sintoma?: string | null;
+
+  @ApiPropertyOptional({ description: 'A causa da falha', nullable: true })
+  falha_causa?: string | null;
+
+  @ApiPropertyOptional({ description: 'A ação tomada', nullable: true })
+  falha_acao?: string | null;
+
   @ApiPropertyOptional({ description: 'Recomendações' })
   recomendacoes?: string;
 
