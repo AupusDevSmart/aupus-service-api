@@ -238,6 +238,24 @@ export class ChecklistAtividadeResponseDto {
   @ApiPropertyOptional({ description: 'ID de quem concluiu' })
   concluida_por_id?: string;
 
+  @ApiProperty({ description: 'VERIFICACAO ou LEITURA (SN-58)' })
+  tipo: string;
+
+  @ApiPropertyOptional({ description: 'Unidade da leitura', nullable: true })
+  unidade: string | null;
+
+  @ApiPropertyOptional({ description: 'Mínimo aceitável da leitura', nullable: true })
+  valor_minimo: number | null;
+
+  @ApiPropertyOptional({ description: 'Máximo aceitável da leitura', nullable: true })
+  valor_maximo: number | null;
+
+  @ApiPropertyOptional({ description: 'Valor medido', nullable: true })
+  valor_lido: number | null;
+
+  @ApiProperty({ description: 'Leitura fora da faixa (conta valor x faixa)' })
+  fora_da_faixa: boolean;
+
   @ApiProperty({ description: 'Data de criação' })
   created_at: Date;
 

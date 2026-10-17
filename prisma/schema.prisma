@@ -2277,6 +2277,13 @@ model checklist_atividades_os {
   /// Antes o vínculo existia só no texto ("Tarefa: item"), e a tela não tinha
   /// como agrupar o checklist por tarefa nem exigir os obrigatórios dela.
   tarefa_os_id     String?        @map("tarefa_os_id")
+  /// SN-58: tipo, unidade e faixa congelados do passo da instrução; o valor que
+  /// a equipe leu. Fora da faixa sai da conta (não é coluna)
+  tipo             String         @default("VERIFICACAO") @db.VarChar(20)
+  unidade          String?        @db.VarChar(20)
+  valor_minimo     Decimal?       @map("valor_minimo") @db.Decimal(14, 4)
+  valor_maximo     Decimal?       @map("valor_maximo") @db.Decimal(14, 4)
+  valor_lido       Decimal?       @map("valor_lido") @db.Decimal(14, 4)
   created_at       DateTime       @default(now()) @map("created_at")
   updated_at       DateTime       @updatedAt @map("updated_at")
   ordem_servico    ordens_servico @relation(fields: [os_id], references: [id], onDelete: Cascade)
@@ -2906,6 +2913,12 @@ model sub_instrucoes {
   obrigatoria    Boolean    @default(false)
   tempo_estimado Int?
   ordem          Int        @db.SmallInt
+  /// SN-58: VERIFICACAO (marcar) ou LEITURA (digitar o valor medido). Unidade e
+  /// faixa só na leitura (CHECK no banco; a API responde 400 antes)
+  tipo           String     @default("VERIFICACAO") @db.VarChar(20)
+  unidade        String?    @db.VarChar(20)
+  valor_minimo   Decimal?   @db.Decimal(14, 4)
+  valor_maximo   Decimal?   @db.Decimal(14, 4)
   created_at     DateTime   @default(now()) @db.Timestamp(0)
   updated_at     DateTime   @updatedAt @db.Timestamp(0)
   instrucao      instrucoes @relation(fields: [instrucao_id], references: [id], onDelete: Cascade)

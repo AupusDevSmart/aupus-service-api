@@ -15,6 +15,7 @@ import {
 import { Type } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { CondicaoOS, TipoOS, PrioridadeOS, OrigemOS, Prisma } from '@/core';
+import { CasasDecimais } from '@/common/decorators/numero';
 
 export class MaterialProgramacaoDto {
   @ApiProperty({ description: 'Descrição do material', example: 'Óleo lubrificante SAE 20W-50' })
@@ -24,7 +25,8 @@ export class MaterialProgramacaoDto {
   descricao: string;
 
   @ApiProperty({ description: 'Quantidade planejada', example: 5.5 })
-  @IsNumber({ maxDecimalPlaces: 3 })
+  @IsNumber()
+  @CasasDecimais(3)
   @Min(0.001)
   quantidade_planejada: number;
 
@@ -36,7 +38,8 @@ export class MaterialProgramacaoDto {
 
   @ApiPropertyOptional({ description: 'Custo unitário', example: 15.50 })
   @IsOptional()
-  @IsNumber({ maxDecimalPlaces: 2 })
+  @IsNumber()
+  @CasasDecimais(2)
   @Min(0)
   custo_unitario?: number;
 }
@@ -56,7 +59,8 @@ export class FerramentaProgramacaoDto {
    * arredondava — a instrução dizia 2,5 e a OS gravava 2.
    */
   @ApiProperty({ description: 'Quantidade necessária', example: 2.5 })
-  @IsNumber({ maxDecimalPlaces: 3 })
+  @IsNumber()
+  @CasasDecimais(3)
   @Min(0)
   quantidade: number;
 
@@ -86,14 +90,16 @@ export class TecnicoProgramacaoDto {
   especialidade: string;
 
   @ApiProperty({ description: 'Horas estimadas', example: 4.5 })
-  @IsNumber({ maxDecimalPlaces: 2 })
+  @IsNumber()
+  @CasasDecimais(2)
   @Min(0.25)
   @Max(24)
   horas_estimadas: number;
 
   @ApiPropertyOptional({ description: 'Custo por hora', example: 50.00 })
   @IsOptional()
-  @IsNumber({ maxDecimalPlaces: 2 })
+  @IsNumber()
+  @CasasDecimais(2)
   @Min(0)
   custo_hora?: number;
 
@@ -112,7 +118,8 @@ export class ItemOrcamentoProgramacaoDto {
   descricao: string;
 
   @ApiProperty({ description: 'Valor do item', example: 500.00 })
-  @IsNumber({ maxDecimalPlaces: 2 })
+  @IsNumber()
+  @CasasDecimais(2)
   @Min(0)
   valor: number;
 }
@@ -206,13 +213,15 @@ export class CreateProgramacaoDto {
   // Planejamento
   @ApiPropertyOptional({ description: 'Tempo estimado em horas (padrão: 2h)', example: 4.5 })
   @IsOptional()
-  @IsNumber({ maxDecimalPlaces: 2 })
+  @IsNumber()
+  @CasasDecimais(2)
   @Min(0.25)
   tempo_estimado?: number;
 
   @ApiPropertyOptional({ description: 'Duração estimada em horas (padrão: 3h ou 1.5x tempo_estimado)', example: 6.0 })
   @IsOptional()
-  @IsNumber({ maxDecimalPlaces: 2 })
+  @IsNumber()
+  @CasasDecimais(2)
   @Min(0.25)
   duracao_estimada?: number;
 
@@ -296,7 +305,8 @@ export class CreateProgramacaoDto {
 
   @ApiPropertyOptional({ description: 'Carga necessária em kg', example: 500.5 })
   @IsOptional()
-  @IsNumber({ maxDecimalPlaces: 2 })
+  @IsNumber()
+  @CasasDecimais(2)
   @Min(0)
   carga_necessaria?: number;
 
@@ -337,7 +347,8 @@ export class CreateProgramacaoDto {
   // Custos
   @ApiPropertyOptional({ description: 'Orçamento previsto', example: 15000.00 })
   @IsOptional()
-  @IsNumber({ maxDecimalPlaces: 2 })
+  @IsNumber()
+  @CasasDecimais(2)
   @Min(0)
   orcamento_previsto?: number;
 

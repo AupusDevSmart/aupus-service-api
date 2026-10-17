@@ -13,6 +13,7 @@ import type { tarefas } from '@prisma/client';
 import { PropagacaoPlanosService } from '../planos-manutencao/propagacao-planos.service';
 import { buscarUltimasExecucoes, ondeElegivel } from './ciclos-das-tarefas';
 import { calcularProximaExecucao } from './periodicidade';
+import { comEtapas } from './etapas-da-instrucao';
 
 /**
  * Tarefa como as consultas deste service a leem. As relacoes dependem do
@@ -195,7 +196,7 @@ export class TarefasService {
       const tarefasPaginadas = tarefasAtrasadas.slice(skip, skip + limit);
 
       return {
-        data: tarefasPaginadas.map(tarefa => this.mapearParaResponse(tarefa)),
+        data: (await comEtapas(this.prisma, tarefasPaginadas)).map(tarefa => this.mapearParaResponse(tarefa)),
         total: tarefasAtrasadas.length,
         page,
         limit,
@@ -216,7 +217,7 @@ export class TarefasService {
     ]);
 
     return {
-      data: tarefas.map(tarefa => this.mapearParaResponse(tarefa)),
+      data: (await comEtapas(this.prisma, tarefas)).map(tarefa => this.mapearParaResponse(tarefa)),
       total,
       page,
       limit,
@@ -233,46 +234,7 @@ export class TarefasService {
         id,
         deleted_at: null
       },
-      include: {
-        plano_manutencao: {
-          select: {
-            id: true,
-            nome: true,
-            versao: true
-          }
-        },
-        planta: {
-          select: {
-            id: true,
-            nome: true,
-            localizacao: true
-          }
-        },
-        equipamento: {
-          select: {
-            id: true,
-            nome: true,
-            tipo_equipamento: true,
-            classificacao: true
-          }
-        },
-        instrucao: {
-          select: {
-            id: true,
-            tag: true,
-            nome: true,
-            categoria: true,
-            tipo_manutencao: true,
-            descricao: true,
-            // As telas de OS leem as etapas daqui: a tarefa nao guarda mais
-            // sub-etapas proprias.
-            sub_instrucoes: {
-              orderBy: { ordem: 'asc' as const },
-              select: { id: true, descricao: true, obrigatoria: true, ordem: true, tempo_estimado: true }
-            }
-          }
-        }
-      }
+      include: this.includeRelacionamentosLista(),
     });
 
     const tempoQuery = Date.now() - inicio;
@@ -282,8 +244,9 @@ export class TarefasService {
       throw new NotFoundException('Tarefa não encontrada');
     }
 
+    const [comAsEtapas] = await comEtapas(this.prisma, [tarefa]);
     return this.mapearParaResponse({
-      ...tarefa,
+      ...comAsEtapas,
       usuario_criador: null,
       usuario_atualizador: null
     });
@@ -307,7 +270,7 @@ export class TarefasService {
       orderBy: { ordem: 'asc' }
     });
 
-    return tarefas.map(tarefa => this.mapearParaResponse(tarefa));
+    return (await comEtapas(this.prisma, tarefas)).map(tarefa => this.mapearParaResponse(tarefa));
   }
 
   async listarPorEquipamento(equipamentoId: string, queryDto?: Partial<QueryTarefasDto>, user?: ScopedUser): Promise<TarefaResponseDto[]> {
@@ -326,7 +289,7 @@ export class TarefasService {
       orderBy: [{ ordem: 'asc' }, { created_at: 'desc' }]
     });
 
-    return tarefas.map(tarefa => this.mapearParaResponse(tarefa));
+    return (await comEtapas(this.prisma, tarefas)).map(tarefa => this.mapearParaResponse(tarefa));
   }
 
   async atualizar(id: string, updateDto: UpdateTarefaDto, user?: ScopedUser): Promise<TarefaResponseDto> {
@@ -618,6 +581,8 @@ export class TarefasService {
           classificacao: true
         }
       },
+      // As etapas (sub_instrucoes) vêm por consulta própria (comEtapas): pelo
+      // include voltavam vazias para instrução de id com 25 caracteres
       instrucao: {
         select: {
           id: true,
@@ -625,70 +590,7 @@ export class TarefasService {
           nome: true,
           categoria: true,
           tipo_manutencao: true,
-          descricao: true,
-          // As telas de OS leem as etapas daqui: a tarefa nao guarda mais
-          // sub-etapas proprias.
-          sub_instrucoes: {
-            orderBy: { ordem: 'asc' as const },
-            select: { id: true, descricao: true, obrigatoria: true, ordem: true, tempo_estimado: true }
-          }
-        }
-      }
-    };
-  }
-
-  private includeRelacionamentosCompletos(): Prisma.tarefasInclude {
-    return {
-      plano_manutencao: {
-        select: {
-          id: true,
-          nome: true,
-          versao: true
-        }
-      },
-      planta: {
-        select: {
-          id: true,
-          nome: true,
-          localizacao: true
-        }
-      },
-      equipamento: {
-        select: {
-          id: true,
-          nome: true,
-          tipo_equipamento: true,
-          classificacao: true
-        }
-      },
-      instrucao: {
-        select: {
-          id: true,
-          tag: true,
-          nome: true,
-          categoria: true,
-          tipo_manutencao: true,
-          descricao: true,
-          // As telas de OS leem as etapas daqui: a tarefa nao guarda mais
-          // sub-etapas proprias.
-          sub_instrucoes: {
-            orderBy: { ordem: 'asc' as const },
-            select: { id: true, descricao: true, obrigatoria: true, ordem: true, tempo_estimado: true }
-          }
-        }
-      },
-      usuario_criador: {
-        select: {
-          id: true,
-          nome: true,
-          email: true
-        }
-      },
-      usuario_atualizador: {
-        select: {
-          id: true,
-          nome: true,
-          email: true
+          descricao: true
         }
       }
     };

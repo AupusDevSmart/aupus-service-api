@@ -43,6 +43,7 @@ import { Instalacao, instalacoesDasOrdens } from '../../common/helpers/instalaca
 import { finalizarOrigem, origemDaProgramacao } from '../../common/helpers/status-da-origem';
 import { cancelarOS } from './cancelar-os';
 import { exigirOSAlteravel } from './os-alteravel';
+import { gravacoesDoChecklist, leituraDoItem, pendenciaDaTarefa, travarItensDoChecklist, travarTarefa } from './itens-do-checklist';
 import { variantesDeId, variantesDeIds } from '../tarefas/ids';
 import { devolverViatura } from '../reservas/ocupacao-da-viatura';
 import type { Evento } from '../notificacoes/catalogo';
@@ -888,18 +889,24 @@ export class ExecucaoOSService {
     const autor = await this.nomeDoUsuario(usuarioId);
 
     await this.prisma.$transaction(async (prisma) => {
-      for (const atividade of dto.atividades) {
+      // As linhas travadas antes de ler: o que se lê é o que está gravado, e
+      // concluir a tarefa ao mesmo tempo espera (ou é esperado)
+      const ids = await travarItensDoChecklist(prisma, id, dto.atividades.map((a) => a.id));
+      const itens = await prisma.checklist_atividades_os.findMany({
+        where: { os_id: id, id: { in: ids } },
+        select: { id: true, atividade: true, tipo: true, concluida: true, valor_lido: true, tarefa_os_id: true },
+      });
+      const idsDasTarefas = [...new Set(itens.map((i) => i.tarefa_os_id?.trim()).filter((t): t is string => !!t))];
+      const tarefas = idsDasTarefas.length
+        ? await prisma.tarefas_os.findMany({
+            where: { os_id: id, id: { in: idsDasTarefas } },
+            select: { id: true, status: true, nome_snapshot: true },
+          })
+        : [];
+
+      for (const { id: itemId, data } of gravacoesDoChecklist(dto.atividades, itens, tarefas, { autor, usuarioId })) {
         // updateMany com os_id: item de outra OS não é alterado por engano
-        await prisma.checklist_atividades_os.updateMany({
-          where: { id: atividade.id, os_id: id },
-          data: {
-            concluida: atividade.concluida,
-            observacoes: atividade.observacoes,
-            concluida_em: atividade.concluida ? new Date() : null,
-            concluida_por: atividade.concluida ? autor : null,
-            concluida_por_id: atividade.concluida ? usuarioId ?? null : null,
-          },
-        });
+        await prisma.checklist_atividades_os.updateMany({ where: { id: itemId, os_id: id }, data });
       }
       // Sem linha no histórico da OS: a tela grava item a item, e cada clique
       // virava um "Checklist atualizado". Quem marcou e quando fica no item.
@@ -973,19 +980,36 @@ export class ExecucaoOSService {
     this.exigirEmExecucao(os.status);
     const tarefa = await this.vinculoDaTarefa(id, tarefaId);
 
-    // D1: a tarefa só conclui com os itens obrigatórios dela marcados.
-    const obrigatoriosPendentes = await this.prisma.checklist_atividades_os.count({
-      where: { os_id: id, tarefa_os_id: tarefa.id, obrigatoria: true, concluida: false },
-    });
-    if (obrigatoriosPendentes > 0) {
-      throw new ConflictException(
-        `Marque os ${obrigatoriosPendentes} item(ns) obrigatório(s) do checklist desta tarefa antes de concluí-la`,
-      );
-    }
-
     const autor = dto.concluida_por || (await this.nomeDoUsuario(usuarioId));
 
     await this.prisma.$transaction(async (prisma) => {
+      // A tarefa travada antes de olhar os itens: desmarcar um item ao mesmo
+      // tempo espera, e a tarefa não fecha com a pendência que acabou de surgir
+      if ((await travarTarefa(prisma, id, tarefa.id)) !== 'PENDENTE') {
+        throw new ConflictException(`A tarefa "${nomeDaTarefa(tarefa)}" não está pendente: desfaça antes de marcar de novo.`);
+      }
+
+      // D1: a tarefa só conclui com os itens obrigatórios dela marcados, e a
+      // leitura fora da faixa explicada (SN-58).
+      const pendencia = pendenciaDaTarefa(
+        await prisma.checklist_atividades_os.findMany({
+          where: { os_id: id, tarefa_os_id: tarefa.id },
+          orderBy: { ordem: 'asc' },
+          select: {
+            atividade: true,
+            obrigatoria: true,
+            concluida: true,
+            tipo: true,
+            unidade: true,
+            valor_lido: true,
+            valor_minimo: true,
+            valor_maximo: true,
+            observacoes: true,
+          },
+        }),
+      );
+      if (pendencia) throw new ConflictException(pendencia);
+
       // Atualizar tarefa
       await prisma.tarefas_os.update({
         where: { id: tarefa.id },
@@ -1465,14 +1489,7 @@ export class ExecucaoOSService {
 
     if (checklistExistente > 0) return;
 
-    const dados: Array<{
-      os_id: string;
-      atividade: string;
-      ordem: number;
-      obrigatoria: boolean;
-      tempo_estimado?: number | null;
-      tarefa_os_id?: string | null;
-    }> = [];
+    const dados: Prisma.checklist_atividades_osCreateManyInput[] = [];
 
     const vinculos = await prisma.tarefas_os.findMany({
       where: { os_id: osId, tarefa_id: { not: null } },
@@ -1498,14 +1515,22 @@ export class ExecucaoOSService {
     // e `instrucoes.id` é VarChar(26). Pelo include, instrução de id com 25
     // caracteres vinha com a lista de sub-instruções VAZIA.
     const idsDasInstrucoes = [...new Set(tarefasBase.map((t) => t.instrucao_id?.trim()).filter(Boolean) as string[])];
-    const subs: Array<{ instrucao_id: string; descricao: string; obrigatoria: boolean | null; tempo_estimado: number | null }> =
-      idsDasInstrucoes.length
-        ? await prisma.sub_instrucoes.findMany({
-            where: { instrucao_id: { in: variantesDeIds(idsDasInstrucoes) } },
-            orderBy: { ordem: 'asc' },
-            select: { instrucao_id: true, descricao: true, obrigatoria: true, tempo_estimado: true },
-          })
-        : [];
+    const subs = idsDasInstrucoes.length
+      ? await prisma.sub_instrucoes.findMany({
+          where: { instrucao_id: { in: variantesDeIds(idsDasInstrucoes) } },
+          orderBy: { ordem: 'asc' },
+          select: {
+            instrucao_id: true,
+            descricao: true,
+            obrigatoria: true,
+            tempo_estimado: true,
+            tipo: true,
+            unidade: true,
+            valor_minimo: true,
+            valor_maximo: true,
+          },
+        })
+      : [];
     const subsPorInstrucao = new Map<string, typeof subs>();
     for (const s of subs) {
       const chave = s.instrucao_id.trim();
@@ -1548,6 +1573,11 @@ export class ExecucaoOSService {
           tempo_estimado: sub.tempo_estimado ?? null,
           // A tela agrupa por tarefa e exige os obrigatórios dela (D4)
           tarefa_os_id: vinculo.id,
+          // A leitura congela unidade e faixa da época, como o texto (SN-58)
+          tipo: sub.tipo,
+          unidade: sub.unidade,
+          valor_minimo: sub.valor_minimo,
+          valor_maximo: sub.valor_maximo,
         });
       }
     }
@@ -1966,6 +1996,7 @@ export class ExecucaoOSService {
         concluida_por: c.concluida_por,
         concluida_por_id: c.concluida_por_id,
         tarefa_os_id: c.tarefa_os_id ?? null,
+        ...leituraDoItem(c),
         created_at: c.created_at,
         updated_at: c.updated_at,
       })) || [],

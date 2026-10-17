@@ -136,6 +136,7 @@ describe('ExecucaoOSService', () => {
     checklist_atividades_os: {
       count: jest.fn(),
       createMany: jest.fn(),
+      findMany: jest.fn().mockResolvedValue([]),
       update: jest.fn(),
       updateMany: jest.fn(),
     },
@@ -496,6 +497,9 @@ describe('ExecucaoOSService', () => {
       // Checklist só muda com a OS em execução (SPEC-EXECUCAO-DA-OS)
       mockPrismaService.ordens_servico.findFirst.mockResolvedValue({ ...mockOSData, status: StatusOS.EM_EXECUCAO });
       mockPrismaService.checklist_atividades_os.updateMany.mockResolvedValue({ count: 1 });
+      mockPrismaService.checklist_atividades_os.findMany.mockResolvedValue([
+        { id: checklistDto.atividades[0].id, atividade: 'Item', tipo: 'VERIFICACAO', concluida: false, valor_lido: null, tarefa_os_id: null },
+      ]);
       mockPrismaService.historico_os.create.mockResolvedValue({});
 
       await service.atualizarChecklist('clrx1234567890123456789012', checklistDto, 'user123');
@@ -599,7 +603,12 @@ describe('ExecucaoOSService', () => {
 
       mockPrismaService.$transaction.mockImplementation(mockTransaction);
       mockPrismaService.ordens_servico.findFirst.mockResolvedValue({ ...mockOSData, status: StatusOS.EM_EXECUCAO });
-      mockPrismaService.checklist_atividades_os.count.mockResolvedValue(0);
+      mockPrismaService.checklist_atividades_os.findMany.mockResolvedValue([]);
+      // A tarefa travada ainda pendente
+      // Template (a trava) ou Prisma.Sql (a instalação da OS): o texto está nos dois
+      mockPrismaService.$queryRaw.mockImplementation((sql: unknown) =>
+        Promise.resolve(JSON.stringify(sql).includes('FOR UPDATE') ? [{ status: 'PENDENTE' }] : []),
+      );
       mockPrismaService.tarefas_os.findFirst.mockResolvedValue(mockTarefaData);
       mockPrismaService.tarefas_os.update.mockResolvedValue({});
       mockPrismaService.registros_tempo_os.create.mockResolvedValue({});

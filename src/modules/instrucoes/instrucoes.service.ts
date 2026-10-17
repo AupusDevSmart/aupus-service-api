@@ -13,7 +13,8 @@ import {
   CreateRecursoInstrucaoDto,
 } from './dto';
 import { StatusTarefa, TipoManutencao, CategoriaTarefa, Prisma } from '@/core';
-import type { anomalias_instrucoes, instrucoes, solicitacoes_instrucoes } from '@prisma/client';
+import type { anomalias_instrucoes, instrucoes, solicitacoes_instrucoes, sub_instrucoes } from '@prisma/client';
+import { passoParaGravar, passoParaResposta } from './passos-da-instrucao';
 
 /**
  * Instrucao como as consultas deste service a leem. As relacoes e contadores
@@ -22,7 +23,7 @@ import type { anomalias_instrucoes, instrucoes, solicitacoes_instrucoes } from '
 type InstrucaoLida = instrucoes & {
   usuario_criador?: InstrucaoResponseDto['usuario_criador'] | null;
   usuario_atualizador?: InstrucaoResponseDto['usuario_atualizador'] | null;
-  sub_instrucoes?: InstrucaoResponseDto['sub_instrucoes'];
+  sub_instrucoes?: sub_instrucoes[];
   recursos?: InstrucaoResponseDto['recursos'];
   anexos?: InstrucaoResponseDto['anexos'];
   _count?: { sub_instrucoes?: number; recursos?: number; anexos?: number; tarefas?: number };
@@ -68,13 +69,7 @@ export class InstrucoesService {
       // Criar sub-instruções se fornecidas
       if (createDto.sub_instrucoes && createDto.sub_instrucoes.length > 0) {
         await tx.sub_instrucoes.createMany({
-          data: createDto.sub_instrucoes.map((sub, index) => ({
-            instrucao_id: novaInstrucao.id,
-            descricao: sub.descricao,
-            obrigatoria: sub.obrigatoria || false,
-            tempo_estimado: sub.tempo_estimado,
-            ordem: sub.ordem ?? index + 1
-          }))
+          data: createDto.sub_instrucoes.map((sub, index) => passoParaGravar(sub, novaInstrucao.id, index))
         });
       }
 
@@ -268,13 +263,7 @@ export class InstrucoesService {
 
         if (updateDto.sub_instrucoes.length > 0) {
           await tx.sub_instrucoes.createMany({
-            data: updateDto.sub_instrucoes.map((sub, index) => ({
-              instrucao_id: id,
-              descricao: sub.descricao,
-              obrigatoria: sub.obrigatoria || false,
-              tempo_estimado: sub.tempo_estimado,
-              ordem: sub.ordem ?? index + 1
-            }))
+            data: updateDto.sub_instrucoes.map((sub, index) => passoParaGravar(sub, id, index))
           });
         }
       }
@@ -777,7 +766,7 @@ export class InstrucoesService {
       atualizado_por: instrucao.atualizado_por,
       usuario_criador: instrucao.usuario_criador,
       usuario_atualizador: instrucao.usuario_atualizador,
-      sub_instrucoes: instrucao.sub_instrucoes,
+      sub_instrucoes: instrucao.sub_instrucoes?.map(passoParaResposta),
       recursos: instrucao.recursos,
       anexos: instrucao.anexos,
       total_sub_instrucoes: instrucao._count?.sub_instrucoes ?? instrucao.sub_instrucoes?.length ?? 0,

@@ -42,6 +42,9 @@ const NOMES: Record<string, string> = {
   bdi_issqn: 'ISSQN',
   cpf_cnpj: 'CPF/CNPJ',
   criado_por: 'autor',
+  valor_minimo: 'mínimo da faixa',
+  valor_maximo: 'máximo da faixa',
+  valor_lido: 'valor lido',
 };
 
 const nomeAmigavel = (campo: string) => NOMES[campo] ?? campo.replace(/_/g, ' ');
@@ -68,6 +71,11 @@ function traduzir(campo: string, restricao: string, original: string): string {
         : `${nome} deve ser no mínimo ${numero}.`;
     case 'max':
       return `${nome} deve ser no máximo ${numero}.`;
+    case 'casasDecimais':
+      // A frase padrão do CasasDecimais ganha o nome do campo; a escrita no DTO fica
+      return original.startsWith('Use no máximo')
+        ? `${nome} aceita no máximo ${numero} ${numero === '1' ? 'casa decimal' : 'casas decimais'}.`
+        : original;
     case 'minLength':
       return `${nome} deve ter ao menos ${numero} caracteres.`;
     case 'maxLength':

@@ -8,6 +8,7 @@ import {
   FrequenciaTarefa,
   OrigemTarefa
 } from '@/core';
+import type { EtapaDaInstrucao } from '../etapas-da-instrucao';
 
 export class UsuarioResumoDto {
   id: string;
@@ -40,6 +41,9 @@ export class InstrucaoResumoDto {
   nome: string;
   categoria: CategoriaTarefa;
   tipo_manutencao: TipoManutencao;
+  descricao?: string | null;
+  /** As etapas, por consulta própria (`comEtapas`), com tipo, unidade e faixa (SN-58) */
+  sub_instrucoes?: EtapaDaInstrucao[];
 }
 
 /**

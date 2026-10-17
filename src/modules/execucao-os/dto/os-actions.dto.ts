@@ -10,10 +10,14 @@ import {
   IsBoolean,
   Min,
   Max,
+  MaxLength,
+  ArrayMaxSize,
   ValidateNested,
 } from 'class-validator';
 import { Type } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { LIMITE_DA_LEITURA } from '@/common/helpers/leitura';
+import { CasasDecimais, VazioEhNulo } from '@/common/decorators/numero';
 
 export class ReservaVeiculoDto {
   @ApiProperty({ description: 'ID do veículo' })
@@ -155,19 +159,33 @@ export class AtividadeChecklistDto {
   @IsNotEmpty()
   id: string;
 
-  @ApiProperty({ description: 'Atividade concluída' })
+  /** Obrigatório na verificação; na leitura segue o valor (SN-58) */
+  @ApiPropertyOptional({ description: 'Atividade concluída. Na leitura, opcional: concluída = tem valor' })
+  @IsOptional()
   @IsBoolean()
-  concluida: boolean;
+  concluida?: boolean;
 
-  @ApiPropertyOptional({ description: 'Observações' })
+  /** A explicação da leitura fora da faixa vai para o relatório: tamanho de texto, não de arquivo */
+  @ApiPropertyOptional({ description: 'Observações (até 2000 caracteres)' })
   @IsOptional()
   @IsString()
-  observacoes?: string;
+  @MaxLength(2000)
+  observacoes?: string | null;
+
+  @ApiPropertyOptional({ description: 'Valor medido, só no item de leitura. null apaga a leitura', nullable: true })
+  @IsOptional()
+  @IsNumber({ allowNaN: false, allowInfinity: false })
+  @CasasDecimais(4)
+  @Min(-LIMITE_DA_LEITURA)
+  @Max(LIMITE_DA_LEITURA)
+  @VazioEhNulo()
+  valor_lido?: number | null;
 }
 
 export class AtualizarChecklistDto {
-  @ApiProperty({ description: 'Lista de atividades', type: [AtividadeChecklistDto] })
+  @ApiProperty({ description: 'Lista de atividades (até 500)', type: [AtividadeChecklistDto] })
   @IsArray()
+  @ArrayMaxSize(500)
   @ValidateNested({ each: true })
   @Type(() => AtividadeChecklistDto)
   atividades: AtividadeChecklistDto[];
@@ -180,7 +198,8 @@ export class MaterialConsumoDto {
   id: string;
 
   @ApiProperty({ description: 'Quantidade consumida' })
-  @IsNumber({ maxDecimalPlaces: 3 })
+  @IsNumber()
+  @CasasDecimais(3)
   @Min(0)
   quantidade_consumida: number;
 
@@ -274,7 +293,8 @@ export class MaterialFinalizacaoDto {
   id: string;
 
   @ApiProperty({ description: 'Quantidade consumida final (mínimo 0.001)' })
-  @IsNumber({ maxDecimalPlaces: 3 })
+  @IsNumber()
+  @CasasDecimais(3)
   @Min(0.001)
   quantidade_consumida: number;
 
@@ -397,7 +417,8 @@ export class ExecutarOSDto {
 
   @ApiPropertyOptional({ description: 'Custos adicionais não planejados' })
   @IsOptional()
-  @IsNumber({ maxDecimalPlaces: 2 })
+  @IsNumber()
+  @CasasDecimais(2)
   @Min(0)
   custos_adicionais?: number;
 }

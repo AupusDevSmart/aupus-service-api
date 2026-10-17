@@ -21,6 +21,11 @@ export class SubInstrucaoResponseDto {
   obrigatoria: boolean;
   tempo_estimado?: number;
   ordem?: number;
+  /** SN-58: VERIFICACAO ou LEITURA; unidade e faixa só na leitura */
+  tipo: string;
+  unidade?: string | null;
+  valor_minimo?: number | null;
+  valor_maximo?: number | null;
   created_at: Date;
   updated_at: Date;
 }

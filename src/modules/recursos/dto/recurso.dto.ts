@@ -12,6 +12,7 @@ import {
 } from 'class-validator';
 import { Type, Transform } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional, PartialType } from '@nestjs/swagger';
+import { CasasDecimais } from '@/common/decorators/numero';
 
 /**
  * No banco o enum se chama TipoRecurso e continua assim: o nome do TIPO nao
@@ -55,7 +56,8 @@ export class CreateRecursoDto {
   })
   @IsOptional()
   @Type(() => Number)
-  @IsNumber({ maxDecimalPlaces: 2 }, { message: 'Preço deve ter no máximo 2 casas decimais' })
+  @IsNumber()
+  @CasasDecimais(2, { message: 'Preço deve ter no máximo 2 casas decimais' })
   @Min(0, { message: 'Preço não pode ser negativo' })
   preco_medio?: number | null;
 

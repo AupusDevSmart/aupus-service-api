@@ -3,6 +3,7 @@ import { Type } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional, PartialType, PickType } from '@nestjs/swagger';
 import { PrioridadeOS } from '@/core';
 import { CreateProgramacaoDto } from './create-programacao.dto';
+import { CasasDecimais } from '@/common/decorators/numero';
 
 export class AprovarProgramacaoDto {
   @ApiPropertyOptional({ description: 'Observações da aprovação' })
@@ -12,7 +13,8 @@ export class AprovarProgramacaoDto {
 
   @ApiPropertyOptional({ description: 'Ajustes no orçamento' })
   @IsOptional()
-  @IsNumber({ maxDecimalPlaces: 2 })
+  @IsNumber()
+  @CasasDecimais(2)
   ajustes_orcamento?: number;
 
   @ApiPropertyOptional({ description: 'Data programada sugerida', example: '2025-02-15' })
