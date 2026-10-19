@@ -160,6 +160,21 @@ describe('planos vinculados pelo escopo da planta (banco real)', () => {
       );
     });
 
+    // Revisão do SN-57: a cópia de outra planta dizia "Equipamento não encontrado", e o
+    // plano que não existe, "Plano de manutenção não encontrado" — o texto contava que existe
+    it('o plano de outra planta e o que não existe dizem o mesmo, por id, no resumo e na propagação', async () => {
+      const tecnico = { id: TECNICO_B, role: 'operador' };
+      const inexistente = 'planoquenaoexiste00000000';
+      for (const consultar of [
+        (id: string) => planos.buscarPorId(id, false, tecnico),
+        (id: string) => planos.obterResumo(id, tecnico),
+        (id: string) => planos.consultarPropagacoes(id, tecnico),
+      ]) {
+        await expect(consultar(copiaAId)).rejects.toThrow('Plano de manutenção não encontrado');
+        await expect(consultar(inexistente)).rejects.toThrow('Plano de manutenção não encontrado');
+      }
+    });
+
     it('o template se abre para o técnico (antes dava 404: o escopo procurava o equipamento que ele não tem)', async () => {
       expect((await planos.buscarPorId(templateId, false, { id: TECNICO_B, role: 'operador' })).nome).toBe(`${PREFIXO} template`);
       await expect(planos.buscarPorId(copiaAId, false, { id: TECNICO_B, role: 'operador' })).rejects.toBeInstanceOf(NotFoundException);
@@ -186,8 +201,11 @@ describe('planos vinculados pelo escopo da planta (banco real)', () => {
 
     const nova = (plano: string) => ({ plano_manutencao_id: plano, nome: 'Tarefa escopo', instrucao_id: instrucaoId, criticidade: 3, frequencia: 'MENSAL', criado_por: TECNICO_B });
 
-    it('o técnico de outra planta não cria tarefa no plano desta', async () => {
-      await expect(tarefas.criar(nova(copiaAId) as never, { id: TECNICO_B, role: 'operador' })).rejects.toBeInstanceOf(NotFoundException);
+    it('o técnico de outra planta não cria tarefa no plano desta (responde como o plano que não existe)', async () => {
+      await expect(tarefas.criar(nova(copiaAId) as never, { id: TECNICO_B, role: 'operador' })).rejects.toThrow('Plano de manutenção não encontrado');
+      await expect(tarefas.criar(nova('planoquenaoexiste00000000') as never, { id: TECNICO_B, role: 'operador' })).rejects.toThrow(
+        'Plano de manutenção não encontrado',
+      );
       expect(await prisma.tarefas.count({ where: { instrucao_id: instrucaoId } })).toBe(0);
     });
 

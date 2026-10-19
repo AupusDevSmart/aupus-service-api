@@ -10,7 +10,7 @@ import {
 import { Prisma, StatusProgramacaoOS, PrioridadeOS, type TipoOS, type programacoes_os, type tarefas_programacao_os } from '@/core';
 import { plantasDosEquipamentos } from '@/core/modules/auth/planta-dos-equipamentos';
 import { garantirPessoasQuePodemAtuar, PessoasDaPlanta, pessoasQuePodemAtuar } from './pessoas-da-os';
-import { equipamentosDasTarefas, plantaDaProgramacao } from './planta-da-programacao';
+import { equipamentosDasTarefas, naoEncontradoDaOrigem, plantaDaProgramacao } from './planta-da-programacao';
 import { PrismaService, PermissionScopeService, ScopedUser } from '@/core';
 import { variantesDeId, variantesDeIds } from '../tarefas/ids';
 import {
@@ -373,11 +373,9 @@ export class ProgramacaoOSService {
     // Toda programação tem planta, a da origem. O escopo confere a planta
     // resolvida: conferir só a informada deixava programar a anomalia de outra
     // planta omitindo o campo.
-    createDto.planta_id = await plantaDaProgramacao(this.prisma, {
-      ...createDto,
-      equipamentos_das_tarefas: await equipamentosDasTarefas(this.prisma, createDto.tarefas_ids),
-    });
-    if (user) await this.scopeService.assertPlantaInScope(createDto.planta_id, user);
+    const onde = { ...createDto, equipamentos_das_tarefas: await equipamentosDasTarefas(this.prisma, createDto.tarefas_ids) };
+    createDto.planta_id = await plantaDaProgramacao(this.prisma, onde);
+    if (user) await this.scopeService.assertPlantaInScope(createDto.planta_id, user, naoEncontradoDaOrigem(onde));
     await this.escalarPessoas(createDto, createDto.planta_id);
 
     // Calcular custo total dos materiais e técnicos
@@ -1483,7 +1481,7 @@ export class ProgramacaoOSService {
         : (await this.prisma.tarefas_programacao_os.findMany({ where: { programacao_id: id }, select: { equipamento_id: true } }))
             .map((v) => v.equipamento_id);
 
-    dto.planta_id = await plantaDaProgramacao(this.prisma, {
+    const onde = {
       planta_id: dto.planta_id,
       // Planta vazia não tira a planta (a tela manda '' quando a origem não traz)
       planta_gravada: atual.planta_id,
@@ -1492,8 +1490,9 @@ export class ProgramacaoOSService {
       dados_origem: dto.dados_origem !== undefined ? dto.dados_origem : atual.dados_origem,
       equipamento_id: dto.equipamento_id !== undefined ? dto.equipamento_id : atual.equipamento_id,
       equipamentos_das_tarefas: equipamentos,
-    });
-    if (user) await this.scopeService.assertPlantaInScope(dto.planta_id, user);
+    };
+    dto.planta_id = await plantaDaProgramacao(this.prisma, onde);
+    if (user) await this.scopeService.assertPlantaInScope(dto.planta_id, user, naoEncontradoDaOrigem(onde));
   }
 
   /**

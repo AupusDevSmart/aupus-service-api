@@ -84,7 +84,8 @@ export function dadosDeFalha(tipo: string, pedido: DadosDeFalhaDoPedido, agora =
   const temParada = !!dados.parada_inicio || !!dados.parada_fim;
 
   if (tipo === 'CORRETIVA') {
-    if (pedido.equipamento_parou === undefined) {
+    // null também: o DTO aceita (IsOptional), e gravaria "não respondido" numa pergunta obrigatória
+    if (typeof pedido.equipamento_parou !== 'boolean') {
       throw new BadRequestException('Na corretiva, diga se o equipamento parou (equipamento_parou).');
     }
     const faltam = [

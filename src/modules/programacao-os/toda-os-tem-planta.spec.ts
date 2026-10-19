@@ -115,6 +115,35 @@ describe('toda anomalia e programação tem planta (banco real)', () => {
       expect(anomalia.planta_id?.trim()).toBe(PLANTA_A);
     });
 
+    // Revisão do SN-57: o equipamento de outra planta dava 404, e o que não existe, 400
+    it('para o técnico, o equipamento de outra planta e o que não existe respondem igual', async () => {
+      const comoTecnico = (equipamentoId: string) =>
+        anomalias.create(
+          {
+            descricao: `${PREFIXO} vazamento`,
+            localizacao: { equipamentoId, local: 'Usina', ativo: 'Inversor' },
+            condicao: CondicaoAnomalia.FUNCIONANDO,
+            origem: OrigemAnomalia.OPERADOR,
+            prioridade: PrioridadeAnomalia.MEDIA,
+          },
+          tecnicoB,
+        );
+      for (const equipamento of [UC_A, ID('naoexiste')]) {
+        const erro = await comoTecnico(equipamento).catch((e) => e);
+        expect(erro).toBeInstanceOf(NotFoundException);
+        expect(erro.message).toBe('Equipamento não encontrado');
+      }
+      // Quem vê todas as plantas segue com o 400 que explica
+      await expect(novaAnomalia(ID('naoexiste'))).rejects.toThrow(BadRequestException);
+
+      const anomalia = await novaAnomalia(UC_B);
+      for (const equipamento of [UC_A, ID('naoexiste')]) {
+        await expect(
+          anomalias.update(anomalia.id, { localizacao: { equipamentoId: equipamento, local: 'x', ativo: 'x' } }, tecnicoB),
+        ).rejects.toThrow('Equipamento não encontrado');
+      }
+    });
+
     it('sem equipamento: recusa', async () => {
       await expect(novaAnomalia(undefined)).rejects.toThrow(BadRequestException);
       expect(await prisma.anomalias.count({ where: { descricao: { startsWith: PREFIXO } } })).toBe(0);
@@ -168,7 +197,9 @@ describe('toda anomalia e programação tem planta (banco real)', () => {
 
     it('técnico de outra planta não programa a anomalia omitindo a planta (o escopo confere a da origem)', async () => {
       const anomalia = await novaAnomalia(UC_A);
-      await expect(novaProgramacao({ origem: OrigemOS.ANOMALIA, anomalia_id: anomalia.id }, tecnicoB)).rejects.toThrow(NotFoundException);
+      // Como a anomalia que não existe (antes: "Planta não encontrada", e o texto contava que existe)
+      await expect(novaProgramacao({ origem: OrigemOS.ANOMALIA, anomalia_id: anomalia.id }, tecnicoB)).rejects.toThrow('Anomalia não encontrada');
+      await expect(novaProgramacao({ origem: OrigemOS.ANOMALIA, anomalia_id: ID('naoexiste') }, tecnicoB)).rejects.toThrow('Anomalia não encontrada');
       expect(await prisma.programacoes_os.count({ where: { descricao: { startsWith: PREFIXO } } })).toBe(0);
     });
 

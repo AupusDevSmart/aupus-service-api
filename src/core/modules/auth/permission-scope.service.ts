@@ -201,11 +201,12 @@ export class PermissionScopeService {
     type: ScopedEntityType,
     entityId: string,
     user: ScopedUser | undefined,
+    /** Quem buscou outro registro antes (o plano, pelo equipamento dele) passa o "não existe" desse registro */
+    naoEncontrado: string = NAO_ENCONTRADO[type],
   ): Promise<void> {
     const scope = await this.getScope(user);
     if (!this.isScoped(scope)) return;
 
-    const naoEncontrado = NAO_ENCONTRADO[type];
     const id = entityId?.trim();
     if (!id) throw new NotFoundException(naoEncontrado);
 

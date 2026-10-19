@@ -30,6 +30,8 @@ const parou = {
 describe('dados de falha (regra)', () => {
   it('na corretiva, é preciso dizer se o equipamento parou', () => {
     expect(() => dadosDeFalha('CORRETIVA', descricao, agora)).toThrow('diga se o equipamento parou');
+    // null passa pelo DTO (IsOptional) e gravaria "não respondido" numa pergunta obrigatória
+    expect(() => dadosDeFalha('CORRETIVA', { ...descricao, equipamento_parou: null } as never, agora)).toThrow('diga se o equipamento parou');
   });
 
   it('parou: sintoma, causa e ação; a mensagem diz o que falta', () => {

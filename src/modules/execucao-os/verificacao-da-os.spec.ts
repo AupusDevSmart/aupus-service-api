@@ -1,6 +1,6 @@
 import * as fs from 'fs';
 import { createHash } from 'node:crypto';
-import { BadRequestException, ConflictException, ForbiddenException, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, NotFoundException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService, PermissionScopeService, TipoAnexoOS } from '@/core';
 import { ExecucaoOSService } from './execucao-os.service';
@@ -296,19 +296,18 @@ describe('código de verificação ao finalizar a OS (banco real)', () => {
     const { codigo } = await osFinalizada();
     const deOutraPlanta = { id: 'cliente', plantas: [] } as never;
 
-    (scope.assertEntityInScope as jest.Mock).mockRejectedValueOnce(new ForbiddenException());
+    (scope.assertEntityInScope as jest.Mock).mockRejectedValueOnce(new NotFoundException('Ordem de serviço não encontrada'));
     await expect(execucoes.conferirCodigo(codigo, deOutraPlanta)).rejects.toBeInstanceOf(NotFoundException);
     await expect(execucoes.conferirCodigo('f'.repeat(64))).rejects.toBeInstanceOf(NotFoundException);
     await expect(execucoes.conferirCodigo('123')).rejects.toBeInstanceOf(BadRequestException);
   });
 
-  // O escopo real recusa com 403 a OS de outra planta (SN-57, decisão pendente:
-  // a regra da casa é 404); o mock antigo rejeitava com 404 e escondia isso
+  // O escopo real recusa a OS de outra planta com 404, igual à que não existe (SN-57)
   it('o relatório confere o escopo de quem pede', async () => {
     const { osId } = await osExecutada(false);
-    (scope.assertEntityInScope as jest.Mock).mockRejectedValueOnce(new ForbiddenException('Recurso fora do escopo'));
+    (scope.assertEntityInScope as jest.Mock).mockRejectedValueOnce(new NotFoundException('Ordem de serviço não encontrada'));
 
-    await expect(execucoes.relatorio(osId, { id: 'x' } as never)).rejects.toBeInstanceOf(ForbiddenException);
+    await expect(execucoes.relatorio(osId, { id: 'x' } as never)).rejects.toThrow('Ordem de serviço não encontrada');
   });
 
   // Já existia: dois "Finalizar" juntos passavam os dois e contavam a execução das tarefas duas vezes

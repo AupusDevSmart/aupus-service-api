@@ -84,7 +84,10 @@ export class TarefasService {
       plano = await this.verificarPlanoExiste(createDto.plano_manutencao_id);
       equipamento_id = plano.equipamento_id;
       planta_id = plano.equipamento?.unidade?.planta_id ?? null;
-      if (user && equipamento_id) await this.scopeService.assertEntityInScope('equipamento', equipamento_id.trim(), user);
+      // O plano de outra planta responde como o que não existe (SN-57)
+      if (user && equipamento_id) {
+        await this.scopeService.assertEntityInScope('equipamento', equipamento_id.trim(), user, 'Plano de manutenção não encontrado');
+      }
 
       if (createDto.ordem === undefined || createDto.ordem === null) {
         createDto.ordem = await this.proximaOrdem(createDto.plano_manutencao_id);

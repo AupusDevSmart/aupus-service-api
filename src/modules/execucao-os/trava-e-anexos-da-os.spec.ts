@@ -1,5 +1,5 @@
 import * as fs from 'fs';
-import { BadRequestException, ConflictException, ForbiddenException, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, NotFoundException } from '@nestjs/common';
 import { PrismaService, PermissionScopeService, StatusOS, TipoAnexoOS } from '@/core';
 import { ExecucaoOSService } from './execucao-os.service';
 import { AnexosOSService } from './anexos-os.service';
@@ -17,7 +17,8 @@ describe('trava e anexos da OS (banco real)', () => {
   const FORA_DO_ESCOPO = 'usuario-fora-do-escopo';
   const scope = {
     assertEntityInScope: jest.fn(async (_tipo: string, _id: string, user: { id: string }) => {
-      if (user?.id === FORA_DO_ESCOPO) throw new ForbiddenException('Recurso fora do escopo do usuario');
+      // Como o escopo real desde o SN-57: fora do escopo é 404, igual ao que não existe
+      if (user?.id === FORA_DO_ESCOPO) throw new NotFoundException('Ordem de serviço não encontrada');
     }),
     assertPlantaInScope: jest.fn(),
     getScope: jest.fn().mockResolvedValue(null),
@@ -146,7 +147,7 @@ describe('trava e anexos da OS (banco real)', () => {
 
       await expect(
         execucoes.registrarMateriais(osId, { materiais: [{ id: materialId, quantidade_consumida: 2 }] } as never, FORA_DO_ESCOPO, fora),
-      ).rejects.toBeInstanceOf(ForbiddenException);
+      ).rejects.toBeInstanceOf(NotFoundException);
     });
 
     it('em execução o consumo grava normalmente', async () => {
@@ -224,10 +225,10 @@ describe('trava e anexos da OS (banco real)', () => {
       const { osId } = await novaOS();
       const anexo = await enviar(osId);
 
-      await expect(anexos.listarAnexosOS(osId, fora)).rejects.toBeInstanceOf(ForbiddenException);
-      await expect(anexos.obterCaminhoArquivo(osId, anexo.id, fora)).rejects.toBeInstanceOf(ForbiddenException);
+      await expect(anexos.listarAnexosOS(osId, fora)).rejects.toBeInstanceOf(NotFoundException);
+      await expect(anexos.obterCaminhoArquivo(osId, anexo.id, fora)).rejects.toBeInstanceOf(NotFoundException);
       await expect(anexos.uploadAnexo(osId, foto(), TipoAnexoOS.FOTO_ANTES, undefined, undefined, fora)).rejects.toBeInstanceOf(
-        ForbiddenException,
+        NotFoundException,
       );
     });
 

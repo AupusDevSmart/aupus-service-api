@@ -103,14 +103,9 @@ export class AnomaliasService {
     const { localizacao, anexos, instrucoes_ids, ...anomaliaData } = createAnomaliaDto;
     const userId = user?.id;
 
-    const plantaId = await this.plantaDoEquipamento(localizacao?.equipamentoId);
-
     // Validar escopo: se usuario tem scope, a planta da anomalia deve estar nele
     const scope = await this.getScope(user);
-    if (this.scopeService.isScoped(scope) && !scope.includes(plantaId)) {
-      // O equipamento de outra planta "não existe" para quem registra (SN-57)
-      throw new NotFoundException('Equipamento não encontrado');
-    }
+    const plantaId = await this.plantaDoEquipamento(localizacao?.equipamentoId, scope);
 
     const data: Prisma.anomaliasCreateInput = {
       ...anomaliaData,
@@ -322,11 +317,7 @@ export class AnomaliasService {
     // Trocar o equipamento leva a planta junto (e o escopo confere a nova)
     let plantaNova: string | undefined;
     if (localizacao?.equipamentoId) {
-      plantaNova = await this.plantaDoEquipamento(localizacao.equipamentoId);
-      const scope = await this.getScope(user);
-      if (this.scopeService.isScoped(scope) && !scope.includes(plantaNova)) {
-        throw new NotFoundException('Equipamento não encontrado');
-      }
+      plantaNova = await this.plantaDoEquipamento(localizacao.equipamentoId, await this.getScope(user));
     }
 
     const data: Prisma.anomaliasUpdateInput = {
@@ -448,11 +439,16 @@ export class AnomaliasService {
    * não tem unidade, ficava sem planta. É por ela que o técnico enxerga a
    * anomalia e que a programação dela herda a planta.
    */
-  private async plantaDoEquipamento(equipamentoId: string | undefined): Promise<string> {
+  private async plantaDoEquipamento(equipamentoId: string | undefined, scope: PlantaScope): Promise<string> {
     if (!equipamentoId?.trim()) {
       throw new BadRequestException('Informe o equipamento da anomalia: e por ele que a anomalia chega a planta.');
     }
     const [planta] = await plantasDosEquipamentos(this.prisma, [equipamentoId]);
+    const escopado = this.scopeService.isScoped(scope);
+    // Para quem tem escopo, o equipamento de outra planta, o sem planta e o que
+    // não existe respondem igual: status ou texto diferente contava que o id
+    // existe (SN-57)
+    if (escopado && (!planta || !scope.includes(planta))) throw new NotFoundException('Equipamento não encontrado');
     if (!planta) throw new BadRequestException('O equipamento informado nao existe ou nao esta em nenhuma planta.');
     return planta;
   }

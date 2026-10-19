@@ -44,10 +44,15 @@ BEGIN
 
   ALTER TABLE public.ordens_servico ADD COLUMN IF NOT EXISTS equipamento_parou BOOLEAN;
 
+  -- A finalizada com código fica como está: a resposta entraria no conteúdo
+  -- recalculado e a conferência daria "não confere" (SN-62). No deploy não
+  -- há nenhuma (este script roda antes da API nova); se houver uma COM parada,
+  -- o CHECK abaixo falha e o script para inteiro (ROLLBACK) — melhor que mudar
+  -- calado o conteúdo de uma OS com código.
   UPDATE public.ordens_servico SET equipamento_parou = true
-   WHERE equipamento_parou IS NULL AND parada_inicio IS NOT NULL;
+   WHERE equipamento_parou IS NULL AND parada_inicio IS NOT NULL AND codigo_verificacao IS NULL;
   UPDATE public.ordens_servico SET equipamento_parou = false
-   WHERE equipamento_parou IS NULL AND parada_inicio IS NULL
+   WHERE equipamento_parou IS NULL AND parada_inicio IS NULL AND codigo_verificacao IS NULL
      AND tipo = 'CORRETIVA' AND falha_sintoma IS NOT NULL;
 
   -- A API responde 400 antes; a trava é a rede para escrita fora dela

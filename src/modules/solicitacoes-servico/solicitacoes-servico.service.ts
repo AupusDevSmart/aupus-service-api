@@ -20,6 +20,7 @@ import { Prisma, type solicitacoes_servico } from '@/core';
 // Import the enum from Prisma
 import { StatusSolicitacaoServico } from '@/core';
 import { comDataNecessidadeNormalizada } from './data-necessidade';
+import { mudouOLugar, plantaDaSolicitacao } from './lugar-da-solicitacao';
 import { registrarNotificacao } from '../notificacoes/registrar-notificacao';
 
 @Injectable()
@@ -170,43 +171,8 @@ export class SolicitacoesServicoService {
         }
       }
 
-      // Determinar o planta_id
-      let planta_id = createDto.planta_id?.trim(); // Adicionar trim() para remover espaços
-
-      // Se não foi fornecido planta_id mas foi fornecido unidade_id, buscar da unidade
-      if (!planta_id && createDto.unidade_id) {
-        const unidade = await prisma.unidades.findUnique({
-          where: { id: createDto.unidade_id.trim() }, // Adicionar trim() aqui também
-          select: { planta_id: true },
-        });
-
-        if (!unidade) {
-          throw new NotFoundException(`Unidade com ID ${createDto.unidade_id} não encontrada`);
-        }
-
-        planta_id = unidade.planta_id?.trim(); // Adicionar trim() ao resultado também
-      }
-
-      // Validar se planta_id foi definido
-      if (!planta_id) {
-        throw new BadRequestException('É necessário informar planta_id ou unidade_id');
-      }
-
-      // Verificar se a planta existe e não está deletada
-      const plantaExiste = await prisma.plantas.findFirst({
-        where: {
-          id: planta_id.trim(), // Garantir que o ID está sem espaços
-          deleted_at: null  // Garantir que a planta não está deletada
-        },
-        select: { id: true },
-      });
-
-      if (!plantaExiste) {
-        throw new NotFoundException(`Planta com ID ${planta_id} não encontrada ou foi deletada`);
-      }
-
-      // Scope RBAC: a planta da solicitacao deve estar no escopo do usuario
-      if (user) await this.scopeService.assertPlantaInScope(planta_id, user);
+      // A planta e a coerência do lugar (unidade, equipamento), com o escopo (SN-57)
+      const planta_id = await plantaDaSolicitacao(this.prisma, this.scopeService, createDto, user);
 
       // Extrair campos que não são colunas da tabela antes de criar
       const { instrucoes_ids, tarefas_ids, ...camposDaTabela } = createDto;
@@ -566,6 +532,21 @@ export class SolicitacoesServicoService {
       throw new ConflictException(
         'Apenas solicitações registradas podem ser editadas',
       );
+    }
+
+    // Levar a solicitação para outro lugar passa pela mesma regra do criar: antes
+    // a edição não conferia a planta nova, e o escopo de quem editava não valia
+    const lugarAtual = await this.prisma.solicitacoes_servico.findUnique({
+      where: { id },
+      select: { planta_id: true, unidade_id: true, equipamento_id: true },
+    });
+    if (lugarAtual && mudouOLugar(updateDto, lugarAtual)) {
+      const novo = {
+        planta_id: updateDto.planta_id !== undefined ? updateDto.planta_id : updateDto.unidade_id !== undefined ? undefined : lugarAtual.planta_id,
+        unidade_id: updateDto.unidade_id !== undefined ? updateDto.unidade_id : lugarAtual.unidade_id,
+        equipamento_id: updateDto.equipamento_id !== undefined ? updateDto.equipamento_id : lugarAtual.equipamento_id,
+      };
+      updateDto.planta_id = await plantaDaSolicitacao(this.prisma, this.scopeService, novo, user);
     }
 
     // Extrair instrucoes_ids e tarefas_ids antes de passar para o Prisma (não são

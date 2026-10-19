@@ -94,3 +94,17 @@ export async function equipamentosDasTarefas(prisma: PrismaService, tarefaIds: s
     SELECT trim(equipamento_id) AS equipamento_id FROM tarefas WHERE trim(id) IN (${Prisma.join(ids)})`;
   return linhas.map((l) => l.equipamento_id).filter((id): id is string => !!id);
 }
+
+/**
+ * O "não encontrado" de quem deu a planta, para o escopo responder igual ao que
+ * não existe (SN-57): a anomalia de outra planta dizia "Planta não encontrada",
+ * e a que não existe, "Anomalia não encontrada" — o texto contava que o id existe.
+ */
+export function naoEncontradoDaOrigem(onde: OndeEstaAProgramacao): string {
+  const { anomaliaId, solicitacaoId } = origemDaProgramacao(onde);
+  if (anomaliaId) return 'Anomalia não encontrada';
+  if (solicitacaoId) return 'Solicitação de serviço não encontrada';
+  if ((onde.equipamentos_das_tarefas ?? []).some((e) => e?.trim())) return 'Uma ou mais tarefas não foram encontradas';
+  if (onde.equipamento_id?.trim()) return 'Equipamento não encontrado';
+  return 'Planta não encontrada';
+}

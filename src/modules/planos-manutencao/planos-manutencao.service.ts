@@ -41,6 +41,9 @@ type PlanoLido = planos_manutencao & {
   _count?: { tarefas?: number; copias?: number };
 };
 
+/** O "não existe" do plano: também para a cópia de outra planta (SN-57) */
+const PLANO_NAO_ENCONTRADO = 'Plano de manutenção não encontrado';
+
 @Injectable()
 export class PlanosManutencaoService {
   constructor(
@@ -67,7 +70,8 @@ export class PlanosManutencaoService {
       select: { equipamento_id: true },
     });
     if (!plano) throw new NotFoundException('Plano de manutenção não encontrado');
-    if (plano.equipamento_id) await this.scopeService.assertEntityInScope('equipamento', plano.equipamento_id, user);
+    // A cópia de outra planta responde como o plano que não existe (SN-57)
+    if (plano.equipamento_id) await this.scopeService.assertEntityInScope('equipamento', plano.equipamento_id, user, PLANO_NAO_ENCONTRADO);
   }
 
   /**
@@ -207,10 +211,12 @@ export class PlanosManutencaoService {
       throw new NotFoundException('Plano de manutenção não encontrado');
     }
 
-    // Scope RBAC: 403 se planta do equipamento nao esta no escopo. O template
-    // (sem equipamento) é livre: antes dava 404 para o técnico e o cliente, que
-    // leem os planos (SN-40).
-    if (user && plano.equipamento_id) await this.scopeService.assertEntityInScope('equipamento', plano.equipamento_id, user);
+    // Fora do escopo: 404 como o plano que não existe (SN-57). O template (sem
+    // equipamento) é livre: antes dava 404 para o técnico e o cliente, que leem
+    // os planos (SN-40).
+    if (user && plano.equipamento_id) {
+      await this.scopeService.assertEntityInScope('equipamento', plano.equipamento_id, user, PLANO_NAO_ENCONTRADO);
+    }
 
     return this.mapearParaResponse(plano);
   }
@@ -420,7 +426,7 @@ export class PlanosManutencaoService {
     // Copia (tem origem) segue amarrada a um equipamento e mantem o escopo por
     // planta. Template e global por categoria e nao tem escopo.
     if (user && existente.equipamento_id) {
-      await this.scopeService.assertEntityInScope('equipamento', existente.equipamento_id, user);
+      await this.scopeService.assertEntityInScope('equipamento', existente.equipamento_id, user, PLANO_NAO_ENCONTRADO);
     }
 
     if (updateDto.categoria_id) {
@@ -453,7 +459,11 @@ export class PlanosManutencaoService {
         where: { id, deleted_at: null },
         select: { equipamento_id: true },
       });
-      if (existing) await this.scopeService.assertEntityInScope('equipamento', existing.equipamento_id, user);
+      // Como no atualizar: só a cópia tem escopo. O template sem equipamento caía
+      // no "id vazio" e dava 404 a quem tem escopo
+      if (existing?.equipamento_id) {
+        await this.scopeService.assertEntityInScope('equipamento', existing.equipamento_id, user, PLANO_NAO_ENCONTRADO);
+      }
     }
     await this.verificarPlanoExiste(id);
 
