@@ -1,5 +1,6 @@
 import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { CondicaoOS, OrigemOS, PermissionScopeService, PrioridadeOS, PrismaService, TipoOS } from '@/core';
+import { apagarSolicitacoesDeTeste, solicitacaoDeTeste } from '../../../test/planta-de-teste';
 import { ProgramacaoOSService } from './programacao-os.service';
 import { AnomaliasService } from '../anomalias/anomalias.service';
 import { CondicaoAnomalia, OrigemAnomalia, PrioridadeAnomalia } from '../anomalias/dto/create-anomalia.dto';
@@ -39,6 +40,7 @@ describe('toda anomalia e programação tem planta (banco real)', () => {
   };
 
   const apagarFixos = async () => {
+    await apagarSolicitacoesDeTeste(prisma, [PLANTA_A, PLANTA_B]);
     await prisma.equipamentos.deleteMany({ where: { id: { in: [UAR_A, UC_A, UC_B] } } });
     await prisma.unidades.deleteMany({ where: { id: { in: [UNIDADE_A, UNIDADE_B] } } });
     await prisma.planta_operadores.deleteMany({ where: { usuario_id: TECNICO_B } });
@@ -127,12 +129,13 @@ describe('toda anomalia e programação tem planta (banco real)', () => {
   });
 
   describe('programação', () => {
-    it('manual sem planta: recusa', async () => {
-      await expect(novaProgramacao()).rejects.toThrow(/precisa de planta/);
+    // SN-69: a manual (sem origem) não existe mais; a planta sai sempre da origem
+    it('manual: recusa antes de procurar a planta', async () => {
+      await expect(novaProgramacao({ planta_id: PLANTA_A })).rejects.toThrow(/Toda OS tem origem/);
     });
 
-    it('manual com planta: grava a informada', async () => {
-      const prog = await novaProgramacao({ planta_id: PLANTA_A });
+    it('da solicitação: a planta dela', async () => {
+      const prog = await novaProgramacao(await solicitacaoDeTeste(prisma, PLANTA_A));
       expect(await plantaGravada(prog.id)).toBe(PLANTA_A);
     });
 
@@ -154,9 +157,13 @@ describe('toda anomalia e programação tem planta (banco real)', () => {
       await expect(novaProgramacao({ origem: OrigemOS.ANOMALIA, anomalia_id: anomalia.id, planta_id: PLANTA_B })).rejects.toThrow(/não é a mesma/);
     });
 
+    // A solicitação de outra planta prova que o UAR resolveu para a do UC pai
     it('do componente (UAR): a planta do UC pai', async () => {
-      const prog = await novaProgramacao({ equipamento_id: UAR_A });
+      const prog = await novaProgramacao({ ...(await solicitacaoDeTeste(prisma, PLANTA_A)), equipamento_id: UAR_A });
       expect(await plantaGravada(prog.id)).toBe(PLANTA_A);
+      await expect(novaProgramacao({ ...(await solicitacaoDeTeste(prisma, PLANTA_B)), equipamento_id: UAR_A })).rejects.toThrow(
+        /A planta do equipamento não é a mesma da solicitação/,
+      );
     });
 
     it('técnico de outra planta não programa a anomalia omitindo a planta (o escopo confere a da origem)', async () => {
@@ -172,7 +179,7 @@ describe('toda anomalia e programação tem planta (banco real)', () => {
     });
 
     it('editar com a planta vazia (a tela manda quando a origem não traz) mantém a gravada', async () => {
-      const prog = await novaProgramacao({ planta_id: PLANTA_A });
+      const prog = await novaProgramacao({ ...(await solicitacaoDeTeste(prisma, PLANTA_A)), planta_id: PLANTA_A });
       await programacoes.atualizar(prog.id, { planta_id: '' } as never);
       expect(await plantaGravada(prog.id)).toBe(PLANTA_A);
     });
@@ -187,10 +194,10 @@ describe('toda anomalia e programação tem planta (banco real)', () => {
       expect(await plantaGravada(prog.id)).toBe(PLANTA_B);
     });
 
-    it('editar trocando a planta da manual vale (não há origem que diga outra)', async () => {
-      const prog = await novaProgramacao({ planta_id: PLANTA_A });
-      await programacoes.atualizar(prog.id, { planta_id: PLANTA_B } as never);
-      expect(await plantaGravada(prog.id)).toBe(PLANTA_B);
+    it('editar trocando a planta para uma que não é a da origem: recusa', async () => {
+      const prog = await novaProgramacao(await solicitacaoDeTeste(prisma, PLANTA_A));
+      await expect(programacoes.atualizar(prog.id, { planta_id: PLANTA_B } as never)).rejects.toThrow(/não é a mesma/);
+      expect(await plantaGravada(prog.id)).toBe(PLANTA_A);
     });
   });
 });

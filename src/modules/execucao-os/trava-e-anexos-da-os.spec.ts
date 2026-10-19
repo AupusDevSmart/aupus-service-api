@@ -81,7 +81,7 @@ describe('trava e anexos da OS (banco real)', () => {
       condicoes: 'FUNCIONANDO',
       tipo: 'CORRETIVA',
       prioridade: 'MEDIA',
-      origem: 'MANUAL',
+      ...(await planta.origem()),
       planta_id: planta.id,
     } as never);
     await programacoes.aprovar(prog.id, {});

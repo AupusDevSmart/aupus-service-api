@@ -116,7 +116,7 @@ describe('código de verificação ao finalizar a OS (banco real)', () => {
       condicoes: 'FUNCIONANDO',
       tipo: 'PREVENTIVA',
       prioridade: 'MEDIA',
-      origem: 'MANUAL',
+      ...(await planta.origem()),
       planta_id: planta.id,
     } as never);
     await programacoes.aprovar(prog.id, {});
@@ -149,7 +149,7 @@ describe('código de verificação ao finalizar a OS (banco real)', () => {
       condicoes: 'FUNCIONANDO',
       tipo: 'PREVENTIVA',
       prioridade: 'MEDIA',
-      origem: 'MANUAL',
+      ...(await planta.origem()),
       planta_id: planta.id,
     } as never);
     await programacoes.aprovar(prog.id, {});

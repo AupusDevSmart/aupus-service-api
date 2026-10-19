@@ -1,5 +1,6 @@
 import { BadRequestException } from '@nestjs/common';
-import { CondicaoOS, OrigemOS, PermissionScopeService, PrioridadeOS, PrismaService, TipoOS } from '@/core';
+import { CondicaoOS, PermissionScopeService, PrioridadeOS, PrismaService, TipoOS } from '@/core';
+import { apagarSolicitacoesDeTeste, solicitacaoDeTeste } from '../../../test/planta-de-teste';
 import { ProgramacaoOSService } from './programacao-os.service';
 import { garantirPessoasQuePodemAtuar, pessoasQuePodemAtuar } from './pessoas-da-os';
 
@@ -47,6 +48,7 @@ describe('pessoas que podem atuar na OS (banco real)', () => {
 
   const apagarFixos = async () => {
     await prisma.planta_operadores.deleteMany({ where: { usuario_id: { in: IDS } } });
+    await apagarSolicitacoesDeTeste(prisma, [PLANTA_A, PLANTA_B]);
     await prisma.plantas.deleteMany({ where: { id: { in: [PLANTA_A, PLANTA_B] } } });
     await prisma.model_has_roles.deleteMany({ where: { model_id: { in: IDS }, model_type: MODEL_TYPE } });
     await prisma.usuarios.deleteMany({ where: { id: { in: IDS } } });
@@ -57,13 +59,13 @@ describe('pessoas que podem atuar na OS (banco real)', () => {
       data: { id, nome: `${PREFIXO} ${id}`, cnpj, localizacao: 'x', horario_funcionamento: '08-18', logradouro: 'Rua', cidade: 'Goiânia', uf: 'GO', cep: '74000-000', proprietario_id: DONO },
     });
 
-  const novaProgramacao = (extra: Record<string, unknown> = {}) =>
+  const novaProgramacao = async (extra: Record<string, unknown> = {}) =>
     programacoes.criar({
       descricao: `${PREFIXO} manutenção`,
       condicoes: CondicaoOS.FUNCIONANDO,
       tipo: TipoOS.CORRETIVA,
       prioridade: PrioridadeOS.MEDIA,
-      origem: OrigemOS.MANUAL,
+      ...(await solicitacaoDeTeste(prisma, PLANTA_A)),
       planta_id: PLANTA_A,
       ...extra,
     } as never);
@@ -195,9 +197,11 @@ describe('pessoas que podem atuar na OS (banco real)', () => {
       expect(editada.responsavel).toBe('Gil Gerente');
       expect(editada.responsavel_id?.trim()).toBe(GERENTE);
 
-      // Ana é da planta A: levar a programação para a B com ela escalada é recusado
+      // Ana é da planta A: levar a programação para a B (a planta sai da origem:
+      // uma solicitação da B) com ela escalada é recusado
       await expect(
         programacoes.atualizar(criada.id, {
+          ...(await solicitacaoDeTeste(prisma, PLANTA_B)),
           planta_id: PLANTA_B,
           tecnicos: [{ tecnico_id: TECNICO_A, especialidade: 'Técnico Elétrico', horas_estimadas: 4 }],
         } as never),

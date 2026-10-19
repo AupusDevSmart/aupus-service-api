@@ -172,7 +172,7 @@ describe('dados de falha ao executar a OS (banco real)', () => {
       condicoes: 'PARADO',
       tipo,
       prioridade: 'ALTA',
-      origem: 'MANUAL',
+      ...(await planta.origem()),
       planta_id: planta.id,
     } as never);
     await programacoes.aprovar(prog.id, {});

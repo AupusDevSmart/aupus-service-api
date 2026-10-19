@@ -1,4 +1,4 @@
-import { CondicaoOS, OrigemOS, PermissionScopeService, PrioridadeOS, PrismaService, TipoOS } from '@/core';
+import { CondicaoOS, PermissionScopeService, PrioridadeOS, PrismaService, TipoOS } from '@/core';
 import { ProgramacaoOSService } from './programacao-os.service';
 import { criarPlantaDeTeste } from '../../../test/planta-de-teste';
 
@@ -33,13 +33,13 @@ describe('código da programação (banco real)', () => {
     await prisma.$disconnect();
   });
 
-  const nova = (rotulo: string) =>
+  const nova = async (rotulo: string) =>
     programacoes.criar({
       descricao: `${PREFIXO} ${rotulo}`,
       condicoes: CondicaoOS.FUNCIONANDO,
       tipo: TipoOS.CORRETIVA,
       prioridade: PrioridadeOS.MEDIA,
-      origem: OrigemOS.MANUAL,
+      ...(await planta.origem()),
       planta_id: planta.id,
     } as never);
 

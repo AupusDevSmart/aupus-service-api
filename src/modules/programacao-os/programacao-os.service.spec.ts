@@ -141,6 +141,8 @@ describe('ProgramacaoOSService', () => {
     tarefas_programacao_os: {
       findMany: jest.fn(),
       findFirst: jest.fn(),
+      // SN-69: editar e aprovar contam as tarefas (origem plano ou tarefa)
+      count: jest.fn().mockResolvedValue(1),
       createMany: jest.fn(),
       updateMany: jest.fn(),
       delete: jest.fn(),
@@ -458,12 +460,17 @@ describe('ProgramacaoOSService', () => {
       planta_id: 'clrx1234567890123456789012',
       tempo_estimado: 4.5,
       duracao_estimada: 6.0,
+      // SN-69: a origem plano aponta para as tarefas
+      tarefas_ids: ['tarefa_1'],
     };
 
     it('deve criar uma programação simples', async () => {
       const mockTransaction = jest.fn(async (callback) => {
         return await callback(mockPrismaService);
       });
+      mockPrismaService.tarefas.findMany.mockResolvedValue([{ id: 'tarefa_1', nome: 'Limpeza', deleted_at: null, instrucao: null }]);
+      mockPrismaService.tarefas_programacao_os.findMany.mockResolvedValue([]);
+      mockPrismaService.tarefas_programacao_os.createMany.mockResolvedValue({ count: 1 });
 
       mockPrismaService.$transaction.mockImplementation(mockTransaction);
       mockPrismaService.programacoes_os.create.mockResolvedValue(mockProgramacaoData);

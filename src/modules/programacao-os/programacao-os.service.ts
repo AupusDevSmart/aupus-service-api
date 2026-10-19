@@ -21,6 +21,7 @@ import {
   type JanelaDaReserva,
 } from '../reservas/ocupacao-da-viatura';
 import { gerarNumeroOS } from '../../common/helpers/numeracao-os';
+import { exigirOrigem } from './origem-exigida';
 import { Instalacao, instalacoesDasProgramacoes } from '../../common/helpers/instalacao-da-os';
 import {
   finalizarOrigem,
@@ -363,6 +364,9 @@ export class ProgramacaoOSService {
       createDto.veiculo_id = createDto.veiculo_id.trim();
     }
 
+    // SN-69: toda OS tem origem, e a origem aponta para o que a originou
+    exigirOrigem({ ...createDto, tarefas: createDto.tarefas_ids?.length ?? 0 });
+
     // Validar relacionamentos
     await this.validarRelacionamentos(createDto);
 
@@ -519,6 +523,20 @@ export class ProgramacaoOSService {
     if (programacao.status !== StatusProgramacaoOS.PENDENTE) {
       throw new ConflictException('Apenas programações pendentes podem ser editadas');
     }
+
+    // SN-69: a origem de depois da edição. A avulsa de antes da regra só se
+    // edita escolhendo uma origem (a edição não troca as tarefas: contam as de hoje)
+    exigirOrigem(
+      {
+      origem: updateDto.origem ?? programacao.origem,
+      anomalia_id: updateDto.anomalia_id !== undefined ? updateDto.anomalia_id : programacao.anomalia_id,
+      solicitacao_servico_id:
+        updateDto.solicitacao_servico_id !== undefined ? updateDto.solicitacao_servico_id : programacao.solicitacao_servico_id,
+      dados_origem: updateDto.dados_origem !== undefined ? updateDto.dados_origem : programacao.dados_origem,
+      tarefas: await this.prisma.tarefas_programacao_os.count({ where: { programacao_id: id } }),
+      },
+      { avulsaAntiga: programacao.origem === 'MANUAL' },
+    );
 
     // Limpar IDs (remover espaços em branco)
     if (updateDto.veiculo_id) {
@@ -706,6 +724,11 @@ export class ProgramacaoOSService {
     if (programacao.status !== StatusProgramacaoOS.PENDENTE) {
       throw new ConflictException('Apenas programações pendentes podem ser aprovadas');
     }
+    // SN-69: a OS nasceria sem origem
+    exigirOrigem(
+      { ...programacao, tarefas: await this.prisma.tarefas_programacao_os.count({ where: { programacao_id: id } }) },
+      { avulsaAntiga: true },
+    );
 
     // Buscar nome do usuário aprovador
     let nomeAprovador: string | null = null;

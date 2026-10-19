@@ -1,6 +1,7 @@
 import { BadRequestException, ConflictException, NotFoundException, ValidationPipe } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
-import { CondicaoOS, OrigemOS, PermissionScopeService, PrioridadeOS, PrismaService, TipoOS } from '@/core';
+import { CondicaoOS, PermissionScopeService, PrioridadeOS, PrismaService, TipoOS } from '@/core';
+import { apagarSolicitacoesDeTeste, solicitacaoDeTeste } from '../../../test/planta-de-teste';
 import { ExecucaoOSService } from './execucao-os.service';
 import { ProgramacaoOSService } from '../programacao-os/programacao-os.service';
 import { horasDaEquipe, horasEmTexto, minutosEfetivos } from './horas-da-execucao';
@@ -141,6 +142,7 @@ describe('horas ao executar a OS (banco real)', () => {
 
   const apagarFixos = async () => {
     await prisma.planta_operadores.deleteMany({ where: { usuario_id: { in: IDS } } });
+    await apagarSolicitacoesDeTeste(prisma, [PLANTA]);
     await prisma.plantas.deleteMany({ where: { id: PLANTA } });
     await prisma.model_has_roles.deleteMany({ where: { model_id: { in: IDS }, model_type: MODEL_TYPE } });
     await prisma.usuarios.deleteMany({ where: { id: { in: IDS } } });
@@ -180,7 +182,7 @@ describe('horas ao executar a OS (banco real)', () => {
       condicoes: CondicaoOS.FUNCIONANDO,
       tipo: TipoOS.PREVENTIVA,
       prioridade: PrioridadeOS.MEDIA,
-      origem: OrigemOS.MANUAL,
+      ...(await solicitacaoDeTeste(prisma, PLANTA)),
       planta_id: PLANTA,
       tecnicos,
     } as never);

@@ -95,13 +95,13 @@ describe('reservas de viatura: conflito de horário e status pelo fluxo da OS (b
     await prisma.$disconnect();
   });
 
-  const programar = (dia: string, horaInicio: string | null, horaFim: string | null, diaFim = dia) =>
+  const programar = async (dia: string, horaInicio: string | null, horaFim: string | null, diaFim = dia) =>
     programacoes.criar({
       descricao: `${PREFIXO} ${dia} ${horaInicio}-${horaFim}`,
       condicoes: 'PARADO',
       tipo: 'CORRETIVA',
       prioridade: 'MEDIA',
-      origem: 'MANUAL',
+      ...(await planta.origem()),
       planta_id: planta.id,
       necessita_veiculo: true,
       veiculo_id: veiculoId,
