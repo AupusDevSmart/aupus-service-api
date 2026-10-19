@@ -54,6 +54,11 @@ export interface ConteudoDaOS {
     recomendacoes: string | null;
     incidentes_seguranca: string | null;
     checklist_concluido: number | null;
+    /**
+     * Ausente = não respondido: o conteúdo de quem não tem resposta (as OS de
+     * antes de 19/out/2026) é o mesmo de antes, e o código delas não muda
+     */
+    equipamento_parou?: boolean;
     parada_inicio: Data;
     parada_fim: Data;
     falha_sintoma: string | null;
@@ -244,6 +249,7 @@ export async function conteudoDaOS(prisma: Leitor, osId: string, somar: Somar = 
       recomendacoes: texto(os.recomendacoes),
       incidentes_seguranca: texto(os.incidentes_seguranca),
       checklist_concluido: numero(os.checklist_concluido),
+      equipamento_parou: os.equipamento_parou ?? undefined,
       parada_inicio: data(os.parada_inicio),
       parada_fim: data(os.parada_fim),
       falha_sintoma: texto(os.falha_sintoma),

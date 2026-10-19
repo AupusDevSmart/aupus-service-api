@@ -621,6 +621,9 @@ export class OrdemServicoResponseDto {
   @ApiPropertyOptional({ description: 'Problemas encontrados' })
   problemas_encontrados?: string;
 
+  @ApiPropertyOptional({ description: 'O equipamento parou? Null = não respondido (SN-60)', nullable: true })
+  equipamento_parou?: boolean | null;
+
   @ApiPropertyOptional({ description: 'Quando o equipamento parou (SN-60)', nullable: true })
   parada_inicio?: Date | null;
 

@@ -1184,7 +1184,8 @@ export class ExecucaoOSService {
 
     // SN-60: na corretiva, se parou, sintoma, causa e ação (400 sem eles)
     const falha = dadosDeFalha(os.tipo, dto);
-    const mudancaNaFalha = os.falha_sintoma || os.parada_inicio ? mudancasNaFalha(dadosDaOS(os), falha) : null;
+    const mudancaNaFalha =
+      os.falha_sintoma || os.parada_inicio || os.equipamento_parou !== null ? mudancasNaFalha(dadosDaOS(os), falha) : null;
     // O equipamento que parou fica na OS: a coluna quase nunca vinha preenchida, e
     // o MTBF por equipamento da Fase 6 não teria de onde ler
     const equipamentoDaFalha =
@@ -1936,6 +1937,7 @@ export class ExecucaoOSService {
       resultado_servico: os.resultado_servico,
       problemas_encontrados: os.problemas_encontrados,
       // SN-60: os dados de falha
+      equipamento_parou: os.equipamento_parou,
       parada_inicio: os.parada_inicio,
       parada_fim: os.parada_fim,
       minutos_parado: minutosParado(os),

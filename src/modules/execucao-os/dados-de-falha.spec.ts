@@ -10,7 +10,9 @@ import { ExecutarOSDto } from './dto/os-actions.dto';
  * Dados de falha na OS (SN-60). Na corretiva, sintoma, causa e ação são
  * obrigatórios e é preciso dizer se o equipamento parou; só quem parou tem
  * parada (exigir de toda corretiva obrigava a inventar uma: a anomalia nasce
- * "funcionando"). Nos outros tipos, tudo opcional, mas a parada vai inteira.
+ * "funcionando"). Quando parou e voltou são opcionais (19/out/2026), e por isso
+ * a resposta "parou?" é gravada. Nos outros tipos, tudo opcional; a parada vai
+ * inteira em qualquer tipo.
  */
 const agora = new Date('2026-10-16T15:00:00.000Z');
 const descricao = {
@@ -30,16 +32,27 @@ describe('dados de falha (regra)', () => {
     expect(() => dadosDeFalha('CORRETIVA', descricao, agora)).toThrow('diga se o equipamento parou');
   });
 
-  it('parou: parada, retorno, sintoma, causa e ação; a mensagem diz o que falta', () => {
+  it('parou: sintoma, causa e ação; a mensagem diz o que falta', () => {
     expect(() => dadosDeFalha('CORRETIVA', { equipamento_parou: true }, agora)).toThrow(
-      'Na corretiva, informe quando o equipamento parou, quando voltou a funcionar, o sintoma, a causa e a ação tomada.',
+      'Na corretiva, informe o sintoma, a causa e a ação tomada.',
     );
     expect(() => dadosDeFalha('CORRETIVA', { ...parou, falha_causa: '  ' }, agora)).toThrow('Na corretiva, informe a causa.');
-    expect(dadosDeFalha('CORRETIVA', parou, agora)).toMatchObject({ falha_causa: 'Ventilador travado por poeira' });
+    expect(dadosDeFalha('CORRETIVA', parou, agora)).toMatchObject({ equipamento_parou: true, falha_causa: 'Ventilador travado por poeira' });
+  });
+
+  // Decisão do usuário (19/out/2026): o técnico nem sempre sabe a hora
+  it('parou sem horário: passa, e o "sim" fica gravado (sem ele, igual a não parou)', () => {
+    expect(dadosDeFalha('CORRETIVA', { equipamento_parou: true, ...descricao }, agora)).toMatchObject({
+      equipamento_parou: true,
+      parada_inicio: null,
+      parada_fim: null,
+    });
+    expect(() => dadosDeFalha('CORRETIVA', { equipamento_parou: true, ...descricao, parada_inicio: parou.parada_inicio }, agora)).toThrow('os dois');
   });
 
   it('não parou: sem parada, mas com sintoma, causa e ação; data de parada é recusada', () => {
     expect(dadosDeFalha('CORRETIVA', { equipamento_parou: false, ...descricao }, agora)).toMatchObject({
+      equipamento_parou: false,
       parada_inicio: null,
       parada_fim: null,
       falha_acao: descricao.falha_acao,
@@ -50,6 +63,7 @@ describe('dados de falha (regra)', () => {
 
   it('nos outros tipos, opcionais (vazio grava nulo)', () => {
     expect(dadosDeFalha('PREVENTIVA', {}, agora)).toEqual({
+      equipamento_parou: null,
       parada_inicio: null,
       parada_fim: null,
       falha_sintoma: null,
@@ -67,6 +81,10 @@ describe('dados de falha (regra)', () => {
     [{ parada_inicio: '2025-10-16T11:00:00.000Z', parada_fim: '2026-10-16T13:00:00.000Z' }, 'mais de um ano'],
   ])('a parada vai inteira e coerente: %j', (pedido, frase) => {
     expect(() => dadosDeFalha('PREVENTIVA', pedido, agora)).toThrow(frase);
+  });
+
+  it('parada informada é parou, também na preventiva (que não pergunta)', () => {
+    expect(dadosDeFalha('PREVENTIVA', { parada_inicio: parou.parada_inicio, parada_fim: parou.parada_fim }, agora).equipamento_parou).toBe(true);
   });
 
   it('o relógio do celular uns minutos adiantado não trava', () => {
@@ -92,6 +110,7 @@ describe('dados de falha (regra)', () => {
       'Dados de falha alterados: voltou em: 2026-10-16T13:05:00.000Z -> 2026-10-16T11:50:00.000Z; causa: Ventilador travado por poeira -> Rolamento',
     );
     expect(mudancasNaFalha(antes, antes)).toBeNull();
+    expect(mudancasNaFalha(antes, dadosDeFalha('CORRETIVA', { equipamento_parou: false, ...descricao }, agora))).toContain('parou: sim -> não');
   });
 });
 
@@ -179,12 +198,37 @@ describe('dados de falha ao executar a OS (banco real)', () => {
     expect(await execucoes.buscarPorId(osId)).toMatchObject({ status: 'EXECUTADA', falha_causa: descricao.falha_causa, minutos_parado: 120 });
   });
 
+  it('parou sem horário: executa, e a OS diz que parou (sem duração)', async () => {
+    const osId = await osEmExecucao('CORRETIVA');
+
+    await execucoes.executar(osId, { resultado_servico: 'ok', equipamento_parou: true, ...descricao } as never);
+
+    expect(await execucoes.buscarPorId(osId)).toMatchObject({ status: 'EXECUTADA', equipamento_parou: true, parada_inicio: null, minutos_parado: null });
+  });
+
+  // A trava do banco (2026-10-19-equipamento-parou.sql): parada só em quem parou
+  it('o banco recusa parada em quem não parou', async () => {
+    const osId = await osEmExecucao('PREVENTIVA');
+
+    await expect(
+      prisma.ordens_servico.update({
+        where: { id: osId },
+        data: { equipamento_parou: false, parada_inicio: new Date(ontem(0)), parada_fim: new Date(ontem(1)) },
+      }),
+    ).rejects.toThrow(/ordens_servico_parou_check/);
+  });
+
   it('não parou: executa sem parada, com sintoma, causa e ação', async () => {
     const osId = await osEmExecucao('CORRETIVA');
 
     await execucoes.executar(osId, { resultado_servico: 'ok', equipamento_parou: false, ...descricao } as never);
 
-    expect(await execucoes.buscarPorId(osId)).toMatchObject({ status: 'EXECUTADA', minutos_parado: null, falha_sintoma: descricao.falha_sintoma });
+    expect(await execucoes.buscarPorId(osId)).toMatchObject({
+      status: 'EXECUTADA',
+      equipamento_parou: false,
+      minutos_parado: null,
+      falha_sintoma: descricao.falha_sintoma,
+    });
   });
 
   it('a preventiva executa sem eles; com a parada, grava a parada', async () => {
@@ -194,7 +238,7 @@ describe('dados de falha ao executar a OS (banco real)', () => {
 
     const comParada = await osEmExecucao('PREVENTIVA');
     await execucoes.executar(comParada, { resultado_servico: 'ok', parada_inicio: ontem(0), parada_fim: ontem(1) } as never);
-    expect((await execucoes.buscarPorId(comParada)).minutos_parado).toBe(60);
+    expect(await execucoes.buscarPorId(comParada)).toMatchObject({ minutos_parado: 60, equipamento_parou: true });
   });
 
   // Revisão do SN-60: o status era conferido fora da gravação, e o segundo

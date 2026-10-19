@@ -2047,8 +2047,10 @@ model ordens_servico {
   incidentes_seguranca         String?                   @map("incidentes_seguranca")
   medidas_seguranca_adicionais String?                   @map("medidas_seguranca_adicionais")
   procedimentos_seguidos       String?                   @map("procedimentos_seguidos")
-  /// SN-60: quando o equipamento parou e voltou (UTC), o sintoma, a causa e a ação.
-  /// Obrigatórios na corretiva; base do MTTR, do MTBF e da disponibilidade
+  /// SN-60: o equipamento parou? (obrigatório na corretiva; nulo = não respondido),
+  /// quando parou e voltou (UTC, opcionais), o sintoma, a causa e a ação (obrigatórios
+  /// na corretiva). Base do MTTR, do MTBF e da disponibilidade
+  equipamento_parou            Boolean?                  @map("equipamento_parou")
   parada_inicio                DateTime?                 @map("parada_inicio") @db.Timestamp(0)
   parada_fim                   DateTime?                 @map("parada_fim") @db.Timestamp(0)
   falha_sintoma                String?                   @map("falha_sintoma")

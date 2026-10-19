@@ -12,8 +12,15 @@ import type { PrismaClient } from '@prisma/client';
  * puxava a data dela, e o técnico gravava dias de parada que não houve. A
  * falha sem parada conta no MTBF e não entra na disponibilidade.
  *
+ * Quando parou e quando voltou são **opcionais** mesmo para quem parou
+ * (decisão do usuário, 19/out/2026: o técnico nem sempre sabe a hora). Por
+ * isso a resposta "parou?" é gravada (`equipamento_parou`): deduzida das
+ * datas, um "sim" sem horário ficaria igual a um "não". A corretiva que parou
+ * sem horário conta como parada, mas sem duração para o MTTR.
+ *
  * Nos outros tipos tudo é opcional (a preventiva pode ter parado o
- * equipamento), mas a parada vai inteira: início sem retorno não tem duração.
+ * equipamento). Em qualquer tipo a parada vai inteira — início sem retorno não
+ * tem duração — e parada informada é "parou".
  */
 export interface DadosDeFalhaDoPedido {
   equipamento_parou?: boolean;
@@ -25,6 +32,8 @@ export interface DadosDeFalhaDoPedido {
 }
 
 export interface DadosDeFalha {
+  /** Null = não respondido (fora da corretiva, sem parada) */
+  equipamento_parou: boolean | null;
   parada_inicio: Date | null;
   parada_fim: Date | null;
   falha_sintoma: string | null;
@@ -65,6 +74,7 @@ const emLista = (itens: string[]) =>
  */
 export function dadosDeFalha(tipo: string, pedido: DadosDeFalhaDoPedido, agora = new Date()): DadosDeFalha {
   const dados: DadosDeFalha = {
+    equipamento_parou: pedido.equipamento_parou ?? null,
     parada_inicio: noSegundo(pedido.parada_inicio),
     parada_fim: noSegundo(pedido.parada_fim),
     falha_sintoma: texto(pedido.falha_sintoma),
@@ -78,8 +88,6 @@ export function dadosDeFalha(tipo: string, pedido: DadosDeFalhaDoPedido, agora =
       throw new BadRequestException('Na corretiva, diga se o equipamento parou (equipamento_parou).');
     }
     const faltam = [
-      pedido.equipamento_parou && !dados.parada_inicio && 'quando o equipamento parou',
-      pedido.equipamento_parou && !dados.parada_fim && 'quando voltou a funcionar',
       !dados.falha_sintoma && 'o sintoma',
       !dados.falha_causa && 'a causa',
       !dados.falha_acao && 'a ação tomada',
@@ -95,6 +103,8 @@ export function dadosDeFalha(tipo: string, pedido: DadosDeFalhaDoPedido, agora =
     throw new BadRequestException('Informe quando o equipamento parou e quando voltou a funcionar, os dois.');
   }
   if (inicio && fim) {
+    // Parada informada é parou, também na preventiva que não pergunta
+    dados.equipamento_parou = true;
     if (fim < inicio) throw new BadRequestException('O equipamento voltou a funcionar antes de parar: confira as duas datas.');
     if (fim.getTime() > agora.getTime() + FOLGA_DO_RELOGIO_MS) {
       throw new BadRequestException('O retorno ao funcionamento está no futuro: informe quando o equipamento voltou de fato.');
@@ -112,12 +122,14 @@ export const minutosParado = (d: Pick<DadosDeFalha, 'parada_inicio' | 'parada_fi
 
 /** Os dados de falha que já estão na OS (a resposta de buscarPorId). */
 export const dadosDaOS = (os: {
+  equipamento_parou?: boolean | null;
   parada_inicio?: Date | string | null;
   parada_fim?: Date | string | null;
   falha_sintoma?: string | null;
   falha_causa?: string | null;
   falha_acao?: string | null;
 }): DadosDeFalha => ({
+  equipamento_parou: os.equipamento_parou ?? null,
   parada_inicio: os.parada_inicio ? new Date(os.parada_inicio) : null,
   parada_fim: os.parada_fim ? new Date(os.parada_fim) : null,
   falha_sintoma: os.falha_sintoma ?? null,
@@ -147,13 +159,15 @@ export async function equipamentoDaCorretiva(
 /** O que mudou nos dados de falha ao reexecutar, para o histórico (o auditor vê o antes e o depois). */
 export function mudancasNaFalha(antes: DadosDeFalha, depois: DadosDeFalha): string | null {
   const rotulos: Record<keyof DadosDeFalha, string> = {
+    equipamento_parou: 'parou',
     parada_inicio: 'parou em',
     parada_fim: 'voltou em',
     falha_sintoma: 'sintoma',
     falha_causa: 'causa',
     falha_acao: 'ação',
   };
-  const valor = (v: Date | string | null) => (v instanceof Date ? v.toISOString() : (v ?? '—'));
+  const valor = (v: DadosDeFalha[keyof DadosDeFalha]) =>
+    v instanceof Date ? v.toISOString() : typeof v === 'boolean' ? (v ? 'sim' : 'não') : (v ?? '—');
   const mudou = (Object.keys(rotulos) as Array<keyof DadosDeFalha>).filter((k) => valor(antes[k]) !== valor(depois[k]));
   if (mudou.length === 0) return null;
   return `Dados de falha alterados: ${mudou.map((k) => `${rotulos[k]}: ${valor(antes[k])} -> ${valor(depois[k])}`).join('; ')}`;

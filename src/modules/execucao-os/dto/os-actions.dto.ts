@@ -412,7 +412,8 @@ export class ExecutarOSDto {
   resultado_servico: string;
 
   // SN-60: os dados de falha. Na corretiva, dizer se parou; sintoma, causa e
-  // ação obrigatórios; a parada, se parou (regra em dados-de-falha.ts)
+  // ação obrigatórios; quando parou e voltou, opcionais e os dois juntos
+  // (regra em dados-de-falha.ts)
   @ApiPropertyOptional({ description: 'O equipamento parou? Obrigatório na corretiva' })
   @IsOptional()
   @IsBoolean()

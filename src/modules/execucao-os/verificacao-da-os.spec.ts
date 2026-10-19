@@ -197,6 +197,17 @@ describe('código de verificação ao finalizar a OS (banco real)', () => {
     });
   });
 
+  // SN-60 (19/out/2026): a chave nova não pode mudar o código das OS sem resposta
+  it('"parou?" sem resposta fica fora do conteúdo; respondida depois, não confere', async () => {
+    const { osId, codigo } = await osFinalizada();
+    const os = await prisma.ordens_servico.findUniqueOrThrow({ where: { id: osId } });
+    expect((os.conteudo_finalizado as unknown as ConteudoDaOS).os).not.toHaveProperty('equipamento_parou');
+
+    await prisma.ordens_servico.update({ where: { id: osId }, data: { equipamento_parou: false } });
+
+    expect(await execucoes.conferirCodigo(codigo)).toMatchObject({ confere: false, diferencas: ['dados da OS (resultado, falha, auditoria, datas)'] });
+  });
+
   it('trocou ou sumiu o arquivo da foto: não confere (fotos e documentos)', async () => {
     const { codigo, caminho } = await osFinalizada();
 
