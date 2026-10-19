@@ -31,6 +31,12 @@ export class PlantasService {
     private scopeService: PermissionScopeService,
   ) {}
 
+  /** O dono de hoje; null se a planta não existe (o escopo já respondeu 404 antes) */
+  async proprietarioDe(id: string): Promise<string | null> {
+    const planta = await this.prisma.plantas.findFirst({ where: { id: id.trim(), deleted_at: null }, select: { proprietario_id: true } });
+    return planta?.proprietario_id?.trim() ?? null;
+  }
+
   async create(createPlantaDto: CreatePlantaDto): Promise<Planta> {
     const { endereco, proprietarioId, cnpj, numero_uc, ...plantaData } = createPlantaDto;
 

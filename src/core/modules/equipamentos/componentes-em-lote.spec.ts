@@ -100,6 +100,30 @@ describe('componentes do UC em lote (banco real)', () => {
     expect(await vivos()).toEqual([[A, 'A'], [B, 'B']]);
   });
 
+  // Revisão do SN-75: o corpo do lote não passa pelo pipe
+  it('o item não grava em outro equipamento nem o que tem rota própria (posição, dono, MQTT, foto fora do upload)', async () => {
+    await equipamentos.salvarComponentesUARLote(UC, [
+      {
+        id: A,
+        nome: 'A',
+        dados_tecnicos: [{ campo: 'tensao', valor: '380', tipo: 'number', equipamento_id: UC }],
+        proprietario_id: DONO,
+        topico_mqtt: 'outro/topico',
+        mqtt_habilitado: true,
+      },
+      { id: B, nome: 'B' },
+    ] as never);
+
+    expect((await prisma.equipamentos_dados_tecnicos.findMany({ where: { equipamento_id: { in: [A, UC] } } })).map((d) => d.equipamento_id.trim())).toEqual([A]);
+    const a = await prisma.equipamentos.findUniqueOrThrow({ where: { id: A } });
+    expect([a.proprietario_id, a.topico_mqtt, a.mqtt_habilitado]).toEqual([null, null, false]);
+
+    await expect(equipamentos.salvarComponentesUARLote(UC, [{ id: A, nome: 'A', foto_url: 'dist/main.js' }] as never)).rejects.toThrow(
+      'A: foto_url inválida',
+    );
+    await prisma.equipamentos_dados_tecnicos.deleteMany({ where: { equipamento_id: A } });
+  });
+
   it('erro no meio não apaga nem altera nada', async () => {
     await expect(
       equipamentos.salvarComponentesUARLote(UC, [

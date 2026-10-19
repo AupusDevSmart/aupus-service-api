@@ -37,10 +37,20 @@ import { ReplicarAnexosDto } from './dto/replicar-anexos.dto';
 import { UserProprietarioId } from '../auth/decorators/user-proprietario.decorator';
 import { Permissions } from '../auth/decorators/permissions.decorator';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
+import { UsePlantaScope } from '../auth/decorators/planta-scope.decorator';
 import type { ScopedUser } from '../auth/permission-scope.service';
 import { LIMITES_DO_MULTIPART } from '@/common/upload/limites-do-upload.module';
 import { cabecalhosDoDownload } from '@/common/upload/tipo-do-arquivo';
 
+/** O "não existe" que o service já dá para o pai: fora do escopo é igual (SN-57) */
+const PAI_NAO_ENCONTRADO = 'Equipamento pai não encontrado ou não é UC';
+const ANEXO_NAO_ENCONTRADO = 'Anexo não encontrado';
+
+/**
+ * Toda escrita confere o escopo por planta (SN-75): pelo `@UsePlantaScope`
+ * (guard, antes do upload) ou, quando o id é de outra coisa (o anexo), no
+ * handler. `escopo-das-escritas.spec.ts` barra a rota nova que esquecer.
+ */
 @ApiTags('Equipamentos')
 @Controller('equipamentos')
 export class EquipamentosController {
@@ -52,6 +62,10 @@ export class EquipamentosController {
 
   @Post()
   @Permissions('equipamentos.manage')
+  @UsePlantaScope(
+    { entity: 'unidade', from: 'body', name: 'unidade_id', opcional: true },
+    { entity: 'equipamento', from: 'body', name: 'equipamento_pai_id', opcional: true, naoEncontrado: PAI_NAO_ENCONTRADO },
+  )
   @ApiOperation({ summary: 'Criar novo equipamento/componente' })
   @ApiResponse({ status: 201, description: 'Equipamento criado com sucesso' })
   @ApiResponse({ status: 400, description: 'Dados inválidos' })
@@ -61,6 +75,10 @@ export class EquipamentosController {
 
   @Post('lote')
   @Permissions('equipamentos.manage')
+  @UsePlantaScope(
+    { entity: 'unidade', from: 'body', name: 'unidade_id', opcional: true },
+    { entity: 'equipamento', from: 'body', name: 'equipamento_pai_id', opcional: true, naoEncontrado: PAI_NAO_ENCONTRADO },
+  )
   @ApiOperation({
     summary: 'Cadastrar vários equipamentos iguais de uma vez',
     description:
@@ -77,6 +95,7 @@ export class EquipamentosController {
 
   @Post('rapido')
   @Permissions('equipamentos.manage')
+  @UsePlantaScope({ entity: 'unidade', from: 'body', name: 'unidade_id' })
   @ApiOperation({
     summary: 'Criar equipamento rapidamente com dados mínimos',
     description: 'Cria equipamento para uso imediato no diagrama. Apenas tipo e unidade são obrigatórios. O nome é gerado automaticamente se não fornecido. Dados completos podem ser preenchidos depois na página de cadastro.'
@@ -164,7 +183,7 @@ export class EquipamentosController {
   ) {
     const anexo = await this.anexosService.buscarAnexo(anexoId);
     // O escopo é o do equipamento do anexo: antes baixava o de qualquer planta (SN-40)
-    await this.equipamentosService.garantirNoEscopo(anexo.equipamento_id, user);
+    await this.equipamentosService.garantirNoEscopo(anexo.equipamento_id, user, ANEXO_NAO_ENCONTRADO);
     const caminho = await this.anexosService.obterCaminhoArquivo(anexoId);
 
     res.set({
@@ -180,12 +199,18 @@ export class EquipamentosController {
   @Permissions('equipamentos.manage')
   @ApiOperation({ summary: 'Remover anexo do equipamento' })
   @ApiResponse({ status: 200, description: 'Anexo removido' })
-  removerAnexo(@Param('anexoId') anexoId: string) {
+  async removerAnexo(@Param('anexoId') anexoId: string, @CurrentUser() user: ScopedUser) {
+    const anexo = await this.anexosService.buscarAnexo(anexoId);
+    await this.equipamentosService.garantirNoEscopo(anexo.equipamento_id, user, ANEXO_NAO_ENCONTRADO);
     return this.anexosService.removerAnexo(anexoId);
   }
 
   @Post('anexos/replicar')
   @Permissions('equipamentos.manage')
+  @UsePlantaScope(
+    { entity: 'equipamento', from: 'body', name: 'origem_equipamento_id' },
+    { entity: 'equipamento', from: 'body', name: 'destino_equipamento_ids' },
+  )
   @ApiOperation({
     summary: 'Copiar os anexos de um equipamento para outros',
     description:
@@ -200,6 +225,7 @@ export class EquipamentosController {
 
   @Post(':id/anexos')
   @Permissions('equipamentos.manage')
+  @UsePlantaScope({ entity: 'equipamento' })
   @UseInterceptors(FileInterceptor('file'))
   @ApiOperation({ summary: 'Enviar anexo (manual, datasheet, documento) do equipamento' })
   @ApiConsumes('multipart/form-data')
@@ -242,6 +268,11 @@ export class EquipamentosController {
 
   @Patch(':id')
   @Permissions('equipamentos.manage')
+  @UsePlantaScope(
+    { entity: 'equipamento' },
+    { entity: 'unidade', from: 'body', name: 'unidade_id', opcional: true },
+    { entity: 'equipamento', from: 'body', name: 'equipamento_pai_id', opcional: true, naoEncontrado: PAI_NAO_ENCONTRADO },
+  )
   @ApiOperation({ summary: 'Atualizar equipamento' })
   @ApiResponse({ status: 200, description: 'Equipamento atualizado' })
   @ApiResponse({ status: 404, description: 'Equipamento não encontrado' })
@@ -251,6 +282,7 @@ export class EquipamentosController {
 
   @Delete(':id')
   @Permissions('equipamentos.manage')
+  @UsePlantaScope({ entity: 'equipamento' })
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({ summary: 'Remover equipamento (soft delete)' })
   @ApiResponse({ status: 204, description: 'Equipamento removido' })
@@ -282,6 +314,7 @@ export class EquipamentosController {
 
   @Put(':ucId/componentes/batch')
   @Permissions('equipamentos.manage')
+  @UsePlantaScope({ entity: 'equipamento', name: 'ucId', naoEncontrado: 'Equipamento UC não encontrado' })
   @ApiOperation({ summary: 'Salvar múltiplos componentes UAR de uma vez' })
   @ApiResponse({ status: 200, description: 'Componentes salvos com sucesso' })
   salvarComponentesUAR(
@@ -317,6 +350,7 @@ export class EquipamentosController {
 
   @Post('virtual/:unidadeId/:tipo')
   @Permissions('equipamentos.manage')
+  @UsePlantaScope({ entity: 'unidade', name: 'unidadeId' })
   @ApiOperation({ summary: 'Criar componente visual (BARRAMENTO ou PONTO) para diagramas' })
   @ApiResponse({ status: 201, description: 'Componente visual criado' })
   @ApiResponse({ status: 404, description: 'Unidade não encontrada' })
@@ -330,6 +364,7 @@ export class EquipamentosController {
 
   @Patch(':id/mqtt')
   @Permissions('equipamentos.manage')
+  @UsePlantaScope({ entity: 'equipamento' })
   @ApiOperation({ summary: 'Configurar tópico MQTT de um equipamento' })
   @ApiResponse({ status: 200, description: 'Configuração MQTT atualizada' })
   @ApiResponse({ status: 404, description: 'Equipamento não encontrado' })
@@ -378,6 +413,8 @@ export class EquipamentosController {
 
   @Post(':id/upload-foto')
   @Permissions('equipamentos.manage')
+  // Guard roda antes do diskStorage: a foto de quem está fora nem chega ao disco
+  @UsePlantaScope({ entity: 'equipamento' })
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Upload de foto do equipamento' })
   @ApiConsumes('multipart/form-data')
@@ -416,6 +453,7 @@ export class EquipamentosController {
 
   @Delete(':id/foto')
   @Permissions('equipamentos.manage')
+  @UsePlantaScope({ entity: 'equipamento' })
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Remover foto do equipamento' })
   @ApiParam({ name: 'id', description: 'ID do equipamento' })

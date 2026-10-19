@@ -637,6 +637,10 @@ export class PlanosManutencaoService {
    * que sao as que a tela mostrou, e o mapeamento acontece aqui.
    */
   async herdarPlano(dto: HerdarPlanoDto, user?: ScopedUser): Promise<HerdarPlanoResponseDto> {
+    // A posicao antes de ler o ocupante dela: a resposta diferente contava que a
+    // posicao de outra planta existia e tinha plano (revisao do SN-75), e o GET
+    // plano-a-herdar ja conferia
+    if (user) await this.scopeService.assertEntityInScope('ativo_funcional', dto.ativo_funcional_id, user);
     const heranca = await planoAHerdar(this.prisma, dto.ativo_funcional_id);
     if (!heranca?.template_id) {
       throw new NotFoundException(

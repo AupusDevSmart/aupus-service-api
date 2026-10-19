@@ -9,6 +9,7 @@ import { CadastroImportavel, ErrosDaLinha, UsuarioDaImportacao } from '../import
 import { validarComoOFormulario } from '../importacao.service';
 import { CatalogoPorNome } from '../catalogo-por-nome';
 import { semOQueNaoMudou } from '../sem-o-que-nao-mudou';
+import { problemaNoDono } from '@/core/modules/plantas/dono-da-planta';
 
 type PlantaComUnidades = plantas & { unidades: unidades[] };
 
@@ -210,13 +211,9 @@ export class PlantasImportacao implements CadastroImportavel<PlantaComUnidades> 
     const escopo = await this.escopo.getScope(usuario);
     if (!this.escopo.isScoped(escopo)) return;
 
-    const dono = planta.proprietarioId?.trim();
-    if (!atual && dono !== usuario.id) {
-      throw ErrosDaLinha.em('proprietario', 'Você só pode criar plantas em que você é o proprietário.');
-    }
-    if (atual && dono && dono !== atual.proprietario_id.trim()) {
-      throw ErrosDaLinha.em('proprietario', 'Você não pode passar a planta para outro proprietário.');
-    }
+    // A mesma regra do formulário (SN-75)
+    const problema = problemaNoDono(usuario, planta.proprietarioId, atual ? atual.proprietario_id : null);
+    if (problema) throw ErrosDaLinha.em('proprietario', problema);
   }
 
   async criar(dto: object) {

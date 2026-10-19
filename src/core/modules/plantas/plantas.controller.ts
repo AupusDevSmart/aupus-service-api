@@ -10,7 +10,8 @@ import {
   Query,
   HttpStatus,
   Logger,
-  ValidationPipe
+  ValidationPipe,
+  ForbiddenException,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -29,6 +30,8 @@ import { UserProprietarioId } from '../auth/decorators/user-proprietario.decorat
 import { Permissions } from '../auth/decorators/permissions.decorator';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import type { ScopedUser } from '../auth/permission-scope.service';
+import { UsePlantaScope } from '../auth/decorators/planta-scope.decorator';
+import { problemaNoDono } from './dono-da-planta';
 
 @ApiTags('plantas')
 @Controller('plantas') // ✅ CORRIGIDO: Remover 'api/v1' - só deixar 'plantas'
@@ -36,6 +39,14 @@ export class PlantasController {
   private readonly logger = new Logger(PlantasController.name);
 
   constructor(private readonly plantasService: PlantasService) {}
+
+  /** O cliente só cadastra planta em nome próprio (SN-75, a regra da planilha: dono-da-planta.ts) */
+  private async conferirDono(user: ScopedUser, novoDono: string | null | undefined, plantaId?: string) {
+    if (user?.role !== 'proprietario') return;
+    const donoAtual = plantaId ? await this.plantasService.proprietarioDe(plantaId) : null;
+    const problema = problemaNoDono(user, novoDono, donoAtual);
+    if (problema) throw new ForbiddenException(problema);
+  }
 
   // ✅ IMPORTANTE: Rota específica ANTES da rota genérica com parâmetro
   @Get('proprietarios')
@@ -93,7 +104,8 @@ export class PlantasController {
     status: HttpStatus.CONFLICT, 
     description: 'CNPJ já cadastrado no sistema' 
   })
-  async create(@Body() createPlantaDto: CreatePlantaDto): Promise<Planta> {
+  async create(@Body() createPlantaDto: CreatePlantaDto, @CurrentUser() user: ScopedUser): Promise<Planta> {
+    await this.conferirDono(user, createPlantaDto.proprietarioId);
     this.logger.log(`🏭 [CREATE PLANTA] Iniciando criação de planta`);
     this.logger.log(`📝 [CREATE PLANTA] Dados recebidos:`, JSON.stringify(createPlantaDto, null, 2));
 
@@ -250,6 +262,7 @@ export class PlantasController {
   // ✅ ROTA: PUT /api/v1/plantas/:id (Atualizar planta)
   @Put(':id')
   @Permissions('plantas.manage')
+  @UsePlantaScope({ entity: 'planta' })
   @ApiOperation({
     summary: 'Atualizar planta',
     description: 'Atualiza os dados de uma planta existente'
@@ -279,8 +292,10 @@ export class PlantasController {
   })
   async update(
     @Param('id') id: string,
-    @Body() updatePlantaDto: UpdatePlantaDto
+    @Body() updatePlantaDto: UpdatePlantaDto,
+    @CurrentUser() user: ScopedUser,
   ): Promise<Planta> {
+    await this.conferirDono(user, updatePlantaDto.proprietarioId, id);
     this.logger.log(`🔄 [UPDATE PLANTA] Atualizando planta ${id}`);
     this.logger.log(`📝 [UPDATE PLANTA] Dados recebidos:`, JSON.stringify(updatePlantaDto, null, 2));
 
@@ -299,6 +314,7 @@ export class PlantasController {
   // ✅ ROTA: DELETE /api/v1/plantas/:id (Deletar planta)
   @Delete(':id')
   @Permissions('plantas.manage')
+  @UsePlantaScope({ entity: 'planta' })
   @ApiOperation({
     summary: 'Deletar planta',
     description: 'Remove uma planta e todas as suas dependências do sistema'

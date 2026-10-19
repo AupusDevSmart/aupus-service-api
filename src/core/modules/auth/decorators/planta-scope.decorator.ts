@@ -8,27 +8,36 @@ export interface PlantaScopeMetadata {
   entity: ScopedEntityType;
   /** Onde achar o id da entidade no request (default: param) */
   from?: 'param' | 'body' | 'query';
-  /** Nome do campo/param onde o id esta (default: 'id') */
+  /** Nome do campo/param onde o id esta (default: 'id'). Lista de ids: confere cada um */
   name?: string;
+  /** Campo do corpo que pode faltar (o pai OU a unidade do equipamento): ausente, nao confere */
+  opcional?: boolean;
+  /** O "nao encontrado" que a rota ja da para o id que nao existe (SN-57: a mesma mensagem) */
+  naoEncontrado?: string;
 }
 
 /**
- * Marca um handler para validar que a entidade alvo esta no escopo do usuario logado.
- * O `PlantaScopeGuard` (registrado na cadeia depois do JwtAuthGuard) le esse metadado
- * e chama `PermissionScopeService.assertEntityInScope` antes do handler executar.
+ * Marca um handler para validar que as entidades alvo estao no escopo do usuario
+ * logado. O `PlantaScopeGuard` (APP_GUARD, depois do PermissionsGuard) le esse
+ * metadado e chama `PermissionScopeService.assertEntityInScope` antes do handler
+ * — e antes dos interceptors: o upload de quem esta fora nem chega ao disco.
+ *
+ * Fora do escopo = 404 com a mesma mensagem do que nao existe (SN-57).
  *
  * Uso:
- *   @Get(':id')
+ *   @Patch(':id')
  *   @UsePlantaScope({ entity: 'equipamento' })            // le params.id
- *   findOne(@Param('id') id: string) { ... }
  *
- *   @Patch(':equipamentoId/comando')
- *   @UsePlantaScope({ entity: 'equipamento', name: 'equipamentoId' })
- *   command(...) { ... }
+ *   @Post(':id/instalar')                                  // a posicao e o equipamento
+ *   @UsePlantaScope({ entity: 'ativo_funcional' }, { entity: 'equipamento', from: 'body', name: 'equipamento_id' })
  *
- *   @Post()
- *   @UsePlantaScope({ entity: 'planta', from: 'body', name: 'planta_id' })
- *   createUnidade(@Body() body: { planta_id: string; ... }) { ... }
+ *   @Post()                                                // o pai OU a unidade
+ *   @UsePlantaScope(
+ *     { entity: 'unidade', from: 'body', name: 'unidade_id', opcional: true },
+ *     { entity: 'equipamento', from: 'body', name: 'equipamento_pai_id', opcional: true },
+ *   )
+ *
+ * Ficou sem efeito ate o SN-75 (out/2026): o guard nunca foi registrado, e
+ * nenhuma rota usava o decorator. `escopo-das-escritas.spec.ts` cobre as rotas.
  */
-export const UsePlantaScope = (meta: PlantaScopeMetadata) =>
-  SetMetadata(PLANTA_SCOPE_KEY, meta);
+export const UsePlantaScope = (...metas: PlantaScopeMetadata[]) => SetMetadata(PLANTA_SCOPE_KEY, metas);

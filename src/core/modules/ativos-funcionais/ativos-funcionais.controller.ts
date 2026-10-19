@@ -13,6 +13,7 @@ import type { Request } from 'express';
 import type { UsuarioAutenticado } from '../auth/strategies/jwt.strategy';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { PermissionScopeService, type ScopedUser } from '../auth/permission-scope.service';
+import { UsePlantaScope } from '../auth/decorators/planta-scope.decorator';
 import { AtivosFuncionaisService } from './ativos-funcionais.service';
 import {
   CriarAtivoFuncionalDto,
@@ -94,6 +95,7 @@ export class AtivosFuncionaisController {
 
   @Post()
   @Permissions('equipamentos.manage')
+  @UsePlantaScope({ entity: 'unidade', from: 'body', name: 'unidade_id' })
   @ApiOperation({ summary: 'Criar posicao' })
   async criar(@Body() dto: CriarAtivoFuncionalDto) {
     return this.service.criar(dto);
@@ -101,6 +103,7 @@ export class AtivosFuncionaisController {
 
   @Post(':id/instalar')
   @Permissions('equipamentos.manage')
+  @UsePlantaScope({ entity: 'ativo_funcional' }, { entity: 'equipamento', from: 'body', name: 'equipamento_id' })
   @ApiOperation({ summary: 'Instalar um equipamento na posicao' })
   @ApiResponse({ status: 409, description: 'A posicao ja tem equipamento ativo' })
   async instalar(
@@ -115,6 +118,7 @@ export class AtivosFuncionaisController {
 
   @Post(':id/remover')
   @Permissions('equipamentos.manage')
+  @UsePlantaScope({ entity: 'ativo_funcional' })
   @ApiOperation({ summary: 'Remover o equipamento ativo, liberando a posicao' })
   @ApiResponse({ status: 404, description: 'A posicao nao tem equipamento ativo' })
   async remover(
@@ -127,6 +131,10 @@ export class AtivosFuncionaisController {
 
   @Post('equipamentos/:equipamentoId/transferir')
   @Permissions('equipamentos.manage')
+  @UsePlantaScope(
+    { entity: 'equipamento', name: 'equipamentoId' },
+    { entity: 'ativo_funcional', from: 'body', name: 'ativo_funcional_id' },
+  )
   @ApiOperation({
     summary: 'Mover um equipamento para outra posicao',
     description:

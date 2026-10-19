@@ -5,8 +5,6 @@ import type { equipamentos } from '@prisma/client';
 // Builtins do Node, sem efeito colateral na carga: nao ha por que adia-los com
 // require() dentro da funcao, que alem de esconder a dependencia obriga o TS a
 // tratar o modulo como `any`.
-import { promises as arquivos } from 'fs';
-import * as caminho from 'path';
 import { PrismaService } from '../../prisma/prisma.service';
 import { depoisDeGravar } from '../../prisma/transacao-em-curso';
 import { IMqttBroker, MQTT_BROKER } from '../../common/interfaces/mqtt-broker.interface';
@@ -16,6 +14,7 @@ import { diaComoInstante } from '../../../common/decorators/dia-de-calendario';
 import { EquipamentoQueryDto } from './dto/equipamento-query.dto';
 import { comNomeDaPosicao } from './nome-exibido';
 import { conferirCriticidade, CriticidadeDoEquipamento } from './criticidade-pela-matriz';
+import { apagarFotoSemUso, conferirFoto } from './foto-do-equipamento';
 import { ConfigurarMqttDto } from './dto/configurar-mqtt.dto';
 import { CreateEquipamentoRapidoDto } from './dto/create-equipamento-rapido.dto';
 import {
@@ -213,6 +212,7 @@ export class EquipamentosService {
     // Extrair dados técnicos separadamente
     const { dados_tecnicos, pontos, ...equipamentoData } = createDto;
     Object.assign(equipamentoData, conferirCriticidade({}, createDto));
+    conferirFoto(null, createDto.foto_url);
 
     // TAG automática só quando ninguém informou uma. Quem digita a etiqueta
     // tem motivo — costuma ser a que já está colada no ativo.
@@ -435,6 +435,7 @@ export class EquipamentosService {
     }
 
     Object.assign(comum, conferirCriticidade({}, comum));
+    conferirFoto(null, comum.foto_url);
 
     const unidadeDoLote =
       comum.unidade_id?.trim() ?? (await this.unidadeDoPai(comum.equipamento_pai_id));
@@ -946,8 +947,9 @@ export class EquipamentosService {
   }
 
   /** Equipamento de planta fora do escopo de quem pede: 404, como o que não existe (SN-57). */
-  async garantirNoEscopo(id: string, user?: ScopedUser): Promise<void> {
-    if (user) await this.scopeService.assertEntityInScope('equipamento', id.trim(), user);
+  /** `naoEncontrado`: quem buscou outro registro antes (o anexo) passa o "não existe" dele (SN-57) */
+  async garantirNoEscopo(id: string, user?: ScopedUser, naoEncontrado?: string): Promise<void> {
+    if (user) await this.scopeService.assertEntityInScope('equipamento', id.trim(), user, naoEncontrado);
   }
 
   async findOne(id: string, user?: ScopedUser) {
@@ -1022,7 +1024,7 @@ export class EquipamentosService {
     const equipamentoExists = await this.prisma.equipamentos.findFirst({
       where: { id, deleted_at: null },
       select: {
-        id: true, topico_mqtt: true, mqtt_habilitado: true,
+        id: true, topico_mqtt: true, mqtt_habilitado: true, foto_url: true, classificacao: true,
         criticidade: true, criticidade_impacto: true, criticidade_probabilidade: true, criticidade_motivo: true,
       },
     });
@@ -1062,6 +1064,18 @@ export class EquipamentosService {
     const { dados_tecnicos, pontos, ...equipamentoData } = updateDto;
     // SN-64: sobre o que fica gravado, nao so o que chegou (PATCH parcial)
     Object.assign(equipamentoData, conferirCriticidade(equipamentoExists, updateDto));
+    conferirFoto(equipamentoExists.foto_url, updateDto.foto_url);
+    // A mesma regra do create: sem a unidade (ou o pai) o equipamento sai de
+    // todas as plantas, e so o admin o ve (achado da revisao do SN-75). So
+    // quando o PATCH mexe no campo: dado de antes sem unidade nao trava
+    const classificacao = updateDto.classificacao ?? equipamentoExists.classificacao;
+    const vazio = (v: unknown) => v === null || (typeof v === 'string' && !v.trim());
+    if (classificacao === 'UC' && updateDto.unidade_id !== undefined && vazio(updateDto.unidade_id)) {
+      throw new BadRequestException('Equipamento UC deve ter uma unidade');
+    }
+    if (classificacao === 'UAR' && updateDto.equipamento_pai_id !== undefined && vazio(updateDto.equipamento_pai_id)) {
+      throw new BadRequestException('Componente UAR deve ter um equipamento pai');
+    }
 
     // ✅ CORRIGIDO: Aumentar timeout da transação para 15 segundos (suficiente para processar dados técnicos)
     const equipamento = await this.prisma.$transaction(async (prisma) => {
@@ -1451,6 +1465,11 @@ export class EquipamentosService {
     'id', 'created_at', 'updated_at', 'deleted_at',
     // Definidos pelo pai, nao pelo item do lote.
     'classificacao', 'equipamento_pai_id', 'unidade_id',
+    // Tem rota propria (posicao, MQTT) ou vem da planta: o lote nao passa pelo
+    // pipe, e por aqui um componente ganhava a posicao, o dono ou o topico de
+    // outro lugar sem conferencia nenhuma (revisao do SN-75)
+    'ativo_funcional_id', 'ativo_na_posicao', 'proprietario_id', 'planta_id', 'diagrama_id',
+    'topico_mqtt', 'mqtt_habilitado',
   ]);
 
   private camposGravaveisDoEquipamento(entrada: Record<string, unknown>): Partial<Prisma.equipamentosCreateManyInput> {
@@ -1542,8 +1561,11 @@ export class EquipamentosService {
       where: { equipamento_id: equipamentoId },
     });
     if (dadosTecnicos.length > 0) {
+      // Campo a campo e o id por ultimo: o corpo do lote nao passa pelo pipe, e
+      // um `equipamento_id` no item gravava o dado tecnico no equipamento de
+      // outra planta (revisao do SN-75)
       await prisma.equipamentos_dados_tecnicos.createMany({
-        data: dadosTecnicos.map(dt => ({ equipamento_id: equipamentoId, ...dt })),
+        data: dadosTecnicos.map(dt => ({ campo: dt.campo, valor: dt.valor, tipo: dt.tipo, unidade: dt.unidade, equipamento_id: equipamentoId })),
       });
     }
   }
@@ -1563,7 +1585,7 @@ export class EquipamentosService {
         equipamento_pai_id: ucId.trim(),
         deleted_at: null,
       },
-      select: { id: true, criticidade: true, criticidade_impacto: true, criticidade_probabilidade: true, criticidade_motivo: true },
+      select: { id: true, foto_url: true, criticidade: true, criticidade_impacto: true, criticidade_probabilidade: true, criticidade_motivo: true },
     });
 
     const idsExistentes = componentesExistentes.map(c => c.id.trim());
@@ -1590,7 +1612,9 @@ export class EquipamentosService {
     const gravadoPorId = new Map(componentesExistentes.map(c => [c.id.trim(), c]));
     const motivos = componentes.map(componente => {
       try {
-        return conferirCriticidade(gravadoPorId.get(componente.id?.trim() ?? '') ?? {}, componente as CriticidadeDoEquipamento);
+        const gravado = gravadoPorId.get(componente.id?.trim() ?? '');
+        conferirFoto(gravado?.foto_url, componente.foto_url);
+        return conferirCriticidade(gravado ?? {}, componente as CriticidadeDoEquipamento);
       } catch (erro) {
         if (erro instanceof BadRequestException) {
           const nome = typeof componente.nome === 'string' ? componente.nome.trim() : '';
@@ -1944,22 +1968,16 @@ export class EquipamentosService {
       throw new NotFoundException('Equipamento nao encontrado');
     }
 
-    // Deletar arquivo antigo se existir
-    if (equipamento.foto_url) {
-      try {
-        const oldFilePath = caminho.join(process.cwd(), equipamento.foto_url);
-        await arquivos.unlink(oldFilePath).catch(() => { /* ignora se nao existir */ });
-      } catch {
-        // nao bloqueia update se limpeza falhar
-      }
-    }
-
     const fotoUrl = `/uploads/equipamentos/${filename}`;
 
     await this.prisma.equipamentos.update({
       where: { id: id.trim() },
       data: { foto_url: fotoUrl },
     });
+
+    // A antiga sai do disco so se ninguem mais aponta para ela, e nunca fora
+    // da pasta das fotos (foto-do-equipamento.ts)
+    await apagarFotoSemUso(this.prisma, equipamento.foto_url, equipamento.id);
 
     return { fotoUrl };
   }
@@ -1973,19 +1991,12 @@ export class EquipamentosService {
       throw new NotFoundException('Equipamento nao encontrado');
     }
 
-    if (equipamento.foto_url) {
-      try {
-        const oldFilePath = caminho.join(process.cwd(), equipamento.foto_url);
-        await arquivos.unlink(oldFilePath).catch(() => { /* ignora se nao existir */ });
-      } catch {
-        // ignora
-      }
-    }
-
     await this.prisma.equipamentos.update({
       where: { id: id.trim() },
       data: { foto_url: null },
     });
+
+    await apagarFotoSemUso(this.prisma, equipamento.foto_url, equipamento.id);
 
     return { fotoUrl: null };
   }

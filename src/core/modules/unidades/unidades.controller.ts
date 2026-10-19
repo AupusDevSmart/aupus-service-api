@@ -42,7 +42,11 @@ import { UserProprietarioId } from '../auth/decorators/user-proprietario.decorat
 import { Permissions } from '../auth/decorators/permissions.decorator';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import type { ScopedUser } from '../auth/permission-scope.service';
+import { UsePlantaScope } from '../auth/decorators/planta-scope.decorator';
 import { cabecalhosDoDownload } from '@/common/upload/tipo-do-arquivo';
+
+/** O "não existe" do anexo: fora do escopo é igual (SN-57) */
+const ANEXO_NAO_ENCONTRADO = 'Anexo não encontrado';
 
 @ApiTags('unidades')
 @Controller('unidades')
@@ -66,7 +70,7 @@ export class UnidadesController {
   async baixarAnexo(@Param('anexoId') anexoId: string, @Res() res: Response, @CurrentUser() user: ScopedUser) {
     const anexo = await this.anexosService.buscarAnexo(anexoId);
     // O escopo é o da unidade do anexo: antes baixava o de qualquer planta (SN-40)
-    await this.unidadesService.garantirNoEscopo(anexo.unidade_id, user);
+    await this.unidadesService.garantirNoEscopo(anexo.unidade_id, user, ANEXO_NAO_ENCONTRADO);
     const caminho = await this.anexosService.obterCaminhoArquivo(anexoId);
 
     // Tipo pela extensão, não o que o cliente declarou no upload (revisão do SN-59)
@@ -78,12 +82,15 @@ export class UnidadesController {
   @Permissions('unidades.manage')
   @ApiOperation({ summary: 'Remover anexo da instalação' })
   @ApiParam({ name: 'anexoId' })
-  removerAnexo(@Param('anexoId') anexoId: string) {
+  async removerAnexo(@Param('anexoId') anexoId: string, @CurrentUser() user: ScopedUser) {
+    const anexo = await this.anexosService.buscarAnexo(anexoId);
+    await this.unidadesService.garantirNoEscopo(anexo.unidade_id, user, ANEXO_NAO_ENCONTRADO);
     return this.anexosService.removerAnexo(anexoId);
   }
 
   @Post(':id/anexos')
   @Permissions('unidades.manage')
+  @UsePlantaScope({ entity: 'unidade' })
   @UseInterceptors(FileInterceptor('file'))
   @ApiOperation({ summary: 'Enviar anexo da instalação (contrato, diagrama, laudo)' })
   @ApiConsumes('multipart/form-data')
@@ -107,6 +114,7 @@ export class UnidadesController {
 
   @Post()
   @Permissions('unidades.manage')
+  @UsePlantaScope({ entity: 'planta', from: 'body', name: 'planta_id' })
   @ApiOperation({
     summary: 'Criar nova unidade',
     description: 'Cadastra uma nova unidade vinculada a uma planta',
@@ -294,6 +302,8 @@ export class UnidadesController {
 
   @Put(':id')
   @Permissions('unidades.manage')
+  // E a planta para onde vai, se a unidade mudar de planta
+  @UsePlantaScope({ entity: 'unidade' }, { entity: 'planta', from: 'body', name: 'planta_id', opcional: true })
   @ApiOperation({
     summary: 'Atualizar unidade',
     description: 'Atualiza os dados de uma unidade existente',
@@ -339,6 +349,7 @@ export class UnidadesController {
 
   @Delete(':id')
   @Permissions('unidades.manage')
+  @UsePlantaScope({ entity: 'unidade' })
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
     summary: 'Remover unidade',

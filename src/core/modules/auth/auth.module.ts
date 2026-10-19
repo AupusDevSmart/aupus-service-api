@@ -11,6 +11,7 @@ import { UsuariosModule } from '../usuarios/usuarios.module';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { PermissionsGuard } from './guards/permissions.guard';
 import { TrocaDeSenhaGuard } from './guards/troca-de-senha.guard';
+import { PlantaScopeGuard } from './guards/planta-scope.guard';
 import { PermissionScopeModule } from './permission-scope.module';
 import { LimiteDeTentativasModule } from './limite-de-tentativas';
 
@@ -51,6 +52,12 @@ import { LimiteDeTentativasModule } from './limite-de-tentativas';
     {
       provide: APP_GUARD,
       useClass: PermissionsGuard, // Valida @Permissions() globalmente (rotas sem decorator passam)
+    },
+    {
+      provide: APP_GUARD,
+      // @UsePlantaScope() nas escritas por id (SN-75). Ate entao o guard nao
+      // estava na cadeia, e o decorator nao fazia nada
+      useClass: PlantaScopeGuard,
     },
   ],
   exports: [AuthService, JwtModule],

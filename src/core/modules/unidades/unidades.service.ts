@@ -36,8 +36,9 @@ export class UnidadesService {
   ) {}
 
   /** 404/403 do escopo da unidade, nas rotas por id que não passam pelo findOne (SN-40). */
-  async garantirNoEscopo(id: string, user?: ScopedUser): Promise<void> {
-    if (user) await this.scopeService.assertEntityInScope('unidade', id?.trim(), user);
+  /** `naoEncontrado`: quem buscou outro registro antes (o anexo) passa o "não existe" dele (SN-57) */
+  async garantirNoEscopo(id: string, user?: ScopedUser, naoEncontrado?: string): Promise<void> {
+    if (user) await this.scopeService.assertEntityInScope('unidade', id?.trim(), user, naoEncontrado);
   }
 
   async create(createDto: CreateUnidadeDto): Promise<UnidadeResponse> {

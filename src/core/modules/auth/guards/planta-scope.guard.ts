@@ -1,4 +1,4 @@
-import { CanActivate, ExecutionContext, Injectable, NotFoundException } from '@nestjs/common';
+import { CanActivate, ExecutionContext, Injectable } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { PermissionScopeService } from '../permission-scope.service';
 import {
@@ -8,15 +8,17 @@ import {
 import { IS_PUBLIC_KEY } from '../decorators/public.decorator';
 
 /**
- * Guard que aplica `assertEntityInScope` automaticamente em handlers marcados com
- * `@UsePlantaScope(...)`. Deve rodar APOS o JwtAuthGuard (que injeta req.user).
+ * Aplica `assertEntityInScope` nos handlers marcados com `@UsePlantaScope(...)`.
+ * Registrado como APP_GUARD depois do JwtAuthGuard (que poe o req.user) e do
+ * PermissionsGuard (SN-75).
  *
- * Comportamento:
- * - Rotas marcadas com @Public() sao puladas.
- * - Sem @UsePlantaScope -> nao faz nada.
- * - Usuario admin/gerente/analista/super_admin -> passa (scope null).
- * - operador/proprietario -> assertEntityInScope; joga ForbiddenException se fora,
- *   NotFoundException se o id nao existe (para nao vazar existencia).
+ * - Rotas @Public() e sem @UsePlantaScope: passa.
+ * - admin/gerente/analista/super_admin: passa (escopo null).
+ * - operador/proprietario: 404 com a mesma mensagem do que nao existe, para o
+ *   que nao existe e para o que esta fora das plantas dele (SN-57).
+ *
+ * Roda antes do ValidationPipe: o valor vem cru. Texto e conferido; lista,
+ * cada item; outro tipo (numero, objeto) e "nao encontrado".
  */
 @Injectable()
 export class PlantaScopeGuard implements CanActivate {
@@ -32,28 +34,28 @@ export class PlantaScopeGuard implements CanActivate {
     ]);
     if (isPublic) return true;
 
-    const meta = this.reflector.getAllAndOverride<PlantaScopeMetadata>(PLANTA_SCOPE_KEY, [
+    const metadados = this.reflector.getAllAndOverride<PlantaScopeMetadata[] | PlantaScopeMetadata>(PLANTA_SCOPE_KEY, [
       context.getHandler(),
       context.getClass(),
     ]);
-    if (!meta) return true;
+    if (!metadados) return true;
 
     const req = context.switchToHttp().getRequest();
-    const user = req.user;
-    const from = meta.from ?? 'param';
-    const name = meta.name ?? 'id';
+    // Admin, gerente e analista não têm escopo: passam sem consulta por id
+    if (!this.scopeService.isScoped(await this.scopeService.getScope(req.user))) return true;
 
-    const source =
-      from === 'param' ? req.params :
-      from === 'body' ? req.body :
-      req.query;
+    for (const meta of Array.isArray(metadados) ? metadados : [metadados]) {
+      const from = meta.from ?? 'param';
+      const fonte = from === 'param' ? req.params : from === 'body' ? req.body : req.query;
+      const valor: unknown = fonte?.[meta.name ?? 'id'];
 
-    const id: string | undefined = source?.[name];
-    if (!id) {
-      throw new NotFoundException(`${meta.entity} nao encontrado`);
+      if (meta.opcional && (valor === undefined || valor === null || valor === '')) continue;
+      const ids = Array.isArray(valor) ? valor : [valor];
+      for (const id of ids) {
+        // '' cai no "nao encontrado" do assertEntityInScope
+        await this.scopeService.assertEntityInScope(meta.entity, typeof id === 'string' ? id : '', req.user, meta.naoEncontrado);
+      }
     }
-
-    await this.scopeService.assertEntityInScope(meta.entity, id, user);
     return true;
   }
 }
