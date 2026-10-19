@@ -64,6 +64,20 @@ describe('componentes do UC em lote (banco real)', () => {
     expect(await vivos()).toEqual([[A, 'A renomeado'], [B, 'B']]);
   });
 
+  // SN-66: o transform manda o dia ("AAAA-MM-DD"); o Prisma recusava e o lote inteiro dava 500
+  it('as datas chegam como o dia: gravam a meia-noite; data inválida é 400', async () => {
+    await equipamentos.salvarComponentesUARLote(UC, [
+      { id: A, nome: 'A', data_instalacao: '2026-04-01', garantia_ate: '2031-04-01' },
+      { id: B, nome: 'B', garantia_ate: null },
+    ] as never);
+
+    const a = await prisma.equipamentos.findUniqueOrThrow({ where: { id: A } });
+    expect([a.data_instalacao?.toISOString(), a.garantia_ate?.toISOString()]).toEqual(['2026-04-01T00:00:00.000Z', '2031-04-01T00:00:00.000Z']);
+    await expect(equipamentos.salvarComponentesUARLote(UC, [{ id: A, nome: 'A', garantia_ate: '31/04/2031' }] as never)).rejects.toThrow(
+      'Data inválida em garantia_ate',
+    );
+  });
+
   it('erro no meio não apaga nem altera nada', async () => {
     await expect(
       equipamentos.salvarComponentesUARLote(UC, [

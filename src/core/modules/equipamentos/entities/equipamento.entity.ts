@@ -99,6 +99,9 @@ export class Equipamento {
   @ApiPropertyOptional()
   data_instalacao?: Date;
 
+  @ApiPropertyOptional({ description: 'Até quando está em garantia (SN-66)' })
+  garantia_ate?: Date;
+
   @ApiPropertyOptional({ example: 15000.00 })
   valor_imobilizado?: number;
 

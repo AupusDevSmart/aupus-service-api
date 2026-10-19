@@ -35,6 +35,9 @@ const COLUNAS_DA_UC: Record<string, keyof equipamentos> = {
   criticidade: 'criticidade',
   localizacao: 'localizacao',
   valor_contabil: 'valor_contabil',
+  // SN-66
+  fornecedor: 'fornecedor',
+  centro_custo: 'centro_custo',
   status: 'status',
   mcpse: 'mcpse',
   tuc: 'tuc',
@@ -56,6 +59,7 @@ const COLUNAS_DO_COMPONENTE: Record<string, keyof equipamentos> = {
   criticidade: 'criticidade',
   localizacao_especifica: 'localizacao_especifica',
   fornecedor: 'fornecedor',
+  centro_custo: 'centro_custo',
   valor_imobilizado: 'valor_imobilizado',
   valor_depreciacao: 'valor_depreciacao',
   valor_contabil: 'valor_contabil',
@@ -123,11 +127,14 @@ export class EquipamentosImportacao implements CadastroImportavel<EquipamentoCom
   async prepararDados(dados: Record<string, unknown>, usuario: UsuarioDaImportacao, atual: EquipamentoComListas | null) {
     const {
       planta, planta_ref, unidade, unidade_ref, modelo, modelo_ref, plano, plano_ref,
-      dados_tecnicos: dadosTecnicos, componentes, data_imobilizacao, ...uc
+      dados_tecnicos: dadosTecnicos, componentes, data_imobilizacao, data_instalacao, garantia_ate, ...uc
     } = dados;
     const erros: ErroDeCampo[] = [];
     const resultado: Record<string, unknown> = { ...uc };
     if (data_imobilizacao !== undefined) resultado.data_imobilizacao = comoATela(data_imobilizacao);
+    // SN-66: as datas vão sempre (como a de imobilização); o retrato as compara
+    if (data_instalacao !== undefined) resultado.data_instalacao = comoATela(data_instalacao);
+    if (garantia_ate !== undefined) resultado.garantia_ate = comoATela(garantia_ate);
 
     if (!atual) {
       resultado.classificacao = 'UC';
@@ -273,7 +280,7 @@ export class EquipamentosImportacao implements CadastroImportavel<EquipamentoCom
     linha: Record<string, unknown>, i: number, atual: EquipamentoComListas | null,
     modelos: Awaited<ReturnType<EquipamentosImportacao['catalogoDeModelos']>>, erros: ErroDeCampo[],
   ) {
-    const { id, modelo, modelo_ref, data_instalacao, ...componente } = linha;
+    const { id, modelo, modelo_ref, data_instalacao, garantia_ate, ...componente } = linha;
     const idDoComponente = typeof id === 'string' && id.trim() ? id.trim() : null;
     const existente = idDoComponente ? atual?.componentes.find((c) => c.id.trim() === idDoComponente) : undefined;
 
@@ -283,6 +290,7 @@ export class EquipamentosImportacao implements CadastroImportavel<EquipamentoCom
 
     const resolvido: Record<string, unknown> = { ...componente };
     if (data_instalacao !== undefined) resolvido.data_instalacao = comoATela(data_instalacao);
+    if (garantia_ate !== undefined) resolvido.garantia_ate = comoATela(garantia_ate);
     this.resolverModelo(
       modelo, modelo_ref, modelos, resolvido, `componentes.${i}.modelo`, false, existente?.tipo_equipamento_id ?? null, erros,
     );
@@ -392,10 +400,10 @@ export class EquipamentosImportacao implements CadastroImportavel<EquipamentoCom
         return typeof v === 'string' ? v.trim() : v instanceof Date ? dia(v) : (numero(v) ?? v);
       });
     return {
-      uc: [...campos(uc, COLUNAS_DA_UC), uc.unidade_id?.trim() ?? null, dia(uc.data_imobilizacao)],
+      uc: [...campos(uc, COLUNAS_DA_UC), uc.unidade_id?.trim() ?? null, dia(uc.data_imobilizacao), dia(uc.data_instalacao), dia(uc.garantia_ate)],
       dadosTecnicos: formaDosDadosTecnicos(dadosTecnicos),
       componentes: componentes
-        .map((c) => [c.id.trim(), ...campos(c, COLUNAS_DO_COMPONENTE), dia(c.data_instalacao)])
+        .map((c) => [c.id.trim(), ...campos(c, COLUNAS_DO_COMPONENTE), dia(c.data_instalacao), dia(c.garantia_ate)])
         .sort((a, b) => String(a[0]).localeCompare(String(b[0]))),
       planoDeOrigem,
     };

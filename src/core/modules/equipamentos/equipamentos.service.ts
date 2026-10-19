@@ -12,6 +12,7 @@ import { depoisDeGravar } from '../../prisma/transacao-em-curso';
 import { IMqttBroker, MQTT_BROKER } from '../../common/interfaces/mqtt-broker.interface';
 import { CreateEquipamentoDto, DadoTecnicoDto } from './dto/create-equipamento.dto';
 import { UpdateEquipamentoDto } from './dto/update-equipamento.dto';
+import { diaComoInstante } from '../../../common/decorators/dia-de-calendario';
 import { EquipamentoQueryDto } from './dto/equipamento-query.dto';
 import { comNomeDaPosicao } from './nome-exibido';
 import { ConfigurarMqttDto } from './dto/configurar-mqtt.dto';
@@ -1460,12 +1461,23 @@ export class EquipamentosService {
         .map(f => f.name),
     );
 
+    // O corpo do lote nao passa pelo pipe (tipo inline): a data chega como a
+    // tela manda — "AAAA-MM-DD", do transform — e o Prisma recusa esse texto num
+    // DateTime, derrubando o lote inteiro (500). Achado no SN-66.
+    const datas = new Set((modelo?.fields ?? []).filter(f => f.kind === 'scalar' && f.type === 'DateTime').map(f => f.name));
+
     const dados: Record<string, unknown> = {};
     for (const [chave, valor] of Object.entries(entrada ?? {})) {
       // `undefined` no Prisma significa "nao mexe": deixar de fora preserva o
       // que ja esta gravado, que e o esperado num update parcial.
       if (valor === undefined || !colunas.has(chave)) continue;
       if (valor === '' && naoTexto.has(chave)) continue;
+      if (datas.has(chave) && typeof valor === 'string') {
+        const instante = diaComoInstante(valor.trim());
+        if (Number.isNaN(Date.parse(instante))) throw new BadRequestException(`Data inválida em ${chave}: ${valor}`);
+        dados[chave] = instante;
+        continue;
+      }
       dados[chave] = valor;
     }
     // So colunas escalares do model (filtradas pelo DMMF), com o valor do DTO

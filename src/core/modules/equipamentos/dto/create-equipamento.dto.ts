@@ -1,4 +1,5 @@
-import { IsString, IsOptional, IsNotEmpty, IsEnum, IsInt, IsBoolean, IsDateString, IsArray, ValidateNested } from 'class-validator';
+import { IsString, IsOptional, IsNotEmpty, IsEnum, IsInt, IsBoolean, IsArray, ValidateNested } from 'class-validator';
+import { DiaDeCalendario } from '../../../../common/decorators/dia-de-calendario';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Type, Transform } from 'class-transformer';
 
@@ -137,13 +138,19 @@ export class CreateEquipamentoDto {
 
   @ApiPropertyOptional({ example: '2024-01-15' })
   @IsOptional()
-  @IsDateString()
+  @DiaDeCalendario()
   data_imobilizacao?: string;
 
   @ApiPropertyOptional({ example: '2024-01-15' })
   @IsOptional()
-  @IsDateString()
+  @DiaDeCalendario()
   data_instalacao?: string;
+
+  // SN-66: null limpa (a tela manda null ao apagar a data)
+  @ApiPropertyOptional({ example: '2027-01-15', nullable: true, description: 'Até quando está em garantia' })
+  @IsOptional()
+  @DiaDeCalendario()
+  garantia_ate?: string | null;
 
   @ApiPropertyOptional({ example: 15000.00 })
   @IsOptional()

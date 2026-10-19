@@ -111,11 +111,16 @@ describe('Importação de equipamentos (banco real)', () => {
       localizacao: 'Casa de inversores',
       valor_contabil: 15000.5,
       data_imobilizacao: '2026-03-15',
+      // SN-66
+      data_instalacao: '2026-04-01',
+      garantia_ate: '2031-04-01',
+      fornecedor: 'Distribuidora Solar',
+      centro_custo: 'CC-UFV1',
       status: 'Ativo',
       mcpse: false,
       plano: 'plano do inversor (teste)',
       dados_tecnicos: [{ _linha: 30, campo: 'potencia', valor: '75', tipo: 'number', unidade: 'kW' }],
-      componentes: [{ _linha: 35, nome: 'String 01', criticidade: '3', fornecedor: 'Fornecedor X' }],
+      componentes: [{ _linha: 35, nome: 'String 01', criticidade: '3', fornecedor: 'Fornecedor X', garantia_ate: '2028-01-10', centro_custo: 'CC-STR' }],
       ...dados,
     },
   });
@@ -144,6 +149,8 @@ describe('Importação de equipamentos (banco real)', () => {
     const e = (await uc())!;
     expect(e).toMatchObject({ tipo_equipamento: 'TST_IMP_INVERSOR', fabricante: 'Fabricante Teste', criticidade: '4' });
     expect(e.data_imobilizacao?.toISOString()).toBe('2026-03-15T00:00:00.000Z');
+    expect(e).toMatchObject({ fornecedor: 'Distribuidora Solar', centro_custo: 'CC-UFV1' });
+    expect([e.data_instalacao?.toISOString(), e.garantia_ate?.toISOString()]).toEqual(['2026-04-01T00:00:00.000Z', '2031-04-01T00:00:00.000Z']);
     expect(await prisma.equipamentos_dados_tecnicos.count({ where: { equipamento_id: e.id } })).toBe(1);
     expect(await prisma.equipamentos.count({ where: { equipamento_pai_id: e.id, classificacao: 'UAR' } })).toBe(1);
     expect((await copiaDoPlano())?.plano_origem_id?.trim()).toBe(TEMPLATE);
@@ -163,7 +170,9 @@ describe('Importação de equipamentos (banco real)', () => {
           {
             criticidade: 'A',
             plano_ref: TEMPLATE,
-            componentes: [{ id: componente.id.trim(), nome: 'String 01', criticidade: '3', fornecedor: 'Fornecedor X' }],
+            componentes: [
+              { id: componente.id.trim(), nome: 'String 01', criticidade: '3', fornecedor: 'Fornecedor X', garantia_ate: '2028-01-10', centro_custo: 'CC-STR' },
+            ],
           },
           e.id.trim(),
         ),
@@ -174,6 +183,35 @@ describe('Importação de equipamentos (banco real)', () => {
 
     expect(r).toMatchObject({ inalterados: 1, alterados: 0, erros: [] });
     expect((await tarefasDaCopia()).map((t) => t.origem_status)).toEqual(['HERDADA']);
+  });
+
+  // SN-66: a garantia e o centro de custo entram no retrato (mudou = alterado)
+  it('trocar a garantia da UC e o centro de custo do componente é alteração, e grava', async () => {
+    await importacao.importar(equipamentos, [ficha()], true, admin);
+    const e = (await uc())!;
+    const [componente] = await prisma.equipamentos.findMany({ where: { equipamento_pai_id: e.id } });
+
+    const r = await importacao.importar(
+      equipamentos,
+      [
+        ficha(
+          {
+            garantia_ate: '2032-04-01',
+            plano_ref: TEMPLATE,
+            componentes: [
+              { id: componente.id.trim(), nome: 'String 01', criticidade: '3', fornecedor: 'Fornecedor X', garantia_ate: '2028-01-10', centro_custo: 'CC-NOVO' },
+            ],
+          },
+          e.id.trim(),
+        ),
+      ],
+      true,
+      admin,
+    );
+
+    expect(r).toMatchObject({ alterados: 1, erros: [] });
+    expect((await uc())!.garantia_ate?.toISOString()).toBe('2032-04-01T00:00:00.000Z');
+    expect((await prisma.equipamentos.findUniqueOrThrow({ where: { id: componente.id } })).centro_custo).toBe('CC-NOVO');
   });
 
   it('a unidade de uma UC não se troca; componente de outra UC é erro na linha dele', async () => {

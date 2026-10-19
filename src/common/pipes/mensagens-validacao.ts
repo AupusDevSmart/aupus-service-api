@@ -21,6 +21,8 @@ const NOMES: Record<string, string> = {
   numero_serie: 'número de série',
   localizacao_especifica: 'localização específica',
   data_instalacao: 'data de instalação',
+  garantia_ate: 'garantia',
+  centro_custo: 'centro de custo',
   equipamento_pai_id: 'equipamento pai',
   unidade_id: 'instalação',
   planta_id: 'planta',

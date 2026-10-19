@@ -1279,6 +1279,8 @@ model equipamentos {
   tipo_depreciacao   String?   @db.VarChar(20)
   data_imobilizacao  DateTime? @db.Date
   data_instalacao    DateTime? @db.Date
+  /// SN-66: até quando está em garantia (data de calendário, como a instalação)
+  garantia_ate       DateTime? @db.Date
   valor_imobilizado  Decimal?  @db.Decimal(15, 2)
   valor_depreciacao  Decimal?  @db.Decimal(15, 2)
   valor_contabil     Decimal?  @db.Decimal(15, 2)
