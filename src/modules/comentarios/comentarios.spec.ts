@@ -161,12 +161,13 @@ describe('comentários (banco real)', () => {
       ]);
     });
 
-    // A regra é lista de quem pode: conta sem papel (ou com papel legado) não é da equipe
-    it('conta sem papel não vê nem escreve interno', async () => {
+    // A regra é lista de quem pode: conta sem papel (ou com papel legado) não é da
+    // equipe. Desde o SN-76 ela também não tem planta nenhuma: a OS "não existe"
+    it('conta sem papel não vê a OS nem comenta nela', async () => {
       await servico.comentar('ordem_servico', OS, { comentario: 'só a equipe', interno: true }, como.gerente);
 
-      expect(await servico.listar('ordem_servico', OS, como.semPapel)).toEqual([]);
-      await expect(servico.comentar('ordem_servico', OS, { comentario: 'x', interno: true }, como.semPapel)).rejects.toBeInstanceOf(ForbiddenException);
+      await expect(servico.listar('ordem_servico', OS, como.semPapel)).rejects.toThrow(new NotFoundException('Ordem de serviço não encontrada'));
+      await expect(servico.comentar('ordem_servico', OS, { comentario: 'x', interno: true }, como.semPapel)).rejects.toBeInstanceOf(NotFoundException);
     });
 
     it('o cliente comenta na solicitação dele, mas nunca interno', async () => {

@@ -5,6 +5,7 @@ import { CreateFeriadoDto } from '@/modules/agenda/dto/create-feriado.dto';
 import { UpdateFeriadoDto } from '@/modules/agenda/dto/update-feriado.dto';
 import { CadastroImportavel, ErrosDaLinha, UsuarioDaImportacao } from '../importacao.types';
 import { CatalogoPorNome, listaDaCelula } from '../catalogo-por-nome';
+import { AGENDA_DA_AUPUS } from '@/modules/agenda/agenda-da-aupus';
 
 /**
  * Feriados: cadastro plano. As plantas de um feriado que não é geral vão numa
@@ -29,6 +30,11 @@ export class FeriadosImportacao implements CadastroImportavel<feriados> {
   }
 
   /** `plantas` (nomes) + `plantas_ids` (os IDs exportados) → `plantaIds`. */
+  /** Cliente e técnico não alteram a agenda, como na tela (SN-76) */
+  async autorizar(usuario: UsuarioDaImportacao) {
+    if (this.escopo.isScoped(await this.escopo.getScope(usuario))) throw ErrosDaLinha.em('nome', AGENDA_DA_AUPUS);
+  }
+
   async prepararDados(dados: Record<string, unknown>, usuario: UsuarioDaImportacao, atual: feriados | null) {
     const { plantas, plantas_ids, ...resto } = dados;
     if (plantas === undefined) return resto;

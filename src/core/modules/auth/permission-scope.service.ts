@@ -30,6 +30,13 @@ export type ScopedEntityType =
   | 'regra_log_mqtt'
   | 'log_mqtt';
 
+/**
+ * Os papéis internos da Aupus, que veem todas as plantas. Operador e
+ * proprietario têm as plantas deles; qualquer outro (sem papel, papel antigo
+ * ou desconhecido) não tem nenhuma (SN-76).
+ */
+export const PAPEIS_SEM_ESCOPO: ReadonlySet<string> = new Set(['super_admin', 'admin', 'gerente', 'analista']);
+
 /** O "não encontrado" de cada tipo: o mesmo para o que não existe e para o que está fora do escopo. */
 const NAO_ENCONTRADO: Record<ScopedEntityType, string> = {
   planta: 'Planta não encontrada',
@@ -75,7 +82,9 @@ export class PermissionScopeService {
 
   async getPlantasDoUsuario(userId: string, roleName?: string | null): Promise<PlantaScope> {
     const id = userId?.trim();
+    // Sem usuário é o sistema (cron, worker): não há escopo a aplicar
     if (!id) return null;
+    if (roleName && PAPEIS_SEM_ESCOPO.has(roleName)) return null;
 
     if (roleName === 'operador') {
       const rows = await this.prisma.planta_operadores.findMany({
@@ -93,7 +102,10 @@ export class PermissionScopeService {
       return rows.map((r) => r.id.trim());
     }
 
-    return null;
+    // Sem papel ou com papel que o sistema não conhece: nenhuma planta. Era
+    // `null` (todas): quem ganhasse uma permissão direta sem ter papel via e
+    // mexia em todas as plantas (decisão do usuário, 19/out/2026, SN-76)
+    return [];
   }
 
   /**

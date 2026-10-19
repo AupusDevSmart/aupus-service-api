@@ -75,6 +75,15 @@ describe('Importação de feriados (banco real)', () => {
     return f.feriado_plantas.map((p) => p.planta_id.trim()).sort();
   };
 
+  // SN-76 (decisão do usuário): a agenda é da Aupus, como na tela
+  it('o cliente não importa feriado, nem da planta dele', async () => {
+    const cliente = { ...admin, id: PROPRIETARIO, role: 'proprietario' };
+    const r = await importacao.importar(feriados, [linha({ plantas: 'planta unica FERIADO' })], true, cliente);
+
+    expect(r.erros).toEqual([expect.objectContaining({ mensagem: 'Cliente e técnico não alteram a agenda: feriados e dias úteis são cadastrados pela Aupus.' })]);
+    expect(await prisma.feriados.count({ where: { data: DATA } })).toBe(0);
+  });
+
   it('planta pelo nome, sem caixa nem acento', async () => {
     const r = await importacao.importar(feriados, [linha({ plantas: 'planta unica FERIADO' })], true, admin);
 

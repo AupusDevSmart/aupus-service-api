@@ -1,9 +1,10 @@
-import { CanActivate, ExecutionContext, Injectable } from '@nestjs/common';
+import { CanActivate, ExecutionContext, ForbiddenException, Injectable } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { PermissionScopeService } from '../permission-scope.service';
 import {
   PLANTA_SCOPE_KEY,
   PlantaScopeMetadata,
+  SO_SEM_ESCOPO_KEY,
 } from '../decorators/planta-scope.decorator';
 import { IS_PUBLIC_KEY } from '../decorators/public.decorator';
 
@@ -38,11 +39,14 @@ export class PlantaScopeGuard implements CanActivate {
       context.getHandler(),
       context.getClass(),
     ]);
-    if (!metadados) return true;
+    const soSemEscopo = this.reflector.getAllAndOverride<string>(SO_SEM_ESCOPO_KEY, [context.getHandler(), context.getClass()]);
+    if (!metadados && !soSemEscopo) return true;
 
     const req = context.switchToHttp().getRequest();
     // Admin, gerente e analista não têm escopo: passam sem consulta por id
     if (!this.scopeService.isScoped(await this.scopeService.getScope(req.user))) return true;
+    if (soSemEscopo) throw new ForbiddenException(soSemEscopo);
+    if (!metadados) return true;
 
     for (const meta of Array.isArray(metadados) ? metadados : [metadados]) {
       const from = meta.from ?? 'param';

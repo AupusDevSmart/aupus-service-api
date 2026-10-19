@@ -1,7 +1,7 @@
 import { ExecutionContext, NotFoundException } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { PlantaScopeGuard } from './planta-scope.guard';
-import { UsePlantaScope } from '../decorators/planta-scope.decorator';
+import { SoSemEscopo, UsePlantaScope } from '../decorators/planta-scope.decorator';
 import { Public } from '../decorators/public.decorator';
 import type { PermissionScopeService } from '../permission-scope.service';
 
@@ -25,6 +25,9 @@ describe('PlantaScopeGuard', () => {
     publica() {}
 
     semEscopo() {}
+
+    @SoSemEscopo('Só a Aupus altera')
+    daAupus() {}
   }
 
   const assert = jest.fn();
@@ -78,6 +81,13 @@ describe('PlantaScopeGuard', () => {
   it('fora do escopo: o 404 do assert sobe', async () => {
     assert.mockRejectedValue(new NotFoundException('Equipamento não encontrado'));
     await expect(rodar(Rotas.prototype.porId, { params: { id: 'e1' } })).rejects.toThrow('Equipamento não encontrado');
+  });
+
+  // SN-76: a agenda é da Aupus
+  it('@SoSemEscopo: quem tem escopo leva 403 com a mensagem; quem não tem passa', async () => {
+    await expect(rodar(Rotas.prototype.daAupus, {})).rejects.toThrow('Só a Aupus altera');
+    getScope.mockResolvedValue(null);
+    await expect(rodar(Rotas.prototype.daAupus, {})).resolves.toBe(true);
   });
 
   it('rota pública e rota sem o decorator passam sem conferir', async () => {

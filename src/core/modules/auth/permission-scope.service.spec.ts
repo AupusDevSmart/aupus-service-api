@@ -214,6 +214,14 @@ describe('PermissionScopeService (banco real)', () => {
     it('técnico sem vínculo não vê planta nenhuma (lista vazia, não "tudo")', async () => {
       expect(await escopo.getScope({ id: SEM_VINCULO, role: 'operador' })).toEqual([]);
     });
+
+    // SN-76 (decisão do usuário): era `null` (todas) para quem não tinha papel
+    it('só os papéis internos veem todas; sem papel ou com papel desconhecido, nenhuma', async () => {
+      for (const role of ['super_admin', 'admin', 'gerente', 'analista']) expect(await escopo.getScope({ id: SEM_VINCULO, role })).toBeNull();
+      for (const role of [null, undefined, '', 'vendedor', 'Admin']) expect(await escopo.getScope({ id: SEM_VINCULO, role })).toEqual([]);
+      // Sem usuário é o sistema (cron, worker)
+      expect(await escopo.getScope(undefined)).toBeNull();
+    });
   });
 
   const tipos: ScopedEntityType[] = ['planta', 'equipamento', 'anomalia', 'tarefa', 'ordem_servico', 'programacao_os', 'solicitacao_servico', 'ativo_funcional'];

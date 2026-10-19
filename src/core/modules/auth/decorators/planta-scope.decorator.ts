@@ -41,3 +41,13 @@ export interface PlantaScopeMetadata {
  * nenhuma rota usava o decorator. `escopo-das-escritas.spec.ts` cobre as rotas.
  */
 export const UsePlantaScope = (...metas: PlantaScopeMetadata[]) => SetMetadata(PLANTA_SCOPE_KEY, metas);
+
+export const SO_SEM_ESCOPO_KEY = 'so_sem_escopo';
+
+/**
+ * A escrita é só de quem não tem escopo por planta (a Aupus): o cliente e o
+ * técnico levam 403 com a mensagem, mesmo com a permissão. Para o que não é de
+ * uma planta só — a agenda (feriados e dias úteis, decisão do usuário,
+ * 19/out/2026, SN-76). Lido pelo mesmo `PlantaScopeGuard`.
+ */
+export const SoSemEscopo = (mensagem: string) => SetMetadata(SO_SEM_ESCOPO_KEY, mensagem);

@@ -5,11 +5,12 @@ import { AuthModule } from './auth.module';
 import { PermissionsGuard } from './guards/permissions.guard';
 import { PlantaScopeGuard } from './guards/planta-scope.guard';
 import { PERMISSIONS_KEY } from './decorators/permissions.decorator';
-import { PLANTA_SCOPE_KEY } from './decorators/planta-scope.decorator';
+import { PLANTA_SCOPE_KEY, SO_SEM_ESCOPO_KEY } from './decorators/planta-scope.decorator';
 import { EquipamentosController } from '../equipamentos/equipamentos.controller';
 import { UnidadesController } from '../unidades/unidades.controller';
 import { PlantasController } from '../plantas/plantas.controller';
 import { AtivosFuncionaisController } from '../ativos-funcionais/ativos-funcionais.controller';
+import { AgendaController } from '../../../modules/agenda/agenda.controller';
 
 /**
  * Toda escrita dos cadastros por planta confere o escopo (SN-75). Até então as
@@ -27,7 +28,7 @@ const CONFERIDAS_NO_HANDLER: Record<string, string> = {
   'PlantasController.create': 'só em nome próprio',
 };
 
-const CONTROLLERS = [EquipamentosController, UnidadesController, PlantasController, AtivosFuncionaisController];
+const CONTROLLERS = [EquipamentosController, UnidadesController, PlantasController, AtivosFuncionaisController, AgendaController];
 
 function escritas() {
   return CONTROLLERS.flatMap((controller) =>
@@ -41,6 +42,8 @@ function escritas() {
           caminho: Reflect.getMetadata(PATH_METADATA, handler) as string | undefined,
           permissoes: (Reflect.getMetadata(PERMISSIONS_KEY, handler) as string[] | undefined) ?? [],
           escopo: Reflect.getMetadata(PLANTA_SCOPE_KEY, handler) as unknown[] | undefined,
+          // A agenda é da Aupus: quem tem escopo não escreve (SN-76)
+          soSemEscopo: Reflect.getMetadata(SO_SEM_ESCOPO_KEY, handler) as string | undefined,
         };
       })
       .filter((r) => r.metodo !== undefined && r.metodo !== RequestMethod.GET),
@@ -49,11 +52,11 @@ function escritas() {
 
 describe('escopo das escritas dos cadastros (SN-75)', () => {
   it('a varredura acha as escritas (a lista não pode vir vazia por engano)', () => {
-    expect(escritas().length).toBeGreaterThan(20);
+    expect(escritas().length).toBeGreaterThan(30);
   });
 
   it.each(escritas().map((r) => [r.rota, r]))('%s confere o escopo', (_rota, r) => {
-    const conferida = (r.escopo?.length ?? 0) > 0 || r.rota in CONFERIDAS_NO_HANDLER;
+    const conferida = (r.escopo?.length ?? 0) > 0 || !!r.soSemEscopo || r.rota in CONFERIDAS_NO_HANDLER;
     expect({ rota: r.rota, caminho: r.caminho, conferida }).toEqual({ rota: r.rota, caminho: r.caminho, conferida: true });
   });
 
