@@ -1,4 +1,4 @@
-import { ForbiddenException } from '@nestjs/common';
+import { NotFoundException } from '@nestjs/common';
 import { PermissionScopeService, PrismaService } from '@/core';
 import { PropagacaoPlanosService } from '../planos-manutencao/propagacao-planos.service';
 import { InstrucoesService } from './instrucoes.service';
@@ -150,14 +150,14 @@ describe('instrução: anomalias, solicitações e tarefas no escopo (banco real
       expect(associacao.created_by?.trim()).toBe(DONO_B);
     });
 
-    it('anomalia de outra planta: recusa (403) e não grava', async () => {
+    it('anomalia de outra planta: recusa (404) e não grava', async () => {
       const outra = await prisma.anomalias.create({ data: { descricao: `${PREFIXO} nova a`, local: 'x', ativo: 'x', origem: 'OPERADOR', equipamento_id: UC_A, planta_id: PLANTA_A } });
-      await expect(instrucoes.associarAnomalia(instrucaoId, outra.id, 'nova', tecnicoB)).rejects.toBeInstanceOf(ForbiddenException);
+      await expect(instrucoes.associarAnomalia(instrucaoId, outra.id, 'nova', tecnicoB)).rejects.toBeInstanceOf(NotFoundException);
       expect(await prisma.anomalias_instrucoes.count({ where: { anomalia_id: outra.id } })).toBe(0);
     });
 
-    it('desassociar a anomalia de outra planta: recusa (403) e a associação fica', async () => {
-      await expect(instrucoes.desassociarAnomalia(instrucaoId, anomalia.a, tecnicoB)).rejects.toBeInstanceOf(ForbiddenException);
+    it('desassociar a anomalia de outra planta: recusa (404) e a associação fica', async () => {
+      await expect(instrucoes.desassociarAnomalia(instrucaoId, anomalia.a, tecnicoB)).rejects.toBeInstanceOf(NotFoundException);
       expect(await prisma.anomalias_instrucoes.count({ where: { anomalia_id: anomalia.a, instrucao_id: instrucaoId } })).toBe(1);
     });
   });

@@ -1,5 +1,5 @@
 import 'reflect-metadata';
-import { BadRequestException, ForbiddenException, ValidationPipe } from '@nestjs/common';
+import { BadRequestException, NotFoundException, ValidationPipe } from '@nestjs/common';
 import { CondicaoOS, OrigemOS, PermissionScopeService, PrioridadeOS, PrismaService, TipoOS } from '@/core';
 import { ProgramacaoOSController } from './programacao-os.controller';
 import { ProgramacaoOSService } from './programacao-os.service';
@@ -124,22 +124,22 @@ describe('programação no escopo da planta (banco real)', () => {
   });
 
   describe('tarefas e exclusão conferem o escopo', () => {
-    it('técnico de outra planta: adicionar, editar e remover tarefa dão 403 e nada muda', async () => {
+    it('técnico de outra planta: adicionar, editar e remover tarefa dão 404 e nada muda', async () => {
       const prog = await programacaoA();
       await expect(programacoes.adicionarTarefasProgramacao(prog.id, { tarefas_ids: [tarefa.uar] }, TECNICO_B, tecnicoB)).rejects.toBeInstanceOf(
-        ForbiddenException,
+        NotFoundException,
       );
       await expect(
         programacoes.atualizarTarefasProgramacao(prog.id, { tarefas: [{ tarefa_id: tarefa.a1, ordem: 9 }] } as never, TECNICO_B, tecnicoB),
-      ).rejects.toBeInstanceOf(ForbiddenException);
-      await expect(programacoes.removerTarefaProgramacao(prog.id, tarefa.a1, TECNICO_B, tecnicoB)).rejects.toBeInstanceOf(ForbiddenException);
+      ).rejects.toBeInstanceOf(NotFoundException);
+      await expect(programacoes.removerTarefaProgramacao(prog.id, tarefa.a1, TECNICO_B, tecnicoB)).rejects.toBeInstanceOf(NotFoundException);
       const vinculos = await prisma.tarefas_programacao_os.findMany({ where: { programacao_id: prog.id } });
       expect(vinculos.map((v) => [v.tarefa_id?.trim(), v.ordem])).toEqual([[tarefa.a1.trim(), 1]]);
     });
 
-    it('técnico de outra planta não exclui (403)', async () => {
+    it('técnico de outra planta não exclui (404)', async () => {
       const prog = await programacaoA();
-      await expect(programacoes.deletar(prog.id, TECNICO_B, tecnicoB)).rejects.toBeInstanceOf(ForbiddenException);
+      await expect(programacoes.deletar(prog.id, TECNICO_B, tecnicoB)).rejects.toBeInstanceOf(NotFoundException);
       expect((await prisma.programacoes_os.findUniqueOrThrow({ where: { id: prog.id } })).deletado_em).toBeNull();
     });
 

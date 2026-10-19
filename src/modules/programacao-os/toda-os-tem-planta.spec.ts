@@ -1,4 +1,4 @@
-import { BadRequestException, ForbiddenException } from '@nestjs/common';
+import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { CondicaoOS, OrigemOS, PermissionScopeService, PrioridadeOS, PrismaService, TipoOS } from '@/core';
 import { ProgramacaoOSService } from './programacao-os.service';
 import { AnomaliasService } from '../anomalias/anomalias.service';
@@ -161,13 +161,13 @@ describe('toda anomalia e programação tem planta (banco real)', () => {
 
     it('técnico de outra planta não programa a anomalia omitindo a planta (o escopo confere a da origem)', async () => {
       const anomalia = await novaAnomalia(UC_A);
-      await expect(novaProgramacao({ origem: OrigemOS.ANOMALIA, anomalia_id: anomalia.id }, tecnicoB)).rejects.toThrow(ForbiddenException);
+      await expect(novaProgramacao({ origem: OrigemOS.ANOMALIA, anomalia_id: anomalia.id }, tecnicoB)).rejects.toThrow(NotFoundException);
       expect(await prisma.programacoes_os.count({ where: { descricao: { startsWith: PREFIXO } } })).toBe(0);
     });
 
     it('pela rota from-anomalia também: o escopo vale (o user chega até o criar)', async () => {
       const anomalia = await novaAnomalia(UC_A);
-      await expect(programacoes.criarDeAnomalia(anomalia.id, {}, TECNICO_B, tecnicoB)).rejects.toThrow(ForbiddenException);
+      await expect(programacoes.criarDeAnomalia(anomalia.id, {}, TECNICO_B, tecnicoB)).rejects.toThrow(NotFoundException);
       expect(await prisma.programacoes_os.count({ where: { descricao: { startsWith: PREFIXO } } })).toBe(0);
     });
 

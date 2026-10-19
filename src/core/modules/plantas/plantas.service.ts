@@ -258,8 +258,8 @@ export class PlantasService {
         throw new NotFoundException(`Planta com ID ${id} não encontrada`);
       }
 
-      // Scope RBAC: 403 se a planta nao esta no escopo do usuario
-      await this.scopeService.assertPlantaInScope(planta.id, user);
+      // Fora do escopo = 404 com a mesma mensagem (SN-57)
+      await this.scopeService.assertPlantaInScope(planta.id, user, `Planta com ID ${id} não encontrada`);
 
       return this.formatPlantaResponse(planta);
 
@@ -484,8 +484,8 @@ export class PlantasService {
         throw new NotFoundException(message);
       }
 
-      // Scope RBAC: 403 se a planta nao esta no escopo do usuario
-      await this.scopeService.assertPlantaInScope(planta.id, user);
+      // Fora do escopo = 404 com a mesma mensagem (SN-57)
+      await this.scopeService.assertPlantaInScope(planta.id, user, `Planta com ID ${plantaId} não encontrada`);
 
       const whereClause: Prisma.unidadesWhereInput = {
         planta_id: plantaId,

@@ -185,7 +185,7 @@ export class ReservasService {
     }
 
     // Scope RBAC: 403 se a planta do veiculo nao esta no escopo
-    await this.scopeService.assertPlantaInScope(reserva.veiculo?.planta_id ?? null, user);
+    await this.scopeService.assertPlantaInScope(reserva.veiculo?.planta_id ?? null, user, `Reserva com ID ${id} não encontrada`);
 
     return this.mapearParaResponse(reserva);
   }

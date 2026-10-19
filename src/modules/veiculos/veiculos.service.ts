@@ -255,8 +255,8 @@ export class VeiculosService {
       throw new NotFoundException(`Veículo com ID ${id} não encontrado`);
     }
 
-    // Scope RBAC: veiculos com planta_id NULL ou fora do escopo -> 403 para users escopados
-    await this.scopeService.assertPlantaInScope(veiculo.planta_id, user);
+    // Veículo sem planta ou de planta fora do escopo: 404, como o que não existe (SN-57)
+    await this.scopeService.assertPlantaInScope(veiculo.planta_id, user, `Veículo com ID ${id} não encontrado`);
 
     return this.mapearParaResponse(veiculo);
   }
@@ -276,7 +276,7 @@ export class VeiculosService {
     }
 
     // Scope RBAC
-    await this.scopeService.assertPlantaInScope(veiculoExistente.planta_id, user);
+    await this.scopeService.assertPlantaInScope(veiculoExistente.planta_id, user, `Veículo com ID ${id} não encontrado`);
     if (user && updateDto.plantaId !== undefined && updateDto.plantaId !== veiculoExistente.planta_id) {
       await this.scopeService.assertPlantaInScope(updateDto.plantaId, user);
     }
@@ -363,7 +363,7 @@ export class VeiculosService {
       throw new NotFoundException(`Veículo com ID ${id} não encontrado`);
     }
 
-    await this.scopeService.assertPlantaInScope(veiculo.planta_id, user);
+    await this.scopeService.assertPlantaInScope(veiculo.planta_id, user, `Veículo com ID ${id} não encontrado`);
 
     if (veiculo.reservas.length > 0) {
       throw new ConflictException('Não é possível inativar veículo com reservas ativas');
@@ -411,7 +411,7 @@ export class VeiculosService {
       throw new NotFoundException(`Veículo com ID ${id} não encontrado`);
     }
 
-    await this.scopeService.assertPlantaInScope(veiculo.planta_id, user);
+    await this.scopeService.assertPlantaInScope(veiculo.planta_id, user, `Veículo com ID ${id} não encontrado`);
 
     // Validar transições de status
     this.validarTransicaoStatus(veiculo.status, alterarStatusDto.novoStatus);

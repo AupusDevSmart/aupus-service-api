@@ -1,4 +1,4 @@
-import { ForbiddenException } from '@nestjs/common';
+import { NotFoundException } from '@nestjs/common';
 import { PermissionScopeService, PrismaService } from '@/core';
 import { EquipamentosService } from '../equipamentos/equipamentos.service';
 import { equipamentoNasPlantas, plantaDeCadaEquipamento } from './planta-dos-equipamentos';
@@ -79,7 +79,7 @@ describe('planta dos equipamentos (banco real)', () => {
 
   it('o componente abre para o cliente da planta do UC e não para o da planta antiga', async () => {
     await expect(equipamentos.findOne(UAR, clienteDaNova)).resolves.toMatchObject({ nome: 'Ventoinha' });
-    await expect(equipamentos.findOne(UAR, clienteDaVelha)).rejects.toBeInstanceOf(ForbiddenException);
+    await expect(equipamentos.findOne(UAR, clienteDaVelha)).rejects.toBeInstanceOf(NotFoundException);
   });
 
   it('a lista de equipamentos mostra o componente e o equipamento sem unidade de quem é a planta', async () => {

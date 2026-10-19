@@ -940,7 +940,7 @@ export class EquipamentosService {
     };
   }
 
-  /** Equipamento de planta fora do escopo de quem pede: 403, como no findOne. */
+  /** Equipamento de planta fora do escopo de quem pede: 404, como o que não existe (SN-57). */
   async garantirNoEscopo(id: string, user?: ScopedUser): Promise<void> {
     if (user) await this.scopeService.assertEntityInScope('equipamento', id.trim(), user);
   }
@@ -1643,7 +1643,7 @@ export class EquipamentosService {
     }
 
     // Scope RBAC: 403 se a planta da unidade nao esta no escopo do usuario
-    await this.scopeService.assertPlantaInScope(unidadeExists.planta_id, user);
+    await this.scopeService.assertPlantaInScope(unidadeExists.planta_id, user, 'Unidade não encontrada');
 
     // Usar o método findAll existente com filtro de unidade
     // Remove planta_id se existir, pois quando temos unidade_id não precisamos de planta_id

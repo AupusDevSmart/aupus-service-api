@@ -159,8 +159,9 @@ export class PlantaOperadoresService {
     if (isAdminLike) return planta;
 
     if (role === 'proprietario') {
-      if (planta.proprietario_id !== requester?.id) {
-        throw new ForbiddenException('Voce so pode gerenciar operadores das suas proprias plantas');
+      // Planta de outro proprietário está fora do escopo: "não existe" (SN-57)
+      if (planta.proprietario_id?.trim() !== requester?.id?.trim()) {
+        throw new NotFoundException('Planta nao encontrada');
       }
       return planta;
     }

@@ -1,4 +1,4 @@
-import { BadRequestException, ForbiddenException } from '@nestjs/common';
+import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { PermissionScopeService, PrismaService } from '@/core';
 import { TarefasService } from '../tarefas/tarefas.service';
 import { PlanosManutencaoService } from './planos-manutencao.service';
@@ -135,15 +135,15 @@ describe('planos vinculados pelo escopo da planta (banco real)', () => {
   });
 
   describe('por id: resumo, propagação e o próprio plano (SN-40)', () => {
-    it('resumo do plano de outra planta: 403; o da planta e o do template passam', async () => {
-      await expect(planos.obterResumo(copiaAId, { id: TECNICO_B, role: 'operador' })).rejects.toBeInstanceOf(ForbiddenException);
-      await expect(planos.obterResumo(antigoAId, { id: TECNICO_B, role: 'operador' })).rejects.toBeInstanceOf(ForbiddenException);
+    it('resumo do plano de outra planta: 404; o da planta e o do template passam', async () => {
+      await expect(planos.obterResumo(copiaAId, { id: TECNICO_B, role: 'operador' })).rejects.toBeInstanceOf(NotFoundException);
+      await expect(planos.obterResumo(antigoAId, { id: TECNICO_B, role: 'operador' })).rejects.toBeInstanceOf(NotFoundException);
       expect((await planos.obterResumo(copiaAId, { id: DONO_A, role: 'proprietario' })).nome).toBe(`${PREFIXO} A`);
       expect((await planos.obterResumo(templateId, { id: TECNICO_B, role: 'operador' })).nome).toBe(`${PREFIXO} template`);
     });
 
-    it('propagação do plano de outra planta: 403; a do template passa', async () => {
-      await expect(planos.consultarPropagacoes(copiaAId, { id: TECNICO_B, role: 'operador' })).rejects.toBeInstanceOf(ForbiddenException);
+    it('propagação do plano de outra planta: 404; a do template passa', async () => {
+      await expect(planos.consultarPropagacoes(copiaAId, { id: TECNICO_B, role: 'operador' })).rejects.toBeInstanceOf(NotFoundException);
       await expect(planos.consultarPropagacoes(templateId, { id: TECNICO_B, role: 'operador' })).resolves.toEqual([]);
     });
 
@@ -162,7 +162,7 @@ describe('planos vinculados pelo escopo da planta (banco real)', () => {
 
     it('o template se abre para o técnico (antes dava 404: o escopo procurava o equipamento que ele não tem)', async () => {
       expect((await planos.buscarPorId(templateId, false, { id: TECNICO_B, role: 'operador' })).nome).toBe(`${PREFIXO} template`);
-      await expect(planos.buscarPorId(copiaAId, false, { id: TECNICO_B, role: 'operador' })).rejects.toBeInstanceOf(ForbiddenException);
+      await expect(planos.buscarPorId(copiaAId, false, { id: TECNICO_B, role: 'operador' })).rejects.toBeInstanceOf(NotFoundException);
     });
   });
 
@@ -187,7 +187,7 @@ describe('planos vinculados pelo escopo da planta (banco real)', () => {
     const nova = (plano: string) => ({ plano_manutencao_id: plano, nome: 'Tarefa escopo', instrucao_id: instrucaoId, criticidade: 3, frequencia: 'MENSAL', criado_por: TECNICO_B });
 
     it('o técnico de outra planta não cria tarefa no plano desta', async () => {
-      await expect(tarefas.criar(nova(copiaAId) as never, { id: TECNICO_B, role: 'operador' })).rejects.toBeInstanceOf(ForbiddenException);
+      await expect(tarefas.criar(nova(copiaAId) as never, { id: TECNICO_B, role: 'operador' })).rejects.toBeInstanceOf(NotFoundException);
       expect(await prisma.tarefas.count({ where: { instrucao_id: instrucaoId } })).toBe(0);
     });
 

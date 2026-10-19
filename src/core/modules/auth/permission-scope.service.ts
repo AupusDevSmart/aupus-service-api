@@ -30,6 +30,21 @@ export type ScopedEntityType =
   | 'regra_log_mqtt'
   | 'log_mqtt';
 
+/** O "não encontrado" de cada tipo: o mesmo para o que não existe e para o que está fora do escopo. */
+const NAO_ENCONTRADO: Record<ScopedEntityType, string> = {
+  planta: 'Planta não encontrada',
+  unidade: 'Unidade não encontrada',
+  ativo_funcional: 'Posição não encontrada',
+  equipamento: 'Equipamento não encontrado',
+  anomalia: 'Anomalia não encontrada',
+  tarefa: 'Tarefa não encontrada',
+  ordem_servico: 'Ordem de serviço não encontrada',
+  solicitacao_servico: 'Solicitação de serviço não encontrada',
+  programacao_os: 'Programação não encontrada',
+  regra_log_mqtt: 'Regra não encontrada',
+  log_mqtt: 'Registro não encontrado',
+};
+
 /**
  * Resolve o conjunto de plantas que um usuario pode acessar, com base no seu role,
  * e fornece helpers para aplicar/validar o escopo em queries e endpoints.
@@ -43,8 +58,12 @@ export type ScopedEntityType =
  * - proprietario -> plantas onde plantas.proprietario_id = userId
  * - demais       -> null (sem filtro)
  *
- * Convencao de resposta a recurso fora do escopo: ForbiddenException (consistente
- * em todos os modulos; ver docs/RBAC-SCOPE.md).
+ * Recurso fora do escopo responde **404, igual ao que não existe** (SN-57, out/2026):
+ * com 403 o técnico ou o cliente descobria se o id de um equipamento, plano ou OS
+ * de outra planta existe. A mensagem é a mesma do "não encontrado" — se fosse
+ * outra, a diferença de texto contaria o mesmo. Permissão que falta continua 403
+ * (no guard); posse ("só edita o que reportou") também, porque o registro é
+ * visível. Ver docs/RBAC-SCOPE.md.
  */
 @Injectable()
 export class PermissionScopeService {
@@ -145,30 +164,29 @@ export class PermissionScopeService {
   // -------------------------------------------------------------------------
 
   /**
-   * Joga ForbiddenException se o `plantaId` nao esta no escopo do usuario.
-   * Aceita scope null (admin) ou plantaId null/undefined (registro "global" -> proibido para escopados).
+   * 404 se o `plantaId` não está no escopo do usuário (scope null = admin passa;
+   * plantaId nulo = registro "global", fora para escopados). `naoEncontrado` é a
+   * mensagem do "não existe" de quem chama: o registro buscado antes (veículo,
+   * reserva, unidade) responde igual ao que não existe; a planta que veio no
+   * pedido, "Planta não encontrada".
    */
-  async assertPlantaInScope(plantaId: string | null | undefined, user: ScopedUser | undefined): Promise<void> {
+  async assertPlantaInScope(
+    plantaId: string | null | undefined,
+    user: ScopedUser | undefined,
+    naoEncontrado = 'Planta não encontrada',
+  ): Promise<void> {
     const scope = await this.getScope(user);
-    if (!this.isScoped(scope)) return;
-
-    const id = plantaId?.trim();
-    if (!id) {
-      throw new ForbiddenException('Recurso fora do escopo do usuario');
-    }
-    if (!scope.includes(id)) {
-      throw new ForbiddenException('Recurso fora do escopo do usuario');
-    }
+    this.assertPlantaInScopeSync(plantaId, scope, naoEncontrado);
   }
 
   /**
    * Variante para quando o caller ja resolveu o scope (evita 2a query).
    */
-  assertPlantaInScopeSync(plantaId: string | null | undefined, scope: PlantaScope): void {
+  assertPlantaInScopeSync(plantaId: string | null | undefined, scope: PlantaScope, naoEncontrado = 'Planta não encontrada'): void {
     if (!this.isScoped(scope)) return;
     const id = plantaId?.trim();
     if (!id || !scope.includes(id)) {
-      throw new ForbiddenException('Recurso fora do escopo do usuario');
+      throw new NotFoundException(naoEncontrado);
     }
   }
 
@@ -176,8 +194,8 @@ export class PermissionScopeService {
    * Resolve o planta_id de uma entidade dependente e valida que esta no escopo.
    * Util quando o controller so tem o id do equipamento/unidade/tarefa/etc.
    *
-   * Lanca NotFoundException se a entidade nao existe (consistente com /:id GET).
-   * Lanca ForbiddenException se existe mas esta fora do escopo.
+   * NotFoundException se a entidade não existe ou se existe e está fora do
+   * escopo — a mesma mensagem nos dois casos (SN-57).
    */
   async assertEntityInScope(
     type: ScopedEntityType,
@@ -187,12 +205,13 @@ export class PermissionScopeService {
     const scope = await this.getScope(user);
     if (!this.isScoped(scope)) return;
 
+    const naoEncontrado = NAO_ENCONTRADO[type];
     const id = entityId?.trim();
-    if (!id) throw new NotFoundException(`${type} nao encontrado`);
+    if (!id) throw new NotFoundException(naoEncontrado);
 
     const plantaId = await this.resolveEntityPlantaId(type, id);
-    if (plantaId === null) throw new NotFoundException(`${type} nao encontrado`);
-    this.assertPlantaInScopeSync(plantaId, scope);
+    if (plantaId === null) throw new NotFoundException(naoEncontrado);
+    this.assertPlantaInScopeSync(plantaId, scope, naoEncontrado);
   }
 
   /**

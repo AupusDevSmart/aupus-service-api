@@ -1,4 +1,4 @@
-import { ForbiddenException } from '@nestjs/common';
+import { NotFoundException } from '@nestjs/common';
 import type { Response } from 'express';
 import { PrismaService } from '../../prisma/prisma.service';
 import { PermissionScopeService } from '../auth/permission-scope.service';
@@ -120,50 +120,50 @@ describe('cadastro por id e listas no escopo da planta (banco real)', () => {
       expect(await ucs(admin)).toEqual([UC_A, UC_B]);
     });
 
-    it('GET /equipamentos/:id/anexos: o cliente lista os do componente; o técnico de outra planta, 403', async () => {
+    it('GET /equipamentos/:id/anexos: o cliente lista os do componente; o técnico de outra planta, 404', async () => {
       expect((await equipamentos.listarAnexos(UAR_A, clienteA)).map((a) => a.id.trim())).toEqual([anexoDoComponente.trim()]);
-      await expect(equipamentos.listarAnexos(UAR_A, tecnicoB)).rejects.toBeInstanceOf(ForbiddenException);
+      await expect(equipamentos.listarAnexos(UAR_A, tecnicoB)).rejects.toBeInstanceOf(NotFoundException);
     });
 
     it('GET /equipamentos/anexos/:anexoId/download: pelo equipamento do anexo', async () => {
       (await equipamentos.downloadAnexo(anexoDoComponente, res, clienteA)).getStream().destroy();
-      await expect(equipamentos.downloadAnexo(anexoDoComponente, res, tecnicoB)).rejects.toBeInstanceOf(ForbiddenException);
+      await expect(equipamentos.downloadAnexo(anexoDoComponente, res, tecnicoB)).rejects.toBeInstanceOf(NotFoundException);
     });
 
-    it('GET /equipamentos/uar/:id/detalhes: 403 para o técnico de outra planta', async () => {
+    it('GET /equipamentos/uar/:id/detalhes: 404 para o técnico de outra planta', async () => {
       await expect(equipamentos.findUARDetalhes(UAR_A, clienteA)).resolves.toBeDefined();
-      await expect(equipamentos.findUARDetalhes(UAR_A, tecnicoB)).rejects.toBeInstanceOf(ForbiddenException);
+      await expect(equipamentos.findUARDetalhes(UAR_A, tecnicoB)).rejects.toBeInstanceOf(NotFoundException);
     });
 
-    it('GET /equipamentos/unidades/:unidadeId/estatisticas: 403 para o técnico de outra planta', async () => {
+    it('GET /equipamentos/unidades/:unidadeId/estatisticas: 404 para o técnico de outra planta', async () => {
       await expect(equipamentos.getEstatisticasUnidade(UNIDADE_A, clienteA)).resolves.toBeDefined();
-      await expect(equipamentos.getEstatisticasUnidade(UNIDADE_A, tecnicoB)).rejects.toBeInstanceOf(ForbiddenException);
+      await expect(equipamentos.getEstatisticasUnidade(UNIDADE_A, tecnicoB)).rejects.toBeInstanceOf(NotFoundException);
     });
 
-    it('GET /equipamentos/:id/dados/atual e /historico: 403 para o técnico de outra planta', async () => {
+    it('GET /equipamentos/:id/dados/atual e /historico: 404 para o técnico de outra planta', async () => {
       await expect(equipamentos.obterDadoAtual(UC_A, clienteA)).resolves.toBeDefined();
-      await expect(equipamentos.obterDadoAtual(UC_A, tecnicoB)).rejects.toBeInstanceOf(ForbiddenException);
+      await expect(equipamentos.obterDadoAtual(UC_A, tecnicoB)).rejects.toBeInstanceOf(NotFoundException);
       await expect(equipamentos.obterHistorico(UC_A, clienteA)).resolves.toBeDefined();
-      await expect(equipamentos.obterHistorico(UC_A, tecnicoB)).rejects.toBeInstanceOf(ForbiddenException);
+      await expect(equipamentos.obterHistorico(UC_A, tecnicoB)).rejects.toBeInstanceOf(NotFoundException);
     });
   });
 
   describe('unidades', () => {
-    it('GET /unidades/:id/anexos: o cliente lista; o técnico de outra planta, 403', async () => {
+    it('GET /unidades/:id/anexos: o cliente lista; o técnico de outra planta, 404', async () => {
       expect((await unidades.listarAnexos(UNIDADE_A, clienteA)).map((a) => a.id.trim())).toEqual([anexoDaUnidade.trim()]);
-      await expect(unidades.listarAnexos(UNIDADE_A, tecnicoB)).rejects.toBeInstanceOf(ForbiddenException);
+      await expect(unidades.listarAnexos(UNIDADE_A, tecnicoB)).rejects.toBeInstanceOf(NotFoundException);
     });
 
     it('GET /unidades/anexos/:anexoId/download: pela unidade do anexo', async () => {
       await expect(unidades.baixarAnexo(anexoDaUnidade, res, clienteA)).resolves.toBeUndefined();
-      await expect(unidades.baixarAnexo(anexoDaUnidade, res, tecnicoB)).rejects.toBeInstanceOf(ForbiddenException);
+      await expect(unidades.baixarAnexo(anexoDaUnidade, res, tecnicoB)).rejects.toBeInstanceOf(NotFoundException);
     });
 
-    it('GET /unidades/:id/estatisticas e /:id/equipamentos/estatisticas: 403 para o técnico de outra planta', async () => {
+    it('GET /unidades/:id/estatisticas e /:id/equipamentos/estatisticas: 404 para o técnico de outra planta', async () => {
       await expect(unidades.getEstatisticas(UNIDADE_A, clienteA)).resolves.toBeDefined();
-      await expect(unidades.getEstatisticas(UNIDADE_A, tecnicoB)).rejects.toBeInstanceOf(ForbiddenException);
+      await expect(unidades.getEstatisticas(UNIDADE_A, tecnicoB)).rejects.toBeInstanceOf(NotFoundException);
       await expect(unidades.getEstatisticasEquipamentos(UNIDADE_A, clienteA)).resolves.toBeDefined();
-      await expect(unidades.getEstatisticasEquipamentos(UNIDADE_A, tecnicoB)).rejects.toBeInstanceOf(ForbiddenException);
+      await expect(unidades.getEstatisticasEquipamentos(UNIDADE_A, tecnicoB)).rejects.toBeInstanceOf(NotFoundException);
     });
   });
 
@@ -176,12 +176,12 @@ describe('cadastro por id e listas no escopo da planta (banco real)', () => {
       expect(await vistas(admin)).toEqual([POSICAO_A, POSICAO_B]);
     });
 
-    it('GET /ativos-funcionais/:id, /:id/historico e /:id/plano-a-herdar: 403 para o técnico de outra planta', async () => {
+    it('GET /ativos-funcionais/:id, /:id/historico e /:id/plano-a-herdar: 404 para o técnico de outra planta', async () => {
       expect((await posicoes.buscarPorId(POSICAO_A, clienteA)).id.trim()).toBe(POSICAO_A);
-      await expect(posicoes.buscarPorId(POSICAO_A, tecnicoB)).rejects.toBeInstanceOf(ForbiddenException);
+      await expect(posicoes.buscarPorId(POSICAO_A, tecnicoB)).rejects.toBeInstanceOf(NotFoundException);
       await expect(posicoes.historico(POSICAO_A, clienteA)).resolves.toEqual([]);
-      await expect(posicoes.historico(POSICAO_A, tecnicoB)).rejects.toBeInstanceOf(ForbiddenException);
-      await expect(posicoes.planoAHerdar(POSICAO_A, tecnicoB)).rejects.toBeInstanceOf(ForbiddenException);
+      await expect(posicoes.historico(POSICAO_A, tecnicoB)).rejects.toBeInstanceOf(NotFoundException);
+      await expect(posicoes.planoAHerdar(POSICAO_A, tecnicoB)).rejects.toBeInstanceOf(NotFoundException);
     });
   });
 });

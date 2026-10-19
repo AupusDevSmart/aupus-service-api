@@ -328,7 +328,7 @@ export class UnidadesService {
       }
 
       // Scope RBAC: 403 se a planta da unidade nao esta no escopo do usuario
-      await this.scopeService.assertPlantaInScope(unidade.planta_id, user);
+      await this.scopeService.assertPlantaInScope(unidade.planta_id, user, `Unidade com ID ${id} não encontrada`);
 
       return this.formatUnidadeResponse(unidade);
     } catch (error) {
@@ -344,7 +344,7 @@ export class UnidadesService {
 
   async findByPlanta(plantaId: string, user?: ScopedUser): Promise<UnidadeResponse[]> {
     try {
-      // Scope RBAC: 403 se a planta nao esta no escopo do usuario
+      // Fora do escopo = 404, como a planta que não existe (SN-57)
       await this.scopeService.assertPlantaInScope(plantaId, user);
 
       // Verificar se planta existe

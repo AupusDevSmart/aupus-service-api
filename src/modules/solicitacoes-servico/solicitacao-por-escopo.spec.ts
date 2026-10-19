@@ -1,4 +1,4 @@
-import { ForbiddenException } from '@nestjs/common';
+import { NotFoundException } from '@nestjs/common';
 import { PermissionScopeService, PrismaService } from '@/core';
 import { SolicitacoesServicoController } from './solicitacoes-servico.controller';
 import { SolicitacoesServicoService } from './solicitacoes-servico.service';
@@ -66,20 +66,20 @@ describe('solicitação: proposta e comentários no escopo (banco real)', () => 
   });
 
   describe('GET /solicitacoes-servico/:id/proposta', () => {
-    it('o cliente da planta lê; o técnico de outra planta é recusado (403)', async () => {
+    it('o cliente da planta lê; o técnico de outra planta é recusado (404)', async () => {
       await expect(controller.obterProposta(solicitacaoA, comoCliente)).resolves.toBeDefined();
-      await expect(controller.obterProposta(solicitacaoA, comoTecnicoB)).rejects.toBeInstanceOf(ForbiddenException);
+      await expect(controller.obterProposta(solicitacaoA, comoTecnicoB)).rejects.toBeInstanceOf(NotFoundException);
     });
   });
 
   // Comentários (escopo, autor, interno): modules/comentarios/comentarios.spec.ts (SN-48)
 
   describe('GET /solicitacoes-servico/:id/programacao-os', () => {
-    it('o técnico de outra planta é recusado (403)', async () => {
+    it('o técnico de outra planta é recusado (404)', async () => {
       await expect(controller.getProgramacaoOS(solicitacaoA, comoCliente)).resolves.toEqual({
         message: 'Esta solicitação ainda não possui uma programação de OS',
       });
-      await expect(controller.getProgramacaoOS(solicitacaoA, comoTecnicoB)).rejects.toBeInstanceOf(ForbiddenException);
+      await expect(controller.getProgramacaoOS(solicitacaoA, comoTecnicoB)).rejects.toBeInstanceOf(NotFoundException);
     });
   });
 });

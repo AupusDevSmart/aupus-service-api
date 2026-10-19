@@ -108,7 +108,8 @@ export class AnomaliasService {
     // Validar escopo: se usuario tem scope, a planta da anomalia deve estar nele
     const scope = await this.getScope(user);
     if (this.scopeService.isScoped(scope) && !scope.includes(plantaId)) {
-      throw new ForbiddenException('Voce nao pode criar anomalia para uma planta fora do seu escopo');
+      // O equipamento de outra planta "não existe" para quem registra (SN-57)
+      throw new NotFoundException('Equipamento não encontrado');
     }
 
     const data: Prisma.anomaliasCreateInput = {
@@ -324,7 +325,7 @@ export class AnomaliasService {
       plantaNova = await this.plantaDoEquipamento(localizacao.equipamentoId);
       const scope = await this.getScope(user);
       if (this.scopeService.isScoped(scope) && !scope.includes(plantaNova)) {
-        throw new ForbiddenException('Voce nao pode mover a anomalia para uma planta fora do seu escopo');
+        throw new NotFoundException('Equipamento não encontrado');
       }
     }
 

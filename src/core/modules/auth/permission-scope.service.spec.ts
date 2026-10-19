@@ -1,4 +1,4 @@
-import { ForbiddenException, NotFoundException } from '@nestjs/common';
+import { NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { PermissionScopeService, type ScopedEntityType } from './permission-scope.service';
 
@@ -224,9 +224,18 @@ describe('PermissionScopeService (banco real)', () => {
       await expect(escopo.assertEntityInScope(tipo, ids[tipo]!.a, cliente)).resolves.toBeUndefined();
     });
 
-    it('de outra planta é recusado (403)', async () => {
-      await expect(escopo.assertEntityInScope(tipo, ids[tipo]!.b, tecnico)).rejects.toBeInstanceOf(ForbiddenException);
-      await expect(escopo.assertEntityInScope(tipo, ids[tipo]!.b, cliente)).rejects.toBeInstanceOf(ForbiddenException);
+    it('de outra planta é recusado (404)', async () => {
+      await expect(escopo.assertEntityInScope(tipo, ids[tipo]!.b, tecnico)).rejects.toBeInstanceOf(NotFoundException);
+      await expect(escopo.assertEntityInScope(tipo, ids[tipo]!.b, cliente)).rejects.toBeInstanceOf(NotFoundException);
+    });
+
+    // SN-57: com mensagem diferente, o texto contaria o que o 404 esconde
+    it('fora do escopo e inexistente respondem a mesma mensagem', async () => {
+      const mensagem = (promessa: Promise<unknown>) => promessa.then(() => '', (erro: Error) => erro.message);
+      const foraDoEscopo = await mensagem(escopo.assertEntityInScope(tipo, ids[tipo]!.b, tecnico));
+      const inexistente = await mensagem(escopo.assertEntityInScope(tipo, 'naoexisteninguem000000000', tecnico));
+      expect(foraDoEscopo).toBe(inexistente);
+      expect(foraDoEscopo).toMatch(/não encontrad/);
     });
 
     it('o id com o espaço do Char(26) dá o mesmo resultado', async () => {
@@ -244,9 +253,9 @@ describe('PermissionScopeService (banco real)', () => {
         await expect(escopo.assertEntityInScope(tipo, doComponente[tipo]!, cliente)).resolves.toBeUndefined();
       });
 
-      it('o cliente de outra planta é recusado (403, não 404)', async () => {
+      it('o cliente de outra planta é recusado (404, igual ao que não existe)', async () => {
         await expect(escopo.assertEntityInScope(tipo, doComponente[tipo]!, { id: OUTRO_DONO, role: 'proprietario' })).rejects.toBeInstanceOf(
-          ForbiddenException,
+          NotFoundException,
         );
       });
     },
@@ -255,7 +264,7 @@ describe('PermissionScopeService (banco real)', () => {
   it('o equipamento sem planta direta vale pela planta da unidade', async () => {
     await expect(escopo.assertEntityInScope('unidade', UNIDADE_A, tecnico)).resolves.toBeUndefined();
     await expect(escopo.assertEntityInScope('equipamento', EQUIP_A, { id: OUTRO_DONO, role: 'proprietario' })).rejects.toBeInstanceOf(
-      ForbiddenException,
+      NotFoundException,
     );
   });
 

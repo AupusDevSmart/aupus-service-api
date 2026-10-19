@@ -1,4 +1,4 @@
-import { ForbiddenException } from '@nestjs/common';
+import { NotFoundException } from '@nestjs/common';
 import type { Response } from 'express';
 import { PermissionScopeService, PrismaService } from '@/core';
 import { AnomaliasController } from './anomalias.controller';
@@ -81,15 +81,15 @@ describe('anexos da anomalia no escopo (banco real)', () => {
       expect((await controller.listarAnexosAnomalia(anomaliaA, clienteA)).map((a) => a.id.trim())).toEqual([anexoA.trim()]);
     });
 
-    it('o técnico de outra planta é recusado (403)', async () => {
-      await expect(controller.listarAnexosAnomalia(anomaliaA, tecnicoB)).rejects.toBeInstanceOf(ForbiddenException);
+    it('o técnico de outra planta é recusado (404)', async () => {
+      await expect(controller.listarAnexosAnomalia(anomaliaA, tecnicoB)).rejects.toBeInstanceOf(NotFoundException);
     });
   });
 
   describe('GET /anomalias/anexos/:anexoId', () => {
     it('pela anomalia do anexo: o cliente vê, o técnico de outra planta não', async () => {
       expect((await controller.buscarAnexo(anexoA, clienteA)).id.trim()).toBe(anexoA.trim());
-      await expect(controller.buscarAnexo(anexoA, tecnicoB)).rejects.toBeInstanceOf(ForbiddenException);
+      await expect(controller.buscarAnexo(anexoA, tecnicoB)).rejects.toBeInstanceOf(NotFoundException);
     });
   });
 
@@ -99,8 +99,8 @@ describe('anexos da anomalia no escopo (banco real)', () => {
       arquivo.getStream().destroy();
     });
 
-    it('o técnico de outra planta é recusado (403) antes de abrir o arquivo', async () => {
-      await expect(controller.downloadAnexo(anexoA, res, tecnicoB)).rejects.toBeInstanceOf(ForbiddenException);
+    it('o técnico de outra planta é recusado (404) antes de abrir o arquivo', async () => {
+      await expect(controller.downloadAnexo(anexoA, res, tecnicoB)).rejects.toBeInstanceOf(NotFoundException);
     });
   });
 });

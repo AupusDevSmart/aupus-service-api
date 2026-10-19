@@ -1,4 +1,4 @@
-import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { equipamentos, equipamentos_dados_tecnicos, EquipamentosService, PermissionScopeService, PrismaService } from '@/core';
 import { CreateEquipamentoDto } from '@/core/modules/equipamentos/dto/create-equipamento.dto';
 import { UpdateEquipamentoDto } from '@/core/modules/equipamentos/dto/update-equipamento.dto';
@@ -341,7 +341,8 @@ export class EquipamentosImportacao implements CadastroImportavel<EquipamentoCom
       try {
         await this.escopo.assertPlantaInScope(unidade?.planta_id ?? null, usuario);
       } catch (erro) {
-        if (erro instanceof ForbiddenException) throw ErrosDaLinha.em('unidade', 'Esta unidade não está nas suas plantas.');
+        // Fora do escopo é 404 desde o SN-57 (a unidade "não existe" para quem importa)
+        if (erro instanceof NotFoundException) throw ErrosDaLinha.em('unidade', 'Esta unidade não está nas suas plantas.');
         throw erro;
       }
     }
