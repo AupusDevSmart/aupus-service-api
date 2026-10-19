@@ -102,6 +102,15 @@ export class Equipamento {
   @ApiPropertyOptional({ description: 'Até quando está em garantia (SN-66)' })
   garantia_ate?: Date;
 
+  @ApiPropertyOptional({ example: 4, description: 'Impacto da falha, de 1 a 5 (SN-64)' })
+  criticidade_impacto?: number;
+
+  @ApiPropertyOptional({ example: 2, description: 'Probabilidade de falha, de 1 a 5 (SN-64)' })
+  criticidade_probabilidade?: number;
+
+  @ApiPropertyOptional({ description: 'Por que a criticidade difere da sugerida pela matriz (SN-64)' })
+  criticidade_motivo?: string;
+
   @ApiPropertyOptional({ example: 15000.00 })
   valor_imobilizado?: number;
 

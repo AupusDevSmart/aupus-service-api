@@ -1,5 +1,6 @@
 import type { Prisma } from '@prisma/client';
 import { normalizarEmail, telefoneE164 } from '../../../common/helpers/contato';
+import { ESCALA_ANTIGA } from '../equipamentos/criticidade-pela-matriz';
 import { Recurso } from './recursos';
 
 type Tx = Prisma.TransactionClient;
@@ -17,12 +18,22 @@ type DadosDoEquipamento = Record<string, unknown> & {
 };
 
 /**
- * Antes de gravar o que chegou: o contato do usuário no padrão deste banco
- * (SN-46). O NexOn manda o telefone e o e-mail como guarda; aqui o telefone é
- * E.164 (o que não é telefone chega vazio) e o e-mail não tem caixa. Só mexe
- * no que veio no payload.
+ * Antes de gravar o que chegou, no padrão deste banco. Só mexe no que veio no
+ * payload.
+ *
+ * - Usuário (SN-46): o NexOn manda o telefone e o e-mail como guarda; aqui o
+ *   telefone é E.164 (o que não é telefone chega vazio) e o e-mail não tem caixa.
+ * - Equipamento (SN-64): a criticidade antiga A/B/C vira 1 a 5 com a régua do
+ *   cron (A = 5, B = 3, C = 1). A conversão do banco foi só no Service
+ *   (decisão do usuário, 19/out/2026) e o NexOn ficou com o A/B/C dele; sem
+ *   isto, qualquer edição lá traria o valor antigo de volta.
  */
 export function antesDeGravar(recurso: Recurso, dados: Record<string, unknown>): void {
+  if (recurso === 'equipamentos') {
+    const antiga = typeof dados.criticidade === 'string' ? ESCALA_ANTIGA[dados.criticidade.trim().toUpperCase()] : undefined;
+    if (antiga) dados.criticidade = String(antiga);
+    return;
+  }
   if (recurso !== 'usuarios') return;
   if ('email' in dados) dados.email = normalizarEmail(dados.email);
   if ('telefone' in dados) {

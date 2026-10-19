@@ -78,6 +78,28 @@ describe('componentes do UC em lote (banco real)', () => {
     );
   });
 
+  // SN-64: o lote não passa pelo pipe; a regra da matriz tem de valer aqui também
+  it('criticidade pela matriz: grava as notas; nível diferente sem motivo é 400 e não grava nada', async () => {
+    await equipamentos.salvarComponentesUARLote(UC, [
+      { id: A, nome: 'A', criticidade: '4', criticidade_impacto: 5, criticidade_probabilidade: 1 },
+      { id: B, nome: 'B', criticidade: '5', criticidade_impacto: 5, criticidade_probabilidade: 1, criticidade_motivo: ' Único da usina ' },
+    ] as never);
+    const gravados = await prisma.equipamentos.findMany({ where: { id: { in: [A, B] } }, orderBy: { nome: 'asc' } });
+    expect(gravados.map((e) => [e.criticidade, e.criticidade_impacto, e.criticidade_probabilidade, e.criticidade_motivo])).toEqual([
+      ['4', 5, 1, null],
+      ['5', 5, 1, 'Único da usina'],
+    ]);
+
+    // Só o nível muda: a conta é com as notas gravadas
+    await expect(
+      equipamentos.salvarComponentesUARLote(UC, [
+        { id: A, nome: 'A renomeado' },
+        { id: B, nome: 'B', criticidade: '5', criticidade_motivo: null },
+      ] as never),
+    ).rejects.toThrow('B: A matriz sugere 4 (Alta) para impacto 5 e probabilidade 1. Para gravar 5, informe o motivo.');
+    expect(await vivos()).toEqual([[A, 'A'], [B, 'B']]);
+  });
+
   it('erro no meio não apaga nem altera nada', async () => {
     await expect(
       equipamentos.salvarComponentesUARLote(UC, [

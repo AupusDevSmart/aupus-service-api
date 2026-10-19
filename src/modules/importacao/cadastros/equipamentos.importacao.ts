@@ -1,7 +1,8 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { equipamentos, equipamentos_dados_tecnicos, EquipamentosService, PermissionScopeService, PrismaService } from '@/core';
 import { CreateEquipamentoDto } from '@/core/modules/equipamentos/dto/create-equipamento.dto';
 import { UpdateEquipamentoDto } from '@/core/modules/equipamentos/dto/update-equipamento.dto';
+import { conferirCriticidade, criticidadeSugerida, type CriticidadeDoEquipamento } from '@/core/modules/equipamentos/criticidade-pela-matriz';
 import { PlanosManutencaoService } from '@/modules/planos-manutencao/planos-manutencao.service';
 import { ErroDeCampo } from '@/common/pipes/mensagens-validacao';
 import { CadastroImportavel, ErrosDaLinha, UsuarioDaImportacao } from '../importacao.types';
@@ -33,6 +34,10 @@ const COLUNAS_DA_UC: Record<string, keyof equipamentos> = {
   fabricante: 'fabricante',
   numero_serie: 'numero_serie',
   criticidade: 'criticidade',
+  // SN-64
+  criticidade_impacto: 'criticidade_impacto',
+  criticidade_probabilidade: 'criticidade_probabilidade',
+  criticidade_motivo: 'criticidade_motivo',
   localizacao: 'localizacao',
   valor_contabil: 'valor_contabil',
   // SN-66
@@ -57,6 +62,9 @@ const COLUNAS_DO_COMPONENTE: Record<string, keyof equipamentos> = {
   fabricante: 'fabricante',
   numero_serie: 'numero_serie',
   criticidade: 'criticidade',
+  criticidade_impacto: 'criticidade_impacto',
+  criticidade_probabilidade: 'criticidade_probabilidade',
+  criticidade_motivo: 'criticidade_motivo',
   localizacao_especifica: 'localizacao_especifica',
   fornecedor: 'fornecedor',
   centro_custo: 'centro_custo',
@@ -81,6 +89,21 @@ const formaDosDadosTecnicos = (lista: Array<Record<string, unknown>>) =>
 
 /** A data do calendário como a tela manda: meia-noite UTC do dia. */
 const comoATela = (d: unknown) => (typeof d === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(d) ? `${d}T00:00:00.000Z` : d);
+
+/**
+ * A regra da matriz (SN-64) já na validação, para o erro sair na linha certa:
+ * no service, o de um componente caía na linha 1 da aba, sem dizer qual.
+ * O service confere de novo ao gravar (é a mesma função).
+ */
+function erroDaMatriz(atual: CriticidadeDoEquipamento, dados: Record<string, unknown>, campo: string, nome?: unknown): ErroDeCampo | null {
+  try {
+    conferirCriticidade(atual, dados as CriticidadeDoEquipamento);
+    return null;
+  } catch (erro) {
+    if (!(erro instanceof BadRequestException)) throw erro;
+    return { campo, mensagem: typeof nome === 'string' && nome.trim() ? `${nome.trim()}: ${erro.message}` : erro.message };
+  }
+}
 
 /**
  * Equipamentos: uma ficha por UC, com DADOS TÉCNICOS e COMPONENTES UAR.
@@ -306,6 +329,8 @@ export class EquipamentosImportacao implements CadastroImportavel<EquipamentoCom
     let equipamento = uc as UpdateEquipamentoDto;
     try {
       equipamento = (await validarComoOFormulario(atual ? UpdateEquipamentoDto : CreateEquipamentoDto, uc)) as UpdateEquipamentoDto;
+      const daUc = erroDaMatriz(atual ?? {}, uc, 'criticidade');
+      if (daUc) erros.push(daUc);
     } catch (erro) {
       if (!(erro instanceof ErrosDaLinha)) throw erro;
       erros.push(...erro.erros);
@@ -317,13 +342,20 @@ export class EquipamentosImportacao implements CadastroImportavel<EquipamentoCom
       for (const [i, linha] of (componentes as Array<Record<string, unknown>>).entries()) {
         const { id, ...componente } = linha;
         try {
+          // Componente novo sem nível: o que a matriz sugere (como no sheet, dar as
+          // notas escolhe o nível); sem notas, Média
+          const sugerida = criticidadeSugerida(componente.criticidade_impacto as number, componente.criticidade_probabilidade as number);
+          const novo = { ...componente, criticidade: componente.criticidade ?? String(sugerida ?? 3) };
           const dto = id
             ? await validarComoOFormulario(UpdateEquipamentoDto, componente, `componentes.${i}`)
             : await validarComoOFormulario(
                 CreateEquipamentoDto,
-                { criticidade: '3', ...componente, equipamento_pai_id: atual?.id.trim() ?? UC_NOVA },
+                { ...novo, equipamento_pai_id: atual?.id.trim() ?? UC_NOVA },
                 `componentes.${i}`,
               );
+          const existente = id ? atual?.componentes.find((c) => c.id.trim() === String(id).trim()) : undefined;
+          const daMatriz = erroDaMatriz(existente ?? {}, id ? componente : novo, `componentes.${i}.criticidade`, componente.nome ?? existente?.nome);
+          if (daMatriz) erros.push(daMatriz);
           validados.push({ id: (id as string | null) ?? null, dto: dto as CreateEquipamentoDto });
         } catch (erro) {
           if (!(erro instanceof ErrosDaLinha)) throw erro;

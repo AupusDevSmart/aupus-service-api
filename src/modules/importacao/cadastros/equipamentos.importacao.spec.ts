@@ -214,6 +214,76 @@ describe('Importação de equipamentos (banco real)', () => {
     expect((await prisma.equipamentos.findUniqueOrThrow({ where: { id: componente.id } })).centro_custo).toBe('CC-NOVO');
   });
 
+  // SN-64: as notas e o motivo entram no retrato; a regra da matriz é a do sheet
+  it('avaliar a criticidade pela planilha: sem motivo para o nível diferente é erro; com ele grava, e reimportar não muda nada', async () => {
+    await importacao.importar(equipamentos, [ficha()], true, admin);
+    const e = (await uc())!;
+    const [componente] = await prisma.equipamentos.findMany({ where: { equipamento_pai_id: e.id } });
+    const avaliada = (motivo: string | null) =>
+      ficha(
+        {
+          criticidade: '4',
+          criticidade_impacto: 2,
+          criticidade_probabilidade: 2,
+          criticidade_motivo: motivo,
+          plano_ref: TEMPLATE,
+          componentes: [
+            {
+              id: componente.id.trim(), nome: 'String 01', criticidade: '3', fornecedor: 'Fornecedor X', garantia_ate: '2028-01-10',
+              centro_custo: 'CC-STR', criticidade_impacto: 3, criticidade_probabilidade: 3,
+            },
+          ],
+        },
+        e.id.trim(),
+      );
+
+    const semMotivo = await importacao.importar(equipamentos, [avaliada(null)], false, admin);
+    expect(semMotivo.erros).toEqual([
+      expect.objectContaining({ mensagem: expect.stringContaining('A matriz sugere 2 (Baixa) para impacto 2 e probabilidade 2. Para gravar 4, informe o motivo.') }),
+    ]);
+
+    const r = await importacao.importar(equipamentos, [avaliada('Alimenta a subestação')], true, admin);
+    expect(r).toMatchObject({ alterados: 1, erros: [] });
+    const gravada = (await uc())!;
+    expect([gravada.criticidade, gravada.criticidade_impacto, gravada.criticidade_probabilidade, gravada.criticidade_motivo]).toEqual([
+      '4', 2, 2, 'Alimenta a subestação',
+    ]);
+    const c = await prisma.equipamentos.findUniqueOrThrow({ where: { id: componente.id } });
+    expect([c.criticidade_impacto, c.criticidade_probabilidade, c.criticidade_motivo]).toEqual([3, 3, null]);
+
+    const deNovo = await importacao.importar(equipamentos, [avaliada('Alimenta a subestação')], true, admin);
+    expect(deNovo).toMatchObject({ inalterados: 1, alterados: 0, erros: [] });
+  });
+
+  it('a matriz no componente: o erro sai na linha dele, com o nome; o novo sem nível fica com o sugerido', async () => {
+    await importacao.importar(equipamentos, [ficha()], true, admin);
+    const e = (await uc())!;
+    const [componente] = await prisma.equipamentos.findMany({ where: { equipamento_pai_id: e.id } });
+    const comComponentes = (componentes: Array<Record<string, unknown>>) =>
+      ficha({ plano_ref: TEMPLATE, componentes }, e.id.trim());
+    const existente = { id: componente.id.trim(), nome: 'String 01', criticidade: '3', fornecedor: 'Fornecedor X', garantia_ate: '2028-01-10', centro_custo: 'CC-STR' };
+
+    const r = await importacao.importar(
+      equipamentos,
+      [comComponentes([{ _linha: 35, ...existente, criticidade: '5', criticidade_impacto: 3, criticidade_probabilidade: 3 }])],
+      false,
+      admin,
+    );
+    expect(r.erros).toEqual([
+      expect.objectContaining({ linha: 35, mensagem: 'String 01: A matriz sugere 3 (Média) para impacto 3 e probabilidade 3. Para gravar 5, informe o motivo.' }),
+    ]);
+
+    const novo = await importacao.importar(
+      equipamentos,
+      [comComponentes([{ _linha: 35, ...existente }, { _linha: 36, nome: 'String 02', criticidade_impacto: 5, criticidade_probabilidade: 1 }])],
+      true,
+      admin,
+    );
+    expect(novo).toMatchObject({ alterados: 1, erros: [] });
+    const criado = await prisma.equipamentos.findFirstOrThrow({ where: { equipamento_pai_id: e.id, nome: 'String 02' } });
+    expect([criado.criticidade, criado.criticidade_impacto, criado.criticidade_probabilidade]).toEqual(['4', 5, 1]);
+  });
+
   it('a unidade de uma UC não se troca; componente de outra UC é erro na linha dele', async () => {
     await importacao.importar(equipamentos, [ficha()], true, admin);
     const e = (await uc())!;

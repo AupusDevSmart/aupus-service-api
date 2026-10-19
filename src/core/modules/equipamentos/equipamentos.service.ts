@@ -15,6 +15,7 @@ import { UpdateEquipamentoDto } from './dto/update-equipamento.dto';
 import { diaComoInstante } from '../../../common/decorators/dia-de-calendario';
 import { EquipamentoQueryDto } from './dto/equipamento-query.dto';
 import { comNomeDaPosicao } from './nome-exibido';
+import { conferirCriticidade, CriticidadeDoEquipamento } from './criticidade-pela-matriz';
 import { ConfigurarMqttDto } from './dto/configurar-mqtt.dto';
 import { CreateEquipamentoRapidoDto } from './dto/create-equipamento-rapido.dto';
 import {
@@ -211,6 +212,7 @@ export class EquipamentosService {
 
     // Extrair dados técnicos separadamente
     const { dados_tecnicos, pontos, ...equipamentoData } = createDto;
+    Object.assign(equipamentoData, conferirCriticidade({}, createDto));
 
     // TAG automática só quando ninguém informou uma. Quem digita a etiqueta
     // tem motivo — costuma ser a que já está colada no ativo.
@@ -431,6 +433,8 @@ export class EquipamentosService {
         'topico_mqtt invalido (rejeitado: vazio, leading/trailing slash, wildcards + ou #)',
       );
     }
+
+    Object.assign(comum, conferirCriticidade({}, comum));
 
     const unidadeDoLote =
       comum.unidade_id?.trim() ?? (await this.unidadeDoPai(comum.equipamento_pai_id));
@@ -1017,7 +1021,10 @@ export class EquipamentosService {
   async update(id: string, updateDto: UpdateEquipamentoDto) {
     const equipamentoExists = await this.prisma.equipamentos.findFirst({
       where: { id, deleted_at: null },
-      select: { id: true, topico_mqtt: true, mqtt_habilitado: true },
+      select: {
+        id: true, topico_mqtt: true, mqtt_habilitado: true,
+        criticidade: true, criticidade_impacto: true, criticidade_probabilidade: true, criticidade_motivo: true,
+      },
     });
 
     if (!equipamentoExists) {
@@ -1053,6 +1060,8 @@ export class EquipamentosService {
 
     // Extrair dados técnicos e pontos separadamente
     const { dados_tecnicos, pontos, ...equipamentoData } = updateDto;
+    // SN-64: sobre o que fica gravado, nao so o que chegou (PATCH parcial)
+    Object.assign(equipamentoData, conferirCriticidade(equipamentoExists, updateDto));
 
     // ✅ CORRIGIDO: Aumentar timeout da transação para 15 segundos (suficiente para processar dados técnicos)
     const equipamento = await this.prisma.$transaction(async (prisma) => {
@@ -1554,7 +1563,7 @@ export class EquipamentosService {
         equipamento_pai_id: ucId.trim(),
         deleted_at: null,
       },
-      select: { id: true }
+      select: { id: true, criticidade: true, criticidade_impacto: true, criticidade_probabilidade: true, criticidade_motivo: true },
     });
 
     const idsExistentes = componentesExistentes.map(c => c.id.trim());
@@ -1576,6 +1585,21 @@ export class EquipamentosService {
       componentes.map(c => c.tipo_equipamento_id),
     );
 
+    // SN-64: a mesma regra do sheet, antes de gravar qualquer um (o corpo do
+    // lote nao passa pelo pipe do DTO)
+    const gravadoPorId = new Map(componentesExistentes.map(c => [c.id.trim(), c]));
+    const motivos = componentes.map(componente => {
+      try {
+        return conferirCriticidade(gravadoPorId.get(componente.id?.trim() ?? '') ?? {}, componente as CriticidadeDoEquipamento);
+      } catch (erro) {
+        if (erro instanceof BadRequestException) {
+          const nome = typeof componente.nome === 'string' ? componente.nome.trim() : '';
+          throw new BadRequestException(`${nome || 'Componente'}: ${erro.message}`);
+        }
+        throw erro;
+      }
+    });
+
     // Tudo ou nada: o apagar rodava fora de transacao, e um erro no meio
     // deixava componentes apagados e outros ja alterados (revisao do SN-12)
     const resultados = await this.prisma.$transaction(async (tx) => {
@@ -1592,11 +1616,11 @@ export class EquipamentosService {
 
       // 3. Criar/Atualizar componentes
       const gravados: equipamentos[] = [];
-      for (const componente of componentes) {
+      for (const [i, componente] of componentes.entries()) {
         const componenteId = componente.id?.trim();
         const { dados_tecnicos } = componente;
 
-        const campos = this.camposGravaveisDoEquipamento(componente);
+        const campos = { ...this.camposGravaveisDoEquipamento(componente), ...motivos[i] };
         if (campos.tipo_equipamento_id) {
           campos.tipo_equipamento_id = tipos.get(String(campos.tipo_equipamento_id).trim());
         }
@@ -1627,6 +1651,11 @@ export class EquipamentosService {
         }
       }
       return gravados;
+    }, {
+      // O padrão de 5 s estourava com lote grande (cada componente regrava os
+      // dados técnicos): P2028, 500, nada gravado. Mesma janela do criarEmLote.
+      maxWait: 15_000,
+      timeout: Math.min(60_000, 15_000 + componentes.length * 1_000),
     });
 
     return {

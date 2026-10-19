@@ -1,3 +1,5 @@
+import { ESCALA_ANTIGA } from '@/core/modules/equipamentos/criticidade-pela-matriz';
+
 /**
  * Prioridade da OS gerada pelo cron a partir da criticidade (do equipamento e
  * da tarefa).
@@ -8,8 +10,6 @@
  * verdade — senão o indicador "Críticas" da execução enche de preventiva.
  */
 export type PrioridadeDaPreventiva = 'ALTA' | 'MEDIA' | 'BAIXA';
-
-const ESCALA_ANTIGA: Record<string, number> = { A: 5, B: 3, C: 1 };
 
 export function nivelDeCriticidade(valor: string | number | null | undefined): number | null {
   if (valor === null || valor === undefined) return null;

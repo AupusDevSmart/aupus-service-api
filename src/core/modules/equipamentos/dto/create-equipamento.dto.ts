@@ -1,4 +1,5 @@
-import { IsString, IsOptional, IsNotEmpty, IsEnum, IsInt, IsBoolean, IsArray, ValidateNested } from 'class-validator';
+import { IsString, IsOptional, IsNotEmpty, IsEnum, IsInt, IsBoolean, IsArray, ValidateNested, Min, Max, MaxLength } from 'class-validator';
+import { LIMITE_DO_MOTIVO } from '../criticidade-pela-matriz';
 import { DiaDeCalendario } from '../../../../common/decorators/dia-de-calendario';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Type, Transform } from 'class-transformer';
@@ -115,6 +116,29 @@ export class CreateEquipamentoDto {
   @ApiProperty({ enum: CriticidadeEquipamento, example: '3' })
   @IsEnum(CriticidadeEquipamento)
   criticidade: CriticidadeEquipamento;
+
+  // SN-64: a avaliação que sugere a criticidade (criticidade-pela-matriz.ts).
+  // A regra entre os campos (notas juntas, motivo quando difere) é do service:
+  // depende do que já está gravado.
+  @ApiPropertyOptional({ example: 4, nullable: true, description: 'Impacto da falha, de 1 a 5' })
+  @IsOptional()
+  @IsInt({ message: 'O impacto da falha vai de 1 a 5.' })
+  @Min(1, { message: 'O impacto da falha vai de 1 a 5.' })
+  @Max(5, { message: 'O impacto da falha vai de 1 a 5.' })
+  criticidade_impacto?: number | null;
+
+  @ApiPropertyOptional({ example: 2, nullable: true, description: 'Probabilidade de falha, de 1 a 5' })
+  @IsOptional()
+  @IsInt({ message: 'A probabilidade de falha vai de 1 a 5.' })
+  @Min(1, { message: 'A probabilidade de falha vai de 1 a 5.' })
+  @Max(5, { message: 'A probabilidade de falha vai de 1 a 5.' })
+  criticidade_probabilidade?: number | null;
+
+  @ApiPropertyOptional({ nullable: true, description: 'Por que a criticidade difere da sugerida pela matriz' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(LIMITE_DO_MOTIVO, { message: `O motivo da criticidade tem no máximo ${LIMITE_DO_MOTIVO} caracteres.` })
+  criticidade_motivo?: string | null;
 
   @ApiPropertyOptional({ example: 'motor_inducao' })
   @IsOptional()

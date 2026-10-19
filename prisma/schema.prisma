@@ -1274,6 +1274,11 @@ model equipamentos {
   modelo             String?   @db.VarChar(255)
   numero_serie       String?   @db.VarChar(255)
   criticidade        String    @db.VarChar(1)
+  /// SN-64: a avaliação que sugere a criticidade (core/modules/equipamentos/criticidade-pela-matriz.ts).
+  /// As duas notas vão juntas (CHECK no banco); o motivo só existe quando o nível difere da matriz.
+  criticidade_impacto       Int?    @db.SmallInt
+  criticidade_probabilidade Int?    @db.SmallInt
+  criticidade_motivo        String? @db.VarChar(1000)
   tipo_equipamento   String?   @db.VarChar(100)
   em_operacao        String?   @db.VarChar(10)
   tipo_depreciacao   String?   @db.VarChar(20)
