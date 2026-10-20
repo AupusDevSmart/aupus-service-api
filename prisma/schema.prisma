@@ -2971,6 +2971,33 @@ model sub_instrucoes {
 /// A unidade mora aqui, e nao no uso: tecnico e sempre por hora, cabo e sempre
 /// por metro. E ela que torna o preco legivel. A quantidade fica na instrucao,
 /// que e onde varia.
+/// SN-84: o cadastro de maquinarios do AupusProject (a maquina que uma
+/// instrucao usa). Tipo, base e rubrica com CHECK no banco; a API normaliza
+/// (regras-do-maquinario.ts). Nome unico entre os nao removidos (lower).
+model maquinarios {
+  id                    String    @id @default(cuid()) @db.Char(26)
+  nome                  String    @db.VarChar(255)
+  /// proprio ou locacao
+  tipo                  String    @db.VarChar(20)
+  descricao             String?
+  /// diaria, hora, km ou fechado
+  base_calculo          String    @default("diaria") @db.VarChar(20)
+  rubrica               String    @default("instrucoes") @db.VarChar(20)
+  preco_unitario        Decimal?  @db.Decimal(12, 2)
+  valor_aquisicao       Decimal?  @db.Decimal(12, 2)
+  prazo_retorno_meses   Int?      @db.SmallInt
+  custos_anuais         Decimal   @default(0) @db.Decimal(12, 2)
+  meta_utilizacao_horas Decimal?  @db.Decimal(10, 2)
+  horas_por_diaria      Int       @default(8) @db.SmallInt
+  ativo                 Boolean   @default(true)
+  created_at            DateTime  @default(now()) @db.Timestamp(0)
+  updated_at            DateTime  @updatedAt @db.Timestamp(0)
+  deleted_at            DateTime? @db.Timestamp(0)
+
+  @@index([tipo])
+  @@index([deleted_at])
+}
+
 /// SN-83: os mesmos campos do recurso do AupusProject (as planilhas de um
 /// importam no outro). Base e rubrica com CHECK no banco; a API normaliza pela
 /// categoria (regras-do-recurso.ts).

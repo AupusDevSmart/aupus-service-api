@@ -23,6 +23,7 @@ describe('ImportacaoController — permissões', () => {
 
   const rotas: Array<[string, string[]]> = [
     ['importarRecursos', ['recursos.manage', 'manutencao.manage']],
+    ['importarMaquinarios', ['recursos.manage', 'manutencao.manage']],
     ['importarVeiculos', ['recursos.manage']],
     ['importarFeriados', ['agenda.manage']],
     ['importarConcessionarias', ['equipamentos.manage']],

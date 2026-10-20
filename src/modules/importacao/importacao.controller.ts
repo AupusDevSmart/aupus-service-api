@@ -5,6 +5,7 @@ import { ImportacaoService } from './importacao.service';
 import { ImportarPlanilhaDto } from './dto/importar-planilha.dto';
 import { UsuarioDaImportacao } from './importacao.types';
 import { RecursosImportacao } from './cadastros/recursos.importacao';
+import { MaquinariosImportacao } from './cadastros/maquinarios.importacao';
 import { VeiculosImportacao } from './cadastros/veiculos.importacao';
 import { FeriadosImportacao } from './cadastros/feriados.importacao';
 import { ConcessionariasImportacao } from './cadastros/concessionarias.importacao';
@@ -26,6 +27,7 @@ export class ImportacaoController {
   constructor(
     private readonly importacao: ImportacaoService,
     private readonly recursos: RecursosImportacao,
+    private readonly maquinarios: MaquinariosImportacao,
     private readonly veiculos: VeiculosImportacao,
     private readonly feriados: FeriadosImportacao,
     private readonly concessionarias: ConcessionariasImportacao,
@@ -42,6 +44,15 @@ export class ImportacaoController {
   @ApiOperation({ summary: 'Prévia ou gravação da planilha de recursos' })
   importarRecursos(@Body() corpo: ImportarPlanilhaDto, @CurrentUser() usuario: UsuarioDaImportacao) {
     return this.importacao.importar(this.recursos, corpo.registros, corpo.confirmar, usuario);
+  }
+
+  // A permissão da tela de maquinários, a mesma do cadastro de recursos (SN-84)
+  @Post('maquinarios')
+  @HttpCode(HttpStatus.OK)
+  @Permissions('recursos.manage', 'manutencao.manage')
+  @ApiOperation({ summary: 'Prévia ou gravação da planilha de maquinários' })
+  importarMaquinarios(@Body() corpo: ImportarPlanilhaDto, @CurrentUser() usuario: UsuarioDaImportacao) {
+    return this.importacao.importar(this.maquinarios, corpo.registros, corpo.confirmar, usuario);
   }
 
   @Post('veiculos')

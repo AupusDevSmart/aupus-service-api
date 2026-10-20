@@ -28,6 +28,7 @@ import { DashboardModule } from './modules/dashboard/dashboard.module';
 import { SolicitacoesServicoModule } from './modules/solicitacoes-servico/solicitacoes-servico.module';
 import { InstrucoesModule } from './modules/instrucoes/instrucoes.module';
 import { RecursosModule } from './modules/recursos/recursos.module';
+import { MaquinariosModule } from './modules/maquinarios/maquinarios.module';
 import { ImportacaoModule } from './modules/importacao/importacao.module';
 
 // Modulos do nucleo (src/core)
@@ -90,6 +91,7 @@ import {
     SolicitacoesServicoModule,
     InstrucoesModule,
     RecursosModule,
+    MaquinariosModule,
     ImportacaoModule,
     DashboardModule,
     UploadsModule,
