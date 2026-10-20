@@ -1063,9 +1063,17 @@ export class PlanosManutencaoService {
     }
 
     if (search) {
+      const contem = { contains: search, mode: 'insensitive' as const };
+      // A cópia se distingue pelo equipamento e por onde ele está, que é o que
+      // a lista de origem da programação mostra (SN-77): buscando só no nome do
+      // plano, "Inversor 3" não achava o plano do Inversor 3
       where.OR = [
-        { nome: { contains: search, mode: 'insensitive' } },
-        { descricao: { contains: search, mode: 'insensitive' } }
+        { nome: contem },
+        { descricao: contem },
+        { equipamento: { nome: contem } },
+        { equipamento: { ativo_funcional: { nome: contem } } },
+        { equipamento: { unidade: { nome: contem } } },
+        { equipamento: { unidade: { planta: { nome: contem } } } },
       ];
     }
 

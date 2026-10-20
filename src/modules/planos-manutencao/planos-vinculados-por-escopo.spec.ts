@@ -85,9 +85,12 @@ describe('planos vinculados pelo escopo da planta (banco real)', () => {
     await prisma.$disconnect();
   });
 
+  // A busca também acha pela instalação e pela planta (SN-77), que aqui levam o
+  // prefixo: o plano "antigo" da mesma instalação vem junto e fica de fora pelo nome
   const vinculados = async (user?: { id: string; role: string }) =>
     (await planos.listar({ page: 1, limit: 100, vinculados: true, search: PREFIXO } as never, user)).data
       .map((p) => p.nome)
+      .filter((nome) => nome.startsWith(`${PREFIXO} `))
       .sort();
 
   it('cliente vê só os planos da planta dele (o componente pelo UC pai)', async () => {

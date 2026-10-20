@@ -286,6 +286,10 @@ export class SolicitacoesServicoService {
         { descricao: { contains: search, mode: 'insensitive' } },
         { local: { contains: search, mode: 'insensitive' } },
         { numero: { contains: search, mode: 'insensitive' } },
+        // O que a lista de origem da programação mostra e a busca não alcançava (SN-77)
+        { solicitante_nome: { contains: search, mode: 'insensitive' } },
+        { planta: { nome: { contains: search, mode: 'insensitive' } } },
+        { unidade: { nome: { contains: search, mode: 'insensitive' } } },
       ];
     }
 

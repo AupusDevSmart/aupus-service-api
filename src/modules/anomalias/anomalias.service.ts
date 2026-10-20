@@ -187,7 +187,12 @@ export class AnomaliasService {
           { local: { contains: search, mode: 'insensitive' } },
           { ativo: { contains: search, mode: 'insensitive' } },
           { criado_por: { contains: search, mode: 'insensitive' } },
-          { id: { contains: search, mode: 'insensitive' } }
+          { id: { contains: search, mode: 'insensitive' } },
+          // A planta e a instalação, que a lista de origem da programação
+          // mostra e a busca não alcançava (SN-77); a do componente é a do UC pai
+          { planta: { nome: { contains: search, mode: 'insensitive' } } },
+          { equipamento: { unidade: { nome: { contains: search, mode: 'insensitive' } } } },
+          { equipamento: { equipamento_pai: { unidade: { nome: { contains: search, mode: 'insensitive' } } } } },
         ]
       }),
       ...(status && { status }),
