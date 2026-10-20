@@ -68,6 +68,34 @@ export interface Confiabilidade {
 const horas = (ms: number) => ms / 3_600_000;
 const tempo = (d: Date | null) => (d ? new Date(d).getTime() : null);
 
+/** O período até agora, em milissegundos: [início, fim) */
+const limitesDoPeriodo = (janela: Pick<JanelaDoPainel, 'desde' | 'ate'>, agora: Date) => ({
+  inicio: janela.desde.getTime(),
+  fim: Math.min(janela.ate.getTime(), agora.getTime()),
+});
+
+/** A corretiva é do período em que parou; sem a parada, de quando terminou */
+export function corretivaDoPeriodo(
+  o: Pick<OrdemDaConfiabilidade, 'tipo' | 'parada_inicio' | 'fim'>,
+  janela: Pick<JanelaDoPainel, 'desde' | 'ate'>,
+  agora = new Date(),
+): boolean {
+  const { inicio, fim } = limitesDoPeriodo(janela, agora);
+  const t = tempo(o.parada_inicio) ?? tempo(o.fim);
+  return o.tipo === 'CORRETIVA' && t !== null && t >= inicio && t < fim;
+}
+
+/** A parada com horário de ida e de volta que tem alguma parte dentro do período: entra nas horas paradas */
+export function paradaNoPeriodo(
+  o: Pick<OrdemDaConfiabilidade, 'parada_inicio' | 'parada_fim'>,
+  janela: Pick<JanelaDoPainel, 'desde' | 'ate'>,
+  agora = new Date(),
+): boolean {
+  if (!o.parada_inicio || !o.parada_fim) return false;
+  const { inicio, fim } = limitesDoPeriodo(janela, agora);
+  return Math.min(tempo(o.parada_fim)!, fim) > Math.max(tempo(o.parada_inicio)!, inicio);
+}
+
 /** Soma a duração da união dos intervalos (sobrepostos contam uma vez). */
 function duracaoDaUniao(intervalos: Array<[number, number]>): number {
   const ordenados = [...intervalos].sort((a, b) => a[0] - b[0]);
@@ -92,12 +120,10 @@ export function calcularConfiabilidade(
   janela: Pick<JanelaDoPainel, 'desde' | 'ate'>,
   agora = new Date(),
 ): Confiabilidade {
-  const inicio = janela.desde.getTime();
-  const fim = Math.min(janela.ate.getTime(), agora.getTime());
-  const noPeriodo = (t: number | null) => t !== null && t >= inicio && t < fim;
+  const { inicio, fim } = limitesDoPeriodo(janela, agora);
 
   // A corretiva é do período em que parou; sem a parada, de quando terminou
-  const corretivas = ordens.filter((o) => o.tipo === 'CORRETIVA' && noPeriodo(tempo(o.parada_inicio) ?? tempo(o.fim)));
+  const corretivas = ordens.filter((o) => corretivaDoPeriodo(o, janela, agora));
   const falhas = corretivas.filter((o) => o.equipamento_parou === true);
   const comHorario = falhas.filter((o) => o.parada_inicio && o.parada_fim);
   const duracoes = comHorario.map((o) => horas(tempo(o.parada_fim)! - tempo(o.parada_inicio)!));

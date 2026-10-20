@@ -82,6 +82,9 @@ export const filtroDe = (valor?: string | null): string | null => {
 /** O SELECT das OS do painel */
 export const SELECT_DA_ORDEM = {
   id: true,
+  // O número e a planta, para a lista das OS da exportação (SN-82)
+  numero_os: true,
+  planta: { select: { nome: true } },
   criado_em: true,
   status: true,
   tipo: true,
@@ -120,6 +123,33 @@ export interface EquipamentoDaOrdem {
  */
 export const fimDaOrdem = (o: Pick<OrdemDoPainel, 'data_hora_fim_real' | 'data_hora_inicio_real'>) =>
   o.data_hora_fim_real ?? o.data_hora_inicio_real;
+
+/**
+ * As OS do painel, cada grupo pela data que ele mede (SN-79). Antes tudo era
+ * cortado pela criação: a OS concluída no mês mas criada antes não entrava no
+ * custo do mês, e o backlog perdia a OS antiga ainda aberta.
+ */
+export interface OrdensDoPeriodo {
+  /** Abertas agora (backlog, atrasadas): não dependem do período */
+  emAberto: OrdemDoPainel[];
+  /** Concluídas no período, pela data de fim */
+  concluidas: OrdemDoPainel[];
+  /** Criadas no período (de onde veio a demanda, o tipo) */
+  criadas: OrdemDoPainel[];
+  /** Programadas para o período (a execução do plano) */
+  programadas: OrdemDoPainel[];
+}
+
+/** Os blocos do período: a mesma regra no painel e na lista da exportação */
+export function agruparOrdens(ordens: OrdemDoPainel[], janela: JanelaDoPainel): OrdensDoPeriodo {
+  return {
+    emAberto: ordens.filter((o) => STATUS_EM_ABERTO.includes(o.status)),
+    concluidas: ordens.filter((o) => STATUS_CONCLUIDO.includes(o.status) && naJanela(fimDaOrdem(o), janela)),
+    criadas: ordens.filter((o) => naJanela(o.criado_em, janela)),
+    // A cancelada não foi programada para acontecer (a mesma regra do calendário)
+    programadas: ordens.filter((o) => o.status !== 'CANCELADA' && naJanela(o.data_hora_programada, janela)),
+  };
+}
 
 /**
  * As horas estimadas da OS: a "Duração estimada (horas)", o campo que o

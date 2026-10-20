@@ -26,4 +26,19 @@ export class DashboardController {
   async getDashboardManutencao(@Query() filtros: QueryDashboardManutencaoDto, @CurrentUser() user: ScopedUser) {
     return this.dashboardManutencaoService.getDashboard(filtros, user);
   }
+
+  // OS por OS, com custo: a permissão de ver OS (a do painel só entrega agregados).
+  // A do método substitui a da classe; na matriz, todo papel com o painel já a tem
+  @Get('manutencao/ordens')
+  @Permissions('execucao_os.view')
+  @ApiOperation({
+    summary: 'As OS que entraram nas contas do painel',
+    description:
+      'Para a exportação do painel (SN-82): com os mesmos filtros e o mesmo escopo, cada OS que ' +
+      'entra em algum número — aberta agora, concluída, criada ou programada no período, ou com ' +
+      'a parada no período —, com as horas estimadas e o custo por natureza.',
+  })
+  async getOrdensDaConta(@Query() filtros: QueryDashboardManutencaoDto, @CurrentUser() user: ScopedUser) {
+    return this.dashboardManutencaoService.getOrdensDaConta(filtros, user);
+  }
 }

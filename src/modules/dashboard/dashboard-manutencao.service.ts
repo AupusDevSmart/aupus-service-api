@@ -7,9 +7,10 @@ import type { QueryDashboardManutencaoDto } from './dto/query-dashboard-manutenc
 import { calcularConfiabilidade, frotaDoRecorte, type Confiabilidade, type Frota } from './confiabilidade';
 import { custosDasOrdens, montarCusto, montarCustoPorOS, type CustosDoPainel } from './custo-do-painel';
 import { explicacoesDosGraficos } from './explicacoes-do-painel';
+import { ordensDaConta } from './exportacao-do-painel';
 import {
   STATUS_CONCLUIDO,
-  STATUS_EM_ABERTO,
+  agruparOrdens,
   filtroDasAnomalias,
   filtroDe,
   fimDaOrdem,
@@ -17,10 +18,10 @@ import {
   indiceDoMes,
   janelaDoPeriodo,
   naEstimativaPadrao,
-  naJanela,
   ordensDoPainel,
   type JanelaDoPainel,
   type OrdemDoPainel,
+  type OrdensDoPeriodo,
 } from './recorte-do-painel';
 
 type UserCtx = ScopedUser | undefined;
@@ -52,22 +53,6 @@ export interface Indicador {
   formula?: string;
   /** Em quantos registros o número se baseia, e o que ficou de fora */
   base?: string;
-}
-
-/**
- * As OS do painel, cada grupo pela data que ele mede (SN-79). Antes tudo era
- * cortado pela criação: a OS concluída no mês mas criada antes não entrava no
- * custo do mês, e o backlog perdia a OS antiga ainda aberta.
- */
-interface OrdensDoPeriodo {
-  /** Abertas agora (backlog, atrasadas): não dependem do período */
-  emAberto: OrdemDoPainel[];
-  /** Concluídas no período, pela data de fim */
-  concluidas: OrdemDoPainel[];
-  /** Criadas no período (de onde veio a demanda, o tipo) */
-  criadas: OrdemDoPainel[];
-  /** Programadas para o período (a execução do plano) */
-  programadas: OrdemDoPainel[];
 }
 
 /** OS vinculada a uma anomalia, como o `select` de `getDashboard` a lê. */
@@ -166,6 +151,21 @@ export class DashboardManutencaoService {
   }
 
   /**
+   * As OS que entraram em alguma conta do painel, para a exportação (SN-82):
+   * o mesmo recorte, o mesmo escopo e o mesmo custo da tela, linha a linha.
+   */
+  async getOrdensDaConta(filtros: QueryDashboardManutencaoDto, user?: UserCtx) {
+    const scope = await this.getScope(user);
+    const janela = janelaDoPeriodo(filtros.periodo);
+    const ordens = await ordensDoPainel(this.prisma, scope, filtros, janela);
+    const custos = await custosDasOrdens(this.prisma, ordens.filter((o) => STATUS_CONCLUIDO.includes(o.status)));
+    return {
+      periodo: { desde: janela.desde.toISOString(), ate: janela.ate.toISOString() },
+      ordens: ordensDaConta(ordens, janela, custos),
+    };
+  }
+
+  /**
    * O que preencher nos combos da tela.
    *
    * Vem junto com os dados, e não de endpoints separados, por dois motivos: são
@@ -235,13 +235,7 @@ export class DashboardManutencaoService {
     custos: CustosDoPainel,
     porEquipe: boolean,
   ) {
-    const grupos: OrdensDoPeriodo = {
-      emAberto: ordens.filter((o) => STATUS_EM_ABERTO.includes(o.status)),
-      concluidas: ordens.filter((o) => STATUS_CONCLUIDO.includes(o.status) && naJanela(fimDaOrdem(o), janela)),
-      criadas: ordens.filter((o) => naJanela(o.criado_em, janela)),
-      // A cancelada não foi programada para acontecer (a mesma regra do calendário)
-      programadas: ordens.filter((o) => o.status !== 'CANCELADA' && naJanela(o.data_hora_programada, janela)),
-    };
+    const grupos = agruparOrdens(ordens, janela);
 
     // As OS concluídas (de qualquer data: a parada pode estar no período e a OS ter terminado
     // depois): a base do MTBF, do MTTR e da disponibilidade

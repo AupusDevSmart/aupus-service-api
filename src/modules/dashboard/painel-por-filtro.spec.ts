@@ -274,6 +274,47 @@ describe('painel de manutenção pelos filtros (banco real)', () => {
     }
   });
 
+  // SN-82: a planilha leva as OS que entraram na conta; somadas, dão os números da tela
+  it('a lista das OS da exportação bate com os números do painel', async () => {
+    for (const filtros of [{ periodo: 'mes', plantaId: a.id }, { periodo: '12meses', plantaId: a.id }, { periodo: 'mes', plantaId: b.id }] as const) {
+      const [p, { ordens }] = await Promise.all([ler(filtros), painel.getOrdensDaConta(filtros as QueryDashboardManutencaoDto)]);
+      const soma = (xs: number[]) => xs.reduce((s, v) => s + v, 0);
+
+      expect(ordens.filter((o) => o.concluida_no_periodo)).toHaveLength(Number(kpi(p, 'os_concluida')));
+      expect(ordens.filter((o) => o.aberta)).toHaveLength(Number(kpi(p, 'os_aberta')));
+      expect(String(Math.round(soma(ordens.filter((o) => o.aberta).map((o) => o.horas_estimadas))))).toBe(kpi(p, 'backlog'));
+      // O custo do gráfico vem em R$ mil, arredondado a uma casa por mês
+      const custo = soma(ordens.filter((o) => o.concluida_no_periodo).map((o) => o.custo?.total ?? 0));
+      expect(Math.abs(custo / 1000 - soma(p.custo.total))).toBeLessThan(0.05 * p.custo.total.length + 1e-9);
+      expect(ordens.filter((o) => o.programada_no_periodo && ['PLANO_MANUTENCAO', 'TAREFA'].includes(o.origem))).toHaveLength(p.execucaoPlano.programadas);
+      const corretivas = ordens.filter((o) => o.corretiva_do_periodo).length;
+      expect(p.kpis.find((k) => k.id === 'mtbf')?.base ?? '').toMatch(new RegExp(`^${corretivas} corretivas? no período`));
+      // O custo só nas concluídas no período: a soma da coluna é a do gráfico
+      expect(ordens.filter((o) => o.custo && !o.concluida_no_periodo)).toEqual([]);
+      const criadas = ordens.filter((o) => o.criada_no_periodo).length;
+      expect(p.graficos.find((g) => g.id === 'origemOS')?.base).toBe(`${criadas} ${criadas === 1 ? 'OS criada' : 'OS criadas'} no período.`);
+    }
+  });
+
+  it('a lista das OS traz o número, a planta, o equipamento da OS e o custo por natureza', async () => {
+    const { ordens } = await painel.getOrdensDaConta({ periodo: 'mes', plantaId: a.id } as QueryDashboardManutencaoDto);
+    const pelaTarefa = ordens.find((o) => o.custo?.mao_de_obra === 2000);
+    expect(pelaTarefa).toMatchObject({
+      planta: expect.stringContaining('painelfiltroa'),
+      equipamentos: ['Ventoinha 1'],
+      concluida_no_periodo: true,
+      custo: { mao_de_obra: 2000, material: 1000, adicionais: 0, total: 3000 },
+    });
+    expect(pelaTarefa?.numero).toMatch(new RegExp(`^${PREFIXO}-`));
+    // A corretiva que parou meia hora, com a parada no período
+    expect(ordens.find((o) => o.equipamento_parou)?.parada_no_periodo).toBe(true);
+  });
+
+  it('a lista das OS respeita o escopo (SN-57): o dono de B não recebe as de A', async () => {
+    const { ordens } = await painel.getOrdensDaConta({ periodo: '12meses', plantaId: a.id } as QueryDashboardManutencaoDto, donoB);
+    expect(ordens).toEqual([]);
+  });
+
   // Anterior ao SN-60: não se sabe se parou — o cartão não pode dizer "nenhuma falha" nem 100%
   it('corretiva sem os dados de falha deixa o número em aberto, e avisa', async () => {
     const p = await ler({ periodo: '12meses', plantaId: b.id });
