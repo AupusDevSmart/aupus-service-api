@@ -159,6 +159,30 @@ describe('trava e anexos da OS (banco real)', () => {
       const m = await prisma.materiais_os.findUniqueOrThrow({ where: { id: materialId } });
       expect(Number(m.quantidade_consumida)).toBe(2);
     });
+
+    // SN-81: o custo real sai ao executar; o consumo registrado depois ficava fora dele
+    it('com a OS executada, o consumo registrado depois refaz o custo real', async () => {
+      const { osId, materialId } = await novaOS();
+      await prisma.materiais_os.update({ where: { id: materialId }, data: { custo_unitario: 12.5 } });
+      await prisma.ordens_servico.update({ where: { id: osId }, data: { status: StatusOS.EXECUTADA, custo_real: 0 } });
+
+      await execucoes.registrarMateriais(osId, { materiais: [{ id: materialId, quantidade_consumida: 2 }] } as never, AUTOR, autor);
+
+      expect(Number((await prisma.ordens_servico.findUniqueOrThrow({ where: { id: osId } })).custo_real)).toBe(25);
+      // O auditor aprovou outro valor: a trilha diz de quanto para quanto
+      const trilha = await prisma.historico_os.findFirstOrThrow({ where: { os_id: osId, acao: 'CONSUMO_MATERIAIS' } });
+      expect(trilha.observacoes).toContain('Custo real de R$ 0,00 para R$ 25,00.');
+    });
+
+    it('em execução não mexe no custo real: ele sai ao executar', async () => {
+      const { osId, materialId } = await novaOS();
+      await prisma.materiais_os.update({ where: { id: materialId }, data: { custo_unitario: 12.5 } });
+      await comStatus(osId, StatusOS.EM_EXECUCAO);
+
+      await execucoes.registrarMateriais(osId, { materiais: [{ id: materialId, quantidade_consumida: 2 }] } as never, AUTOR, autor);
+
+      expect((await prisma.ordens_servico.findUniqueOrThrow({ where: { id: osId } })).custo_real).toBeNull();
+    });
   });
 
   describe('anexos (SN-22)', () => {

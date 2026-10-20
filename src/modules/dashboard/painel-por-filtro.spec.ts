@@ -89,11 +89,17 @@ describe('painel de manutenção pelos filtros (banco real)', () => {
     // Planta A — concluída hoje, pela tarefa no componente da instalação 1 (sem a coluna equipamento_id)
     const pelaTarefa = await ordem(a.id, { ...concluida(0), time_equipe: 'Equipe Alfa ', custo_real: 3000 });
     await prisma.tarefas_os.create({ data: { os_id: pelaTarefa, ordem: 1, status: 'CONCLUIDA', equipamento_id: UAR_1, nome_snapshot: 'x' } });
+    // O custo dela pelas linhas (SN-81): 20 h x R$ 100 de mão de obra e 100 x R$ 10 de material
+    await prisma.tecnicos_os.create({ data: { os_id: pelaTarefa, especialidade: 'Eletricista', horas_estimadas: 8, horas_trabalhadas: 20, custo_hora: 100 } });
+    await prisma.materiais_os.create({ data: { os_id: pelaTarefa, descricao: 'Cabo', unidade: 'm', quantidade_planejada: 100, quantidade_consumida: 100, custo_unitario: 10 } });
+    // ...e o que não tem preço: entra como zero, e a base diz
+    await prisma.tecnicos_os.create({ data: { os_id: pelaTarefa, especialidade: 'Ajudante (entrou na execução)', horas_estimadas: 0, horas_trabalhadas: 2.5 } });
+    await prisma.materiais_os.create({ data: { os_id: pelaTarefa, descricao: 'Fita', unidade: 'un', quantidade_planejada: 1, quantidade_consumida: 1 } });
     // Concluída hoje, pela anomalia no UC da instalação 1 (criticidade 5)
     const anomalia = await prisma.anomalias.create({ data: { descricao: `${PREFIXO} vazamento`, local: 'x', ativo: 'x', origem: 'OPERADOR', planta_id: a.id, equipamento_id: UC_1 } });
     // ...e que parou o equipamento meia hora (SN-80)
     await ordem(a.id, {
-      ...concluida(0), origem: 'ANOMALIA', tipo: 'CORRETIVA', anomalia_id: anomalia.id, custo_real: 1000,
+      ...concluida(0), origem: 'ANOMALIA', tipo: 'CORRETIVA', anomalia_id: anomalia.id, custos_adicionais: 1000,
       equipamento_parou: true, parada_inicio: new Date(Date.now() - 60 * 60_000), parada_fim: new Date(Date.now() - 30 * 60_000),
     });
     // Anomalia de 40 dias, ainda aberta, cuja única OS foi cancelada: aberta AGORA e "sem OS"
@@ -105,12 +111,14 @@ describe('painel de manutenção pelos filtros (banco real)', () => {
     await prisma.anomalias.create({ data: { descricao: `${PREFIXO} componente`, local: 'x', ativo: 'x', origem: 'OPERADOR', equipamento_id: UAR_1 } });
     // Programada para agora e cancelada: não conta no plano do período
     await ordem(a.id, { status: 'CANCELADA' });
-    // Concluída há 40 dias, no UC da instalação 2 (na coluna): no trimestre, fora do mês
-    await ordem(a.id, { ...concluida(40), equipamento_id: UC_2 });
+    // Concluída há 40 dias, no UC da instalação 2 (na coluna): no trimestre, fora do mês. Sem
+    // horas registradas (anterior ao SN-61) e com o custo real gravado sem a mão de obra
+    const antes = await ordem(a.id, { ...concluida(40), equipamento_id: UC_2 });
+    await prisma.tecnicos_os.create({ data: { os_id: antes, especialidade: 'Mecânico', horas_estimadas: 4, custo_hora: 50 } });
     // Concluída há 200 dias: só nos 12 meses
     await ordem(a.id, { ...concluida(200), equipamento_id: UC_2 });
     // Aberta, criada há 200 dias: o backlog é de agora, qualquer que seja o período
-    await ordem(a.id, { status: 'PENDENTE', criado_em: haDias(200), data_hora_programada: haDias(199), equipamento_id: UC_2, tempo_estimado: 5 });
+    await ordem(a.id, { status: 'PENDENTE', criado_em: haDias(200), data_hora_programada: haDias(199), equipamento_id: UC_2, duracao_estimada: 5 });
 
     // Planta B — uma concluída hoje, de outra equipe
     await ordem(b.id, { ...concluida(0), equipamento_id: UC_B, time_equipe: 'Equipe Beta' });
@@ -118,6 +126,9 @@ describe('painel de manutenção pelos filtros (banco real)', () => {
     await ordem(b.id, { ...concluida(100), tipo: 'CORRETIVA', origem: 'ANOMALIA', equipamento_id: UC_B });
     // Concluída sem a data de fim (legado): vale a de início, não some
     await ordem(b.id, { status: 'FINALIZADA', equipamento_id: UC_B, data_hora_inicio_real: agoraMesmo(), data_hora_fim_real: null });
+    // Abertas, com a estimativa padrão do servidor e com a do formulário antigo (ninguém estimou)
+    await ordem(b.id, { status: 'PENDENTE', equipamento_id: UC_B, tempo_estimado: 2, duracao_estimada: 3 });
+    await ordem(b.id, { status: 'PENDENTE', equipamento_id: UC_B, tempo_estimado: 4, duracao_estimada: 6 });
   });
 
   afterAll(async () => {
@@ -162,6 +173,36 @@ describe('painel de manutenção pelos filtros (banco real)', () => {
       const p = await ler({ periodo, plantaId: a.id });
       expect([kpi(p, 'os_aberta'), kpi(p, 'backlog')]).toEqual(['1', '5']);
     }
+  });
+
+  // SN-81: pela duração estimada (o campo da tela); a OS sem estimativa, à parte
+  it('o backlog em HH conta à parte a OS com a estimativa padrão (do servidor e do formulário antigo)', async () => {
+    const p = await ler({ periodo: 'mes', plantaId: b.id });
+    const backlog = p.kpis.find((k) => k.id === 'backlog');
+    expect([backlog?.valor, backlog?.nota, backlog?.status]).toEqual(['9', '2 OS abertas · 2 sem estimativa', 'warn']);
+    expect(backlog?.base).toBe('2 OS abertas: 0 com estimativa, 2 sem (no padrão).');
+    expect((await ler({ periodo: 'mes', plantaId: a.id })).kpis.find((k) => k.id === 'backlog')?.status).toBeNull();
+    // O HH planejado também soma o padrão: a base diz quanto
+    const hh = p.graficos.find((g) => g.id === 'hh');
+    expect(hh?.base).toBe('4 OS programadas no período, 2 sem estimativa (no padrão).');
+    expect(hh?.formula).toContain('Planejado: a duração estimada');
+  });
+
+  // SN-81: era o total dividido em 55/30/15, marcado "simulado"
+  it('custo por natureza: mão de obra e material pelas linhas, adicionais da OS', async () => {
+    const { custo, custoPorOS, graficos } = await ler({ periodo: 'mes', plantaId: a.id });
+    expect([custo.maoObra, custo.material, custo.adicionais, custo.total]).toEqual([[2], [1], [1], [4]]);
+    const legenda = graficos.find((g) => g.id === 'custo');
+    expect(legenda?.base).toBe('2 OS concluídas no período, 2 com custo. Sem preço, fora do custo: 2,5 h trabalhadas sem custo/hora e 1 material consumido sem custo unitário.');
+    expect(legenda?.formula).toContain('Mão de obra = custo/hora × horas trabalhadas');
+    // A corretiva custou só os adicionais; a preventiva, as linhas
+    expect([custoPorOS.corretiva, custoPorOS.preventiva, custoPorOS.base]).toEqual([[1000], [3000], 2]);
+  });
+
+  it('a OS com o custo real gravado diferente das linhas entra pela linha, e a base diz', async () => {
+    const { custo, graficos } = await ler({ periodo: 'trimestre', plantaId: a.id });
+    expect(custo.maoObra.reduce((s, v) => s + v, 0)).toBeCloseTo(2.2, 6);
+    expect(graficos.find((g) => g.id === 'custo')?.base).toContain('1 OS tem o custo real gravado diferente da soma das linhas');
   });
 
   it('equipe: o filtro conta só a dela, e o combo só traz as do escopo', async () => {
@@ -212,8 +253,13 @@ describe('painel de manutenção pelos filtros (banco real)', () => {
     expect(card('disponibilidade')?.unidade).toBe('%');
     expect(card('disponibilidade')?.base).toContain('1 corretiva no período: 1 parou o equipamento (1 com horário, 0 sem), 0 sem os dados de falha. Frota: 2 UCs');
     expect(p.alertas.find((k) => k.id === 'parada')?.valor).toBe('0,5');
-    // Toda caixa diz como o número sai
+    // Toda caixa diz como o número sai, e todo gráfico também (a legenda das fórmulas)
     expect(p.kpis.filter((k) => !k.formula).map((k) => k.id)).toEqual([]);
+    expect(p.graficos.map((g) => g.id)).toEqual(
+      expect.arrayContaining(['execucaoPlano', 'planejadaVsNao', 'origemOS', 'custo', 'custoPorOS', 'anomalias', 'hh']),
+    );
+    expect(p.graficos.filter((g) => !g.formula || !g.base).map((g) => g.id)).toEqual([]);
+    expect(p.graficos.find((g) => g.id === 'anomalias')?.base).toBe('3 anomalias registradas no período: 1 virou OS, 1 resolvida.');
   });
 
   it('a frota da disponibilidade segue o filtro (os UCs da instalação)', async () => {

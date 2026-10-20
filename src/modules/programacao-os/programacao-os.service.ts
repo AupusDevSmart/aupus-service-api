@@ -22,6 +22,7 @@ import {
 } from '../reservas/ocupacao-da-viatura';
 import { gerarNumeroOS } from '../../common/helpers/numeracao-os';
 import { exigirOrigem } from './origem-exigida';
+import { ESTIMATIVA_PADRAO, MAXIMO_DE_HORAS, horasDasInstrucoes } from './estimativa-da-programacao';
 import { Instalacao, instalacoesDasProgramacoes } from '../../common/helpers/instalacao-da-os';
 import {
   finalizarOrigem,
@@ -417,8 +418,8 @@ export class ProgramacaoOSService {
             || (createDto.dados_origem as { solicitacaoServicoId?: string } | undefined)?.solicitacaoServicoId?.trim()
             || null,
           dados_origem: createDto.dados_origem,
-          tempo_estimado: createDto.tempo_estimado || 2, // Padrão: 2 horas
-          duracao_estimada: createDto.duracao_estimada || (createDto.tempo_estimado ? createDto.tempo_estimado * 1.5 : 3), // Padrão: 3h ou 1.5x tempo
+          tempo_estimado: createDto.tempo_estimado || ESTIMATIVA_PADRAO.tempo_estimado,
+          duracao_estimada: createDto.duracao_estimada || (createDto.tempo_estimado ? createDto.tempo_estimado * 1.5 : ESTIMATIVA_PADRAO.duracao_estimada),
           data_previsao_inicio: createDto.data_previsao_inicio ? new Date(createDto.data_previsao_inicio) : null,
           data_previsao_fim: createDto.data_previsao_fim ? new Date(createDto.data_previsao_fim) : null,
           necessita_veiculo: createDto.necessita_veiculo || false,
@@ -942,8 +943,8 @@ export class ProgramacaoOSService {
       origem: 'ANOMALIA',
       equipamento_id: anomalia.equipamento_id,
       anomalia_id: anomalia.id,
-      tempo_estimado: dto.ajustes?.tempo_estimado || 2,
-      duracao_estimada: dto.ajustes?.tempo_estimado ? dto.ajustes.tempo_estimado * 1.5 : 3,
+      tempo_estimado: dto.ajustes?.tempo_estimado || ESTIMATIVA_PADRAO.tempo_estimado,
+      duracao_estimada: dto.ajustes?.tempo_estimado ? dto.ajustes.tempo_estimado * 1.5 : ESTIMATIVA_PADRAO.duracao_estimada,
       dados_origem: {
         anomalia_descricao: anomalia.descricao,
         anomalia_data: anomalia.data,
@@ -1015,8 +1016,8 @@ export class ProgramacaoOSService {
       planta_id: solicitacao.planta_id,
       equipamento_id: solicitacao.equipamento_id,
       solicitacao_servico_id: solicitacao.id,
-      tempo_estimado: solicitacao.tempo_estimado ? Number(solicitacao.tempo_estimado) : 2,
-      duracao_estimada: solicitacao.tempo_estimado ? Number(solicitacao.tempo_estimado) * 1.5 : 3,
+      tempo_estimado: solicitacao.tempo_estimado ? Number(solicitacao.tempo_estimado) : ESTIMATIVA_PADRAO.tempo_estimado,
+      duracao_estimada: solicitacao.tempo_estimado ? Number(solicitacao.tempo_estimado) * 1.5 : ESTIMATIVA_PADRAO.duracao_estimada,
       observacoes: solicitacao.descricao,
       justificativa: solicitacao.justificativa,
       // Quem pediu não é quem responde pela execução (SN-31): o solicitante fica
@@ -1069,6 +1070,15 @@ export class ProgramacaoOSService {
     const plantas = await plantasDosEquipamentos(this.prisma, tarefas.map((t) => t.equipamento_id));
     const equipamentos = [...new Set(tarefas.map(t => t.equipamento_id).filter(Boolean))];
 
+    // A estimativa sai das instruções (SN-81): sem isso toda preventiva do cron
+    // entrava no backlog com o padrão de 2 h, fosse uma inspeção ou uma revisão
+    const estimativa = await horasDasInstrucoes(this.prisma, tarefas.map((t) => t.instrucao_id));
+    // Acima do que a coluna guarda, a programação não seria criada: corta e avisa
+    const horas = Math.min(estimativa.horas, MAXIMO_DE_HORAS);
+    if (estimativa.horas > MAXIMO_DE_HORAS) {
+      this.logger.warn(`Estimativa de ${estimativa.horas} h das ${tarefas.length} tarefas cortada em ${MAXIMO_DE_HORAS} h (o maior que a coluna guarda)`);
+    }
+
     const createDto: CreateProgramacaoDto = {
       descricao: dto.descricao || `Execução de ${tarefas.length} tarefa(s) de manutenção`,
       local: dto.agrupar_por === 'planta' && plantas.length === 1
@@ -1089,10 +1099,13 @@ export class ProgramacaoOSService {
       responsavel: dto.responsavel,
       observacoes: dto.observacoes,
       tarefas_ids: dto.tarefas_ids,
+      ...(horas > 0 && { tempo_estimado: horas, duracao_estimada: horas }),
       dados_origem: {
         tarefas_count: tarefas.length,
         agrupamento: dto.agrupar_por,
         tarefas_nomes: tarefas.map(t => t.nome),
+        // A estimativa é das instruções que têm tempo: quantas ficaram de fora dela
+        tarefas_sem_estimativa: estimativa.tarefasSemTempo,
       },
     };
 

@@ -32,6 +32,7 @@ describe('planta da programação e da OS de tarefa (banco real)', () => {
   let tarefaUC: string;
   let tarefaUAR: string;
   let tarefaB: string;
+  let tarefaComInstrucao: string;
 
   const limpar = async () => {
     const progs = (await prisma.programacoes_os.findMany({ where: { descricao: { startsWith: PREFIXO } }, select: { id: true } })).map((p) => p.id);
@@ -53,6 +54,8 @@ describe('planta da programação e da OS de tarefa (banco real)', () => {
 
   const apagarFixos = async () => {
     await prisma.tarefas.deleteMany({ where: { tag: { startsWith: PREFIXO } } });
+    await prisma.sub_instrucoes.deleteMany({ where: { instrucao: { tag: `${PREFIXO}-INS` } } });
+    await prisma.instrucoes.deleteMany({ where: { tag: `${PREFIXO}-INS` } });
     await prisma.equipamentos.deleteMany({ where: { id: { in: [UAR_A, UC_A, UC_B] } } });
     await prisma.unidades.deleteMany({ where: { id: { in: [UNIDADE_A, UNIDADE_B] } } });
     await prisma.planta_operadores.deleteMany({ where: { usuario_id: { in: [TECNICO_A, TECNICO_B] } } });
@@ -78,6 +81,24 @@ describe('planta da programação e da OS de tarefa (banco real)', () => {
     tarefaUC = (await tarefa('UC', UC_A)).id.trim();
     tarefaUAR = (await tarefa('UAR', UAR_A)).id.trim();
     tarefaB = (await tarefa('B', UC_B)).id.trim();
+
+    // A instrução dura 2 h pelas sub-instruções (90 + 30 min); os campos dela, que a tela não mostra, dizem outra coisa
+    const instrucao = await prisma.instrucoes.create({
+      data: {
+        tag: `${PREFIXO}-INS`, nome: 'Revisão do inversor', descricao: 'x', categoria: 'ELETRICA', tipo_manutencao: 'PREVENTIVA',
+        condicao_ativo: 'PARADO', criticidade: 3, duracao_estimada: 9, tempo_estimado: 600,
+      },
+    });
+    await prisma.sub_instrucoes.createMany({
+      data: [
+        { instrucao_id: instrucao.id, descricao: 'Limpar', ordem: 1, tempo_estimado: 90 },
+        { instrucao_id: instrucao.id, descricao: 'Medir', ordem: 2, tempo_estimado: 30 },
+        { instrucao_id: instrucao.id, descricao: 'Fotografar', ordem: 3 },
+      ],
+    });
+    tarefaComInstrucao = (
+      await prisma.tarefas.create({ data: { tag: `${PREFIXO}-INS`, nome: 'INS', criticidade: 3, ordem: 2, equipamento_id: UC_A, instrucao_id: instrucao.id } })
+    ).id.trim();
   });
 
   beforeEach(limpar);
@@ -127,5 +148,22 @@ describe('planta da programação e da OS de tarefa (banco real)', () => {
     await expect(escopo.assertEntityInScope('ordem_servico', os.id, tecnicoA)).resolves.toBeUndefined();
     await expect(escopo.assertEntityInScope('programacao_os', prog.id, tecnicoA)).resolves.toBeUndefined();
     await expect(escopo.assertEntityInScope('ordem_servico', os.id, tecnicoB)).rejects.toThrow();
+  });
+
+  // SN-81: a preventiva do cron entrava no backlog com o padrão de 2 h, fosse inspeção ou revisão
+  it('a programação do cron leva a duração das instruções (a soma das sub-instruções)', async () => {
+    const prog = await gerar([tarefaComInstrucao, tarefaUC]);
+
+    const salva = await prisma.programacoes_os.findUniqueOrThrow({ where: { id: prog.id } });
+    expect([Number(salva.tempo_estimado), Number(salva.duracao_estimada)]).toEqual([2, 2]);
+    // A outra tarefa não tem instrução: a estimativa é parcial, e a programação guarda quantas ficaram de fora
+    expect((salva.dados_origem as { tarefas_sem_estimativa?: number }).tarefas_sem_estimativa).toBe(1);
+  });
+
+  it('sem instrução com tempo, fica o padrão do servidor (que o painel conta à parte)', async () => {
+    const prog = await gerar([tarefaUC]);
+
+    const salva = await prisma.programacoes_os.findUniqueOrThrow({ where: { id: prog.id } });
+    expect([Number(salva.tempo_estimado), Number(salva.duracao_estimada)]).toEqual([2, 3]);
   });
 });

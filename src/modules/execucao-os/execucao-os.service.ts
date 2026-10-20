@@ -45,7 +45,8 @@ import { finalizarOrigem, origemDaProgramacao } from '../../common/helpers/statu
 import { cancelarOS } from './cancelar-os';
 import { exigirOSAlteravel, travarOSAlteravel } from './os-alteravel';
 import { dadosDaOS, dadosDeFalha, equipamentoDaCorretiva, minutosParado, mudancasNaFalha } from './dados-de-falha';
-import { MARCOS_DO_TEMPO, emCentavos, gravacaoDasHoras, horasDaEquipe, minutosEfetivos } from './horas-da-execucao';
+import { MARCOS_DO_TEMPO, gravacaoDasHoras, horasDaEquipe, minutosEfetivos } from './horas-da-execucao';
+import { custoDasLinhas, reais } from './custo-da-os';
 import { conferirCodigo, gravarCodigoDeVerificacao, relatorioDaOS, somasDosAnexosSemSoma, type ConferenciaDoCodigo, type RelatorioDaOS } from './verificacao-da-os';
 import { pessoasQuePodemAtuar } from '@/modules/programacao-os/pessoas-da-os';
 import type { PessoasDaOS } from './horas-da-execucao';
@@ -961,7 +962,7 @@ export class ExecucaoOSService {
 
     await this.prisma.$transaction(async (prisma) => {
       // SN-62: gravado durante o finalizar, ficava fora do conteúdo da OS finalizada
-      await travarOSAlteravel(prisma, id);
+      const status = await travarOSAlteravel(prisma, id, 'gravar');
       for (const material of dto.materiais) {
         // updateMany com os_id: o id de um material de outra OS não altera aquela OS
         const { count } = await prisma.materiais_os.updateMany({
@@ -974,6 +975,17 @@ export class ExecucaoOSService {
         if (count === 0) throw new NotFoundException(`Material ${material.id} não pertence a esta OS`);
       }
 
+      // O custo real sai ao executar: o consumo registrado depois (executada ou
+      // auditada) ficava fora dele, e o custo da OS mentia (SN-81)
+      let mudancaDoCusto = '';
+      if (status === StatusOS.EXECUTADA || status === StatusOS.AUDITADA) {
+        const antes = (await prisma.ordens_servico.findUniqueOrThrow({ where: { id }, select: { custo_real: true } })).custo_real;
+        const custo = await this.calcularCustoReal(prisma, id);
+        await prisma.ordens_servico.update({ where: { id }, data: { custo_real: custo } });
+        // O auditor aprovou um valor: a trilha diz de quanto para quanto mudou
+        if (!custo.equals(antes ?? 0)) mudancaDoCusto = ` Custo real de R$ ${reais(antes)} para R$ ${reais(custo)}.`;
+      }
+
       // Registrar histórico
       await this.registrarHistorico(
         prisma,
@@ -981,9 +993,10 @@ export class ExecucaoOSService {
         'CONSUMO_MATERIAIS',
         'Sistema',
         usuarioId,
-        `Consumo registrado: ${dto.materiais.length} material(is)`,
+        `Consumo registrado: ${dto.materiais.length} material(is).${mudancaDoCusto}`,
       );
-    });
+      // O tempo do executar: ele segura a OS até 15 s, e o padrão (5 s) virava 500 (P2028)
+    }, { timeout: 15000, maxWait: 15000 });
   }
 
   async registrarFerramentas(id: string, dto: RegistrarFerramentasDto, usuarioId?: string, user?: ScopedUser): Promise<void> {
@@ -1473,6 +1486,11 @@ export class ExecucaoOSService {
         throw new ConflictException('A OS já não está auditada (finalizada por outra pessoa agora há pouco?): recarregue a tela.');
       }
 
+      // O custo real refeito antes de selar o conteúdo (SN-81): a OS executada
+      // pelo código antigo, com consumo registrado depois, ficaria no documento
+      // provado com o custo de antes do consumo
+      await prisma.ordens_servico.update({ where: { id }, data: { custo_real: await this.calcularCustoReal(prisma, id) } });
+
       await this.registrarHistorico(
         prisma,
         id,
@@ -1750,25 +1768,9 @@ export class ExecucaoOSService {
       where: { os_id: osId },
     });
 
-    // Em Decimal, cada parcela arredondada como o custo da linha (SN-61): em
-    // float, 0,5 h x R$ 2,01 gravava 1,00 na linha e 1,01 no custo da OS
-    let custoTotal = new Prisma.Decimal(0);
-
-    // Material realmente consumido
-    for (const material of materiais) {
-      if (material.custo_unitario && material.quantidade_consumida) {
-        custoTotal = custoTotal.add(emCentavos(material.custo_unitario.mul(material.quantidade_consumida)));
-      }
-    }
-
-    // Mão de obra: a estimada só para OS executada antes do SN-61, sem horas registradas
-    for (const tecnico of tecnicos) {
-      if (tecnico.custo_hora) {
-        custoTotal = custoTotal.add(emCentavos(tecnico.custo_hora.mul(tecnico.horas_trabalhadas ?? tecnico.horas_estimadas)));
-      }
-    }
-
-    return custoTotal;
+    // A mesma conta do custo por natureza do painel (SN-81)
+    const { maoDeObra, material } = custoDasLinhas(materiais, tecnicos);
+    return maoDeObra.add(material);
   }
 
   /**

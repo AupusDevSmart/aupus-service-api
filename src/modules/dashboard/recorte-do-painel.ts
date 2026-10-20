@@ -2,6 +2,7 @@ import { Prisma, PrismaService, PlantaScope, StatusOS } from '@/core';
 import { ordemDasPlantas } from '../../common/helpers/filtros-da-os';
 import { instalacoesDasOrdens } from '../../common/helpers/instalacao-da-os';
 import { variantesDeIds } from '../tarefas/ids';
+import { ESTIMATIVAS_INVENTADAS } from '../programacao-os/estimativa-da-programacao';
 import type { PeriodoDoPainel, QueryDashboardManutencaoDto } from './dto/query-dashboard-manutencao.dto';
 
 /**
@@ -86,6 +87,7 @@ export const SELECT_DA_ORDEM = {
   tipo: true,
   origem: true,
   tempo_estimado: true,
+  duracao_estimada: true,
   custo_real: true,
   orcamento_previsto: true,
   custos_adicionais: true,
@@ -118,6 +120,19 @@ export interface EquipamentoDaOrdem {
  */
 export const fimDaOrdem = (o: Pick<OrdemDoPainel, 'data_hora_fim_real' | 'data_hora_inicio_real'>) =>
   o.data_hora_fim_real ?? o.data_hora_inicio_real;
+
+/**
+ * As horas estimadas da OS: a "Duração estimada (horas)", o campo que o
+ * planejador vê e preenche (SN-81). O `tempo_estimado` não aparece na tela: a
+ * programação feita por ela o gravava sempre com 4, e o servidor com 2.
+ */
+export const horasEstimadas = (o: Pick<OrdemDoPainel, 'duracao_estimada'>) => o.duracao_estimada?.toNumber() ?? 0;
+
+/** A OS ficou com uma estimativa que ninguém fez (o padrão do servidor ou o do formulário antigo) */
+export const naEstimativaPadrao = (o: Pick<OrdemDoPainel, 'tempo_estimado' | 'duracao_estimada'>) =>
+  ESTIMATIVAS_INVENTADAS.some(
+    (e) => Number(o.tempo_estimado) === e.tempo_estimado && Number(o.duracao_estimada) === e.duracao_estimada,
+  );
 
 /**
  * As OS do painel: a planta e o escopo pela coluna da OS ou pelo equipamento

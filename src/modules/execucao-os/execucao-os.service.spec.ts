@@ -102,7 +102,8 @@ describe('ExecucaoOSService', () => {
       findMany: jest.fn().mockResolvedValue([]),
     },
     materiais_os: {
-      findMany: jest.fn(),
+      // Vazias por padrão: o custo real é refeito ao finalizar e ao registrar consumo (SN-81)
+      findMany: jest.fn().mockResolvedValue([]),
       updateMany: jest.fn(),
       update: jest.fn(),
     },
@@ -111,7 +112,7 @@ describe('ExecucaoOSService', () => {
       update: jest.fn(),
     },
     tecnicos_os: {
-      findMany: jest.fn(),
+      findMany: jest.fn().mockResolvedValue([]),
       updateMany: jest.fn(),
     },
     reserva_veiculo: {
@@ -176,9 +177,9 @@ describe('ExecucaoOSService', () => {
      * quatro origens e precisa de UNION com DISTINCT, que o Prisma nao
      * expressa. Sem o mock, `listar` e `buscarPorId` derrubavam a suite.
      */
-    // A OS travada (FOR SHARE, SN-62) devolve o status dela; o resto, nada
+    // A OS travada (FOR SHARE, SN-62; FOR NO KEY UPDATE para gravar, SN-81) devolve o status dela; o resto, nada
     $queryRaw: jest.fn((sql: unknown) =>
-      Promise.resolve(JSON.stringify(sql).includes('FOR SHARE') ? [{ status: 'EM_EXECUCAO' }] : []),
+      Promise.resolve(/FOR (SHARE|NO KEY UPDATE)/.test(JSON.stringify(sql)) ? [{ status: 'EM_EXECUCAO' }] : []),
     ),
     // As somas dos anexos de antes do SN-62, lidas antes da transação do finalizar
     anexos_os: { findMany: jest.fn().mockResolvedValue([]) },

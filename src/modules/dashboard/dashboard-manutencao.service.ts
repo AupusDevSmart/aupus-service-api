@@ -5,14 +5,18 @@ import { Prisma, PrismaService, PermissionScopeService, PlantaScope, ScopedUser 
 import { ordemDasPlantas } from '../../common/helpers/filtros-da-os';
 import type { QueryDashboardManutencaoDto } from './dto/query-dashboard-manutencao.dto';
 import { calcularConfiabilidade, frotaDoRecorte, type Confiabilidade, type Frota } from './confiabilidade';
+import { custosDasOrdens, montarCusto, montarCustoPorOS, type CustosDoPainel } from './custo-do-painel';
+import { explicacoesDosGraficos } from './explicacoes-do-painel';
 import {
   STATUS_CONCLUIDO,
   STATUS_EM_ABERTO,
   filtroDasAnomalias,
   filtroDe,
   fimDaOrdem,
+  horasEstimadas,
   indiceDoMes,
   janelaDoPeriodo,
+  naEstimativaPadrao,
   naJanela,
   ordensDoPainel,
   type JanelaDoPainel,
@@ -20,6 +24,12 @@ import {
 } from './recorte-do-painel';
 
 type UserCtx = ScopedUser | undefined;
+
+const plural = (n: number, um: string, varios: string) => `${n} ${n === 1 ? um : varios}`;
+
+/** Como o painel reconhece a OS sem estimativa (SN-81) */
+const TEXTO_DO_PADRAO =
+  'Sem estimativa, a OS entra com o padrão do servidor (2 h de trabalho e 3 h de duração) ou com o do formulário antigo (4 e 6 h) e é contada à parte; a estimada de verdade nesses números também conta como sem estimativa.';
 
 /**
  * Indicador que a tela mostra. `simulado` existe porque nem tudo que a
@@ -86,19 +96,9 @@ export class DashboardManutencaoService {
     return this.scopeService.getPlantasDoUsuario(user.id, user.role);
   }
 
-  private numero(valor: Prisma.Decimal | number | null | undefined): number {
-    if (valor === null || valor === undefined) return 0;
-    const n = typeof valor === 'object' && 'toNumber' in valor ? valor.toNumber() : Number(valor);
-    return Number.isFinite(n) ? n : 0;
-  }
-
   private pct(parte: number, total: number): number {
     if (!total) return 0;
     return Math.round((parte / total) * 100);
-  }
-
-  private virgula(n: number, casas = 1): string {
-    return n.toFixed(casas).replace('.', ',');
   }
 
   /** Número com vírgula e ponto de milhar, sem depender do ICU do Node */
@@ -148,10 +148,12 @@ export class DashboardManutencaoService {
 
     // As abertas são de agora, como o backlog: a registrada há 40 dias sumia do card no "mês"
     const abertas: Prisma.anomaliasWhereInput = { AND: [daAnomalia, { status: { not: 'FINALIZADA' } }] };
-    const [anomaliasAbertas, anomaliasSemOS, frota] = await Promise.all([
+    const [anomaliasAbertas, anomaliasSemOS, frota, custos] = await Promise.all([
       this.prisma.anomalias.count({ where: abertas }),
       this.prisma.anomalias.count({ where: { AND: [abertas, { ordens_servico: { none: osValida } }] } }),
       frotaDoRecorte(this.prisma, scope, filtros, janela),
+      // O custo por natureza, das linhas de material e de técnico (SN-81)
+      custosDasOrdens(this.prisma, ordens.filter((o) => STATUS_CONCLUIDO.includes(o.status))),
     ]);
 
     return {
@@ -159,7 +161,7 @@ export class DashboardManutencaoService {
       meses: janela.meses.map((m) => m.rotulo),
       periodo: { desde: janela.desde.toISOString(), ate: janela.ate.toISOString() },
       opcoes: await this.montarOpcoes(scope, filtros),
-      ...this.montarBlocos(ordens, anomalias, janela, { abertas: anomaliasAbertas, semOS: anomaliasSemOS }, frota, Boolean(filtroDe(filtros.equipe))),
+      ...this.montarBlocos(ordens, anomalias, janela, { abertas: anomaliasAbertas, semOS: anomaliasSemOS }, frota, custos, Boolean(filtroDe(filtros.equipe))),
     };
   }
 
@@ -230,6 +232,7 @@ export class DashboardManutencaoService {
     janela: JanelaDoPainel,
     anomaliasDeAgora: { abertas: number; semOS: number },
     frota: Frota,
+    custos: CustosDoPainel,
     porEquipe: boolean,
   ) {
     const grupos: OrdensDoPeriodo = {
@@ -250,17 +253,42 @@ export class DashboardManutencaoService {
       janela,
     );
 
+    const aderencia = this.montarAderencia(grupos);
+    // A fórmula e a base do custo e do HH saem da conta deles, mas vão na legenda com as outras
+    const { formula: formulaDoCusto, base: baseDoCusto, ...custo } = montarCusto(grupos.concluidas, custos, janela);
+    const custoPorOS = montarCustoPorOS(grupos.concluidas, custos, janela);
+    const blocoDeAnomalias = this.montarAnomalias(anomalias, janela);
+    const {
+      hh: { formula: formulaDoHH, base: baseDoHH, ...hh },
+      ...produtividade
+    } = this.montarProdutividade(grupos, janela);
+
     return {
       kpis: this.montarKpis(grupos, anomaliasDeAgora, conf, porEquipe),
-      ...this.montarAderencia(grupos),
-      custo: this.montarCusto(grupos.concluidas, janela),
-      custoPorOS: this.montarCustoPorOS(grupos.concluidas, janela),
+      ...aderencia,
+      custo,
+      custoPorOS,
       finalidade: this.montarFinalidade(grupos.criadas, janela),
-      anomalias: this.montarAnomalias(anomalias, janela),
+      anomalias: blocoDeAnomalias,
       backlogIdade: this.montarBacklog(grupos.emAberto),
-      ofensores: this.montarOfensores(grupos.concluidas),
-      ...this.montarProdutividade(grupos, janela),
+      ofensores: this.montarOfensores(grupos.concluidas, custos),
+      ...produtividade,
+      hh,
       alertas: this.montarAlertas(grupos, anomalias, conf),
+      // A legenda das fórmulas: como cada gráfico sai (no ícone dele e em "Como se calcula")
+      graficos: explicacoesDosGraficos({
+        doPlano: aderencia.execucaoPlano.programadas,
+        doPlanoConcluidas: aderencia.execucaoPlano.executadas,
+        metaDoPlano: aderencia.execucaoPlano.meta,
+        criadas: grupos.criadas.length,
+        concluidasComCusto: custoPorOS.base,
+        anomalias: blocoDeAnomalias,
+        abertas: grupos.emAberto.length,
+        concluidasComEquipe: grupos.concluidas.filter((o) => o.time_equipe?.trim()).length,
+        metaPrazo: produtividade.metaPrazo,
+        custo: { formula: formulaDoCusto, base: baseDoCusto },
+        hh: { formula: formulaDoHH, base: baseDoHH },
+      }),
     };
   }
 
@@ -282,9 +310,10 @@ export class DashboardManutencaoService {
 
     // Backlog em HH: em semanas exigiria a capacidade das equipes, que não é
     // cadastrada — pode ir gente de fora (decisão do usuário, 20/out/2026)
-    const hhPendente = emAberto.reduce((soma, o) => soma + this.numero(o.tempo_estimado), 0);
+    const hhPendente = emAberto.reduce((soma, o) => soma + horasEstimadas(o), 0);
+    // A OS gerada sem estimativa soma o padrão do servidor: contada à parte (SN-81)
+    const noPadrao = emAberto.filter(naEstimativaPadrao).length;
 
-    const plural = (n: number, um: string, varios: string) => `${n} ${n === 1 ? um : varios}`;
     const baseDaFalha = `${plural(conf.corretivas, 'corretiva', 'corretivas')} no período: ${plural(conf.falhas, 'parou', 'pararam')} o equipamento (${conf.comHorario} com horário, ${conf.semHorario} sem), ${conf.semDadosDeFalha} sem os dados de falha. Frota: ${plural(conf.equipamentos, 'UC', 'UCs')}, ${this.decimal(conf.horasDaFrota, 0)} h no período.`;
     // A corretiva sem a resposta "parou?" (anterior ao SN-60): não se sabe se parou, e o
     // cartão não pode afirmar "nenhuma falha" nem 100% de disponibilidade
@@ -326,11 +355,12 @@ export class DashboardManutencaoService {
         id: 'backlog',
         icone: 'stack',
         rotulo: 'Backlog',
-        valor: this.virgula(hhPendente, 0),
+        valor: this.decimal(hhPendente, 0),
         unidade: 'HH',
-        nota: `${plural(emAberto.length, 'OS aberta', 'OS abertas')}`,
-        status: null,
-        formula: 'Soma do tempo estimado das OS abertas agora. Sem semanas: a capacidade das equipes não é cadastrada (pode ir gente de fora).',
+        nota: `${plural(emAberto.length, 'OS aberta', 'OS abertas')}${noPadrao > 0 ? ` · ${noPadrao} sem estimativa` : ''}`,
+        status: noPadrao > 0 ? 'warn' : null,
+        formula: `Soma da duração estimada (horas) das OS abertas agora, de qualquer data. A preventiva do plano leva a duração das instruções (a soma das sub-instruções); as demais, a que o planejador informou. ${TEXTO_DO_PADRAO} Sem semanas: a capacidade das equipes não é cadastrada (pode ir gente de fora).`,
+        base: `${plural(emAberto.length, 'OS aberta', 'OS abertas')}: ${emAberto.length - noPadrao} com estimativa, ${noPadrao} sem (no padrão).`,
       },
       {
         id: 'anomalias',
@@ -427,66 +457,6 @@ export class DashboardManutencaoService {
         corretiva: this.pct(porTipo('CORRETIVA'), ordens.length),
         melhoria: this.pct(porTipo('INSPECAO') + porTipo('VISITA_TECNICA'), ordens.length),
       },
-    };
-  }
-
-  /**
-   * Custo mensal. O total é real (`custo_real` + `custos_adicionais`), mas a
-   * decomposição em mão de obra / material / terceiros NÃO existe no banco —
-   * `custo_real` é um número único. A divisão abaixo é proporção fixa, para a
-   * tela poder ser validada, e vem marcada como simulada.
-   */
-  private montarCusto(ordens: OrdemDoPainel[], janela: JanelaDoPainel) {
-    const total = this.serie(janela);
-    const orcado = this.serie(janela);
-
-    // As concluídas no período, no mês em que terminaram
-    for (const o of ordens) {
-      const i = indiceDoMes(fimDaOrdem(o), janela);
-      if (i < 0) continue;
-      total[i] += this.numero(o.custo_real) + this.numero(o.custos_adicionais);
-      orcado[i] += this.numero(o.orcamento_previsto);
-    }
-
-    const emMil = (v: number) => Math.round(v / 100) / 10;
-
-    return {
-      maoObra: total.map((v) => emMil(v * 0.55)),
-      material: total.map((v) => emMil(v * 0.3)),
-      terceiros: total.map((v) => emMil(v * 0.15)),
-      orcado: orcado.map(emMil),
-      total: total.map(emMil),
-      simulado: true,
-      pendencia:
-        'A decomposição por natureza é proporção fixa. Para ser real, o custo da OS precisa ser lançado separado em mão de obra, material e terceiros — ou derivado do catálogo de recursos.',
-    };
-  }
-
-  private montarCustoPorOS(ordens: OrdemDoPainel[], janela: JanelaDoPainel) {
-    const soma = { corretiva: this.serie(janela), preventiva: this.serie(janela) };
-    const qtd = { corretiva: this.serie(janela), preventiva: this.serie(janela) };
-
-    for (const o of ordens) {
-      const custo = this.numero(o.custo_real) + this.numero(o.custos_adicionais);
-      if (!custo) continue;
-
-      const i = indiceDoMes(fimDaOrdem(o), janela);
-      if (i < 0) continue;
-
-      const chave = o.tipo === 'CORRETIVA' ? 'corretiva' : 'preventiva';
-      soma[chave][i] += custo;
-      qtd[chave][i] += 1;
-    }
-
-    const media = (s: number[], q: number[]) => s.map((v, i) => (q[i] > 0 ? Math.round(v / q[i]) : 0));
-    const comCusto = ordens.filter((o) => this.numero(o.custo_real) > 0).length;
-
-    return {
-      corretiva: media(soma.corretiva, qtd.corretiva),
-      preventiva: media(soma.preventiva, qtd.preventiva),
-      base: comCusto,
-      pendencia:
-        comCusto === 0 ? 'Nenhuma OS concluída tem custo real lançado.' : undefined,
     };
   }
 
@@ -608,11 +578,12 @@ export class DashboardManutencaoService {
    * vazio: ela quase nunca vem (no dev, as 4 OS com custo a tinham nula). A OS
    * de mais de um equipamento divide o custo em partes iguais entre eles.
    */
-  private montarOfensores(ordens: OrdemDoPainel[]) {
+  private montarOfensores(ordens: OrdemDoPainel[], custos: CustosDoPainel) {
     const porEquipamento = new Map<string, { ativo: string; custo: number }>();
 
     for (const o of ordens) {
-      const custo = this.numero(o.custo_real) + this.numero(o.custos_adicionais);
+      // O mesmo custo do gráfico de custo: pelas linhas, mais os adicionais
+      const custo = custos.get(o.id)?.total ?? 0;
       if (!custo || o.equipamentos.length === 0) continue;
 
       const parte = custo / o.equipamentos.length;
@@ -631,8 +602,8 @@ export class DashboardManutencaoService {
 
   /**
    * Produtividade. O prazo por equipe não sai: `time_equipe` está vazio em
-   * todas as OS. O HH sai de verdade — planejado é `tempo_estimado`, apontado é
-   * a duração real entre início e fim.
+   * todas as OS. O HH sai de verdade — planejado é a duração estimada,
+   * apontado é a duração real entre início e fim.
    */
   private montarProdutividade({ concluidas, programadas }: OrdensDoPeriodo, janela: JanelaDoPainel) {
     const porEquipe = new Map<string, { total: number; noPrazo: number }>();
@@ -653,9 +624,12 @@ export class DashboardManutencaoService {
     const planejado = this.serie(janela);
     const apontado = this.serie(janela);
 
+    let planejadasNoPadrao = 0;
     for (const o of programadas) {
       const i = indiceDoMes(o.data_hora_programada, janela);
-      if (i >= 0) planejado[i] += this.numero(o.tempo_estimado);
+      if (i < 0) continue;
+      planejado[i] += horasEstimadas(o);
+      if (naEstimativaPadrao(o)) planejadasNoPadrao += 1;
     }
     for (const o of concluidas) {
       const i = indiceDoMes(fimDaOrdem(o), janela);
@@ -677,6 +651,9 @@ export class DashboardManutencaoService {
       hh: {
         planejado: planejado.map((v) => Math.round(v)),
         apontado: apontado.map((v) => Math.round(v)),
+        formula: `Planejado: a duração estimada das OS programadas para cada mês (sem as canceladas). Apontado: fim − início das OS concluídas no mês em que terminaram. ${TEXTO_DO_PADRAO}`,
+        // O planejado soma também o padrão: dizer quanto dele ninguém estimou
+        base: `${plural(programadas.length, 'OS programada', 'OS programadas')} no período, ${planejadasNoPadrao} sem estimativa (no padrão).`,
       },
     };
   }
@@ -703,9 +680,11 @@ export class DashboardManutencaoService {
       }
     }
 
-    // Das concluídas no período: o estimado contra a duração real delas
-    const hhPlanejado = concluidas.reduce((s, o) => s + this.numero(o.tempo_estimado), 0);
-    const hhReal = concluidas.reduce((s, o) => {
+    // Das concluídas no período: o estimado contra a duração real delas. Sem as
+    // que ficaram no padrão: ninguém estimou, e a razão não diria nada (SN-81)
+    const estimadas = concluidas.filter((o) => !naEstimativaPadrao(o));
+    const hhPlanejado = estimadas.reduce((s, o) => s + horasEstimadas(o), 0);
+    const hhReal = estimadas.reduce((s, o) => {
       if (!o.data_hora_inicio_real || !o.data_hora_fim_real) return s;
       return s + (new Date(o.data_hora_fim_real).getTime() - new Date(o.data_hora_inicio_real).getTime()) / 36e5;
     }, 0);
@@ -755,7 +734,8 @@ export class DashboardManutencaoService {
         icone: 'checklist',
         rotulo: 'Aderência HH',
         valor: hhPlanejado > 0 ? `${aderenciaHH}%` : '—',
-        nota: 'duração real sobre tempo estimado',
+        nota: 'duração real sobre a estimada',
+        formula: 'Duração real (fim − início) sobre a duração estimada, das OS concluídas no período que têm estimativa (as que ficaram no padrão do servidor não entram).',
         status: hhPlanejado > 0 && (aderenciaHH < 90 || aderenciaHH > 110) ? 'warn' : null,
       },
     ];
