@@ -86,15 +86,14 @@ describe('planos vinculados pelo escopo da planta (banco real)', () => {
   });
 
   // A busca também acha pela instalação e pela planta (SN-77), que aqui levam o
-  // prefixo: o plano "antigo" da mesma instalação vem junto e fica de fora pelo nome
+  // prefixo: o plano "antigo" da instalação A vem junto — e só para quem vê a planta A
   const vinculados = async (user?: { id: string; role: string }) =>
     (await planos.listar({ page: 1, limit: 100, vinculados: true, search: PREFIXO } as never, user)).data
       .map((p) => p.nome)
-      .filter((nome) => nome.startsWith(`${PREFIXO} `))
       .sort();
 
   it('cliente vê só os planos da planta dele (o componente pelo UC pai)', async () => {
-    expect(await vinculados({ id: DONO_A, role: 'proprietario' })).toEqual([`${PREFIXO} A`, `${PREFIXO} componente A`]);
+    expect(await vinculados({ id: DONO_A, role: 'proprietario' })).toEqual([`${PREFIXO} A`, `${PREFIXO} componente A`, `${ANTIGO} A`]);
   });
 
   it('técnico vê só os planos das plantas em que atua', async () => {
@@ -106,7 +105,7 @@ describe('planos vinculados pelo escopo da planta (banco real)', () => {
   });
 
   it('quem vê todas as plantas vê todos', async () => {
-    expect(await vinculados({ id: DONO_A, role: 'admin' })).toHaveLength(3);
+    expect(await vinculados({ id: DONO_A, role: 'admin' })).toHaveLength(4);
   });
 
   const templates = async (user?: { id: string; role: string }, extra: Record<string, unknown> = {}) =>

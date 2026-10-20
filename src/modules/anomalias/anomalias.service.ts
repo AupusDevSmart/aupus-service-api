@@ -236,7 +236,8 @@ export class AnomaliasService {
             }
           }
         },
-        orderBy: { created_at: 'desc' },
+        // Desempate pelo id: no mesmo segundo (Timestamp(0)) a ordem entre páginas não é garantida
+        orderBy: [{ created_at: 'desc' }, { id: 'desc' }],
         skip: (page - 1) * limit,
         take: limit
       }),

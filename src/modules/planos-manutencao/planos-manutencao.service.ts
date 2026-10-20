@@ -1032,6 +1032,10 @@ export class PlanosManutencaoService {
       where: { id: { in: ids }, deleted_at: null },
       include: {
         unidade: { include: { planta: { select: { id: true, nome: true } } } },
+        // O componente e o equipamento antigo mostram onde estão por aqui: sem
+        // isso, "Ventoinha" vinha de todas as usinas sem dizer de qual
+        equipamento_pai: { select: { id: true, nome: true, unidade: { include: { planta: { select: { id: true, nome: true } } } } } },
+        planta: { select: { id: true, nome: true } },
       },
     });
 
@@ -1074,13 +1078,25 @@ export class PlanosManutencaoService {
         { equipamento: { ativo_funcional: { nome: contem } } },
         { equipamento: { unidade: { nome: contem } } },
         { equipamento: { unidade: { planta: { nome: contem } } } },
+        // O componente (UAR) é da instalação do UC pai, e o equipamento antigo
+        // tem só a coluna da planta — a regra do escopo; e a categoria, que a
+        // linha mostra como etiqueta
+        { equipamento: { equipamento_pai: { unidade: { nome: contem } } } },
+        { equipamento: { equipamento_pai: { unidade: { planta: { nome: contem } } } } },
+        { equipamento: { planta: { nome: contem } } },
+        { equipamento: { tipo_equipamento: contem } },
       ];
     }
 
     return where;
   }
 
-  private construirOrdenacao(sortBy?: string, sortOrder?: 'asc' | 'desc') {
+  /**
+   * Com o id no fim, para desempatar: as cópias de um template têm o mesmo nome,
+   * e por OFFSET o Postgres não garante a mesma ordem entre as páginas — planos
+   * se repetiam e outros nunca apareciam ao rolar a lista de origem (SN-77).
+   */
+  private construirOrdenacao(sortBy?: string, sortOrder?: 'asc' | 'desc'): Prisma.planos_manutencaoOrderByWithRelationInput[] {
     const orderBy: Prisma.planos_manutencaoOrderByWithRelationInput = {};
 
     switch (sortBy) {
@@ -1098,7 +1114,7 @@ export class PlanosManutencaoService {
         orderBy.created_at = sortOrder || 'desc';
     }
 
-    return orderBy;
+    return [orderBy, { id: 'asc' }];
   }
 
   private mapearParaResponse(plano: PlanoLido): PlanoManutencaoResponseDto {

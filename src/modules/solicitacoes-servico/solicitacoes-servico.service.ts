@@ -21,8 +21,12 @@ import { Prisma, type solicitacoes_servico } from '@/core';
 import { StatusSolicitacaoServico } from '@/core';
 import { comDataNecessidadeNormalizada } from './data-necessidade';
 import { periodoDoFiltro } from '../../common/helpers/filtros-da-os';
-import { mudouOLugar, plantaDaSolicitacao } from './lugar-da-solicitacao';
+import { comOLugarAparado, mudouOLugar, plantaDaSolicitacao } from './lugar-da-solicitacao';
 import { registrarNotificacao } from '../notificacoes/registrar-notificacao';
+
+/** A planta e a unidade que a linha da lista mostra */
+interface PlantaDaLinha { id: string; nome: string; cidade: string; uf: string }
+interface UnidadeDaLinha { id: string; nome: string; tipo: string; cidade: string; estado: string }
 
 @Injectable()
 export class SolicitacoesServicoService {
@@ -177,7 +181,7 @@ export class SolicitacoesServicoService {
 
       // Extrair campos que não são colunas da tabela antes de criar
       const { instrucoes_ids, tarefas_ids, ...camposDaTabela } = createDto;
-      const createData = comDataNecessidadeNormalizada(camposDaTabela);
+      const createData = comOLugarAparado(comDataNecessidadeNormalizada(camposDaTabela));
 
       // Criar solicitação com solicitante_id e solicitante_nome preenchidos
       // Removido o include da planta para evitar erro com soft delete
@@ -353,49 +357,36 @@ export class SolicitacoesServicoService {
       },
       skip: (page - 1) * limit,
       take: limit,
-      orderBy: {
-        [sortBy]: sortOrder,
-      },
+      // Desempate pelo id: com a ordem empatada, as páginas repetiam e perdiam registros (SN-77)
+      orderBy: [{ [sortBy]: sortOrder }, { id: 'asc' }],
     });
 
-    // Buscar plantas e unidades manualmente para evitar problemas com soft delete e espaços
-    const solicitacoesCompletas = await Promise.all(
-      solicitacoes.map(async (solicitacao) => {
-        // Buscar planta
-        let planta = null;
-        if (solicitacao.planta_id) {
-          // Usar raw query com TRIM para garantir match mesmo com espaços
-          const plantaResult = await this.prisma.$queryRaw`
-            SELECT id, nome, cidade, uf
-            FROM plantas
-            WHERE TRIM(id) = TRIM(${solicitacao.planta_id})
-              AND deleted_at IS NULL
-            LIMIT 1
-          `;
-          planta = plantaResult[0] || null;
-        }
-
-        // Buscar unidade
-        let unidade = null;
-        if (solicitacao.unidade_id) {
-          // Usar raw query com TRIM para garantir match mesmo com espaços
-          const unidadeResult = await this.prisma.$queryRaw`
-            SELECT id, nome, tipo, cidade, estado
-            FROM unidades
-            WHERE TRIM(id) = TRIM(${solicitacao.unidade_id})
-              AND deleted_at IS NULL
-            LIMIT 1
-          `;
-          unidade = unidadeResult[0] || null;
-        }
-
-        return {
-          ...solicitacao,
-          planta: planta,
-          unidade: unidade
-        };
-      })
-    );
+    // Plantas e unidades por consulta própria, com TRIM (soft delete e ids com
+    // espaço): uma por tabela. Eram duas por linha, em paralelo — com o seletor
+    // de origem buscando a cada letra, 100 consultas por busca (SN-77)
+    const aparados = (campo: 'planta_id' | 'unidade_id') =>
+      [...new Set(solicitacoes.map((s) => s[campo]?.trim()).filter((id): id is string => Boolean(id)))];
+    const idsDePlanta = aparados('planta_id');
+    const idsDeUnidade = aparados('unidade_id');
+    const [plantas, unidades] = await Promise.all([
+      idsDePlanta.length
+        ? this.prisma.$queryRaw<PlantaDaLinha[]>`
+            SELECT id, nome, cidade, uf FROM plantas
+            WHERE TRIM(id) = ANY(${idsDePlanta}) AND deleted_at IS NULL`
+        : Promise.resolve<PlantaDaLinha[]>([]),
+      idsDeUnidade.length
+        ? this.prisma.$queryRaw<UnidadeDaLinha[]>`
+            SELECT id, nome, tipo, cidade, estado FROM unidades
+            WHERE TRIM(id) = ANY(${idsDeUnidade}) AND deleted_at IS NULL`
+        : Promise.resolve<UnidadeDaLinha[]>([]),
+    ]);
+    const plantaPorId = new Map(plantas.map((p) => [p.id.trim(), p]));
+    const unidadePorId = new Map(unidades.map((u) => [u.id.trim(), u]));
+    const solicitacoesCompletas = solicitacoes.map((solicitacao) => ({
+      ...solicitacao,
+      planta: (solicitacao.planta_id && plantaPorId.get(solicitacao.planta_id.trim())) || null,
+      unidade: (solicitacao.unidade_id && unidadePorId.get(solicitacao.unidade_id.trim())) || null,
+    }));
 
     return {
       data: solicitacoesCompletas.map(s => this.mapToResponseDto(s)),
@@ -555,7 +546,7 @@ export class SolicitacoesServicoService {
     // Extrair instrucoes_ids e tarefas_ids antes de passar para o Prisma (não são
     // colunas da tabela). tarefas_ids ia junto e o Prisma recusava com 500.
     const { instrucoes_ids, tarefas_ids, ...camposDaTabela } = updateDto;
-    const prismaData = comDataNecessidadeNormalizada(camposDaTabela);
+    const prismaData = comOLugarAparado(comDataNecessidadeNormalizada(camposDaTabela));
 
     return await this.prisma.$transaction(async (prisma) => {
       const solicitacaoAtualizada = await prisma.solicitacoes_servico.update({

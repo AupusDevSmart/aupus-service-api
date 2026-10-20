@@ -1,7 +1,7 @@
 // ===== src/modules/anomalias/dto/anomalia-filters.dto.ts =====
 import { ApiProperty } from '@nestjs/swagger';
-import { IsString, IsOptional, IsEnum } from 'class-validator';
-import { Transform } from 'class-transformer';
+import { IsString, IsOptional, IsEnum, IsInt, Max, Min } from 'class-validator';
+import { Type } from 'class-transformer';
 import { PrioridadeAnomalia, OrigemAnomalia } from './create-anomalia.dto';
 import { StatusAnomalia } from '@/core';
 
@@ -41,13 +41,20 @@ export class AnomaliaFiltersDto {
   @IsString()
   unidade?: string;
 
+  // Inteiros com teto (revisão do SN-77): só com o parseInt, "abc" virava NaN
+  // (500), -1 lia do fim da tabela e ?limit=100000 trazia todas com os includes
   @ApiProperty({ required: false, description: 'Número da página', default: 1 })
   @IsOptional()
-  @Transform(({ value }) => parseInt(value))
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
   page?: number = 1;
 
-  @ApiProperty({ required: false, description: 'Itens por página', default: 10 })
+  @ApiProperty({ required: false, description: 'Itens por página', default: 10, maximum: 100 })
   @IsOptional()
-  @Transform(({ value }) => parseInt(value))
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(100)
   limit?: number = 10;
 }

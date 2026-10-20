@@ -2,7 +2,7 @@ import { NotFoundException } from '@nestjs/common';
 import { PermissionScopeService, PrismaService } from '@/core';
 import { SolicitacoesServicoService } from './solicitacoes-servico.service';
 import { PropostaService } from './proposta.service';
-import { mudouOLugar } from './lugar-da-solicitacao';
+import { comOLugarAparado, mudouOLugar } from './lugar-da-solicitacao';
 
 /**
  * O lugar da solicitação (revisão do SN-57). Para quem tem escopo, a planta, a
@@ -112,5 +112,15 @@ describe('o lugar da solicitação (banco real)', () => {
     expect(mudouOLugar({ titulo: 'x' } as never, atual)).toBe(false);
     expect(mudouOLugar({ planta_id: PLANTA_A, unidade_id: ` ${UNIDADE_A}`, equipamento_id: '' }, atual)).toBe(false);
     expect(mudouOLugar({ unidade_id: UNIDADE_B }, atual)).toBe(true);
+  });
+});
+
+// SN-77: a coluna é texto e o id de destino Char(26); com o espaço do fim, a
+// busca pelo nome da instalação e o escopo por planta não achavam a solicitação
+describe('comOLugarAparado', () => {
+  it('apara os ids do lugar; vazio vira null; o resto fica como veio', () => {
+    expect(
+      comOLugarAparado({ planta_id: 'p1 ', unidade_id: ' u1  ', equipamento_id: '   ', proprietario_id: undefined, titulo: ' x ' }),
+    ).toEqual({ planta_id: 'p1', unidade_id: 'u1', equipamento_id: null, proprietario_id: undefined, titulo: ' x ' });
   });
 });

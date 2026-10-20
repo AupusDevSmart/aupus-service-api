@@ -66,3 +66,19 @@ export function mudouOLugar(pedido: LugarDaSolicitacao, atual: LugarDaSolicitaca
     (campo) => pedido[campo] !== undefined && !igual(pedido[campo], atual[campo]),
   );
 }
+
+/**
+ * Os ids do lugar aparados, como são gravados. As colunas da solicitação são
+ * texto e os ids de planta e unidade são Char(26): o id antigo, de 25
+ * caracteres, chegava da tela com o espaço do fim e era gravado assim — e o
+ * filtro por relação (a busca pelo nome da instalação, SN-77) compara texto
+ * com espaço contra o char sem ele, e não achava a solicitação.
+ */
+export function comOLugarAparado<T extends Record<string, unknown>>(dados: T): T {
+  const aparados = { ...dados } as Record<string, unknown>;
+  for (const campo of ['planta_id', 'unidade_id', 'equipamento_id', 'proprietario_id']) {
+    const valor = aparados[campo];
+    if (typeof valor === 'string') aparados[campo] = valor.trim() || null;
+  }
+  return aparados as T;
+}
