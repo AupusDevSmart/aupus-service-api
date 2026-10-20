@@ -64,7 +64,7 @@ export class ChamadosNexonService {
   private async criar(dto: ChamadoNexonDto, origem: OrigemRequisicao) {
     const planta = await this.prisma.plantas.findFirst({
       where: { id: dto.planta_id, deleted_at: null },
-      select: { id: true, nome: true },
+      select: { id: true, nome: true, proprietario_id: true },
     });
     // Sem planta nao existe solicitacao (coluna obrigatoria). 422 e definitivo
     // para quem le: o NexON tenta de novo e, se a planta for sincronizada no
@@ -75,25 +75,34 @@ export class ChamadosNexonService {
       );
     }
 
-    const [equipamento, unidade, proprietario] = await Promise.all([
+    // Equipamento, unidade e proprietario so entram se forem DESTA planta. Id de
+    // outra planta (cadastro divergente entre os dois bancos) vira texto em
+    // `faltando`, nunca uma solicitacao pendurada no ativo de outro cliente.
+    const [equipamento, unidade] = await Promise.all([
       dto.equipamento_id
         ? this.prisma.equipamentos.findFirst({
-            where: { id: dto.equipamento_id, deleted_at: null },
+            where: {
+              id: dto.equipamento_id,
+              deleted_at: null,
+              OR: [{ planta_id: planta.id }, { unidade: { planta_id: planta.id } }],
+            },
             select: { id: true, nome: true, unidade_id: true },
           })
         : null,
       dto.unidade_id
-        ? this.prisma.unidades.findFirst({ where: { id: dto.unidade_id, deleted_at: null }, select: { id: true } })
-        : null,
-      dto.proprietario_id
-        ? this.prisma.usuarios.findFirst({ where: { id: dto.proprietario_id, deleted_at: null }, select: { id: true } })
+        ? this.prisma.unidades.findFirst({
+            where: { id: dto.unidade_id, planta_id: planta.id, deleted_at: null },
+            select: { id: true },
+          })
         : null,
     ]);
+    const proprietarioId =
+      dto.proprietario_id && dto.proprietario_id === planta.proprietario_id?.trim() ? planta.proprietario_id : null;
 
     const { faltando, ...dados } = montarSolicitacao(dto, {
       equipamento,
-      unidade_id: unidade?.id ?? equipamento?.unidade_id ?? null,
-      proprietario_id: proprietario?.id ?? null,
+      unidade_id: unidade?.id ?? (dto.unidade_id ? null : (equipamento?.unidade_id ?? null)),
+      proprietario_id: proprietarioId,
       planta_nome: planta.nome,
     });
 
