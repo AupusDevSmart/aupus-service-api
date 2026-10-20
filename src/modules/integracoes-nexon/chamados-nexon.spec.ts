@@ -94,10 +94,9 @@ describe('ChamadosNexonService', () => {
     const prisma: any = {
       solicitacoes_servico: { findUnique: jest.fn().mockResolvedValue(existente), create: jest.fn() },
       historico_solicitacao_servico: { create: jest.fn() },
-      plantas: { findFirst: jest.fn().mockResolvedValue({ id: 'PL1', nome: 'Fazenda X' }) },
+      plantas: { findFirst: jest.fn().mockResolvedValue({ id: 'PL1', nome: 'Fazenda X', proprietario_id: 'US1' }) },
       equipamentos: { findFirst: jest.fn().mockResolvedValue({ id: 'EQ1', nome: 'Inversor 01', unidade_id: 'UN1' }) },
       unidades: { findFirst: jest.fn().mockResolvedValue({ id: 'UN1' }) },
-      usuarios: { findFirst: jest.fn().mockResolvedValue({ id: 'US1' }) },
     };
     prisma.$transaction = jest.fn((fn: any) => fn(prisma));
     const solicitacoes: any = { gerarNumeroSolicitacao: jest.fn().mockResolvedValue('2026-0005') };
@@ -139,6 +138,22 @@ describe('ChamadosNexonService', () => {
       }),
     );
     expect(await service.receber(chamado())).toEqual({ id: 'S9', numero: '2026-0009', criada: false });
+  });
+
+  it('equipamento, unidade e proprietário de outra planta não entram', async () => {
+    const { prisma, service } = montar();
+    prisma.equipamentos.findFirst.mockResolvedValue(null);
+    prisma.unidades.findFirst.mockResolvedValue(null);
+    prisma.solicitacoes_servico.create.mockResolvedValue({ id: 'S1', numero: '2026-0005' });
+    await service.receber(chamado({ proprietario_id: 'OUTRO' }));
+    expect(prisma.equipamentos.findFirst.mock.calls[0][0].where.OR).toEqual([
+      { planta_id: 'PL1' },
+      { unidade: { planta_id: 'PL1' } },
+    ]);
+    expect(prisma.unidades.findFirst.mock.calls[0][0].where.planta_id).toBe('PL1');
+    const data = prisma.solicitacoes_servico.create.mock.calls[0][0].data;
+    expect(data).toMatchObject({ equipamento_id: null, unidade_id: null, proprietario_id: null });
+    expect(data.observacoes).toContain('proprietário OUTRO');
   });
 
   it('planta que não está no Service é 422', async () => {
