@@ -6,8 +6,10 @@ import {
   CondicaoAtivo,
   TipoRecurso,
   TipoAnexo,
-  Prisma
+  Prisma,
+  type recursos,
 } from '@/core';
+import type { custoApurado } from '../../recursos/regras-do-recurso';
 
 export class UsuarioResumoDto {
   id: string;
@@ -34,6 +36,15 @@ export class SubInstrucaoResponseDto {
 
 export class RecursoInstrucaoResponseDto {
   id: string;
+  /** Nulo nas linhas antigas, digitadas antes do catálogo */
+  recurso_id?: string | null;
+  /**
+   * O recurso do catálogo, com o custo apurado (`preco_base`, a regra do
+   * recurso, SN-83): a sugestão de valor da proposta usa o mesmo preço do servidor
+   */
+  recurso?: (recursos & Partial<ReturnType<typeof custoApurado>> & { bases_disponiveis?: readonly string[] }) | null;
+  /** O custo da linha (preço da cobrança x as unidades); nulo sem preço */
+  subtotal?: number | null;
   tipo: TipoRecurso;
   descricao: string;
   // Decimal(10,3) no banco, repassado sem conversao: no JSON chega como texto.

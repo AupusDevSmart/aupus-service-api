@@ -27,7 +27,7 @@ describe('ImportacaoService (banco real)', () => {
   });
 
   const novo = (nome: string, extra: Record<string, unknown> = {}) =>
-    registro({ categoria: 'TECNICO', nome: `${PREFIXO} ${nome}`, unidade: 'h', preco_medio: 10, ativo: true, ...extra });
+    registro({ categoria: 'MAO_DE_OBRA', nome: `${PREFIXO} ${nome}`, unidade: 'h', preco_unitario: 10, ativo: true, ...extra });
 
   const doBanco = () =>
     prisma.recursos.findMany({ where: { nome: { startsWith: PREFIXO } }, orderBy: { nome: 'asc' } });
@@ -90,7 +90,7 @@ describe('ImportacaoService (banco real)', () => {
   it('ID que não existe é erro, e nada é criado no lugar', async () => {
     const r = await importacao.importar(
       recursos,
-      [registro({ categoria: 'TECNICO', nome: `${PREFIXO} fantasma` }, { id: 'naoexiste0000000000000000' })],
+      [registro({ categoria: 'MAO_DE_OBRA', nome: `${PREFIXO} fantasma` }, { id: 'naoexiste0000000000000000' })],
       true,
       usuario,
     );
@@ -101,7 +101,7 @@ describe('ImportacaoService (banco real)', () => {
   });
 
   it('ID repetido na planilha é erro', async () => {
-    const criado = await prisma.recursos.create({ data: { categoria: 'TECNICO', nome: `${PREFIXO} A` } });
+    const criado = await prisma.recursos.create({ data: { categoria: 'MAO_DE_OBRA', base_calculo: 'hora', rubrica: 'instrucoes', nome: `${PREFIXO} A` } });
     const id = criado.id.trim();
 
     const r = await importacao.importar(
@@ -122,7 +122,7 @@ describe('ImportacaoService (banco real)', () => {
 
     beforeEach(async () => {
       const criado = await prisma.recursos.create({
-        data: { categoria: 'TECNICO', nome: `${PREFIXO} Eletricista`, unidade: 'h', preco_medio: 85.5 },
+        data: { categoria: 'MAO_DE_OBRA', base_calculo: 'hora', rubrica: 'instrucoes', nome: `${PREFIXO} Eletricista`, unidade: 'h', preco_unitario: 85.5 },
       });
       id = criado.id.trim();
       exportadoEm = criado.updated_at.toISOString();
@@ -130,7 +130,7 @@ describe('ImportacaoService (banco real)', () => {
 
     const comoExportado = (extra: Record<string, unknown> = {}) =>
       registro(
-        { categoria: 'TECNICO', nome: `${PREFIXO} Eletricista`, unidade: 'h', preco_medio: 85.5, ativo: true, ...extra },
+        { categoria: 'MAO_DE_OBRA', nome: `${PREFIXO} Eletricista`, unidade: 'h', preco_unitario: 85.5, ativo: true, ...extra },
         { id: ` ${id}  `, atualizado_em: exportadoEm },
       );
 
@@ -156,17 +156,17 @@ describe('ImportacaoService (banco real)', () => {
     });
 
     it('alterado grava, e o aviso de "mudou depois" não dispara falso', async () => {
-      const r = await importacao.importar(recursos, [comoExportado({ preco_medio: 90 })], true, usuario);
+      const r = await importacao.importar(recursos, [comoExportado({ preco_unitario: 90 })], true, usuario);
 
       expect(r).toMatchObject({ confirmado: true, alterados: 1, avisos: [] });
-      expect(Number((await prisma.recursos.findUniqueOrThrow({ where: { id } })).preco_medio)).toBe(90);
+      expect(Number((await prisma.recursos.findUniqueOrThrow({ where: { id } })).preco_unitario)).toBe(90);
     });
 
     it('avisa quando o registro mudou no sistema depois da exportação', async () => {
       await new Promise((r) => setTimeout(r, 1100));
       await prisma.recursos.update({ where: { id }, data: { unidade: 'un' } });
 
-      const r = await importacao.importar(recursos, [comoExportado({ preco_medio: 90 })], false, usuario);
+      const r = await importacao.importar(recursos, [comoExportado({ preco_unitario: 90 })], false, usuario);
 
       expect(r.avisos).toEqual([
         expect.objectContaining({ linha: 2, mensagem: expect.stringContaining('alterado no sistema depois da exportação') }),

@@ -15,6 +15,8 @@ import {
 import { StatusTarefa, TipoManutencao, CategoriaTarefa, Prisma } from '@/core';
 import type { anomalias_instrucoes, instrucoes, solicitacoes_instrucoes, sub_instrucoes } from '@prisma/client';
 import { passoParaGravar, passoParaResposta } from './passos-da-instrucao';
+import { comCusto } from '../recursos/recursos.service';
+import { subtotalDaLinha } from '../recursos/regras-do-recurso';
 
 /**
  * Instrucao como as consultas deste service a leem. As relacoes e contadores
@@ -767,7 +769,13 @@ export class InstrucoesService {
       usuario_criador: instrucao.usuario_criador,
       usuario_atualizador: instrucao.usuario_atualizador,
       sub_instrucoes: instrucao.sub_instrucoes?.map(passoParaResposta),
-      recursos: instrucao.recursos,
+      // O recurso do catálogo com o custo apurado: a sugestão da proposta usa o mesmo preço do servidor (SN-83)
+      recursos: instrucao.recursos?.map((linha) => ({
+        ...linha,
+        recurso: linha.recurso ? comCusto(linha.recurso) : linha.recurso,
+        // O custo da linha, calculado aqui: a sugestão da proposta no front lê este número
+        subtotal: linha.recurso ? subtotalDaLinha(linha.recurso, linha) : null,
+      })),
       anexos: instrucao.anexos,
       total_sub_instrucoes: instrucao._count?.sub_instrucoes ?? instrucao.sub_instrucoes?.length ?? 0,
       total_recursos: instrucao._count?.recursos ?? instrucao.recursos?.length ?? 0,

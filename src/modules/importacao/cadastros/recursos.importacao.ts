@@ -21,9 +21,9 @@ export class RecursosImportacao implements CadastroImportavel<recursos> {
     return this.recursos.buscarPorId(id);
   }
 
-  /** Nome e unidade antigos, fora da regra de hoje, não travam a linha se não mudaram. */
+  /** Nome, unidade e função antigos, fora da regra de hoje, não travam a linha se não mudaram. */
   async prepararDados(dados: Record<string, unknown>, _usuario: unknown, atual: recursos | null) {
-    return semOQueNaoMudou(dados, atual, { nome: 'nome', unidade: 'unidade' });
+    return semOQueNaoMudou(dados, atual, { nome: 'nome', unidade: 'unidade', funcao: 'funcao', descricao: 'descricao' });
   }
 
   async criar(dto: object) {
@@ -36,11 +36,21 @@ export class RecursosImportacao implements CadastroImportavel<recursos> {
 
   async retrato(id: string) {
     const r = await this.prisma.recursos.findUniqueOrThrow({ where: { id } });
+    const numero = (v: unknown) => (v === null || v === undefined ? null : Number(v));
     return {
       categoria: r.categoria,
       nome: r.nome,
+      funcao: r.funcao,
+      descricao: r.descricao,
       unidade: r.unidade,
-      preco_medio: r.preco_medio === null ? null : Number(r.preco_medio),
+      base_calculo: r.base_calculo,
+      rubrica: r.rubrica,
+      preco_unitario: numero(r.preco_unitario),
+      valor_aquisicao: numero(r.valor_aquisicao),
+      prazo_retorno_meses: r.prazo_retorno_meses,
+      custos_anuais: numero(r.custos_anuais),
+      meta_utilizacao_horas: numero(r.meta_utilizacao_horas),
+      horas_por_diaria: r.horas_por_diaria,
       ativo: r.ativo,
     };
   }

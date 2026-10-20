@@ -39,12 +39,23 @@ export class RecursosController {
     return this.recursosService.listar(query);
   }
 
+  // Antes de ':id', senão "catalogo" seria lido como um id
+  @Get('catalogo')
+  @ApiOperation({
+    summary: 'O que o formulário pode oferecer',
+    description: 'As categorias, as bases de cobrança que cada uma aceita (a primeira é o padrão) e as rubricas: a mesma regra que valida a gravação, para a tela não oferecer o que a API recusa.',
+  })
+  catalogo() {
+    return this.recursosService.catalogo();
+  }
+
   @Get(':id')
   @ApiOperation({ summary: 'Buscar recurso por ID' })
   @ApiParam({ name: 'id' })
   @ApiResponse({ status: 404, description: 'Recurso não encontrado' })
   buscarPorId(@Param('id') id: string) {
-    return this.recursosService.buscarPorId(id);
+    // Com o custo apurado, como a listagem
+    return this.recursosService.detalhar(id);
   }
 
   @Post()

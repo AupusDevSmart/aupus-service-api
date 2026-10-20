@@ -40,13 +40,13 @@ describe('TransacaoEmCurso (banco real)', () => {
   });
 
   it('fora de uma transação em curso, grava direto', async () => {
-    await prisma.recursos.create({ data: { categoria: 'TECNICO', nome: `${PREFIXO} direto` } });
+    await prisma.recursos.create({ data: { categoria: 'MAO_DE_OBRA', base_calculo: 'hora', rubrica: 'instrucoes', nome: `${PREFIXO} direto` } });
     expect(await contar()).toBe(1);
   });
 
   it('dentro, o model vai para a transação: visto lá dentro, desfeito no fim', async () => {
     await dentroDeUmaTransacaoDesfeita(async () => {
-      await prisma.recursos.create({ data: { categoria: 'TECNICO', nome: `${PREFIXO} desfeito` } });
+      await prisma.recursos.create({ data: { categoria: 'MAO_DE_OBRA', base_calculo: 'hora', rubrica: 'instrucoes', nome: `${PREFIXO} desfeito` } });
       expect(await contar()).toBe(1);
     });
 
@@ -56,10 +56,10 @@ describe('TransacaoEmCurso (banco real)', () => {
   it('o $transaction de um service vira parte da transação de fora', async () => {
     await dentroDeUmaTransacaoDesfeita(async () => {
       await prisma.$transaction(async (tx) => {
-        await tx.recursos.create({ data: { categoria: 'TECNICO', nome: `${PREFIXO} interna` } });
+        await tx.recursos.create({ data: { categoria: 'MAO_DE_OBRA', base_calculo: 'hora', rubrica: 'instrucoes', nome: `${PREFIXO} interna` } });
       });
       await prisma.$transaction([
-        prisma.recursos.create({ data: { categoria: 'TECNICO', nome: `${PREFIXO} lista` } }),
+        prisma.recursos.create({ data: { categoria: 'MAO_DE_OBRA', base_calculo: 'hora', rubrica: 'instrucoes', nome: `${PREFIXO} lista` } }),
       ]);
       expect(await contar()).toBe(2);
     });
@@ -70,7 +70,7 @@ describe('TransacaoEmCurso (banco real)', () => {
   it('SQL cru também vai para a transação', async () => {
     await dentroDeUmaTransacaoDesfeita(async () => {
       await prisma.$executeRawUnsafe(
-        `INSERT INTO recursos (id, categoria, nome, updated_at) VALUES ('${PREFIXO}00001', 'TECNICO', '${PREFIXO} cru', NOW())`,
+        `INSERT INTO recursos (id, categoria, nome, base_calculo, rubrica, updated_at) VALUES ('${PREFIXO}00001', 'MAO_DE_OBRA', '${PREFIXO} cru', 'hora', 'instrucoes', NOW())`,
       );
       expect(await contar()).toBe(1);
     });
@@ -84,7 +84,7 @@ describe('TransacaoEmCurso (banco real)', () => {
       await new Promise<void>((resolve, reject) => {
         setImmediate(() => {
           TransacaoEmCurso.fora(() =>
-            prisma.recursos.create({ data: { categoria: 'TECNICO', nome: `${PREFIXO} fora` } }),
+            prisma.recursos.create({ data: { categoria: 'MAO_DE_OBRA', base_calculo: 'hora', rubrica: 'instrucoes', nome: `${PREFIXO} fora` } }),
           ).then(() => resolve(), reject);
         });
       });
@@ -138,7 +138,7 @@ describe('TransacaoEmCurso (banco real)', () => {
       await dentroDeUmaTransacaoDesfeita(async (emCurso) => {
         emCursoGuardada = emCurso;
         depoisDeGravar(() =>
-          prisma.recursos.create({ data: { categoria: 'TECNICO', nome: `${PREFIXO} depois` } }),
+          prisma.recursos.create({ data: { categoria: 'MAO_DE_OBRA', base_calculo: 'hora', rubrica: 'instrucoes', nome: `${PREFIXO} depois` } }),
         );
       });
 

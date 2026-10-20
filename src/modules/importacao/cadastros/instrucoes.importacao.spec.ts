@@ -29,7 +29,7 @@ describe('Importação de instruções (banco real)', () => {
     });
     await prisma.recursos.deleteMany({ where: { nome: { startsWith: 'TESTE IMP INSTR' } } });
     eletricista = (
-      await prisma.recursos.create({ data: { categoria: 'TECNICO', nome: 'TESTE IMP INSTR Eletricista', unidade: 'h' } })
+      await prisma.recursos.create({ data: { categoria: 'MAO_DE_OBRA', base_calculo: 'hora', rubrica: 'instrucoes', nome: 'TESTE IMP INSTR Eletricista', unidade: 'h' } })
     ).id.trim();
   });
 
@@ -62,7 +62,7 @@ describe('Importação de instruções (banco real)', () => {
         { _linha: 10, descricao: 'Medir', obrigatoria: false, tempo_estimado: 90 },
       ],
       recursos: [
-        { _linha: 14, tipo: 'TECNICO', recurso: 'teste imp instr eletricista', quantidade: 2, obrigatorio: true },
+        { _linha: 14, tipo: 'MAO_DE_OBRA', recurso: 'teste imp instr eletricista', quantidade: 2, obrigatorio: true },
       ],
       ...dados,
     },
@@ -99,8 +99,8 @@ describe('Importação de instruções (banco real)', () => {
       [
         ficha({
           recursos: [
-            { _linha: 14, tipo: 'TECNICO', recurso: 'TESTE IMP INSTR Eletricista', quantidade: 1 },
-            { _linha: 15, tipo: 'TECNICO', recurso: 'Encanador', quantidade: 1 },
+            { _linha: 14, tipo: 'MAO_DE_OBRA', recurso: 'TESTE IMP INSTR Eletricista', quantidade: 1 },
+            { _linha: 15, tipo: 'MAO_DE_OBRA', recurso: 'Encanador', quantidade: 1 },
           ],
         }),
       ],
@@ -131,7 +131,7 @@ describe('Importação de instruções (banco real)', () => {
 
     const r = await importacao.importar(
       instrucoes,
-      [ficha({ status: 'INATIVA', recursos: [{ tipo: 'TECNICO', recurso: 'TESTE IMP INSTR Eletricista', recurso_ref: eletricista, quantidade: 2, obrigatorio: true }] }, i.id.trim())],
+      [ficha({ status: 'INATIVA', recursos: [{ tipo: 'MAO_DE_OBRA', recurso: 'TESTE IMP INSTR Eletricista', recurso_ref: eletricista, quantidade: 2, obrigatorio: true }] }, i.id.trim())],
       true,
       usuario,
     );
@@ -146,7 +146,7 @@ describe('Importação de instruções (banco real)', () => {
 
     const r = await importacao.importar(
       instrucoes,
-      [ficha({ recursos: [{ tipo: 'TECNICO', recurso: 'TESTE IMP INSTR Eletricista', quantidade: 3, obrigatorio: true }] }, id)],
+      [ficha({ recursos: [{ tipo: 'MAO_DE_OBRA', recurso: 'TESTE IMP INSTR Eletricista', quantidade: 3, obrigatorio: true }] }, id)],
       true,
       usuario,
     );

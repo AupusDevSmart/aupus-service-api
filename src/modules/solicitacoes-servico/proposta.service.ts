@@ -2,6 +2,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '@/core';
 import { Prisma } from '@prisma/client';
+import { subtotalDaLinha } from '../recursos/regras-do-recurso';
 
 /**
  * A proposta comercial de uma solicitação de serviço.
@@ -89,9 +90,10 @@ export class PropostaService {
     const somaPorInstrucao = new Map<string, number>();
     for (const r of recursos) {
       const chave = r.instrucao_id.trim();
-      const preco = this.num(r.recurso?.preco_medio);
-      const quantidade = this.num(r.quantidade) || 1;
-      somaPorInstrucao.set(chave, (somaPorInstrucao.get(chave) ?? 0) + preco * quantidade);
+      // O custo da linha pela regra do recurso (SN-83): a linha em horas de um
+      // instrumento por diária vira diárias, não horas vezes o preço da diária
+      const custo = r.recurso ? (subtotalDaLinha(r.recurso, r) ?? 0) : 0;
+      somaPorInstrucao.set(chave, (somaPorInstrucao.get(chave) ?? 0) + custo);
     }
 
     const porId = new Map(instrucoes.map((i) => [i.id.trim(), i]));

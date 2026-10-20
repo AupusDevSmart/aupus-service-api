@@ -1,66 +1,146 @@
 // src/modules/recursos/dto/recurso.dto.ts
 import {
   IsEnum,
+  IsIn,
   IsNotEmpty,
   IsOptional,
   IsString,
   MaxLength,
   IsNumber,
+  Max,
   Min,
   IsBoolean,
   IsInt,
 } from 'class-validator';
 import { Type, Transform } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional, PartialType } from '@nestjs/swagger';
-import { CasasDecimais } from '@/common/decorators/numero';
+import { CasasDecimais, VazioEhNulo } from '@/common/decorators/numero';
 import { BooleanoDoTexto } from '@/common/decorators/booleano';
+import { BASES, RUBRICAS } from '../regras-do-recurso';
+
+/** O maior valor de DECIMAL(12,2) e de DECIMAL(10,2): acima, o banco recusava com 500 */
+const DECIMAL_12_2 = 9_999_999_999.99;
+const DECIMAL_10_2 = 99_999_999.99;
 
 /**
- * No banco o enum se chama TipoRecurso e continua assim: o nome do TIPO nao
- * muda, so o rotulo na tela ("Categoria"), que e o que interessa a quem usa.
- *
- * O valor PECA foi renomeado para INSTRUMENTO no proprio enum do Postgres
- * (ALTER TYPE ... RENAME VALUE), e nao criando um valor novo e migrando dados:
- * o banco troca o rotulo em todas as colunas do tipo de uma vez, sem reescrever
- * linha. Nenhuma linha usava PECA quando isso foi feito.
+ * As 6 categorias do AupusProject (SN-83). No banco o enum continua se
+ * chamando TipoRecurso; a tela diz "Categoria". Eram INSTRUMENTO, MATERIAL,
+ * FERRAMENTA, TECNICO e VIATURA: o SQL 2026-10-20-recursos-como-no-aupusproject
+ * converteu técnico em mão de obra, viatura em veículo e ferramenta em
+ * instrumento.
  */
 export enum CategoriaRecurso {
-  INSTRUMENTO = 'INSTRUMENTO',
+  MAO_DE_OBRA = 'MAO_DE_OBRA',
   MATERIAL = 'MATERIAL',
-  FERRAMENTA = 'FERRAMENTA',
-  TECNICO = 'TECNICO',
-  VIATURA = 'VIATURA',
+  INSTRUMENTO = 'INSTRUMENTO',
+  VEICULO = 'VEICULO',
+  TERCEIRO = 'TERCEIRO',
+  DESPESA_CAMPO = 'DESPESA_CAMPO',
 }
 
+const aparado = ({ value }: { value: unknown }) => (typeof value === 'string' ? value.trim() || null : value);
+
 export class CreateRecursoDto {
-  @ApiProperty({ enum: CategoriaRecurso, example: CategoriaRecurso.TECNICO })
+  @ApiProperty({ enum: CategoriaRecurso, example: CategoriaRecurso.MAO_DE_OBRA })
   @IsEnum(CategoriaRecurso, { message: 'Categoria inválida' })
   categoria: CategoriaRecurso;
 
   @ApiProperty({ example: 'Eletricista' })
   @IsString()
   @IsNotEmpty({ message: 'Nome é obrigatório' })
-  @MaxLength(200, { message: 'Nome deve ter no máximo 200 caracteres' })
+  // 255, como o AupusProject: a planilha de lá não pode ser recusada aqui
+  @MaxLength(255, { message: 'Nome deve ter no máximo 255 caracteres' })
   @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
   nome: string;
 
-  @ApiPropertyOptional({ example: 'h', description: 'Unidade a que o preço se refere.' })
+  @ApiPropertyOptional({ example: 'Técnico', description: 'Só mão de obra: a função de quem executa.' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(255, { message: 'Função deve ter no máximo 255 caracteres' })
+  @Transform(aparado)
+  funcao?: string | null;
+
+  @ApiPropertyOptional({ description: 'Observação livre.' })
+  // Texto livre, como lá (o corpo da requisição tem o próprio limite)
+  @IsOptional()
+  @IsString()
+  @Transform(aparado)
+  descricao?: string | null;
+
+  @ApiPropertyOptional({ example: 'm', description: 'Unidade de compra do material (m, un, kg...).' })
   @IsOptional()
   @IsString()
   @MaxLength(20, { message: 'Unidade deve ter no máximo 20 caracteres' })
-  @Transform(({ value }) => (typeof value === 'string' ? value.trim() || null : value))
+  @Transform(aparado)
   unidade?: string | null;
 
-  @ApiPropertyOptional({
-    example: 85.5,
-    description: 'Custo médio por unidade. Vazio significa preço desconhecido, não zero.',
-  })
+  @ApiPropertyOptional({ enum: BASES, description: 'Como é cobrado. Fora da categoria, vale o padrão dela.' })
   @IsOptional()
+  @IsIn(BASES, { message: 'Cobrança inválida' })
+  base_calculo?: string;
+
+  @ApiPropertyOptional({ enum: RUBRICAS, description: 'A linha do orçamento. Vazio = o padrão da categoria.' })
+  @IsOptional()
+  @IsIn(RUBRICAS, { message: 'Rubrica inválida' })
+  rubrica?: string;
+
+  @ApiPropertyOptional({ example: 85.5, description: 'Preço por unidade da cobrança. Vazio = sem preço, não zero.' })
+  @IsOptional()
+  @VazioEhNulo()
   @Type(() => Number)
   @IsNumber()
   @CasasDecimais(2, { message: 'Preço deve ter no máximo 2 casas decimais' })
   @Min(0, { message: 'Preço não pode ser negativo' })
-  preco_medio?: number | null;
+  @Max(DECIMAL_12_2, { message: 'Valor acima do que o cadastro guarda' })
+  preco_unitario?: number | null;
+
+  @ApiPropertyOptional({ description: 'Só instrumento: o investimento a amortizar.' })
+  @IsOptional()
+  @VazioEhNulo()
+  @Type(() => Number)
+  @IsNumber()
+  @CasasDecimais(2)
+  @Min(0)
+  @Max(DECIMAL_12_2, { message: 'Valor acima do que o cadastro guarda' })
+  valor_aquisicao?: number | null;
+
+  @ApiPropertyOptional({ description: 'Só instrumento: em quantos meses o investimento se paga (1 a 600).' })
+  @IsOptional()
+  @VazioEhNulo()
+  @Type(() => Number)
+  @IsInt({ message: 'Prazo de retorno deve ser inteiro (meses)' })
+  @Min(1)
+  @Max(600)
+  prazo_retorno_meses?: number | null;
+
+  @ApiPropertyOptional({ description: 'Só instrumento: manutenção, calibração, seguro e licenças por ano.' })
+  @IsOptional()
+  @VazioEhNulo()
+  @Type(() => Number)
+  @IsNumber()
+  @CasasDecimais(2)
+  @Min(0)
+  @Max(DECIMAL_12_2, { message: 'Valor acima do que o cadastro guarda' })
+  custos_anuais?: number | null;
+
+  @ApiPropertyOptional({ description: 'Só instrumento: horas de uso previstas por ano.' })
+  @IsOptional()
+  @VazioEhNulo()
+  @Type(() => Number)
+  @IsNumber()
+  @CasasDecimais(2)
+  @Min(0)
+  @Max(DECIMAL_10_2, { message: 'Valor acima do que o cadastro guarda' })
+  meta_utilizacao_horas?: number | null;
+
+  @ApiPropertyOptional({ description: 'Quantas horas formam uma diária (1 a 24). Padrão 8.' })
+  @IsOptional()
+  @VazioEhNulo()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(24)
+  horas_por_diaria?: number | null;
 
   @ApiPropertyOptional({ default: true })
   @IsOptional()
@@ -95,10 +175,11 @@ export class QueryRecursosDto {
   @Min(1)
   page?: number;
 
-  @ApiPropertyOptional({ default: 10 })
+  @ApiPropertyOptional({ default: 10, maximum: 100 })
   @IsOptional()
   @Type(() => Number)
   @IsInt()
   @Min(1)
+  @Max(100)
   limit?: number;
 }
