@@ -1,97 +1,19 @@
 import { Controller, Get, Query } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse, ApiQuery } from '@nestjs/swagger';
-import { DashboardService } from './dashboard.service';
-import { DashboardSimpleService, FiltrosDashboardAvancado } from './dashboard-simple.service';
-import { DashboardManutencaoService, FiltrosDashboardManutencao } from './dashboard-manutencao.service';
+import { ApiTags, ApiOperation } from '@nestjs/swagger';
+import { DashboardManutencaoService } from './dashboard-manutencao.service';
+import { QueryDashboardManutencaoDto } from './dto/query-dashboard-manutencao.dto';
 import { Permissions, CurrentUser, ScopedUser } from '@/core';
-import { DashboardOverviewDto } from './dto/overview.dto';
-import { DashboardWorkOrdersDto } from './dto/work-orders.dto';
-import { DashboardTaskPrioritiesDto } from './dto/task-priorities.dto';
-import { DashboardSeverityDistributionDto } from './dto/severity-distribution.dto';
-import { DashboardPlannedVsCompletedDto } from './dto/planned-vs-completed.dto';
-import { DashboardSystemStatusDto } from './dto/system-status.dto';
 
+/**
+ * O painel de manutenção. Saíram em 20/out/2026 (SN-79) o `/dashboard/advanced`
+ * (o `getSimpleDashboard`, que ignorava os filtros) e os seis endpoints do
+ * `DashboardService` (overview, work-orders...): nenhuma tela os chamava.
+ */
 @ApiTags('Dashboard')
 @Controller('dashboard')
 @Permissions('dashboard.view')
 export class DashboardController {
-  constructor(
-    private readonly dashboardService: DashboardService,
-    private readonly dashboardSimpleService: DashboardSimpleService,
-    private readonly dashboardManutencaoService: DashboardManutencaoService,
-  ) {}
-
-  @Get('overview')
-  @ApiOperation({ summary: 'Retorna visão geral do dashboard' })
-  @ApiResponse({
-    status: 200,
-    description: 'Visão geral retornada com sucesso',
-    type: DashboardOverviewDto,
-  })
-  async getOverview(@CurrentUser() user: ScopedUser): Promise<DashboardOverviewDto> {
-    return this.dashboardService.getOverview(user);
-  }
-
-  @Get('work-orders')
-  @ApiOperation({ summary: 'Retorna métricas de ordens de serviço' })
-  @ApiResponse({
-    status: 200,
-    description: 'Métricas de OS retornadas com sucesso',
-    type: DashboardWorkOrdersDto,
-  })
-  async getWorkOrders(@CurrentUser() user: ScopedUser): Promise<DashboardWorkOrdersDto> {
-    return this.dashboardService.getWorkOrders(user);
-  }
-
-  @Get('task-priorities')
-  @ApiOperation({ summary: 'Retorna tarefas ordenadas por criticidade' })
-  @ApiResponse({
-    status: 200,
-    description: 'Tarefas prioritárias retornadas com sucesso',
-    type: DashboardTaskPrioritiesDto,
-  })
-  async getTaskPriorities(@CurrentUser() user: ScopedUser): Promise<DashboardTaskPrioritiesDto> {
-    return this.dashboardService.getTaskPriorities(user);
-  }
-
-  @Get('severity-distribution')
-  @ApiOperation({ summary: 'Retorna distribuição de anomalias por prioridade' })
-  @ApiResponse({
-    status: 200,
-    description: 'Distribuição de prioridades retornada com sucesso',
-    type: DashboardSeverityDistributionDto,
-  })
-  async getSeverityDistribution(@CurrentUser() user: ScopedUser): Promise<DashboardSeverityDistributionDto> {
-    return this.dashboardService.getSeverityDistribution(user);
-  }
-
-  @Get('planned-vs-completed')
-  @ApiOperation({
-    summary: 'Retorna comparação de OS planejadas vs concluídas (últimos 6 meses)',
-  })
-  @ApiResponse({
-    status: 200,
-    description: 'Comparação retornada com sucesso',
-    type: DashboardPlannedVsCompletedDto,
-  })
-  async getPlannedVsCompleted(@CurrentUser() user: ScopedUser): Promise<DashboardPlannedVsCompletedDto> {
-    return this.dashboardService.getPlannedVsCompleted(user);
-  }
-
-  @Get('system-status')
-  @ApiOperation({
-    summary: 'Retorna status do sistema',
-    description:
-      'NOTA: Alguns campos retornam 0 (TODO) pois precisam de definição de regra de negócio',
-  })
-  @ApiResponse({
-    status: 200,
-    description: 'Status do sistema retornado com sucesso',
-    type: DashboardSystemStatusDto,
-  })
-  async getSystemStatus(@CurrentUser() user: ScopedUser): Promise<DashboardSystemStatusDto> {
-    return this.dashboardService.getSystemStatus(user);
-  }
+  constructor(private readonly dashboardManutencaoService: DashboardManutencaoService) {}
 
   @Get('manutencao')
   @ApiOperation({
@@ -101,24 +23,7 @@ export class DashboardController {
       'com `simulado: true` e o campo `pendencia` dizendo o que falta registrar para ' +
       'que passem a ser reais.',
   })
-  @ApiQuery({ name: 'periodo', required: false, enum: ['12meses', 'mes', 'trimestre', 'ano'] })
-  @ApiQuery({ name: 'plantaId', required: false })
-  @ApiQuery({ name: 'unidadeId', required: false })
-  @ApiQuery({ name: 'equipe', required: false })
-  @ApiQuery({ name: 'criticidade', required: false })
-  async getDashboardManutencao(@Query() filtros: FiltrosDashboardManutencao, @CurrentUser() user: ScopedUser) {
+  async getDashboardManutencao(@Query() filtros: QueryDashboardManutencaoDto, @CurrentUser() user: ScopedUser) {
     return this.dashboardManutencaoService.getDashboard(filtros, user);
-  }
-
-  @Get('advanced')
-  @ApiOperation({
-    summary: 'Dashboard avançado com métricas detalhadas',
-    description: 'Retorna dados consolidados de todos os módulos, com filtro por escopo do usuário.',
-  })
-  @ApiQuery({ name: 'plantaId', required: false })
-  @ApiQuery({ name: 'unidadeId', required: false })
-  @ApiQuery({ name: 'periodo', required: false, enum: ['hoje', '7dias', '30dias', '6meses', 'ano', 'custom'] })
-  async getAdvancedDashboard(@Query() filters: FiltrosDashboardAvancado, @CurrentUser() user: ScopedUser) {
-    return this.dashboardSimpleService.getSimpleDashboard(filters, user);
   }
 }

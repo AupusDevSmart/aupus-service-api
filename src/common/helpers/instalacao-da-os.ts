@@ -75,7 +75,9 @@ export async function instalacoesDasProgramacoes(
 ): Promise<Map<string, Instalacao[]>> {
   if (programacaoIds.length === 0) return new Map();
 
-  const ids = Prisma.join(programacaoIds);
+  // Um array só: com IN (...) repetido em cada ramo, milhares de linhas estouravam
+  // o limite de parâmetros do Prisma
+  const ids = programacaoIds.map((id) => id.trim());
 
   const linhas = await prisma.$queryRaw<LinhaCrua[]>(Prisma.sql`
     WITH eq_unidade AS (${EQUIPAMENTO_ATE_UNIDADE}),
@@ -83,23 +85,23 @@ export async function instalacoesDasProgramacoes(
       SELECT tp.programacao_id AS ref, eu.unidade
         FROM tarefas_programacao_os tp
         JOIN eq_unidade eu ON eu.eq = trim(tp.equipamento_id)
-       WHERE tp.programacao_id IN (${ids})
+       WHERE tp.programacao_id = ANY(${ids}::text[])
       UNION
       SELECT po.id, eu.unidade
         FROM programacoes_os po
         JOIN eq_unidade eu ON eu.eq = trim(po.equipamento_id)
-       WHERE po.id IN (${ids})
+       WHERE po.id = ANY(${ids}::text[])
       UNION
       SELECT po.id, eu.unidade
         FROM programacoes_os po
         JOIN anomalias a ON trim(a.id) = trim(po.anomalia_id)
         JOIN eq_unidade eu ON eu.eq = trim(a.equipamento_id)
-       WHERE po.id IN (${ids})
+       WHERE po.id = ANY(${ids}::text[])
       UNION
       SELECT po.id, trim(s.unidade_id)
         FROM programacoes_os po
         JOIN solicitacoes_servico s ON trim(s.id) = trim(po.solicitacao_servico_id)
-       WHERE po.id IN (${ids}) AND s.unidade_id IS NOT NULL
+       WHERE po.id = ANY(${ids}::text[]) AND s.unidade_id IS NOT NULL
     )
     ${SELECT_FINAL}
   `);
@@ -113,7 +115,7 @@ export async function instalacoesDasOrdens(
 ): Promise<Map<string, Instalacao[]>> {
   if (ordemIds.length === 0) return new Map();
 
-  const ids = Prisma.join(ordemIds);
+  const ids = ordemIds.map((id) => id.trim());
 
   const linhas = await prisma.$queryRaw<LinhaCrua[]>(Prisma.sql`
     WITH eq_unidade AS (${EQUIPAMENTO_ATE_UNIDADE}),
@@ -121,18 +123,18 @@ export async function instalacoesDasOrdens(
       SELECT t.os_id AS ref, eu.unidade
         FROM tarefas_os t
         JOIN eq_unidade eu ON eu.eq = trim(t.equipamento_id)
-       WHERE t.os_id IN (${ids})
+       WHERE t.os_id = ANY(${ids}::text[])
       UNION
       SELECT os.id, eu.unidade
         FROM ordens_servico os
         JOIN eq_unidade eu ON eu.eq = trim(os.equipamento_id)
-       WHERE os.id IN (${ids})
+       WHERE os.id = ANY(${ids}::text[])
       UNION
       SELECT os.id, eu.unidade
         FROM ordens_servico os
         JOIN anomalias a ON trim(a.id) = trim(os.anomalia_id)
         JOIN eq_unidade eu ON eu.eq = trim(a.equipamento_id)
-       WHERE os.id IN (${ids})
+       WHERE os.id = ANY(${ids}::text[])
       UNION
       -- A OS nao tem solicitacao_servico_id: so a programacao tem. Sem este
       -- salto, toda OS vinda de solicitacao ficaria sem instalacao mesmo com a
@@ -141,7 +143,7 @@ export async function instalacoesDasOrdens(
         FROM ordens_servico os
         JOIN programacoes_os po ON po.id = os.programacao_id
         JOIN solicitacoes_servico s ON trim(s.id) = trim(po.solicitacao_servico_id)
-       WHERE os.id IN (${ids}) AND s.unidade_id IS NOT NULL
+       WHERE os.id = ANY(${ids}::text[]) AND s.unidade_id IS NOT NULL
     )
     ${SELECT_FINAL}
   `);
