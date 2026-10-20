@@ -53,7 +53,7 @@ export class SolicitacoesServicoService {
    * A busca é por prefixo do ano corrente, então virar o ano zera a série
    * sozinho, sem tarefa agendada nem intervenção.
    */
-  private async gerarNumeroSolicitacao(): Promise<string> {
+  async gerarNumeroSolicitacao(): Promise<string> {
     return this.proximoNumeroAnual('solicitacoes_servico');
   }
 
