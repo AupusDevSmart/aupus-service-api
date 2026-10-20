@@ -3,10 +3,8 @@ import {
   IsOptional,
   IsNumber,
   IsInt,
-  IsDateString,
   IsArray,
   IsNotEmpty,
-  Length,
   IsBoolean,
   Min,
   Max,
@@ -19,92 +17,6 @@ import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { LIMITE_DA_LEITURA } from '@/common/helpers/leitura';
 import { InstanteComFuso } from '@/common/decorators/instante';
 import { CasasDecimais, VazioEhNulo } from '@/common/decorators/numero';
-
-export class ReservaVeiculoDto {
-  @ApiProperty({ description: 'ID do veículo' })
-  @IsString()
-  @IsNotEmpty()
-  veiculo_id: string;
-
-  @ApiProperty({ description: 'Data de início da reserva', example: '2025-02-15' })
-  @IsDateString()
-  data_inicio: string;
-
-  @ApiProperty({ description: 'Data de fim da reserva', example: '2025-02-15' })
-  @IsDateString()
-  data_fim: string;
-
-  @ApiProperty({ description: 'Hora de início', example: '08:00' })
-  @IsString()
-  @Length(5, 5)
-  hora_inicio: string;
-
-  @ApiProperty({ description: 'Hora de fim', example: '17:00' })
-  @IsString()
-  @Length(5, 5)
-  hora_fim: string;
-
-  @ApiProperty({ description: 'Finalidade da reserva' })
-  @IsString()
-  @IsNotEmpty()
-  finalidade: string;
-
-  @ApiPropertyOptional({ description: 'KM inicial' })
-  @IsOptional()
-  @IsNumber()
-  @Min(0)
-  km_inicial?: number;
-}
-
-export class ProgramarOSDto {
-  @ApiProperty({ description: 'Data e hora programada', example: '2025-02-15T08:00:00Z' })
-  @IsDateString()
-  data_hora_programada: string;
-
-  @ApiProperty({ description: 'Responsável pela execução' })
-  @IsString()
-  @IsNotEmpty()
-  responsavel: string;
-
-  @ApiPropertyOptional({ description: 'ID do responsável' })
-  @IsOptional()
-  @IsString()
-  responsavel_id?: string;
-
-  @ApiPropertyOptional({ description: 'Time/equipe' })
-  @IsOptional()
-  @IsString()
-  time_equipe?: string;
-
-  @ApiPropertyOptional({ description: 'IDs dos materiais confirmados (lista vazia significa sem materiais confirmados)' })
-  @IsOptional()
-  @IsArray()
-  @IsString({ each: true })
-  materiais_confirmados?: string[];
-
-  @ApiPropertyOptional({ description: 'IDs das ferramentas confirmadas (lista vazia significa sem ferramentas confirmadas)' })
-  @IsOptional()
-  @IsArray()
-  @IsString({ each: true })
-  ferramentas_confirmadas?: string[];
-
-  @ApiPropertyOptional({ description: 'IDs dos técnicos confirmados (lista vazia significa sem técnicos confirmados)' })
-  @IsOptional()
-  @IsArray()
-  @IsString({ each: true })
-  tecnicos_confirmados?: string[];
-
-  @ApiPropertyOptional({ description: 'Reserva de veículo' })
-  @IsOptional()
-  @ValidateNested()
-  @Type(() => ReservaVeiculoDto)
-  reserva_veiculo?: ReservaVeiculoDto;
-
-  @ApiPropertyOptional({ description: 'Observações da programação' })
-  @IsOptional()
-  @IsString()
-  observacoes_programacao?: string;
-}
 
 export class IniciarExecucaoDto {
   @ApiPropertyOptional({ description: 'Equipe presente na execução' })
@@ -125,7 +37,7 @@ export class IniciarExecucaoDto {
 
   @ApiPropertyOptional({ description: 'Data e hora de início real', example: '2025-02-15T08:00:00Z' })
   @IsOptional()
-  @IsDateString()
+  @InstanteComFuso()
   data_hora_inicio_real?: string;
 
   @ApiPropertyOptional({ description: 'Km da viatura na saída (opcional; só com reserva)', example: 12500 })
@@ -403,7 +315,7 @@ export class ExecutarOSDto {
 
   @ApiPropertyOptional({ description: 'Data e hora de fim real', example: '2025-02-15T17:00:00Z' })
   @IsOptional()
-  @IsDateString()
+  @InstanteComFuso()
   data_hora_fim_real?: string;
 
   @ApiProperty({ description: 'Resultado do serviço executado' })
@@ -456,11 +368,6 @@ export class ExecutarOSDto {
   @IsOptional()
   @IsString()
   recomendacoes?: string | null;
-
-  @ApiPropertyOptional({ description: 'Data sugerida para próxima manutenção', example: '2025-08-15' })
-  @IsOptional()
-  @IsDateString()
-  proxima_manutencao?: string;
 
   @ApiPropertyOptional({ description: 'Materiais consumidos', type: [MaterialFinalizacaoDto] })
   @IsOptional()

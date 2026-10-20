@@ -20,6 +20,7 @@ import { Prisma, type solicitacoes_servico } from '@/core';
 // Import the enum from Prisma
 import { StatusSolicitacaoServico } from '@/core';
 import { comDataNecessidadeNormalizada } from './data-necessidade';
+import { periodoDoFiltro } from '../../common/helpers/filtros-da-os';
 import { mudouOLugar, plantaDaSolicitacao } from './lugar-da-solicitacao';
 import { registrarNotificacao } from '../notificacoes/registrar-notificacao';
 
@@ -300,12 +301,10 @@ export class SolicitacoesServicoService {
     if (departamento) where.departamento = { contains: departamento, mode: 'insensitive' };
     if (solicitante_nome) where.solicitante_nome = { contains: solicitante_nome, mode: 'insensitive' };
 
-    // Filtro de datas
-    if (data_inicio || data_fim) {
-      where.data_solicitacao = {};
-      if (data_inicio) where.data_solicitacao.gte = new Date(data_inicio);
-      if (data_fim) where.data_solicitacao.lte = new Date(data_fim);
-    }
+    // O mesmo período das OS: AAAA-MM-DD é o dia inteiro em Brasília. Com o
+    // new Date, o fim era a meia-noite UTC e as do último dia ficavam de fora
+    const periodo = periodoDoFiltro(data_inicio, data_fim);
+    if (periodo) where.data_solicitacao = periodo;
 
     // Scope RBAC: filtrar por planta do escopo
     const scope = await this.scopeService.getScope(user);

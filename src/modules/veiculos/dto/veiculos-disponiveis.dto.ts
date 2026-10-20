@@ -1,23 +1,23 @@
-import { IsString, IsNotEmpty, IsOptional, IsInt, IsArray, Min } from 'class-validator';
+import { IsString, IsOptional, IsInt, IsArray, Min } from 'class-validator';
 import { Type } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { TipoVeiculo } from '@/core';
+import { DiaDeCalendario } from '@/common/decorators/dia-de-calendario';
 
 export class VeiculosDisponiveisDto {
   @ApiProperty({
     description: 'Data de início da verificação (YYYY-MM-DD)',
     example: '2025-01-20'
   })
-  @IsString({ message: 'Data de início deve ser uma string' })
-  @IsNotEmpty({ message: 'Data de início é obrigatória' })
+  // Como texto: a regra da ocupação junta o dia com a hora de Brasília
+  @DiaDeCalendario({ comoTexto: true, obrigatoria: true })
   dataInicio: string;
 
   @ApiProperty({
     description: 'Data de fim da verificação (YYYY-MM-DD)',
     example: '2025-01-20'
   })
-  @IsString({ message: 'Data de fim deve ser uma string' })
-  @IsNotEmpty({ message: 'Data de fim é obrigatória' })
+  @DiaDeCalendario({ comoTexto: true, obrigatoria: true })
   dataFim: string;
 
   @ApiPropertyOptional({

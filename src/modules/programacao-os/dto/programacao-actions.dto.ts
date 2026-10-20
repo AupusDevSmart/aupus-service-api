@@ -1,9 +1,11 @@
-import { IsString, IsOptional, IsNumber, IsDateString, IsArray, IsNotEmpty, Length, IsEnum, ValidateNested } from 'class-validator';
+import { IsString, IsOptional, IsNumber, IsArray, IsNotEmpty, Length, IsEnum, ValidateNested } from 'class-validator';
 import { Type } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional, PartialType, PickType } from '@nestjs/swagger';
 import { PrioridadeOS } from '@/core';
 import { CreateProgramacaoDto } from './create-programacao.dto';
 import { CasasDecimais } from '@/common/decorators/numero';
+import { DiaDeCalendario } from '@/common/decorators/dia-de-calendario';
+import { HoraDoDia, InstanteComFuso } from '@/common/decorators/instante';
 
 export class AprovarProgramacaoDto {
   @ApiPropertyOptional({ description: 'Observações da aprovação' })
@@ -19,13 +21,12 @@ export class AprovarProgramacaoDto {
 
   @ApiPropertyOptional({ description: 'Data programada sugerida', example: '2025-02-15' })
   @IsOptional()
-  @IsDateString()
+  @DiaDeCalendario({ comoTexto: true })
   data_programada_sugerida?: string;
 
   @ApiPropertyOptional({ description: 'Hora programada sugerida', example: '08:00' })
   @IsOptional()
-  @IsString()
-  @Length(5, 5)
+  @HoraDoDia()
   hora_programada_sugerida?: string;
 }
 
@@ -112,7 +113,7 @@ export class CreateProgramacaoTarefasDto {
 
   @ApiPropertyOptional({ description: 'Data e hora sugerida', example: '2025-02-15T08:00:00Z' })
   @IsOptional()
-  @IsDateString()
+  @InstanteComFuso()
   data_hora_programada?: string;
 
   @ApiPropertyOptional({ description: 'Responsável sugerido' })

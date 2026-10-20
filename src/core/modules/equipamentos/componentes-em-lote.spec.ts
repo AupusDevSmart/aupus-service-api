@@ -73,9 +73,13 @@ describe('componentes do UC em lote (banco real)', () => {
 
     const a = await prisma.equipamentos.findUniqueOrThrow({ where: { id: A } });
     expect([a.data_instalacao?.toISOString(), a.garantia_ate?.toISOString()]).toEqual(['2026-04-01T00:00:00.000Z', '2031-04-01T00:00:00.000Z']);
-    await expect(equipamentos.salvarComponentesUARLote(UC, [{ id: A, nome: 'A', garantia_ate: '31/04/2031' }] as never)).rejects.toThrow(
-      'Data inválida em garantia_ate',
-    );
+    // A mesma regra do pipe (SN-74): o Date.parse daqui aceitava 30/02 (virava 2 de março),
+    // a hora sem fuso (o Prisma recusava: 500) e o ano 9999
+    for (const invalida of ['31/04/2031', '2031-02-30', '2031-04-01T10:00', '9999-12-31']) {
+      await expect(equipamentos.salvarComponentesUARLote(UC, [{ id: A, nome: 'A', garantia_ate: invalida }] as never)).rejects.toThrow(
+        'Data inválida em garantia_ate',
+      );
+    }
   });
 
   // SN-64: o lote não passa pelo pipe; a regra da matriz tem de valer aqui também

@@ -10,7 +10,7 @@ import { depoisDeGravar } from '../../prisma/transacao-em-curso';
 import { IMqttBroker, MQTT_BROKER } from '../../common/interfaces/mqtt-broker.interface';
 import { CreateEquipamentoDto, DadoTecnicoDto } from './dto/create-equipamento.dto';
 import { UpdateEquipamentoDto } from './dto/update-equipamento.dto';
-import { diaComoInstante } from '../../../common/decorators/dia-de-calendario';
+import { lerDiaDeCalendario } from '../../../common/decorators/dia-de-calendario';
 import { EquipamentoQueryDto } from './dto/equipamento-query.dto';
 import { comNomeDaPosicao } from './nome-exibido';
 import { conferirCriticidade, CriticidadeDoEquipamento } from './criticidade-pela-matriz';
@@ -1501,8 +1501,8 @@ export class EquipamentosService {
       if (valor === undefined || !colunas.has(chave)) continue;
       if (valor === '' && naoTexto.has(chave)) continue;
       if (datas.has(chave) && typeof valor === 'string') {
-        const instante = diaComoInstante(valor.trim());
-        if (Number.isNaN(Date.parse(instante))) throw new BadRequestException(`Data inválida em ${chave}: ${valor}`);
+        const instante = lerDiaDeCalendario(valor);
+        if (!instante) throw new BadRequestException(`Data inválida em ${chave}: ${valor}`);
         dados[chave] = instante;
         continue;
       }

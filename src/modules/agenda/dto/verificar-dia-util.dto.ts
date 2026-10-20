@@ -1,6 +1,7 @@
-import { IsDate, IsOptional, IsString } from 'class-validator';
+import { IsInt, IsOptional, IsString, Max, Min } from 'class-validator';
 import { Type } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { DiaComoData } from '@/common/decorators/dia-de-calendario';
 
 export class VerificarDiaUtilDto {
   @ApiProperty({
@@ -8,8 +9,7 @@ export class VerificarDiaUtilDto {
     example: '2024-12-25',
     type: Date
   })
-  @IsDate({ message: 'Data deve ser uma data válida' })
-  @Type(() => Date)
+  @DiaComoData({ obrigatoria: true })
   data: Date;
 
   @ApiPropertyOptional({
@@ -26,7 +26,11 @@ export class ProximosDiasUteisDto {
     description: 'Quantidade de dias úteis a retornar',
     example: 5
   })
+  // Com teto: o laço anda até 10 vezes a quantidade
   @Type(() => Number)
+  @IsInt({ message: 'Quantidade deve ser um número inteiro' })
+  @Min(1)
+  @Max(366)
   quantidade: number;
 
   @ApiPropertyOptional({
@@ -35,9 +39,8 @@ export class ProximosDiasUteisDto {
     type: Date
   })
   @IsOptional()
-  @IsDate({ message: 'Data de início deve ser uma data válida' })
-  @Type(() => Date)
-  dataInicio?: Date;
+  @DiaComoData()
+  dataInicio?: Date | null;
 
   @ApiPropertyOptional({
     description: 'ID da planta para verificar configurações específicas',

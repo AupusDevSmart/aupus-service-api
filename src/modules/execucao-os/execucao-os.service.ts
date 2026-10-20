@@ -1240,7 +1240,6 @@ export class ExecucaoOSService {
           resultado_servico: dto.resultado_servico,
           problemas_encontrados: dto.problemas_encontrados,
           recomendacoes: dto.recomendacoes,
-          proxima_manutencao: dto.proxima_manutencao,
           atividades_realizadas: dto.atividades_realizadas,
           // Derivado do proprio checklist, nao pedido ao usuario: o painel de
           // executar nunca coletou esse campo, entao a coluna vivia nula.

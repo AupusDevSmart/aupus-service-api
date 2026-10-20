@@ -5,13 +5,13 @@ import {
   IsString,
   IsNotEmpty,
   IsOptional,
-  IsDateString,
   IsEnum,
   IsDecimal,
   MaxLength,
 } from 'class-validator';
 import { Transform } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { InstanteComFuso } from '@/common/decorators/instante';
 
 export enum TipoManutencao {
   PREVENTIVA = 'preventiva',
@@ -31,12 +31,12 @@ export class CreateManutencaoDto {
   tipo_manutencao: TipoManutencao;
 
   @ApiProperty({ example: '2024-09-18T08:00:00Z' })
-  @IsDateString()
+  @InstanteComFuso({ obrigatorio: true })
   data_inicio: string;
 
   @ApiPropertyOptional({ example: '2024-09-18T12:00:00Z' })
   @IsOptional()
-  @IsDateString()
+  @InstanteComFuso()
   data_fim?: string;
 
   @ApiProperty({ enum: StatusManutencao, example: StatusManutencao.EM_ANDAMENTO })

@@ -25,18 +25,6 @@ import { AGENDA_DA_AUPUS } from './agenda-da-aupus';
 import { AgendaService, DiaUtilResponse, ProximosDiasUteisResponse } from './agenda.service';
 import { FeriadosService, PaginatedResponse } from './feriados.service';
 
-/** Query crua de `verificar-dia-util`: tudo chega como texto. */
-interface QueryVerificarDiaUtil {
-  data: string;
-  plantaId?: string;
-}
-
-/** Query crua de `proximos-dias-uteis`: tudo chega como texto. */
-interface QueryProximosDiasUteis {
-  quantidade: string;
-  dataInicio?: string;
-  plantaId?: string;
-}
 import { ConfiguracoesDiasUteisService } from './configuracoes-dias-uteis.service';
 import {
   CreateFeriadoDto,
@@ -475,18 +463,14 @@ export class AgendaController {
     status: HttpStatus.OK,
     description: 'Verificação realizada com sucesso'
   })
-  async verificarDiaUtil(@Query() query: QueryVerificarDiaUtil): Promise<DiaUtilResponse> {
-    const { data, plantaId } = query;
-    this.logger.log(`🗓️ [VERIFICAR DIA UTIL] Verificando data: ${data}, planta: ${plantaId || 'geral'}`);
+  // Pelo DTO (SN-74): a query crua ia direto ao new Date, e "2026-02-30" virava 2 de março
+  async verificarDiaUtil(@Query() dto: VerificarDiaUtilDto): Promise<DiaUtilResponse> {
+    const dia = dto.data.toISOString().slice(0, 10);
+    this.logger.log(`🗓️ [VERIFICAR DIA UTIL] Verificando data: ${dia}, planta: ${dto.plantaId || 'geral'}`);
 
     try {
-      const dto: VerificarDiaUtilDto = {
-        data: new Date(data),
-        plantaId
-      };
-
       const resultado = await this.agendaService.verificarDiaUtil(dto);
-      this.logger.log(`✅ [VERIFICAR DIA UTIL] ${data} é ${resultado.ehDiaUtil ? 'dia útil' : 'não é dia útil'}`);
+      this.logger.log(`✅ [VERIFICAR DIA UTIL] ${dia} é ${resultado.ehDiaUtil ? 'dia útil' : 'não é dia útil'}`);
       return resultado;
     } catch (error) {
       this.logger.error(`❌ [VERIFICAR DIA UTIL] Erro:`, error.message);
@@ -506,17 +490,10 @@ export class AgendaController {
     status: HttpStatus.OK,
     description: 'Próximos dias úteis obtidos com sucesso'
   })
-  async proximosDiasUteis(@Query() query: QueryProximosDiasUteis): Promise<ProximosDiasUteisResponse> {
-    const { quantidade, dataInicio, plantaId } = query;
-    this.logger.log(`📅 [PROXIMOS DIAS UTEIS] Buscando ${quantidade} dias úteis`);
+  async proximosDiasUteis(@Query() dto: ProximosDiasUteisDto): Promise<ProximosDiasUteisResponse> {
+    this.logger.log(`📅 [PROXIMOS DIAS UTEIS] Buscando ${dto.quantidade} dias úteis`);
 
     try {
-      const dto: ProximosDiasUteisDto = {
-        quantidade: parseInt(quantidade),
-        dataInicio: dataInicio ? new Date(dataInicio) : undefined,
-        plantaId
-      };
-
       const resultado = await this.agendaService.obterProximosDiasUteis(dto);
       this.logger.log(`✅ [PROXIMOS DIAS UTEIS] Encontrados ${resultado.diasEncontrados} dias úteis`);
       return resultado;

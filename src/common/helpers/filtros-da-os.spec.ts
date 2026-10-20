@@ -159,6 +159,12 @@ describe('filtros das listas de programação e execução (banco real)', () => 
       await expect(numerosDaOS({ data_inicio: '2026-11-20', data_fim: '2026-11-10' })).rejects.toBeInstanceOf(BadRequestException);
     });
 
+    // SN-74: o fim de 9999-12-31 em UTC é o ano 10000, que o Prisma recusa (500)
+    it('ano fora de 1900–2199 é 400, também quem chama o service sem o pipe', async () => {
+      await expect(numerosDaOS({ data_inicio: '2026-11-01', data_fim: '9999-12-31' })).rejects.toBeInstanceOf(BadRequestException);
+      await expect(codigosDaProgramacao({ data_inicio: '0001-01-01' })).rejects.toBeInstanceOf(BadRequestException);
+    });
+
     it('período e equipamento juntos (dois OR que não se apagam)', async () => {
       expect(await codigosDaProgramacao({ data_inicio: '2026-11-01', data_fim: '2026-11-30', equipamento_id: UC })).toEqual([
         `${PREFIXO}-ANOMALIA`,

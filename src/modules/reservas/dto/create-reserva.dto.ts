@@ -3,12 +3,11 @@ import {
   IsNotEmpty,
   IsEnum,
   IsOptional,
-  IsDate,
   Matches
 } from 'class-validator';
-import { Type } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { TipoSolicitante } from '@/core';
+import { DiaComoData } from '@/common/decorators/dia-de-calendario';
 
 export class CreateReservaDto {
   @ApiProperty({
@@ -40,8 +39,7 @@ export class CreateReservaDto {
     example: '2025-01-20',
     type: Date
   })
-  @IsDate({ message: 'Data de início deve ser uma data válida' })
-  @Type(() => Date)
+  @DiaComoData({ obrigatoria: true })
   dataInicio: Date;
 
   @ApiProperty({
@@ -49,8 +47,7 @@ export class CreateReservaDto {
     example: '2025-01-20',
     type: Date
   })
-  @IsDate({ message: 'Data de fim deve ser uma data válida' })
-  @Type(() => Date)
+  @DiaComoData({ obrigatoria: true })
   dataFim: Date;
 
   @ApiProperty({

@@ -1,7 +1,8 @@
-import { IsOptional, IsEnum, IsDateString, IsString, IsNumber, Min, Length, MaxLength, Max } from 'class-validator';
+import { IsOptional, IsEnum, IsString, IsNumber, Min, Length, MaxLength, Max } from 'class-validator';
 import { Type } from 'class-transformer';
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { StatusProgramacaoOS, TipoOS, PrioridadeOS, OrigemOS } from '@/core';
+import { DiaOuInstante } from '@/common/decorators/instante';
 
 export class ProgramacaoFiltersDto {
   @ApiPropertyOptional({ description: 'Página', example: 1 })
@@ -66,12 +67,12 @@ export class ProgramacaoFiltersDto {
 
   @ApiPropertyOptional({ description: 'Data de início do filtro', example: '2025-01-01' })
   @IsOptional()
-  @IsDateString()
+  @DiaOuInstante()
   data_inicio?: string;
 
   @ApiPropertyOptional({ description: 'Data de fim do filtro', example: '2025-12-31' })
   @IsOptional()
-  @IsDateString()
+  @DiaOuInstante()
   data_fim?: string;
 
   // Sem @Length(26): ids antigos de anomalia tem 25 caracteres (cuid).

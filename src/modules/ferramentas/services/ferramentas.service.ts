@@ -221,7 +221,14 @@ export class FerramentasService {
       }
     }
 
-    if (updateFerramentaDto.necessita_calibracao && !updateFerramentaDto.proxima_data_calibracao) {
+    // Pelo estado que fica gravado: apagar a data de quem precisa de calibração
+    // (sem mandar `necessita_calibracao`) passava calado e a tirava dos alertas;
+    // mandar só `necessita_calibracao: true` recusava a que já estava gravada
+    const precisa = updateFerramentaDto.necessita_calibracao ?? ferramenta.necessita_calibracao;
+    const proxima = updateFerramentaDto.proxima_data_calibracao !== undefined
+      ? updateFerramentaDto.proxima_data_calibracao
+      : ferramenta.proxima_data_calibracao;
+    if (precisa && !proxima) {
       throw new BadRequestException('Data de calibração é obrigatória quando necessita calibração');
     }
 

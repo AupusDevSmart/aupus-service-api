@@ -1,7 +1,7 @@
-import { IsEnum, IsOptional, IsString, IsDate } from 'class-validator';
-import { Type } from 'class-transformer';
+import { IsEnum, IsOptional, IsString } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { StatusVeiculo } from '@/core';
+import { DiaComoData } from '@/common/decorators/dia-de-calendario';
 
 export class AlterarStatusVeiculoDto {
   @ApiProperty({
@@ -24,10 +24,9 @@ export class AlterarStatusVeiculoDto {
     example: '2025-01-25',
     type: Date
   })
-  @IsDate({ message: 'Data de retorno deve ser uma data válida' })
-  @Type(() => Date)
   @IsOptional()
-  dataRetornoPrevista?: Date;
+  @DiaComoData()
+  dataRetornoPrevista?: Date | null;
 
   @ApiPropertyOptional({
     description: 'Observações adicionais'

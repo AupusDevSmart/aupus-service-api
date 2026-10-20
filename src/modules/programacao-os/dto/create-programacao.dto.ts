@@ -5,7 +5,6 @@ import {
   IsOptional,
   IsNumber,
   IsBoolean,
-  IsDateString,
   IsArray,
   ValidateNested,
   Min,
@@ -16,6 +15,8 @@ import { Type } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { CondicaoOS, TipoOS, PrioridadeOS, OrigemOS, Prisma } from '@/core';
 import { CasasDecimais } from '@/common/decorators/numero';
+import { DiaDeCalendario } from '@/common/decorators/dia-de-calendario';
+import { HoraDoDia, InstanteComFuso } from '@/common/decorators/instante';
 
 export class MaterialProgramacaoDto {
   @ApiProperty({ description: 'Descrição do material', example: 'Óleo lubrificante SAE 20W-50' })
@@ -227,18 +228,18 @@ export class CreateProgramacaoDto {
 
   @ApiPropertyOptional({ description: 'Data e hora de previsão de início', example: '2025-02-15T08:00:00Z' })
   @IsOptional()
-  @IsDateString()
+  @InstanteComFuso()
   data_previsao_inicio?: string;
 
   @ApiPropertyOptional({ description: 'Data e hora de previsão de fim', example: '2025-02-15T17:00:00Z' })
   @IsOptional()
-  @IsDateString()
+  @InstanteComFuso()
   data_previsao_fim?: string;
 
   // Programação inicial
   @ApiPropertyOptional({ description: 'Data e hora programada', example: '2025-02-15T08:00:00Z' })
   @IsOptional()
-  @IsDateString()
+  @InstanteComFuso()
   data_hora_programada?: string;
 
   @ApiPropertyOptional({ description: 'Responsável pela execução', example: 'João Silva' })
@@ -273,23 +274,23 @@ export class CreateProgramacaoDto {
 
   @ApiPropertyOptional({ description: 'Data de início da reserva', example: '2025-02-15' })
   @IsOptional()
-  @IsDateString()
+  @DiaDeCalendario()
   reserva_data_inicio?: string;
 
   @ApiPropertyOptional({ description: 'Data de fim da reserva', example: '2025-02-15' })
   @IsOptional()
-  @IsDateString()
+  @DiaDeCalendario()
   reserva_data_fim?: string;
 
   @ApiPropertyOptional({ description: 'Hora de início da reserva (HH:mm)', example: '08:00' })
   @IsOptional()
-  @IsString()
-  reserva_hora_inicio?: string;
+  @HoraDoDia()
+  reserva_hora_inicio?: string | null;
 
   @ApiPropertyOptional({ description: 'Hora de fim da reserva (HH:mm)', example: '18:00' })
   @IsOptional()
-  @IsString()
-  reserva_hora_fim?: string;
+  @HoraDoDia()
+  reserva_hora_fim?: string | null;
 
   @ApiPropertyOptional({ description: 'Finalidade da reserva', example: 'Manutenção em planta remota' })
   @IsOptional()

@@ -2,7 +2,6 @@ import { ApiProperty } from '@nestjs/swagger';
 import {
   IsString,
   IsNotEmpty,
-  IsDateString,
   IsOptional,
   IsNumber,
   ValidateNested,
@@ -14,6 +13,7 @@ import {
   Max,
 } from 'class-validator';
 import { Type } from 'class-transformer';
+import { DiaDeCalendario } from '@/common/decorators/dia-de-calendario';
 
 /** O maior valor que a coluna Decimal(10,6) guarda: acima disso o banco recusaria com 500. */
 const TARIFA_MAXIMA = 9999.999999;
@@ -156,14 +156,14 @@ export class CreateConcessionariaDto {
     description: 'Data de início da vigência das tarifas',
     example: '2025-01-01',
   })
-  @IsDateString()
+  @DiaDeCalendario({ obrigatoria: true })
   data_inicio: string;
 
   @ApiProperty({
     description: 'Data de validade das tarifas',
     example: '2025-12-31',
   })
-  @IsDateString()
+  @DiaDeCalendario({ obrigatoria: true })
   data_validade: string;
 
   @ApiProperty({

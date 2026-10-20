@@ -2,7 +2,6 @@
 // src/modules/ferramentas/dto/create-calibracao.dto.ts
 // ===============================
 import {
-  IsDateString,
   IsString,
   IsNotEmpty,
   IsOptional,
@@ -11,14 +10,15 @@ import {
 } from 'class-validator';
 import { Transform } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { DiaDeCalendario } from '@/common/decorators/dia-de-calendario';
 
 export class CreateCalibracaoDto {
   @ApiProperty({ example: '2024-09-18' })
-  @IsDateString()
+  @DiaDeCalendario({ obrigatoria: true })
   data_calibracao: string;
 
   @ApiProperty({ example: '2025-03-18' })
-  @IsDateString()
+  @DiaDeCalendario({ obrigatoria: true })
   data_vencimento: string;
 
   @ApiProperty({ example: 'Laboratório TecCal' })

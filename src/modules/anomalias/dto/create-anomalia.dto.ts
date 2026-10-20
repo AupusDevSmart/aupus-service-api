@@ -1,7 +1,8 @@
 // src/modules/anomalias/dto/create-anomalia.dto.ts
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsString, IsNotEmpty, IsOptional, IsEnum, IsArray, IsDateString, ValidateNested } from 'class-validator';
+import { IsString, IsNotEmpty, IsOptional, IsEnum, IsArray, ValidateNested } from 'class-validator';
 import { Type } from 'class-transformer';
+import { InstanteComFuso } from '@/common/decorators/instante';
 
 export enum PrioridadeAnomalia {
   BAIXA = 'BAIXA',
@@ -96,12 +97,13 @@ export class CreateAnomaliaDto {
    * inventar um numero so para conseguir salvar.
    */
   @ApiPropertyOptional({
-    description: 'Prazo para resolucao (data e hora)',
+    description: 'Prazo para resolucao (data e hora, com o fuso). Null apaga.',
     example: '2026-09-15T18:00:00.000Z',
+    nullable: true,
   })
   @IsOptional()
-  @IsDateString()
-  prazo?: string;
+  @InstanteComFuso()
+  prazo?: string | null;
 
   @ApiProperty({
     description: 'Anexos (arquivos)',

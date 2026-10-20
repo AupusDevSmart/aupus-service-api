@@ -5,14 +5,13 @@ import {
   IsOptional,
   IsBoolean,
   IsArray,
-  IsDate,
   Length,
   ArrayMinSize,
   ValidateIf
 } from 'class-validator';
-import { Type } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { TipoFeriado } from '@/core';
+import { DiaComoData } from '@/common/decorators/dia-de-calendario';
 
 // O enum e o do banco. A copia local que existia aqui tinha os mesmos valores,
 // mas para o TypeScript era outro tipo e nao aceitava o `tipo` lido do Prisma.
@@ -33,8 +32,7 @@ export class CreateFeriadoDto {
     example: '2024-12-25',
     type: Date
   })
-  @IsDate({ message: 'Data deve ser uma data válida' })
-  @Type(() => Date)
+  @DiaComoData({ obrigatoria: true })
   data: Date;
 
   @ApiProperty({

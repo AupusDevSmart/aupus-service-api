@@ -1,7 +1,8 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
-import { IsOptional, IsEnum, IsString, IsNumber, IsDateString, Min } from 'class-validator';
+import { IsOptional, IsEnum, IsIn, IsString, IsNumber, Max, Min } from 'class-validator';
 import { Type } from 'class-transformer';
 import { StatusSolicitacaoServico, TipoSolicitacaoServico, PrioridadeSolicitacao, OrigemSolicitacao } from '@/core';
+import { DiaOuInstante } from '@/common/decorators/instante';
 
 export class SolicitacaoFiltersDto {
   @ApiPropertyOptional({ description: 'Página atual', minimum: 1, default: 1 })
@@ -16,6 +17,9 @@ export class SolicitacaoFiltersDto {
   @Type(() => Number)
   @IsNumber()
   @Min(1)
+  // Sem teto, ?limit=1000000 trazia a tabela inteira e fazia duas consultas por
+  // linha (revisão do SN-74), como nas OS e programações
+  @Max(100)
   limit?: number = 10;
 
   @ApiPropertyOptional({ description: 'Busca por texto (título, descrição, local)' })
@@ -75,12 +79,12 @@ export class SolicitacaoFiltersDto {
 
   @ApiPropertyOptional({ description: 'Data inicial (formato ISO 8601)' })
   @IsOptional()
-  @IsDateString()
+  @DiaOuInstante()
   data_inicio?: string;
 
   @ApiPropertyOptional({ description: 'Data final (formato ISO 8601)' })
   @IsOptional()
-  @IsDateString()
+  @DiaOuInstante()
   data_fim?: string;
 
   @ApiPropertyOptional({
@@ -88,8 +92,9 @@ export class SolicitacaoFiltersDto {
     enum: ['data_solicitacao', 'prioridade', 'status', 'titulo'],
     default: 'data_solicitacao'
   })
+  // Lista fechada: outra coluna ia direto ao orderBy e o Prisma recusava (500)
   @IsOptional()
-  @IsString()
+  @IsIn(['data_solicitacao', 'prioridade', 'status', 'titulo'])
   sortBy?: string = 'data_solicitacao';
 
   @ApiPropertyOptional({
@@ -98,6 +103,6 @@ export class SolicitacaoFiltersDto {
     default: 'desc'
   })
   @IsOptional()
-  @IsString()
+  @IsIn(['asc', 'desc'])
   sortOrder?: 'asc' | 'desc' = 'desc';
 }

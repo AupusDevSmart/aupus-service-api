@@ -6,7 +6,6 @@ import {
   IsNotEmpty,
   IsOptional,
   IsBoolean,
-  IsDateString,
   IsDecimal,
   IsEnum,
   IsUrl,
@@ -17,6 +16,7 @@ import {
 import { Transform } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { BooleanoDoTexto } from '@/common/decorators/booleano';
+import { DiaDeCalendario } from '@/common/decorators/dia-de-calendario';
 
 export enum StatusFerramenta {
   DISPONIVEL = 'disponivel',
@@ -68,11 +68,13 @@ export class CreateFerramentaDto {
   @BooleanoDoTexto()
   necessita_calibracao: boolean;
 
+  // Obrigatória só para quem precisa de calibração; informada, é conferida
+  // sempre (antes, sem calibração, qualquer texto passava e o new Date dava 500)
   @ApiPropertyOptional({ example: '2024-12-15' })
-  @ValidateIf((o) => o.necessita_calibracao === true)
-  @IsNotEmpty()
-  @IsDateString()
-  proxima_data_calibracao?: string;
+  @ValidateIf((o) => o.necessita_calibracao === true || o.proxima_data_calibracao != null)
+  @IsNotEmpty({ message: 'Ferramenta que precisa de calibração precisa da próxima data.' })
+  @DiaDeCalendario()
+  proxima_data_calibracao?: string | null;
 
   @ApiProperty({ example: 'Planta Industrial São Paulo - Laboratório' })
   @IsString()
@@ -92,7 +94,7 @@ export class CreateFerramentaDto {
   planta_nome?: string;
 
   @ApiProperty({ example: '2023-06-10' })
-  @IsDateString()
+  @DiaDeCalendario({ obrigatoria: true })
   data_aquisicao: string;
 
   @ApiPropertyOptional({ example: 1250.00 })

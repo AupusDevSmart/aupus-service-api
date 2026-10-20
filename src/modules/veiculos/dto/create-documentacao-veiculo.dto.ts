@@ -1,7 +1,7 @@
-import { IsEnum, IsString, IsNotEmpty, IsOptional, IsDate } from 'class-validator';
-import { Type } from 'class-transformer';
+import { IsEnum, IsString, IsNotEmpty, IsOptional } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { TipoDocumentacaoVeiculo } from '@/core';
+import { DiaComoData } from '@/common/decorators/dia-de-calendario';
 
 export class CreateDocumentacaoVeiculoDto {
   @ApiProperty({
@@ -20,15 +20,15 @@ export class CreateDocumentacaoVeiculoDto {
   @IsNotEmpty({ message: 'Descrição é obrigatória' })
   descricao: string;
 
-  @ApiPropertyOptional({
+  // Obrigatória: a coluna é NOT NULL, e sem ela o Prisma recusava (500). A tela
+  // sempre manda (padrão: daqui a um ano)
+  @ApiProperty({
     description: 'Data de vencimento',
     example: '2025-12-31',
     type: Date
   })
-  @IsDate({ message: 'Data de vencimento deve ser uma data válida' })
-  @Type(() => Date)
-  @IsOptional()
-  dataVencimento?: Date;
+  @DiaComoData({ obrigatoria: true })
+  dataVencimento: Date;
 
   @ApiPropertyOptional({
     description: 'Número do documento',

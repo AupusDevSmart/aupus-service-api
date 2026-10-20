@@ -53,7 +53,9 @@ export class AgendaService {
   }
 
   async obterProximosDiasUteis(dto: ProximosDiasUteisDto): Promise<ProximosDiasUteisResponse> {
-    const { quantidade, dataInicio = new Date(), plantaId } = dto;
+    // `??`, não o padrão da desestruturação: com null ele não vale e a conta partia de 1970
+    const { quantidade, plantaId } = dto;
+    const dataInicio = dto.dataInicio ?? new Date();
     const regra = await regraDeDiasUteis(this.prisma, plantaId);
 
     const diasUteis: Date[] = [];

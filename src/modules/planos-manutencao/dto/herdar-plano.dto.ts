@@ -1,6 +1,7 @@
-import { IsString, IsNotEmpty, IsOptional, IsArray, ValidateNested, IsDateString } from 'class-validator';
+import { IsString, IsNotEmpty, IsOptional, IsArray, ValidateNested } from 'class-validator';
 import { Type } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { InstanteComFuso } from '@/common/decorators/instante';
 
 export class AjusteDeDataDto {
   @ApiProperty({ description: 'ID da tarefa do equipamento ANTERIOR — a que a tela mostrou' })
@@ -9,7 +10,7 @@ export class AjusteDeDataDto {
   tarefa_id: string;
 
   @ApiPropertyOptional({ description: 'Quando foi feita de fato neste equipamento. Nulo zera a contagem.' })
-  @IsDateString()
+  @InstanteComFuso()
   @IsOptional()
   data_ultima_execucao?: string | null;
 }

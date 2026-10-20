@@ -4,7 +4,6 @@ import {
   IsEnum,
   IsOptional,
   IsInt,
-  IsDate,
   Length,
   Matches,
   Min,
@@ -13,6 +12,7 @@ import {
 import { Type, Transform } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { TipoVeiculo, TipoCombustivel } from '@/core';
+import { DiaComoData } from '@/common/decorators/dia-de-calendario';
 
 export class CreateVeiculoDto {
   @ApiProperty({
@@ -175,10 +175,9 @@ export class CreateVeiculoDto {
     example: '2023-01-15',
     type: Date
   })
-  @IsDate({ message: 'Data de aquisição deve ser uma data válida' })
-  @Type(() => Date)
   @IsOptional()
-  dataAquisicao?: Date;
+  @DiaComoData()
+  dataAquisicao?: Date | null;
 
   @ApiPropertyOptional({
     description: 'Responsável pelo veículo',
@@ -240,19 +239,17 @@ export class CreateVeiculoDto {
     description: 'Data da próxima revisão',
     type: Date
   })
-  @IsDate({ message: 'Data da próxima revisão deve ser uma data válida' })
-  @Type(() => Date)
   @IsOptional()
-  proximaRevisao?: Date;
+  @DiaComoData()
+  proximaRevisao?: Date | null;
 
   @ApiPropertyOptional({
     description: 'Data da última revisão',
     type: Date
   })
-  @IsDate({ message: 'Data da última revisão deve ser uma data válida' })
-  @Type(() => Date)
   @IsOptional()
-  ultimaRevisao?: Date;
+  @DiaComoData()
+  ultimaRevisao?: Date | null;
 
   @ApiPropertyOptional({
     description: 'Seguradora do veículo',
@@ -268,8 +265,7 @@ export class CreateVeiculoDto {
     example: '2025-12-31',
     type: Date
   })
-  @IsDate({ message: 'Data de vencimento do seguro deve ser uma data válida' })
-  @Type(() => Date)
   @IsOptional()
-  vencimentoSeguro?: Date;
+  @DiaComoData()
+  vencimentoSeguro?: Date | null;
 }

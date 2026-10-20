@@ -2,6 +2,7 @@ import { IsString, IsOptional, IsEnum, IsInt, Min, Max } from 'class-validator';
 import { Type } from 'class-transformer';
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { StatusReserva, TipoSolicitante } from '@/core';
+import { DiaDeCalendario } from '@/common/decorators/dia-de-calendario';
 
 export class QueryReservasDto {
   @ApiPropertyOptional({
@@ -69,16 +70,16 @@ export class QueryReservasDto {
     description: 'Data de início mínima (YYYY-MM-DD)',
     example: '2025-01-20'
   })
-  @IsString({ message: 'Data de início deve ser uma string' })
   @IsOptional()
+  @DiaDeCalendario()
   dataInicio?: string;
 
   @ApiPropertyOptional({
     description: 'Data de fim máxima (YYYY-MM-DD)',
     example: '2025-01-25'
   })
-  @IsString({ message: 'Data de fim deve ser uma string' })
   @IsOptional()
+  @DiaDeCalendario()
   dataFim?: string;
 
   @ApiPropertyOptional({

@@ -3,7 +3,6 @@ import {
   IsString,
   IsEnum,
   IsOptional,
-  IsDateString,
   IsNumber,
   IsNotEmpty,
   MaxLength,
@@ -14,6 +13,7 @@ import {
   PrioridadeSolicitacao,
   OrigemSolicitacao,
 } from '@/core';
+import { InstanteComFuso } from '@/common/decorators/instante';
 
 
 
@@ -96,7 +96,7 @@ export class CreateSolicitacaoDto {
   // Datas e prazos
   @ApiPropertyOptional({ description: 'Data em que o serviço é necessário' })
   @IsOptional()
-  @IsDateString()
+  @InstanteComFuso()
   data_necessidade?: string;
 
   @ApiPropertyOptional({ description: 'Prazo de execução em dias' })
@@ -106,12 +106,12 @@ export class CreateSolicitacaoDto {
 
   @ApiPropertyOptional({ description: 'Data prevista de início' })
   @IsOptional()
-  @IsDateString()
+  @InstanteComFuso()
   data_prevista_inicio?: string;
 
   @ApiPropertyOptional({ description: 'Data prevista de fim' })
   @IsOptional()
-  @IsDateString()
+  @InstanteComFuso()
   data_prevista_fim?: string;
 
   // Justificativa e benefícios
