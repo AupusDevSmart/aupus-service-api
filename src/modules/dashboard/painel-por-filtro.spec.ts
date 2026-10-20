@@ -91,7 +91,11 @@ describe('painel de manutenção pelos filtros (banco real)', () => {
     await prisma.tarefas_os.create({ data: { os_id: pelaTarefa, ordem: 1, status: 'CONCLUIDA', equipamento_id: UAR_1, nome_snapshot: 'x' } });
     // Concluída hoje, pela anomalia no UC da instalação 1 (criticidade 5)
     const anomalia = await prisma.anomalias.create({ data: { descricao: `${PREFIXO} vazamento`, local: 'x', ativo: 'x', origem: 'OPERADOR', planta_id: a.id, equipamento_id: UC_1 } });
-    await ordem(a.id, { ...concluida(0), origem: 'ANOMALIA', tipo: 'CORRETIVA', anomalia_id: anomalia.id, custo_real: 1000 });
+    // ...e que parou o equipamento meia hora (SN-80)
+    await ordem(a.id, {
+      ...concluida(0), origem: 'ANOMALIA', tipo: 'CORRETIVA', anomalia_id: anomalia.id, custo_real: 1000,
+      equipamento_parou: true, parada_inicio: new Date(Date.now() - 60 * 60_000), parada_fim: new Date(Date.now() - 30 * 60_000),
+    });
     // Anomalia de 40 dias, ainda aberta, cuja única OS foi cancelada: aberta AGORA e "sem OS"
     const antiga = await prisma.anomalias.create({
       data: { descricao: `${PREFIXO} antiga`, local: 'x', ativo: 'x', origem: 'OPERADOR', planta_id: a.id, equipamento_id: UC_1, created_at: haDias(40) },
@@ -110,6 +114,8 @@ describe('painel de manutenção pelos filtros (banco real)', () => {
 
     // Planta B — uma concluída hoje, de outra equipe
     await ordem(b.id, { ...concluida(0), equipamento_id: UC_B, time_equipe: 'Equipe Beta' });
+    // Corretiva de 100 dias sem os dados de falha (anterior ao SN-60)
+    await ordem(b.id, { ...concluida(100), tipo: 'CORRETIVA', origem: 'ANOMALIA', equipamento_id: UC_B });
     // Concluída sem a data de fim (legado): vale a de início, não some
     await ordem(b.id, { status: 'FINALIZADA', equipamento_id: UC_B, data_hora_inicio_real: agoraMesmo(), data_hora_fim_real: null });
   });
@@ -195,6 +201,39 @@ describe('painel de manutenção pelos filtros (banco real)', () => {
       { ativo: 'Ventoinha 1', custoMil: 3 },
       { ativo: 'Inversor 1', custoMil: 1 },
     ]);
+  });
+
+  // SN-80: dos dados de falha; o período de 12 meses evita a virada do mês
+  it('MTTR, MTBF e disponibilidade das corretivas que pararam, com a base e a fórmula', async () => {
+    const p = await ler({ periodo: '12meses', plantaId: a.id });
+    const card = (id: string) => p.kpis.find((k) => k.id === id);
+    expect([card('mttr')?.valor, card('mttr')?.nota]).toEqual(['0,5', 'base: 1 parada']);
+    expect(card('mtbf')?.nota).toBe('1 falha · 2 equip.');
+    expect(card('disponibilidade')?.unidade).toBe('%');
+    expect(card('disponibilidade')?.base).toContain('1 corretiva no período: 1 parou o equipamento (1 com horário, 0 sem), 0 sem os dados de falha. Frota: 2 UCs');
+    expect(p.alertas.find((k) => k.id === 'parada')?.valor).toBe('0,5');
+    // Toda caixa diz como o número sai
+    expect(p.kpis.filter((k) => !k.formula).map((k) => k.id)).toEqual([]);
+  });
+
+  it('a frota da disponibilidade segue o filtro (os UCs da instalação)', async () => {
+    expect((await ler({ periodo: '12meses', plantaId: a.id, unidadeId: UNIDADE_2 })).kpis.find((k) => k.id === 'disponibilidade')?.nota).toBe('0,0 h paradas · 1 equip.');
+  });
+
+  // A frota não é por equipe: as falhas de uma equipe sobre a frota inteira inflavam o MTBF
+  it('com equipe no filtro, MTBF e disponibilidade não se calculam', async () => {
+    const p = await ler({ periodo: '12meses', plantaId: a.id, equipe: 'Equipe Alfa' });
+    for (const id of ['mtbf', 'disponibilidade']) {
+      expect([p.kpis.find((k) => k.id === id)?.valor, p.kpis.find((k) => k.id === id)?.nota]).toEqual(['—', 'não se calcula por equipe']);
+    }
+  });
+
+  // Anterior ao SN-60: não se sabe se parou — o cartão não pode dizer "nenhuma falha" nem 100%
+  it('corretiva sem os dados de falha deixa o número em aberto, e avisa', async () => {
+    const p = await ler({ periodo: '12meses', plantaId: b.id });
+    const card = (id: string) => p.kpis.find((k) => k.id === id);
+    expect([card('mtbf')?.valor, card('mtbf')?.nota, card('mtbf')?.status]).toEqual(['—', '1 corretiva sem dado de falha', 'warn']);
+    expect([card('disponibilidade')?.valor, card('disponibilidade')?.status]).toEqual(['—', 'warn']);
   });
 });
 

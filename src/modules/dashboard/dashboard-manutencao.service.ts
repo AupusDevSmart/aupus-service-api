@@ -4,6 +4,7 @@ import type { anomalias, ordens_servico } from '@prisma/client';
 import { Prisma, PrismaService, PermissionScopeService, PlantaScope, ScopedUser } from '@/core';
 import { ordemDasPlantas } from '../../common/helpers/filtros-da-os';
 import type { QueryDashboardManutencaoDto } from './dto/query-dashboard-manutencao.dto';
+import { calcularConfiabilidade, frotaDoRecorte, type Confiabilidade, type Frota } from './confiabilidade';
 import {
   STATUS_CONCLUIDO,
   STATUS_EM_ABERTO,
@@ -37,6 +38,10 @@ export interface Indicador {
   status: null | 'ok' | 'warn' | 'bad';
   simulado?: boolean;
   pendencia?: string;
+  /** Como o número sai, escrito para quem lê o painel (SN-80: a fórmula visível na tela) */
+  formula?: string;
+  /** Em quantos registros o número se baseia, e o que ficou de fora */
+  base?: string;
 }
 
 /**
@@ -96,6 +101,13 @@ export class DashboardManutencaoService {
     return n.toFixed(casas).replace('.', ',');
   }
 
+  /** Número com vírgula e ponto de milhar, sem depender do ICU do Node */
+  private decimal(n: number, casas = 1): string {
+    const [inteiro, fracao] = n.toFixed(casas).split('.');
+    const comMilhar = inteiro.replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+    return fracao ? `${comMilhar},${fracao}` : comMilhar;
+  }
+
   /** Uma série zerada, um valor por mês da janela */
   private serie(janela: JanelaDoPainel): number[] {
     return new Array(janela.meses.length).fill(0);
@@ -136,9 +148,10 @@ export class DashboardManutencaoService {
 
     // As abertas são de agora, como o backlog: a registrada há 40 dias sumia do card no "mês"
     const abertas: Prisma.anomaliasWhereInput = { AND: [daAnomalia, { status: { not: 'FINALIZADA' } }] };
-    const [anomaliasAbertas, anomaliasSemOS] = await Promise.all([
+    const [anomaliasAbertas, anomaliasSemOS, frota] = await Promise.all([
       this.prisma.anomalias.count({ where: abertas }),
       this.prisma.anomalias.count({ where: { AND: [abertas, { ordens_servico: { none: osValida } }] } }),
+      frotaDoRecorte(this.prisma, scope, filtros, janela),
     ]);
 
     return {
@@ -146,7 +159,7 @@ export class DashboardManutencaoService {
       meses: janela.meses.map((m) => m.rotulo),
       periodo: { desde: janela.desde.toISOString(), ate: janela.ate.toISOString() },
       opcoes: await this.montarOpcoes(scope, filtros),
-      ...this.montarBlocos(ordens, anomalias, janela, { abertas: anomaliasAbertas, semOS: anomaliasSemOS }),
+      ...this.montarBlocos(ordens, anomalias, janela, { abertas: anomaliasAbertas, semOS: anomaliasSemOS }, frota, Boolean(filtroDe(filtros.equipe))),
     };
   }
 
@@ -216,6 +229,8 @@ export class DashboardManutencaoService {
     anomalias: AnomaliaDoPainel[],
     janela: JanelaDoPainel,
     anomaliasDeAgora: { abertas: number; semOS: number },
+    frota: Frota,
+    porEquipe: boolean,
   ) {
     const grupos: OrdensDoPeriodo = {
       emAberto: ordens.filter((o) => STATUS_EM_ABERTO.includes(o.status)),
@@ -225,8 +240,18 @@ export class DashboardManutencaoService {
       programadas: ordens.filter((o) => o.status !== 'CANCELADA' && naJanela(o.data_hora_programada, janela)),
     };
 
+    // As OS concluídas (de qualquer data: a parada pode estar no período e a OS ter terminado
+    // depois): a base do MTBF, do MTTR e da disponibilidade
+    const conf = calcularConfiabilidade(
+      ordens
+        .filter((o) => STATUS_CONCLUIDO.includes(o.status))
+        .map((o) => ({ ...o, fim: fimDaOrdem(o), equipamentos: o.equipamentos.map((e) => e.id) })),
+      frota,
+      janela,
+    );
+
     return {
-      kpis: this.montarKpis(grupos, anomaliasDeAgora),
+      kpis: this.montarKpis(grupos, anomaliasDeAgora, conf, porEquipe),
       ...this.montarAderencia(grupos),
       custo: this.montarCusto(grupos.concluidas, janela),
       custoPorOS: this.montarCustoPorOS(grupos.concluidas, janela),
@@ -235,11 +260,16 @@ export class DashboardManutencaoService {
       backlogIdade: this.montarBacklog(grupos.emAberto),
       ofensores: this.montarOfensores(grupos.concluidas),
       ...this.montarProdutividade(grupos, janela),
-      alertas: this.montarAlertas(grupos, anomalias),
+      alertas: this.montarAlertas(grupos, anomalias, conf),
     };
   }
 
-  private montarKpis({ emAberto, concluidas, programadas }: OrdensDoPeriodo, anomalias: { abertas: number; semOS: number }): Indicador[] {
+  private montarKpis(
+    { emAberto, concluidas, programadas }: OrdensDoPeriodo,
+    anomalias: { abertas: number; semOS: number },
+    conf: Confiabilidade,
+    porEquipe: boolean,
+  ): Indicador[] {
     // O plano do período: as OS do plano programadas para ele, e quantas delas já saíram
     const doPlano = programadas.filter((o) => o.origem === 'PLANO_MANUTENCAO' || o.origem === 'TAREFA');
     const planoConcluidas = doPlano.filter((o) => STATUS_CONCLUIDO.includes(o.status));
@@ -250,25 +280,19 @@ export class DashboardManutencaoService {
 
     const noPrazo = concluidas.filter((o) => o.data_hora_programada && new Date(fimDaOrdem(o)!) <= new Date(o.data_hora_programada)).length;
 
-    // MTTR real: média de horas entre início e fim das corretivas concluídas.
-    const corretivasFechadas = concluidas.filter(
-      (o) => o.tipo === 'CORRETIVA' && o.data_hora_inicio_real && o.data_hora_fim_real,
-    );
-    const mttr =
-      corretivasFechadas.length > 0
-        ? corretivasFechadas.reduce(
-            (soma, o) =>
-              soma +
-              (new Date(o.data_hora_fim_real).getTime() - new Date(o.data_hora_inicio_real).getTime()) /
-                36e5,
-            0,
-          ) / corretivasFechadas.length
-        : 0;
-
-    // Backlog em HH pendente. A spec pede semanas, mas semanas exigem a
-    // capacidade da equipe, que não existe cadastrada — então mostra a grandeza
-    // que é real (horas) em vez de dividir por um número inventado.
+    // Backlog em HH: em semanas exigiria a capacidade das equipes, que não é
+    // cadastrada — pode ir gente de fora (decisão do usuário, 20/out/2026)
     const hhPendente = emAberto.reduce((soma, o) => soma + this.numero(o.tempo_estimado), 0);
+
+    const plural = (n: number, um: string, varios: string) => `${n} ${n === 1 ? um : varios}`;
+    const baseDaFalha = `${plural(conf.corretivas, 'corretiva', 'corretivas')} no período: ${plural(conf.falhas, 'parou', 'pararam')} o equipamento (${conf.comHorario} com horário, ${conf.semHorario} sem), ${conf.semDadosDeFalha} sem os dados de falha. Frota: ${plural(conf.equipamentos, 'UC', 'UCs')}, ${this.decimal(conf.horasDaFrota, 0)} h no período.`;
+    // A corretiva sem a resposta "parou?" (anterior ao SN-60): não se sabe se parou, e o
+    // cartão não pode afirmar "nenhuma falha" nem 100% de disponibilidade
+    const incompleto = conf.semDadosDeFalha > 0;
+    const semDado = `${plural(conf.semDadosDeFalha, 'corretiva', 'corretivas')} sem dado de falha`;
+    const naoSeSabe = conf.falhas === 0 && incompleto;
+    // A frota não é por equipe: as falhas de uma equipe sobre a frota inteira inflavam o MTBF
+    const semFrota = porEquipe ? 'não se calcula por equipe' : undefined;
 
     return [
       {
@@ -278,6 +302,7 @@ export class DashboardManutencaoService {
         valor: String(doPlano.length),
         nota: `${planoConcluidas.length} executadas`,
         status: null,
+        formula: 'OS do plano de manutenção (e das tarefas) programadas para o período, sem as canceladas; "executadas" são as que já foram concluídas.',
       },
       {
         id: 'os_aberta',
@@ -286,6 +311,7 @@ export class DashboardManutencaoService {
         valor: String(emAberto.length),
         nota: atrasadas > 0 ? `${atrasadas} atrasadas` : 'nenhuma atrasada',
         status: atrasadas > 0 ? 'bad' : 'ok',
+        formula: 'OS pendentes, em execução ou pausadas agora, de qualquer data. Atrasada: programada para antes de agora.',
       },
       {
         id: 'os_concluida',
@@ -294,6 +320,7 @@ export class DashboardManutencaoService {
         valor: String(concluidas.length),
         nota: concluidas.length > 0 ? `${this.pct(noPrazo, concluidas.length)}% no prazo` : 'sem conclusões',
         status: null,
+        formula: 'OS executadas, auditadas ou finalizadas no período, pela data de fim (sem ela, a de início). No prazo: terminou até a data programada.',
       },
       {
         id: 'backlog',
@@ -301,9 +328,9 @@ export class DashboardManutencaoService {
         rotulo: 'Backlog',
         valor: this.virgula(hhPendente, 0),
         unidade: 'HH',
-        nota: 'em semanas exige capacidade da equipe',
+        nota: `${plural(emAberto.length, 'OS aberta', 'OS abertas')}`,
         status: null,
-        pendencia: 'Cadastrar HH disponível por semana para converter em semanas de trabalho.',
+        formula: 'Soma do tempo estimado das OS abertas agora. Sem semanas: a capacidade das equipes não é cadastrada (pode ir gente de fora).',
       },
       {
         id: 'anomalias',
@@ -312,39 +339,56 @@ export class DashboardManutencaoService {
         valor: String(anomalias.abertas),
         nota: `${anomalias.semOS} ainda sem OS`,
         status: anomalias.semOS > 0 ? 'warn' : null,
+        formula: 'Anomalias não finalizadas agora, de qualquer data. Sem OS: nenhuma OS válida (a cancelada não conta).',
       },
       {
         id: 'mtbf',
         icone: 'activity',
         rotulo: 'MTBF',
-        valor: '—',
+        valor: semFrota ? '—' : conf.mtbf !== null ? this.decimal(conf.mtbf, conf.mtbf < 10 ? 1 : 0) : '—',
         unidade: 'h',
-        nota: 'sem apontamento de falha',
-        status: null,
-        simulado: true,
-        pendencia: 'Exige registro de horas em operação e de cada falha por equipamento.',
+        nota: semFrota ?? (incompleto ? semDado : conf.falhas > 0 ? `${plural(conf.falhas, 'falha', 'falhas')} · ${conf.equipamentos} equip.` : 'nenhuma falha no período'),
+        status: incompleto && !semFrota ? 'warn' : null,
+        formula: 'Tempo médio entre falhas = (horas da frota no período − horas paradas) ÷ falhas. Falha: corretiva que parou o equipamento, no período em que parou. Frota: os UCs do filtro, cada um desde que foi cadastrado; calendário 24 h, até agora.',
+        base: baseDaFalha,
       },
       {
         id: 'mttr',
         icone: 'clock',
         rotulo: 'MTTR',
-        valor: corretivasFechadas.length > 0 ? this.virgula(mttr) : '—',
+        valor: conf.mttr !== null ? this.decimal(conf.mttr) : '—',
         unidade: 'h',
         nota:
-          corretivasFechadas.length > 0
-            ? `base: ${corretivasFechadas.length} corretiva${corretivasFechadas.length > 1 ? 's' : ''}`
-            : 'nenhuma corretiva concluída',
-        status: null,
+          conf.comHorario > 0
+            ? `base: ${plural(conf.comHorario, 'parada', 'paradas')}${conf.semHorario ? ` · ${conf.semHorario} sem horário` : ''}`
+            : conf.semHorario > 0
+              ? `${plural(conf.semHorario, 'parada', 'paradas')} sem horário`
+              : incompleto
+                ? semDado
+                : 'nenhuma parada no período',
+        status: incompleto ? 'warn' : null,
+        formula: 'Tempo médio para reparar = média de (fim − início da parada) das corretivas que pararam com o horário informado. A parada sem horário conta como falha, mas não tem duração.',
+        base: baseDaFalha,
       },
       {
         id: 'disponibilidade',
         icone: 'plug',
         rotulo: 'Disponibilidade',
-        valor: '—',
-        nota: 'sem apontamento de parada',
-        status: null,
-        simulado: true,
-        pendencia: 'Exige registro de tempo programado e tempo parado por equipamento.',
+        // Truncada, nunca arredondada para cima: com uma frota grande, 99,996% virava "100,0"
+        valor: semFrota || naoSeSabe || conf.disponibilidade === null ? '—' : this.decimal(Math.floor(conf.disponibilidade * 10_000) / 100, 2),
+        unidade: semFrota || naoSeSabe || conf.disponibilidade === null ? undefined : '%',
+        nota:
+          semFrota ??
+          (conf.equipamentos === 0
+            ? 'nenhum equipamento no filtro'
+            : naoSeSabe || incompleto
+              ? semDado
+              : conf.semHorario > 0
+                ? `${plural(conf.semHorario, 'parada', 'paradas')} sem horário (não descontada${conf.semHorario > 1 ? 's' : ''})`
+                : `${this.decimal(conf.horasParadas, conf.horasParadas < 10 ? 1 : 0)} h paradas · ${conf.equipamentos} equip.`),
+        status: incompleto && !semFrota ? 'warn' : null,
+        formula: '(horas da frota no período − horas paradas) ÷ horas da frota. Horas paradas: as de toda OS concluída com parada (a preventiva que parou também tira de operação), só a parte dentro do período e sem contar duas vezes a mesma hora do mesmo equipamento; a parada sem horário não desconta. Calendário 24 h, até agora.',
+        base: baseDaFalha,
       },
     ];
   }
@@ -637,7 +681,7 @@ export class DashboardManutencaoService {
     };
   }
 
-  private montarAlertas({ emAberto, concluidas }: OrdensDoPeriodo, anomalias: AnomaliaDoPainel[]): Indicador[] {
+  private montarAlertas({ emAberto, concluidas }: OrdensDoPeriodo, anomalias: AnomaliaDoPainel[], conf: Confiabilidade): Indicador[] {
     const travadas = emAberto.filter((o) => o.status === 'PAUSADA').length;
 
     // Reincidência: equipamento com mais de uma anomalia em 90 dias.
@@ -699,12 +743,12 @@ export class DashboardManutencaoService {
         id: 'parada',
         icone: 'pause',
         rotulo: 'Parada não programada',
-        valor: '—',
+        // Sem nenhuma parada com horário o valor é desconhecido, não zero
+        valor: conf.comHorario > 0 ? this.decimal(conf.horasParadasNaoProgramadas) : '—',
         unidade: 'h',
-        nota: 'sem apontamento de parada',
-        status: null,
-        simulado: true,
-        pendencia: 'Exige registro de parada de equipamento com e sem programação.',
+        nota: conf.falhas > 0 ? `${conf.falhas} parada${conf.falhas > 1 ? 's' : ''}${conf.semHorario ? ` · ${conf.semHorario} sem horário` : ''}` : 'nenhuma parada no período',
+        status: conf.falhas > 0 ? 'warn' : null,
+        formula: 'Horas paradas das corretivas que pararam o equipamento (fim − início da parada, a parte dentro do período, sem contar duas vezes a mesma hora). A parada sem horário conta na quantidade, sem horas.',
       },
       {
         id: 'aderencia_hh',

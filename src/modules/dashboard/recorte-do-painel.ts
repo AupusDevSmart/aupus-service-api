@@ -95,6 +95,10 @@ export const SELECT_DA_ORDEM = {
   time_equipe: true,
   equipamento_id: true,
   equipamento: { select: { nome: true } },
+  // Os dados de falha da corretiva (SN-60): a base do MTBF, MTTR e disponibilidade
+  equipamento_parou: true,
+  parada_inicio: true,
+  parada_fim: true,
 } satisfies Prisma.ordens_servicoSelect;
 
 export type OrdemDoPainel = Prisma.ordens_servicoGetPayload<{ select: typeof SELECT_DA_ORDEM }> & {
@@ -142,6 +146,8 @@ export async function ordensDoPainel(
         { data_hora_programada: noPeriodo },
         { data_hora_fim_real: noPeriodo },
         { data_hora_fim_real: null, data_hora_inicio_real: noPeriodo },
+        // A parada que cruza o período (a OS pode ter terminado depois): conta na disponibilidade (SN-80)
+        { parada_inicio: { lt: janela.ate }, parada_fim: { gt: janela.desde } },
       ],
     },
   ];
