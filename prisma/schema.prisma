@@ -2563,6 +2563,9 @@ model solicitacoes_servico {
   sugestoes_alternativas    String?
   cancelado_por_nome        String?                  @db.VarChar(255)
   ordem_servico_id          String?                  @db.VarChar(50)
+  /// Id do chamado no NexON quando a solicitacao veio de la (NEXON-27). Unico:
+  /// e o que torna a entrega idempotente quando a fila do NexON tenta de novo.
+  nexon_chamado_id          String?                  @unique @db.VarChar(64)
   /// ----------------------------------------------------------------------
   /// Proposta comercial — BDI (Benefícios e Despesas Indiretas)
   ///
