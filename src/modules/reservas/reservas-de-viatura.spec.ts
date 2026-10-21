@@ -209,6 +209,34 @@ describe('reservas de viatura: conflito de horário e status pelo fluxo da OS (b
       expect(os.data_hora_programada?.toISOString()).toBe('2027-03-12T12:00:00.000Z');
     });
 
+    // SN-90: a hora da OS não é a hora de pegar a viatura (a equipe sai antes)
+    const programarAs = async (dia: string, hora: string) => {
+      const prog = await programar(dia, '07:00', '18:00');
+      await prisma.programacoes_os.update({ where: { id: prog.id }, data: { data_hora_programada: new Date(`${dia}T${hora}:00-03:00`) } });
+      return prog;
+    };
+
+    it('mesma data e hora já programadas: a reserva não se mexe', async () => {
+      const prog = await programarAs('2027-03-10', '08:00');
+      await programar('2027-03-10', '18:00', '19:00');
+
+      await programacoes.aprovar(prog.id, { data_programada_sugerida: '2027-03-10', hora_programada_sugerida: '08:00' } as never);
+
+      const reserva = await reservaDa(prog.id);
+      expect(diaDe(reserva.data_inicio)).toBe('2027-03-10');
+      expect(reserva).toMatchObject({ hora_inicio: '07:00', hora_fim: '18:00', tipo_solicitante: 'ordem_servico' });
+    });
+
+    it('OS já programada que muda de dia e hora: a reserva anda o mesmo tanto, com a saída antecipada', async () => {
+      const prog = await programarAs('2027-03-10', '08:00');
+
+      await programacoes.aprovar(prog.id, { data_programada_sugerida: '2027-03-12', hora_programada_sugerida: '10:00' } as never);
+
+      const reserva = await reservaDa(prog.id);
+      expect(diaDe(reserva.data_inicio)).toBe('2027-03-12');
+      expect(reserva).toMatchObject({ hora_inicio: '09:00', hora_fim: '20:00' });
+    });
+
     it('nova data que bate com outra reserva é recusada', async () => {
       const prog = await programar('2027-03-10', '08:00', '12:00');
       await programar('2027-03-12', '10:00', '11:00');

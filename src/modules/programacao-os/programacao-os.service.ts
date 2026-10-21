@@ -7,7 +7,7 @@ import {
   programacaoDoEquipamento,
   programacaoNaData,
 } from '../../common/helpers/filtros-da-os';
-import { Prisma, StatusProgramacaoOS, PrioridadeOS, type TipoOS, type programacoes_os, type tarefas_programacao_os } from '@/core';
+import { Prisma, StatusProgramacaoOS, PrioridadeOS, type programacoes_os, type tarefas_programacao_os } from '@/core';
 import { plantasDosEquipamentos } from '@/core/modules/auth/planta-dos-equipamentos';
 import { garantirPessoasQuePodemAtuar, PessoasDaPlanta, pessoasQuePodemAtuar } from './pessoas-da-os';
 import { equipamentosDasTarefas, naoEncontradoDaOrigem, plantaDaProgramacao } from './planta-da-programacao';
@@ -17,6 +17,7 @@ import {
   camposDaJanela,
   garantirViaturaLivre,
   instanteEmBrasilia,
+  intervaloDaReserva,
   moverJanela,
   type JanelaDaReserva,
 } from '../reservas/ocupacao-da-viatura';
@@ -35,6 +36,7 @@ import {
 import { avancarAncoraDosCiclos, cancelarOS } from '../execucao-os/cancelar-os';
 import type { Evento } from '../notificacoes/catalogo';
 import { registrarNotificacao } from '../notificacoes/registrar-notificacao';
+import { tipoDaOSDaSolicitacao } from './tipo-da-os-da-solicitacao';
 import {
   AdicionarTarefasDto,
   AJUSTES_DA_PROGRAMACAO_DA_SOLICITACAO,
@@ -1016,23 +1018,6 @@ export class ProgramacaoOSService {
       throw new ConflictException('Apenas solicitações registradas podem gerar programação');
     }
 
-    // Mapear tipo de solicitação para tipo de OS
-    const mapTipoSolicitacaoToTipoOS = (tipo: string): TipoOS => {
-      const mapeamento: Record<string, TipoOS> = {
-        INSTALACAO: 'CORRETIVA',
-        MANUTENCAO_PREVENTIVA: 'PREVENTIVA',
-        MANUTENCAO_CORRETIVA: 'CORRETIVA',
-        INSPECAO: 'INSPECAO',
-        CALIBRACAO: 'INSPECAO',
-        MODIFICACAO: 'CORRETIVA',
-        REMOCAO: 'CORRETIVA',
-        CONSULTORIA: 'VISITA_TECNICA',
-        TREINAMENTO: 'VISITA_TECNICA',
-        OUTRO: 'CORRETIVA',
-      };
-      return mapeamento[tipo] || 'CORRETIVA';
-    };
-
     // Só os ajustes da lista: o que vem da solicitação (ela mesma, a planta, a
     // origem) não se sobrescreve, nem chamando o service direto (SN-40)
     const ajustes = Object.fromEntries(
@@ -1045,7 +1030,7 @@ export class ProgramacaoOSService {
       local: solicitacao.local,
       ativo: solicitacao.equipamento?.nome || 'N/A',
       condicoes: 'FUNCIONANDO',
-      tipo: mapTipoSolicitacaoToTipoOS(solicitacao.tipo),
+      tipo: tipoDaOSDaSolicitacao(solicitacao.tipo),
       // A solicitação tem URGENTE, a OS não: vai para CRITICA, o topo da OS.
       // Antes seguia como veio e o Prisma recusava (500).
       prioridade: solicitacao.prioridade === 'URGENTE' ? PrioridadeOS.CRITICA : (solicitacao.prioridade as PrioridadeOS),
@@ -1861,13 +1846,22 @@ export class ProgramacaoOSService {
   }
 
   /**
-   * Onde a reserva começa no dia sugerido: na hora sugerida, ou na hora que ela
-   * já tinha. A de dia inteiro só troca de dia — começar às 09:00 a faria
-   * atravessar a meia-noite.
+   * Onde a reserva começa no dia sugerido. A de dia inteiro só troca de dia —
+   * começar às 09:00 a faria atravessar a meia-noite. Com a OS já programada, a
+   * reserva anda o mesmo tanto que a OS (SN-90): a hora da OS não é a de pegar
+   * a viatura, e começar a reserva nela apagava a saída antecipada (07:00–18:00
+   * para a OS das 08:00 virava 08:00–19:00 ao aprovar sem mudar nada, e batia
+   * na reserva seguinte). Sem hora programada antes, começa na hora sugerida;
+   * sem hora sugerida, na hora que a reserva já tinha.
    */
-  private novoInicioDaReserva(base: JanelaDaReserva, dia: string, hora: string | null): Date {
+  private novoInicioDaReserva(base: JanelaDaReserva, dia: string, hora: string | null, programadaAntes?: Date | null): Date {
     const diaInteiro = (base.hora_inicio || '00:00') === '00:00' && (base.hora_fim || '23:59') === '23:59';
-    return instanteEmBrasilia(dia, diaInteiro ? '00:00' : hora || base.hora_inicio || '00:00');
+    if (diaInteiro) return instanteEmBrasilia(dia, '00:00');
+    if (hora && programadaAntes) {
+      const deslocamento = instanteEmBrasilia(dia, hora).getTime() - new Date(programadaAntes).getTime();
+      return new Date(intervaloDaReserva(base).inicio.getTime() + deslocamento);
+    }
+    return instanteEmBrasilia(dia, hora || base.hora_inicio || '00:00');
   }
 
   /** A reserva ativa da programação: pelo `reserva_id` ou, nas antigas, pelo solicitante */
@@ -1946,7 +1940,9 @@ export class ProgramacaoOSService {
     }
 
     const base: JanelaDaReserva = atual ?? this.janelaDaReserva(programacao);
-    const janela = novaData.dia ? moverJanela(base, this.novoInicioDaReserva(base, novaData.dia, novaData.hora)) : base;
+    const janela = novaData.dia
+      ? moverJanela(base, this.novoInicioDaReserva(base, novaData.dia, novaData.hora, programacao.data_hora_programada))
+      : base;
     await garantirViaturaLivre(prisma, { veiculoId, janela, excluirReservaId: atual?.id });
 
     const dados = {
