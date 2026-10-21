@@ -38,6 +38,38 @@ export function apagarOsNovos(antes: Set<string>): { apagados: number; presos: s
   return { apagados, presos };
 }
 
+/** O nome das fotos que o seed grava, por pasta (o service acrescenta _<ms>_<aleatório>) */
+const FOTOS_DO_SEED: Record<string, RegExp> = {
+  'uploads/anexos-os': /^(antes|depois|defeito|geral|leitura|termografia)-\d{4}-\d{2}-\d{2}-\d+_\d+_[a-z0-9]+\.png$/,
+  'uploads/anexos': /^anomalia-\d{4}-\d{2}-\d{2}_\d+_[a-z0-9]+\.png$/,
+  'uploads/instrucoes/anexos': /^esquema-[a-z0-9-]+_\d+_[a-z0-9]+\.png$/,
+};
+
+/**
+ * Depois de gravar: as fotos de um seed anterior que ficaram sem linha no
+ * banco (o apagar tira a linha do anexo, não o arquivo, e cada --aplicar
+ * deixava as do anterior no disco). Só o que tem o nome do seed e que nenhum
+ * anexo usa; arquivo de outra origem fica, mesmo sem linha.
+ */
+export function apagarFotosOrfasDoSeed(emUso: Set<string>): { apagados: number; presos: string[] } {
+  let apagados = 0;
+  const presos: string[] = [];
+  for (const [pasta, doSeed] of Object.entries(FOTOS_DO_SEED)) {
+    const dir = path.join(process.cwd(), pasta);
+    if (!fs.existsSync(dir)) continue;
+    for (const nome of fs.readdirSync(dir)) {
+      if (!doSeed.test(nome) || emUso.has(nome)) continue;
+      try {
+        fs.unlinkSync(path.join(dir, nome));
+        apagados++;
+      } catch {
+        presos.push(path.join(dir, nome));
+      }
+    }
+  }
+  return { apagados, presos };
+}
+
 /** Como o dotenv: entre aspas vale o que está dentro; sem aspas, o " #" começa um comentário */
 function valorDoEnv(cru: string): string {
   const aspas = cru.match(/^(["'])(.*)\1(\s+#.*)?$/);

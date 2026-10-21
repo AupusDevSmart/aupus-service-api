@@ -21,7 +21,7 @@ import { TransacaoEmCurso } from '@/core/prisma/transacao-em-curso';
 import { ResetPasswordDto } from '@/core/modules/usuarios/dto/reset-password.dto';
 import { bancoDoAmbiente, exigirApiParada, exigirBackup, exigirBancoConectado, lerOpcoes, montarServicos, validar } from './ambiente';
 import { apagarDadosDoDev, contar, DOMINIO_DO_SEED, TABELAS_CONTADAS } from './apagar';
-import { apagarOsNovos, arquivosDeUpload, lerDoEnv } from './arquivos';
+import { apagarFotosOrfasDoSeed, apagarOsNovos, arquivosDeUpload, lerDoEnv } from './arquivos';
 import type { Cenario } from './cenario';
 import { Relogio } from './relogio';
 import { Sorteio } from './sorteio';
@@ -169,6 +169,18 @@ async function main(): Promise<void> {
         throw erro;
       }
       log(`\nPrévia desfeita: nada foi gravado (${apagados} arquivos de upload desfeitos).`);
+      relatarPresos(presos);
+    }
+
+    if (opcoes.aplicar) {
+      // Gravado: as fotos do seed anterior, cujas linhas o apagar tirou, saem do disco
+      const nomes = await Promise.all([
+        prisma.anexos_os.findMany({ select: { nome: true } }),
+        prisma.anexos_anomalias.findMany({ select: { nome: true } }),
+        prisma.anexos_instrucao.findMany({ select: { nome: true } }),
+      ]);
+      const { apagados, presos } = apagarFotosOrfasDoSeed(new Set(nomes.flat().map((a) => a.nome.trim())));
+      log(`\nFotos de seeds anteriores sem anexo no banco, apagadas: ${apagados}`);
       relatarPresos(presos);
     }
 
