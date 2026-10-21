@@ -118,6 +118,9 @@ export class HistoricoEquipamentoService {
         status: 'CONCLUIDA',
         data_conclusao: { not: null },
         ordem_servico: { status: 'FINALIZADA', deletado_em: null },
+        // A instrução avulsa (SN-86) não é execução de tarefa: pelo nome ela casaria
+        // com a tarefa de mesmo nome e adiaria o próximo ciclo sem a tarefa ter sido feita
+        origem_item: 'TAREFA',
       },
       select: { tarefa_id: true, nome_snapshot: true, data_conclusao: true },
     });
@@ -231,8 +234,10 @@ export class HistoricoEquipamentoService {
       where: {
         equipamento_id: id,
         deletado_em: null,
-        // As que vieram de tarefa já entraram pelo caminho do vínculo.
-        tarefas_os: { none: {} },
+        // As que têm vínculo com o equipamento já entraram pelo caminho do vínculo. O
+        // vínculo SEM equipamento (a instrução avulsa sem ele, SN-86, ou a linha antiga
+        // anterior ao congelamento) não leva a OS a lugar nenhum: sem isto, ela sumia.
+        tarefas_os: { none: { equipamento_id: { not: null } } },
       },
       select: {
         id: true,

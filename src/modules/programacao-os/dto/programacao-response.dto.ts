@@ -409,6 +409,10 @@ export class ProgramacaoResponseDto {
   @ApiPropertyOptional({ description: 'Tarefas da programação', type: [TarefaProgramacaoResponseDto] })
   tarefas_programacao?: TarefaProgramacaoResponseDto[];
 
+  /** SN-86: as instruções avulsas (da origem e as acrescentadas), congeladas */
+  @ApiPropertyOptional({ description: 'Instruções avulsas da programação' })
+  instrucoes?: Array<{ id: string; instrucao_id: string | null; codigo: string | null; nome: string | null; descricao: string | null; ordem: number }>;
+
   // Auditoria
   @ApiPropertyOptional({ description: 'Criado por' })
   criado_por?: string;

@@ -2122,15 +2122,22 @@ model tarefas_programacao_os {
   equipamento_id       String?         @map("equipamento_id") @db.Char(26)
   // Data-alvo do ciclo que gerou este item. Base da idempotencia do cron.
   ciclo_referencia     DateTime?       @map("ciclo_referencia") @db.Timestamp(0)
+  /// SN-86: TAREFA (a linha da tarefa) ou INSTRUCAO (a instrucao avulsa, sem
+  /// tarefa: da anomalia, da solicitacao ou acrescentada pelo planejador)
+  origem_item          String          @default("TAREFA") @map("origem_item") @db.VarChar(12)
+  /// SN-86: a instrucao congelada (rastro; o conteudo e o snapshot)
+  instrucao_id         String?         @map("instrucao_id") @db.VarChar(26)
   created_at           DateTime        @default(now()) @map("created_at")
   updated_at           DateTime        @updatedAt @map("updated_at")
   programacao          programacoes_os @relation(fields: [programacao_id], references: [id], onDelete: Cascade)
   tarefa               tarefas?        @relation(fields: [tarefa_id], references: [id])
+  instrucao            instrucoes?     @relation(fields: [instrucao_id], references: [id], onDelete: SetNull)
 
   @@unique([programacao_id, tarefa_id])
   @@index([programacao_id])
   @@index([tarefa_id])
   @@index([equipamento_id])
+  @@index([instrucao_id])
   @@map("tarefas_programacao_os")
 }
 
@@ -2158,10 +2165,16 @@ model tarefas_os {
   equipamento_id       String?        @map("equipamento_id") @db.Char(26)
   // Data-alvo do ciclo que gerou este item. Base da idempotencia do cron.
   ciclo_referencia     DateTime?      @map("ciclo_referencia") @db.Timestamp(0)
+  /// SN-86: TAREFA (a linha da tarefa) ou INSTRUCAO (a instrucao avulsa, sem
+  /// tarefa: da anomalia, da solicitacao ou acrescentada pelo planejador)
+  origem_item          String         @default("TAREFA") @map("origem_item") @db.VarChar(12)
+  /// SN-86: a instrucao congelada (rastro; o conteudo e o snapshot)
+  instrucao_id         String?        @map("instrucao_id") @db.VarChar(26)
   created_at           DateTime       @default(now()) @map("created_at")
   updated_at           DateTime       @updatedAt @map("updated_at")
   ordem_servico        ordens_servico @relation(fields: [os_id], references: [id], onDelete: Cascade)
   tarefa               tarefas?       @relation(fields: [tarefa_id], references: [id])
+  instrucao            instrucoes?    @relation(fields: [instrucao_id], references: [id], onDelete: SetNull)
   /// Itens do checklist que pertencem a esta tarefa (SPEC-EXECUCAO-DA-OS, D4)
   checklist            checklist_atividades_os[]
   /// SN-59: as fotos da tarefa (e as dos itens dela)
@@ -2170,6 +2183,7 @@ model tarefas_os {
   @@index([os_id])
   @@index([tarefa_id])
   @@index([equipamento_id])
+  @@index([instrucao_id])
   @@map("tarefas_os")
 }
 
@@ -2934,6 +2948,9 @@ model instrucoes {
   sub_instrucoes          sub_instrucoes[]
   recursos                instrucao_recursos[]
   maquinarios             instrucao_maquinarios[]
+  /// SN-86: onde a instrucao entrou avulsa (congelada)
+  programacoes            tarefas_programacao_os[]
+  ordens_servico          tarefas_os[]
   anexos                  anexos_instrucao[]
   tarefas                 tarefas[]
   anomalias_instrucoes    anomalias_instrucoes[]

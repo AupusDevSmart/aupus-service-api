@@ -440,6 +440,8 @@ export class SolicitacoesServicoService {
           orderBy: { ordem: 'asc' }
         },
         solicitacoes_instrucoes: {
+          // A instrução excluída não aparece: semeada na programação, ela dava 400 (SN-86)
+          where: { instrucao: { deleted_at: null } },
           include: {
             instrucao: {
               select: {

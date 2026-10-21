@@ -10,6 +10,7 @@ import {
   Min,
   Max,
   Length,
+  ArrayMaxSize,
 } from 'class-validator';
 import { Type } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
@@ -210,6 +211,18 @@ export class CreateProgramacaoDto {
   @IsArray()
   @IsString({ each: true })
   tarefas_ids?: string[];
+
+  /**
+   * SN-86: as instruções avulsas (que não vêm por tarefa). Sem a lista, na
+   * criação entram as da origem (anomalia ou solicitação); com ela, exatamente
+   * a lista. Na edição, vinda, troca as que havia.
+   */
+  @ApiPropertyOptional({ description: 'Instruções avulsas da programação (as da origem e as acrescentadas)' })
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(50)
+  @IsString({ each: true })
+  instrucoes_ids?: string[];
 
   // Planejamento
   @ApiPropertyOptional({ description: 'Tempo estimado em horas (padrão: 2h)', example: 4.5 })

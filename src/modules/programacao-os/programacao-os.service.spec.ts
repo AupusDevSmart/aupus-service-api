@@ -1056,7 +1056,9 @@ describe('ProgramacaoOSService', () => {
       expect(mockPrismaService.tarefas_programacao_os.updateMany).toHaveBeenCalledWith({
         where: {
           programacao_id: 'clrx1234567890123456789012',
-          tarefa_id: 'clrx1234567890123456789012',
+          // Só a linha da tarefa, pelo id nas duas formas do Char(26) (SN-86)
+          origem_item: 'TAREFA',
+          tarefa_id: { in: ['clrx1234567890123456789012'] },
         },
         data: {
           ordem: 1,
@@ -1064,6 +1066,16 @@ describe('ProgramacaoOSService', () => {
           observacoes: 'Tarefa prioritária',
         },
       });
+    });
+
+    it('programação que não está pendente: 409, e nenhuma linha muda', async () => {
+      jest.spyOn(service, 'buscarPorId').mockResolvedValue({ ...mockProgramacaoData, status: 'APROVADA' });
+      mockPrismaService.tarefas_programacao_os.updateMany.mockClear();
+
+      await expect(service.atualizarTarefasProgramacao('clrx1234567890123456789012', atualizarTarefasDto, 'user123')).rejects.toThrow(
+        'Apenas programações pendentes',
+      );
+      expect(mockPrismaService.tarefas_programacao_os.updateMany).not.toHaveBeenCalled();
     });
   });
 

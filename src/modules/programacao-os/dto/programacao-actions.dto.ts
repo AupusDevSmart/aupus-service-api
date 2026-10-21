@@ -1,4 +1,4 @@
-import { IsString, IsOptional, IsNumber, IsArray, IsNotEmpty, Length, IsEnum, ValidateNested } from 'class-validator';
+import { IsString, IsOptional, IsNumber, IsArray, IsNotEmpty, Length, IsEnum, ValidateNested, ArrayMaxSize, IsIn } from 'class-validator';
 import { Type } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional, PartialType, PickType } from '@nestjs/swagger';
 import { PrioridadeOS } from '@/core';
@@ -147,7 +147,8 @@ export class AdicionarTarefasDto {
 export class AtualizarTarefaDto {
   @ApiProperty({ description: 'ID da tarefa' })
   @IsString()
-  @Length(26, 26)
+  // Até 26: o id antigo (cuid) tem 25 caracteres
+  @Length(1, 26)
   tarefa_id: string;
 
   @ApiProperty({ description: 'Ordem de execução' })
@@ -156,7 +157,7 @@ export class AtualizarTarefaDto {
 
   @ApiPropertyOptional({ description: 'Status da tarefa', enum: ['PENDENTE', 'CONCLUIDA', 'CANCELADA'] })
   @IsOptional()
-  @IsString()
+  @IsIn(['PENDENTE', 'CONCLUIDA', 'CANCELADA'])
   status?: 'PENDENTE' | 'CONCLUIDA' | 'CANCELADA';
 
   @ApiPropertyOptional({ description: 'Observações' })
@@ -168,5 +169,10 @@ export class AtualizarTarefaDto {
 export class AtualizarTarefasDto {
   @ApiProperty({ description: 'Lista de tarefas para atualizar', type: [AtualizarTarefaDto] })
   @IsArray()
+  // Sem o ValidateNested, nada de cada item era conferido (nem a whitelist): `tarefa_id: null`
+  // casava as linhas sem tarefa, e item sem tarefa_id casava todas (achado no SN-86)
+  @ArrayMaxSize(500)
+  @ValidateNested({ each: true })
+  @Type(() => AtualizarTarefaDto)
   tarefas: AtualizarTarefaDto[];
 }

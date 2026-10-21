@@ -57,6 +57,17 @@ import {
   TecnicoProgramacaoDto,
   UpdateProgramacaoDto,
 } from './dto';
+import {
+  ITEM_DA_INSTRUCAO,
+  ITEM_DA_TAREFA,
+  acertarAvulsasDepoisDasTarefas,
+  equipamentoDasAvulsas,
+  gravarInstrucoesDaProgramacao,
+  linhasDaProgramacao,
+  instrucaoDaResposta,
+  instrucoesDaOrigem,
+  vinculoDaOS,
+} from './instrucoes-da-programacao';
 
 /** A programação como as consultas deste service a trazem para a resposta */
 type ProgramacaoParaResposta = programacoes_os & {
@@ -462,6 +473,14 @@ export class ProgramacaoOSService {
         await this.adicionarTarefas(prisma, programacao.id, createDto.tarefas_ids);
       }
 
+      // SN-86: as instruções avulsas. Sem a lista, as da origem (anomalia ou
+      // solicitação): antes a corretiva nascia sem checklist e sem recursos
+      const daOrigem = await instrucoesDaOrigem(prisma, origemDaProgramacao(programacao));
+      const instrucoes = createDto.instrucoes_ids ?? daOrigem;
+      if (instrucoes.length) {
+        await gravarInstrucoesDaProgramacao(prisma, programacao.id, instrucoes, await equipamentoDasAvulsas(prisma, programacao), daOrigem);
+      }
+
       // Criar materiais
       if (createDto.materiais && createDto.materiais.length > 0) {
         await this.criarMateriais(prisma, programacao.id, createDto.materiais);
@@ -508,7 +527,9 @@ export class ProgramacaoOSService {
         usuarioId,
       });
 
-      return this.mapearParaResponse(programacao);
+      // As tarefas e as instruções gravadas acima: a programação lida no create
+      // ainda não as tinha, e a resposta saía com as duas listas vazias
+      return this.mapearParaResponse({ ...programacao, tarefas_programacao: await linhasDaProgramacao(prisma, programacao.id) });
     }, {
       timeout: 15000, // 15 seconds timeout
     });
@@ -532,7 +553,7 @@ export class ProgramacaoOSService {
       solicitacao_servico_id:
         updateDto.solicitacao_servico_id !== undefined ? updateDto.solicitacao_servico_id : programacao.solicitacao_servico_id,
       dados_origem: updateDto.dados_origem !== undefined ? updateDto.dados_origem : programacao.dados_origem,
-      tarefas: await this.prisma.tarefas_programacao_os.count({ where: { programacao_id: id } }),
+      tarefas: await this.prisma.tarefas_programacao_os.count({ where: { programacao_id: id, origem_item: ITEM_DA_TAREFA } }),
       },
       { avulsaAntiga: programacao.origem === 'MANUAL' },
     );
@@ -552,7 +573,7 @@ export class ProgramacaoOSService {
     // Prepare data without undefined fields to avoid Prisma issues
     // ✅ Separar campos de relacionamentos (materiais, ferramentas, tecnicos)
     // unidade_id está no DTO, mas não é coluna: ia para o update e o Prisma recusava (500)
-    const { materiais, ferramentas, tecnicos, itens_orcamento, tarefas_ids, unidade_id: _unidadeId, ...restDto } = updateDto;
+    const { materiais, ferramentas, tecnicos, itens_orcamento, tarefas_ids, instrucoes_ids, unidade_id: _unidadeId, ...restDto } = updateDto;
     const updateData: Record<string, unknown> = {};
 
     Object.keys(restDto).forEach(key => {
@@ -591,6 +612,18 @@ export class ProgramacaoOSService {
           ordem_servico: true,
         },
       });
+
+      // SN-86: as instruções avulsas, trocadas pela lista que veio
+      if (instrucoes_ids !== undefined) {
+        const daOrigem = await instrucoesDaOrigem(prisma, origemDaProgramacao(programacaoAtualizada));
+        await gravarInstrucoesDaProgramacao(prisma, id, instrucoes_ids, await equipamentoDasAvulsas(prisma, programacaoAtualizada), daOrigem);
+      } else if (restDto.equipamento_id !== undefined || restDto.anomalia_id !== undefined || restDto.solicitacao_servico_id !== undefined) {
+        // A avulsa é do equipamento da programação (ou da origem): sem a lista, segue a troca dele
+        await prisma.tarefas_programacao_os.updateMany({
+          where: { programacao_id: id, origem_item: ITEM_DA_INSTRUCAO },
+          data: { equipamento_id: await equipamentoDasAvulsas(prisma, programacaoAtualizada) },
+        });
+      }
 
       // Atualizar recursos (delete + recreate)
       if (materiais !== undefined) {
@@ -663,7 +696,7 @@ export class ProgramacaoOSService {
         { programacaoId: id, codigo: programacao.codigo, usuarioId },
       );
 
-      return this.mapearParaResponse(programacaoAtualizada);
+      return this.mapearParaResponse({ ...programacaoAtualizada, tarefas_programacao: await linhasDaProgramacao(prisma, id) });
     }, {
       timeout: 15000,
     });
@@ -725,7 +758,7 @@ export class ProgramacaoOSService {
     }
     // SN-69: a OS nasceria sem origem
     exigirOrigem(
-      { ...programacao, tarefas: await this.prisma.tarefas_programacao_os.count({ where: { programacao_id: id } }) },
+      { ...programacao, tarefas: await this.prisma.tarefas_programacao_os.count({ where: { programacao_id: id, origem_item: ITEM_DA_TAREFA } }) },
       { avulsaAntiga: true },
     );
 
@@ -928,6 +961,8 @@ export class ProgramacaoOSService {
     if (!anomalia) {
       throw new NotFoundException('Anomalia não encontrada');
     }
+    // O escopo antes do status: o 409 de "não registrada" confirmava que a anomalia de outra planta existe (SN-57)
+    if (user) await this.scopeService.assertEntityInScope('anomalia', anomalia.id, user);
 
     if (anomalia.status !== 'REGISTRADA') {
       throw new ConflictException('Apenas anomalias registradas podem gerar programação');
@@ -974,6 +1009,8 @@ export class ProgramacaoOSService {
     if (!solicitacao) {
       throw new NotFoundException('Solicitação de serviço não encontrada');
     }
+    // O escopo antes do status, como na anomalia (SN-57)
+    if (user) await this.scopeService.assertEntityInScope('solicitacao_servico', solicitacao.id, user);
 
     if (solicitacao.status !== 'REGISTRADA') {
       throw new ConflictException('Apenas solicitações registradas podem gerar programação');
@@ -1115,11 +1152,13 @@ export class ProgramacaoOSService {
   // `user` em todas as rotas de tarefas e na exclusão: antes buscavam a
   // programação sem ele e não conferiam o escopo (SN-40).
   async adicionarTarefasProgramacao(id: string, dto: AdicionarTarefasDto, usuarioId?: string, user?: ScopedUser): Promise<void> {
-    await this.buscarPorId(id, user); // Verificar se existe (e o escopo)
+    const programacao = await this.buscarPorId(id, user); // Verificar se existe (e o escopo)
     await this.conferirPlantaDasNovasTarefas(id, dto.tarefas_ids, user);
 
     await this.prisma.$transaction(async (prisma) => {
       await this.adicionarTarefas(prisma, id, dto.tarefas_ids);
+      // SN-86: a instrução que agora vem pela tarefa deixa de ser avulsa
+      await acertarAvulsasDepoisDasTarefas(prisma, id, await equipamentoDasAvulsas(prisma, programacao));
 
       await this.registrarHistorico(
         prisma,
@@ -1135,14 +1174,20 @@ export class ProgramacaoOSService {
   }
 
   async atualizarTarefasProgramacao(id: string, dto: AtualizarTarefasDto, usuarioId?: string, user?: ScopedUser): Promise<void> {
-    await this.buscarPorId(id, user); // Verificar se existe (e o escopo)
+    const programacao = await this.buscarPorId(id, user); // Verificar se existe (e o escopo)
+    // Como a edição: a aprovada já levou as linhas para a OS
+    if (programacao.status !== StatusProgramacaoOS.PENDENTE) {
+      throw new ConflictException('Apenas programações pendentes podem ter as tarefas alteradas');
+    }
 
     await this.prisma.$transaction(async (prisma) => {
       for (const tarefa of dto.tarefas) {
         await prisma.tarefas_programacao_os.updateMany({
           where: {
             programacao_id: id,
-            tarefa_id: tarefa.tarefa_id,
+            // Só a linha da tarefa: com `tarefa_id: null`, o where casava as instruções avulsas (SN-86)
+            origem_item: ITEM_DA_TAREFA,
+            tarefa_id: { in: variantesDeIds([tarefa.tarefa_id]) },
           },
           data: {
             ordem: tarefa.ordem,
@@ -1492,8 +1537,12 @@ export class ProgramacaoOSService {
     const equipamentos =
       dto.tarefas_ids !== undefined
         ? await equipamentosDasTarefas(this.prisma, dto.tarefas_ids)
-        : (await this.prisma.tarefas_programacao_os.findMany({ where: { programacao_id: id }, select: { equipamento_id: true } }))
-            .map((v) => v.equipamento_id);
+        : // Só as de tarefa: a avulsa (SN-86) leva o equipamento da programação, que já entra
+          // abaixo — o antigo dela barrava trocar a origem para outra planta
+          (await this.prisma.tarefas_programacao_os.findMany({
+            where: { programacao_id: id, origem_item: ITEM_DA_TAREFA },
+            select: { equipamento_id: true },
+          })).map((v) => v.equipamento_id);
 
     const onde = {
       planta_id: dto.planta_id,
@@ -1687,20 +1736,8 @@ export class ProgramacaoOSService {
     if (programacao.tarefas_programacao.length > 0) {
       // O snapshot ja foi congelado na programacao; a OS carrega o mesmo
       // conteudo adiante em vez de reler a tarefa viva.
-      const tarefasOS = programacao.tarefas_programacao.map(tp => ({
-        os_id: os.id,
-        tarefa_id: tp.tarefa_id,
-        ordem: tp.ordem,
-        equipamento_id: tp.equipamento_id ?? null,
-        nome_snapshot: tp.nome_snapshot ?? null,
-        criticidade_snapshot: tp.criticidade_snapshot ?? null,
-        frequencia_snapshot: tp.frequencia_snapshot ?? null,
-        instrucao_tag: tp.instrucao_tag ?? null,
-        instrucao_nome: tp.instrucao_nome ?? null,
-        instrucao_descricao: tp.instrucao_descricao ?? null,
-        ciclo_referencia: tp.ciclo_referencia ?? null,
-      }));
-      await prisma.tarefas_os.createMany({ data: tarefasOS });
+      // As instruções avulsas (SN-86) vão junto, como as tarefas
+      await prisma.tarefas_os.createMany({ data: programacao.tarefas_programacao.map((tp) => vinculoDaOS(tp, os.id)) });
     }
 
     // Copiar materiais para a OS
@@ -2028,7 +2065,12 @@ export class ProgramacaoOSService {
       motivo_rejeicao: programacao.motivo_rejeicao,
       sugestoes_melhoria: programacao.sugestoes_melhoria,
       motivo_cancelamento: programacao.motivo_cancelamento,
-      tarefas_programacao: programacao.tarefas_programacao?.map((tp) => ({
+      // SN-86: as linhas de instrução avulsa saem em `instrucoes`; aqui, só as de tarefa
+      instrucoes: (programacao.tarefas_programacao ?? [])
+        .filter((tp) => tp.origem_item !== ITEM_DA_TAREFA)
+        .sort((a, b) => a.ordem - b.ordem)
+        .map(instrucaoDaResposta),
+      tarefas_programacao: programacao.tarefas_programacao?.filter((tp) => tp.origem_item === ITEM_DA_TAREFA).map((tp) => ({
         id: tp.id,
         programacao_id: tp.programacao_id,
         tarefa_id: tp.tarefa_id,

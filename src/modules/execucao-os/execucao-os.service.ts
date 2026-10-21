@@ -56,6 +56,7 @@ import { variantesDeId, variantesDeIds } from '../tarefas/ids';
 import { devolverViatura } from '../reservas/ocupacao-da-viatura';
 import type { Evento } from '../notificacoes/catalogo';
 import { registrarNotificacao } from '../notificacoes/registrar-notificacao';
+import { vinculoDaOS } from '../programacao-os/instrucoes-da-programacao';
 
 /**
  * Nome da tarefa dentro de uma OS, sem depender da tarefa viva.
@@ -814,23 +815,8 @@ export class ExecucaoOSService {
 
       // Copiar tarefas, carregando adiante o conteudo congelado na programacao
       if (programacao.tarefas_programacao.length > 0) {
-        await prisma.tarefas_os.createMany({
-          data: programacao.tarefas_programacao.map(tp => ({
-            os_id: osId,
-            tarefa_id: tp.tarefa_id,
-            ordem: tp.ordem,
-            equipamento_id: tp.equipamento_id ?? null,
-            status: 'PENDENTE',
-            observacoes: tp.observacoes,
-            nome_snapshot: tp.nome_snapshot ?? null,
-            criticidade_snapshot: tp.criticidade_snapshot ?? null,
-            frequencia_snapshot: tp.frequencia_snapshot ?? null,
-            instrucao_tag: tp.instrucao_tag ?? null,
-            instrucao_nome: tp.instrucao_nome ?? null,
-            instrucao_descricao: tp.instrucao_descricao ?? null,
-            ciclo_referencia: tp.ciclo_referencia ?? null,
-          })),
-        });
+        // As instruções avulsas (SN-86) vão junto, como as tarefas
+        await prisma.tarefas_os.createMany({ data: programacao.tarefas_programacao.map((tp) => vinculoDaOS(tp, osId)) });
       }
 
       // Gerar checklist padrão
@@ -1640,10 +1626,12 @@ export class ExecucaoOSService {
 
     const dados: Prisma.checklist_atividades_osCreateManyInput[] = [];
 
+    // Todos os vínculos (SN-86): a instrução avulsa (da anomalia, da solicitação ou
+    // acrescentada) não tem tarefa, e antes ficava de fora — a corretiva nascia sem checklist
     const vinculos = await prisma.tarefas_os.findMany({
-      where: { os_id: osId, tarefa_id: { not: null } },
+      where: { os_id: osId },
       orderBy: { ordem: 'asc' },
-      select: { id: true, tarefa_id: true, nome_snapshot: true, instrucao_nome: true },
+      select: { id: true, tarefa_id: true, instrucao_id: true, nome_snapshot: true, instrucao_nome: true },
     });
 
     // As tarefas vêm numa consulta à parte, pelo id sem espaço. Pelo include
@@ -1651,7 +1639,7 @@ export class ExecucaoOSService {
     // `tarefas.id` (VarChar(26)) volta NULO para ids de 25 caracteres — o
     // Prisma compara em JS —, e a OS nascia só com os itens gerais, sem as
     // sub-instruções das tarefas.
-    const idsDasTarefas = vinculos.map((v) => v.tarefa_id!.trim());
+    const idsDasTarefas = vinculos.map((v) => v.tarefa_id?.trim()).filter((id): id is string => !!id);
     const tarefasBase: Array<{ id: string; nome: string; instrucao_id: string | null; instrucao: { nome: string } | null }> =
       idsDasTarefas.length
         ? await prisma.tarefas.findMany({
@@ -1663,7 +1651,13 @@ export class ExecucaoOSService {
     // Mesma armadilha um nível abaixo: `sub_instrucoes.instrucao_id` é Char(26)
     // e `instrucoes.id` é VarChar(26). Pelo include, instrução de id com 25
     // caracteres vinha com a lista de sub-instruções VAZIA.
-    const idsDasInstrucoes = [...new Set(tarefasBase.map((t) => t.instrucao_id?.trim()).filter(Boolean) as string[])];
+    const idsDasInstrucoes = [
+      ...new Set(
+        [...tarefasBase.map((t) => t.instrucao_id), ...vinculos.map((v) => v.instrucao_id)]
+          .map((id) => id?.trim())
+          .filter(Boolean) as string[],
+      ),
+    ];
     const subs = idsDasInstrucoes.length
       ? await prisma.sub_instrucoes.findMany({
           where: { instrucao_id: { in: variantesDeIds(idsDasInstrucoes) } },
@@ -1698,11 +1692,14 @@ export class ExecucaoOSService {
         },
       ]),
     );
-    const tarefasDaOS = vinculos.map((v) => ({ ...v, tarefa: tarefaPorId.get(v.tarefa_id!.trim()) ?? null }));
+    const tarefasDaOS = vinculos.map((v) => ({ ...v, tarefa: v.tarefa_id ? (tarefaPorId.get(v.tarefa_id.trim()) ?? null) : null }));
 
     let ordem = 1;
     for (const vinculo of tarefasDaOS) {
-      const subInstrucoes = vinculo.tarefa?.instrucao?.sub_instrucoes ?? [];
+      // A avulsa (SN-86) traz a instrução no vínculo; a linha de tarefa, pela tarefa
+      const subInstrucoes = vinculo.instrucao_id
+        ? (subsPorInstrucao.get(vinculo.instrucao_id.trim()) ?? [])
+        : (vinculo.tarefa?.instrucao?.sub_instrucoes ?? []);
       if (subInstrucoes.length === 0) continue;
 
       // Prefixo identifica a que tarefa cada etapa pertence quando a OS junta
@@ -1993,7 +1990,9 @@ export class ExecucaoOSService {
         // Ponte para a instrução e para o plano: o congelamento guarda o nome
         // e a descrição do que foi pedido, mas não os ids — e é o id que abre
         // o sheet da instrução com etapas, recursos e anexos.
-        instrucao_id: to.tarefa?.instrucao_id ?? null,
+        instrucao_id: to.instrucao_id?.trim() ?? to.tarefa?.instrucao_id ?? null,
+        // SN-86: TAREFA ou INSTRUCAO (a avulsa, sem tarefa)
+        origem_item: to.origem_item,
         plano_id: to.tarefa?.plano_manutencao?.id ?? null,
         plano_nome: to.tarefa?.plano_manutencao?.nome ?? null,
         // Só id e nome: `categoria` e `tipo_manutencao` foram droppadas da

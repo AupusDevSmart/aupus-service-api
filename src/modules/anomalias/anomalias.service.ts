@@ -156,6 +156,8 @@ export class AnomaliasService {
           orderBy: { created_at: 'desc' }
         },
         anomalias_instrucoes: {
+          // A instrução excluída não aparece: semeada na programação, ela dava 400 (SN-86)
+          where: { instrucao: { deleted_at: null } },
           include: {
             instrucao: {
               select: { id: true, codigo: true, nome: true, status: true, ativo: true }
@@ -229,6 +231,7 @@ export class AnomaliasService {
         },
           usuario: { select: { id: true, nome: true, email: true } },
           anomalias_instrucoes: {
+            where: { instrucao: { deleted_at: null } },
             include: {
               instrucao: {
                 select: { id: true, codigo: true, nome: true, status: true, ativo: true }
@@ -290,6 +293,8 @@ export class AnomaliasService {
           orderBy: { created_at: 'desc' }
         },
         anomalias_instrucoes: {
+          // A instrução excluída não aparece: semeada na programação, ela dava 400 (SN-86)
+          where: { instrucao: { deleted_at: null } },
           include: {
             instrucao: {
               select: { id: true, codigo: true, nome: true, status: true, ativo: true }
