@@ -16,9 +16,24 @@ const url = process.env.DATABASE_URL_TEST
 
 process.env.DATABASE_URL = url;
 
-if (!/aupus_test/.test(url)) {
+/**
+ * O nome do banco, nao "aupus_test em qualquer parte da URL" (passava com
+ * `?x=aupus_test` apontando para outro banco). A mensagem nao repete a URL:
+ * ela traz a senha.
+ */
+function bancoDaUrl(texto: string): { host: string; banco: string } | null {
+  try {
+    const { hostname, pathname } = new URL(texto);
+    return { host: hostname, banco: decodeURIComponent(pathname.replace(/^\//, '')) };
+  } catch {
+    return null;
+  }
+}
+
+const alvo = bancoDaUrl(url);
+if (alvo?.banco !== 'aupus_test') {
   throw new Error(
-    `Os testes so rodam contra o banco de teste. DATABASE_URL aponta para: ${url}`,
+    `Os testes so rodam contra o banco aupus_test. DATABASE_URL aponta para: ${alvo ? `${alvo.banco} em ${alvo.host}` : 'uma URL que nao se le'}`,
   );
 }
 

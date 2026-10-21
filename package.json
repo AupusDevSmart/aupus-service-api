@@ -25,7 +25,8 @@
     "docker:logs": "docker-compose logs -f app",
     "backup": "ts-node src/scripts/backup-database.ts",
     "restore": "ts-node src/scripts/restore-database.ts",
-    "test:db": "jest --runInBand src/core/modules/ativos-funcionais src/modules/planos-manutencao"
+    "test:db": "jest --runInBand src/core/modules/ativos-funcionais src/modules/planos-manutencao",
+    "seed:dev": "ts-node -r tsconfig-paths/register scripts/seed-dev/semear.ts"
   },
   "jest": {
     "moduleFileExtensions": [
@@ -81,6 +82,7 @@
     "supertest": "^7.1.4",
     "ts-jest": "^29.4.1",
     "ts-node": "^10.9.2",
+    "tsconfig-paths": "4.2.0",
     "typescript": "^5.9.2",
     "typescript-eslint": "^8.30.1"
   },
