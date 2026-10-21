@@ -56,7 +56,8 @@ describe('migrarEquipamentosParaPosicoes (banco real)', () => {
     // com equipamento ainda apontando viola a constraint, e o teste falha por
     // sujeira de limpeza — nao por defeito no codigo.
     await prisma.ativos_funcionais_equipamentos.deleteMany({});
-    await prisma.equipamentos.updateMany({ data: { ativo_funcional_id: null, ativo_na_posicao: false } });
+    // De volta ao padrão (sem posição = verdadeiro): o falso trava o gerador de preventivas para o aupus_test inteiro
+    await prisma.equipamentos.updateMany({ where: { ativo_funcional_id: { not: null } }, data: { ativo_funcional_id: null, ativo_na_posicao: true } });
     await prisma.equipamentos.deleteMany({ where: { unidade_id: ID_UNIDADE } });
     await prisma.equipamentos.deleteMany({ where: { nome: { startsWith: 'MIG ' } } });
     await prisma.ativos_funcionais.deleteMany({ where: { unidade_id: ID_UNIDADE } });

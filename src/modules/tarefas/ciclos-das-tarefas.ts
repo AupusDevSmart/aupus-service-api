@@ -85,9 +85,16 @@ export function ondeElegivel(filtro: { equipamentoIds?: string[]; plantas?: stri
     // o equipamento que tem unidade_id, e a UAR (sem unidade) ficava viva
     equipamento: {
       deleted_at: null,
+      // Fora da posição (foi ao fabricante, ao conserto) não há o que manter onde
+      // estava: a preventiva saía toda madrugada para o equipamento que saiu
+      // (achado do SN-88). O plano fica; voltou a uma posição, volta a vencer.
+      // O que nunca teve posição tem o padrão verdadeiro e segue como antes
+      ativo_na_posicao: true,
       // AND: os dois filtros são OR, e espalhados na mesma chave um apagaria o outro
       AND: [
-        { OR: [{ equipamento_pai_id: null }, { equipamento_pai: { deleted_at: null } }] },
+        // O componente vai junto com a UC: só ela é tirada da posição, e a
+        // ventoinha do inversor que foi ao fabricante não tem onde ser mantida
+        { OR: [{ equipamento_pai_id: null }, { equipamento_pai: { deleted_at: null, ativo_na_posicao: true } }] },
         ...(filtro.plantas ? [equipamentoNasPlantas(variantesDeIds(filtro.plantas))] : []),
       ],
     },
