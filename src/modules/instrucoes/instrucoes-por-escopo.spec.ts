@@ -36,10 +36,10 @@ describe('instrução: anomalias, solicitações e tarefas no escopo (banco real
   const anomalia: Record<'a' | 'uar' | 'b', string> = { a: '', uar: '', b: '' };
 
   const apagar = async () => {
-    await prisma.anomalias_instrucoes.deleteMany({ where: { instrucao: { tag: PREFIXO } } });
-    await prisma.solicitacoes_instrucoes.deleteMany({ where: { instrucao: { tag: PREFIXO } } });
+    await prisma.anomalias_instrucoes.deleteMany({ where: { instrucao: { codigo: PREFIXO } } });
+    await prisma.solicitacoes_instrucoes.deleteMany({ where: { instrucao: { codigo: PREFIXO } } });
     await prisma.tarefas.deleteMany({ where: { tag: { startsWith: PREFIXO } } });
-    await prisma.instrucoes.deleteMany({ where: { tag: PREFIXO } });
+    await prisma.instrucoes.deleteMany({ where: { codigo: PREFIXO } });
     await prisma.anomalias.deleteMany({ where: { descricao: { startsWith: PREFIXO } } });
     await prisma.solicitacoes_servico.deleteMany({ where: { numero: { startsWith: PREFIXO } } });
     await prisma.equipamentos.deleteMany({ where: { id: UAR_A } });
@@ -72,7 +72,7 @@ describe('instrução: anomalias, solicitações e tarefas no escopo (banco real
 
     instrucaoId = (
       await prisma.instrucoes.create({
-        data: { tag: PREFIXO, nome: 'Limpeza', descricao: 'x', categoria: 'MECANICA', tipo_manutencao: 'PREVENTIVA', condicao_ativo: 'PARADO', criticidade: 3, duracao_estimada: 1, tempo_estimado: 30 },
+        data: { codigo: PREFIXO, nome: 'Limpeza', descricao: 'x'},
       })
     ).id;
 

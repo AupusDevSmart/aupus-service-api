@@ -1112,8 +1112,9 @@ describe('ExecucaoOSService', () => {
           { id: 'TAREFA1', nome: 'Relação de transformação', instrucao_id: 'INST1', instrucao: { nome: 'Ensaio TTR' } },
         ]);
         mockPrismaService.sub_instrucoes.findMany.mockResolvedValue([
-          { instrucao_id: 'INST1 ', descricao: 'Desconectar os cabos', obrigatoria: true, tempo_estimado: 10 },
-          { instrucao_id: 'INST1 ', descricao: 'Realizar o ensaio', obrigatoria: true, tempo_estimado: 20 },
+          // O passo em horas (SN-85); o item da OS guarda minutos: 0,17 h = 10 min
+          { instrucao_id: 'INST1 ', descricao: 'Desconectar os cabos', obrigatoria: true, duracao_horas: 0.17, registro: 'VERIFICACAO' },
+          { instrucao_id: 'INST1 ', descricao: 'Realizar o ensaio', obrigatoria: true, duracao_horas: null, registro: 'VERIFICACAO' },
         ]);
 
         await service.iniciar('clrx1234567890123456789012', {

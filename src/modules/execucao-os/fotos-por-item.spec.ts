@@ -58,28 +58,22 @@ describe('fotos por tarefa e por item do checklist (banco real)', () => {
     await limpar();
     planta = await criarPlantaDeTeste(prisma, 'fotositem', '95.000.000/0001-59');
     await prisma.tarefas.deleteMany({ where: { tag: { startsWith: 'TESTE-FOTO-' } } });
-    await prisma.sub_instrucoes.deleteMany({ where: { instrucao: { tag: TAG_INSTRUCAO } } });
-    await prisma.instrucoes.deleteMany({ where: { tag: TAG_INSTRUCAO } });
+    await prisma.sub_instrucoes.deleteMany({ where: { instrucao: { codigo: TAG_INSTRUCAO } } });
+    await prisma.instrucoes.deleteMany({ where: { codigo: TAG_INSTRUCAO } });
 
     instrucaoId = (
       await prisma.instrucoes.create({
         data: {
-          tag: TAG_INSTRUCAO,
+          codigo: TAG_INSTRUCAO,
           nome: 'Troca de fusível',
           descricao: 'Instrução de teste',
-          categoria: 'ELETRICA',
-          tipo_manutencao: 'CORRETIVA',
-          condicao_ativo: 'PARADO',
-          criticidade: 3,
-          duracao_estimada: 1,
-          tempo_estimado: 30,
         },
       })
     ).id;
     await prisma.sub_instrucoes.createMany({
       data: [
         { instrucao_id: instrucaoId, descricao: 'Fotografar o fusível queimado', ordem: 1, obrigatoria: true, exige_foto: true },
-        { instrucao_id: instrucaoId, descricao: 'Tensão depois da troca', ordem: 2, tipo: 'LEITURA', unidade: 'V', exige_foto: true },
+        { instrucao_id: instrucaoId, descricao: 'Tensão depois da troca', ordem: 2, registro: 'LEITURA', unidade: 'V', exige_foto: true },
         { instrucao_id: instrucaoId, descricao: 'Limpar o painel', ordem: 3 },
       ],
     });
@@ -94,8 +88,8 @@ describe('fotos por tarefa e por item do checklist (banco real)', () => {
     await limpar();
     for (const caminho of arquivosCriados) if (fs.existsSync(caminho)) fs.unlinkSync(caminho);
     await prisma.tarefas.deleteMany({ where: { tag: { startsWith: 'TESTE-FOTO-' } } });
-    await prisma.sub_instrucoes.deleteMany({ where: { instrucao: { tag: TAG_INSTRUCAO } } });
-    await prisma.instrucoes.deleteMany({ where: { tag: TAG_INSTRUCAO } });
+    await prisma.sub_instrucoes.deleteMany({ where: { instrucao: { codigo: TAG_INSTRUCAO } } });
+    await prisma.instrucoes.deleteMany({ where: { codigo: TAG_INSTRUCAO } });
     await planta.apagar();
     await prisma.$disconnect();
   });

@@ -13,7 +13,7 @@ type EquipamentoDaAnomalia = Prisma.equipamentosGetPayload<{
 
 /** O vinculo com a instrucao como o service o inclui */
 type InstrucaoDaAnomalia = Prisma.anomalias_instrucoesGetPayload<{
-  include: { instrucao: { select: { id: true; tag: true; nome: true; status: true; ativo: true } } };
+  include: { instrucao: { select: { id: true; codigo: true; nome: true; status: true; ativo: true } } };
 }>;
 
 export class AnomaliaResponseDto {

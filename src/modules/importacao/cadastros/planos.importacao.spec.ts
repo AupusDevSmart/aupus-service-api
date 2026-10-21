@@ -29,15 +29,12 @@ describe('Importação de planos de manutenção (banco real)', () => {
   let inspecao: string;
   let disparo: jest.SpyInstance;
 
-  const instrucao = async (tag: string, nome: string) =>
+  const instrucao = async (codigo: string, nome: string) =>
     (
       await prisma.instrucoes.upsert({
-        where: { tag },
+        where: { codigo },
         update: { nome, deleted_at: null, ativo: true },
-        create: {
-          tag, nome, descricao: 'Teste', categoria: 'LIMPEZA', tipo_manutencao: 'PREVENTIVA',
-          condicao_ativo: 'QUALQUER', criticidade: 3, duracao_estimada: 1, tempo_estimado: 60,
-        },
+        create: { codigo, nome, descricao: 'Teste' },
       })
     ).id.trim();
 
@@ -70,7 +67,7 @@ describe('Importação de planos de manutenção (banco real)', () => {
   afterEach(() => disparo.mockRestore());
   afterAll(async () => {
     await limpar();
-    await prisma.instrucoes.deleteMany({ where: { tag: { in: ['TST-IMP-PL1', 'TST-IMP-PL2'] } } });
+    await prisma.instrucoes.deleteMany({ where: { codigo: { in: ['TST-IMP-PL1', 'TST-IMP-PL2'] } } });
     await prisma.categorias_equipamentos.deleteMany({ where: { id: CATEGORIA } });
     await prisma.usuarios.deleteMany({ where: { id: usuario.id } });
     await prisma.$disconnect();

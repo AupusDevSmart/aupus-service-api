@@ -2,7 +2,8 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '@/core';
 import { Prisma } from '@prisma/client';
-import { subtotalDaLinha } from '../recursos/regras-do-recurso';
+import { variantesDeIds } from '../tarefas/ids';
+import { linhaDoMaquinario, linhaDoRecurso } from '../instrucoes/custo-da-instrucao';
 
 /**
  * A proposta comercial de uma solicitação de serviço.
@@ -75,26 +76,30 @@ export class PropostaService {
       return;
     }
 
-    const [instrucoes, recursos] = await Promise.all([
+    // As linhas pelas variantes do id: instrucao_recursos.instrucao_id é Char(26)
+    // e o id de 25 caracteres cru não casava (a sugestão saía zero)
+    const [instrucoes, recursos, maquinarios] = await Promise.all([
       db.instrucoes.findMany({
         where: { id: { in: instrucaoIds } },
-        select: { id: true, tag: true, nome: true },
+        select: { id: true, codigo: true, nome: true },
       }),
-      db.recursos_instrucao.findMany({
-        where: { instrucao_id: { in: instrucaoIds } },
+      db.instrucao_recursos.findMany({
+        where: { instrucao_id: { in: variantesDeIds(instrucaoIds) } },
         include: { recurso: true },
+      }),
+      db.instrucao_maquinarios.findMany({
+        where: { instrucao_id: { in: instrucaoIds } },
+        include: { maquinario: true },
       }),
     ]);
 
-    // A soma do catálogo por instrução, que vira a sugestão de valor.
+    // O custo da instrução (a conta do AupusProject, SN-85), que vira a sugestão
+    // de valor. A linha sem preço entra como zero: é sugestão, e a pessoa ajusta
     const somaPorInstrucao = new Map<string, number>();
-    for (const r of recursos) {
-      const chave = r.instrucao_id.trim();
-      // O custo da linha pela regra do recurso (SN-83): a linha em horas de um
-      // instrumento por diária vira diárias, não horas vezes o preço da diária
-      const custo = r.recurso ? (subtotalDaLinha(r.recurso, r) ?? 0) : 0;
-      somaPorInstrucao.set(chave, (somaPorInstrucao.get(chave) ?? 0) + custo);
-    }
+    const somar = (instrucaoId: string, custo: number | null) =>
+      somaPorInstrucao.set(instrucaoId.trim(), (somaPorInstrucao.get(instrucaoId.trim()) ?? 0) + (custo ?? 0));
+    for (const r of recursos) somar(r.instrucao_id, linhaDoRecurso(r).subtotal);
+    for (const m of maquinarios) somar(m.instrucao_id, linhaDoMaquinario(m).subtotal);
 
     const porId = new Map(instrucoes.map((i) => [i.id.trim(), i]));
 
@@ -108,7 +113,7 @@ export class PropostaService {
         return {
           solicitacao_id: solicitacaoId,
           instrucao_id: id,
-          descricao: this.rotulo(instrucao.tag, instrucao.nome),
+          descricao: this.rotulo(instrucao.codigo, instrucao.nome),
           quantidade: 1,
           preco_unitario_original: valor,
           preco_unitario: valor,
@@ -123,9 +128,9 @@ export class PropostaService {
     await this.recalcular(solicitacaoId, db);
   }
 
-  /** "INST-003 - Troca de rolamento", ou só o nome quando não há tag. */
-  private rotulo(tag: string | null | undefined, nome: string): string {
-    const limpa = tag?.trim();
+  /** "INST-003 - Troca de rolamento", ou só o nome quando não há código. */
+  private rotulo(codigo: string | null | undefined, nome: string): string {
+    const limpa = codigo?.trim();
     return limpa ? `${limpa} - ${nome}` : nome;
   }
 

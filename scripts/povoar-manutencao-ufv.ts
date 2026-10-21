@@ -40,12 +40,6 @@ const INSTRUCOES = [
     nome: 'Inspeção termográfica do inversor',
     descricao:
       'Registrar imagem térmica dos módulos de potência, barramentos CC/CA e conexões com o inversor em operação. Investigar qualquer ponto com delta acima de 10 °C em relação aos pontos equivalentes.',
-    categoria: 'ELETRICA',
-    tipo_manutencao: 'PREDITIVA',
-    condicao_ativo: 'FUNCIONANDO',
-    criticidade: 4,
-    duracao_estimada: 1.5,
-    tempo_estimado: 1,
     sub_instrucoes: [
       'Confirmar que o inversor está em operação e com carga representativa',
       'Registrar imagem térmica dos módulos de potência',
@@ -58,12 +52,6 @@ const INSTRUCOES = [
     nome: 'Limpeza dos filtros de ventilação do inversor',
     descricao:
       'Remover, limpar e recolocar os filtros de ar. Filtro obstruído eleva a temperatura interna e derrata o inversor nas horas de maior irradiância.',
-    categoria: 'LIMPEZA',
-    tipo_manutencao: 'PREVENTIVA',
-    condicao_ativo: 'PARADO',
-    criticidade: 3,
-    duracao_estimada: 1,
-    tempo_estimado: 0.75,
     sub_instrucoes: [
       'Desligar o inversor pelo seccionador CC e CA',
       'Remover os filtros e limpar com ar comprimido',
@@ -76,12 +64,6 @@ const INSTRUCOES = [
     nome: 'Reaperto das conexões CC e CA do inversor',
     descricao:
       'Reapertar todas as conexões de potência com torquímetro, no torque indicado pelo fabricante. Conexão frouxa é a causa mais comum de aquecimento e falha de string.',
-    categoria: 'ELETRICA',
-    tipo_manutencao: 'PREVENTIVA',
-    condicao_ativo: 'PARADO',
-    criticidade: 5,
-    duracao_estimada: 2,
-    tempo_estimado: 1.5,
     sub_instrucoes: [
       'Bloquear e sinalizar o equipamento',
       'Conferir ausência de tensão nos barramentos',
@@ -95,12 +77,6 @@ const INSTRUCOES = [
     nome: 'Limpeza dos módulos fotovoltaicos',
     descricao:
       'Lavar os módulos com água desmineralizada e escova macia, no início da manhã ou fim de tarde. Sujidade acumulada chega a custar mais de 5% de geração.',
-    categoria: 'LIMPEZA',
-    tipo_manutencao: 'PREVENTIVA',
-    condicao_ativo: 'QUALQUER',
-    criticidade: 2,
-    duracao_estimada: 4,
-    tempo_estimado: 3,
     sub_instrucoes: [
       'Verificar temperatura dos módulos antes de aplicar água',
       'Lavar as fileiras com água desmineralizada e escova macia',
@@ -112,12 +88,6 @@ const INSTRUCOES = [
     nome: 'Inspeção visual dos módulos fotovoltaicos',
     descricao:
       'Procurar trincas, delaminação, pontos quentes, oxidação de conectores MC4 e sombreamento novo. Fotografar e abrir anomalia para cada ocorrência.',
-    categoria: 'INSPECAO',
-    tipo_manutencao: 'INSPECAO',
-    condicao_ativo: 'QUALQUER',
-    criticidade: 3,
-    duracao_estimada: 2,
-    tempo_estimado: 1.5,
     sub_instrucoes: [
       'Percorrer as fileiras procurando trincas e delaminação',
       'Conferir conectores MC4 quanto a oxidação',
@@ -130,12 +100,6 @@ const INSTRUCOES = [
     nome: 'Teste de atuação do disjuntor',
     descricao:
       'Ensaiar a atuação por sobrecorrente e verificar tempo de resposta contra a curva de proteção do projeto.',
-    categoria: 'ELETRICA',
-    tipo_manutencao: 'PREVENTIVA',
-    condicao_ativo: 'PARADO',
-    criticidade: 5,
-    duracao_estimada: 2,
-    tempo_estimado: 1.5,
     sub_instrucoes: [
       'Isolar o circuito e sinalizar',
       'Ensaiar atuação por sobrecorrente',
@@ -148,12 +112,6 @@ const INSTRUCOES = [
     nome: 'Inspeção termográfica do quadro de distribuição',
     descricao:
       'Termografia do quadro com carga, procurando desequilíbrio entre fases e conexões aquecidas.',
-    categoria: 'ELETRICA',
-    tipo_manutencao: 'PREDITIVA',
-    condicao_ativo: 'FUNCIONANDO',
-    criticidade: 4,
-    duracao_estimada: 1,
-    tempo_estimado: 0.75,
     sub_instrucoes: [
       'Abrir o quadro com o EPI adequado',
       'Registrar imagem térmica de cada fase',
@@ -165,12 +123,6 @@ const INSTRUCOES = [
     nome: 'Análise físico-química do óleo isolante',
     descricao:
       'Coletar amostra do óleo e enviar para ensaio de rigidez dielétrica, teor de água e acidez.',
-    categoria: 'ELETRICA',
-    tipo_manutencao: 'PREDITIVA',
-    condicao_ativo: 'FUNCIONANDO',
-    criticidade: 5,
-    duracao_estimada: 1.5,
-    tempo_estimado: 1,
     sub_instrucoes: [
       'Coletar amostra pelo registro inferior, descartando o primeiro volume',
       'Identificar e lacrar a amostra',
@@ -182,12 +134,6 @@ const INSTRUCOES = [
     nome: 'Verificação de nível e vazamento de óleo',
     descricao:
       'Conferir o nível no visor, procurar vazamento em juntas, radiadores e buchas, e verificar o sílica-gel do respiro.',
-    categoria: 'INSPECAO',
-    tipo_manutencao: 'INSPECAO',
-    condicao_ativo: 'FUNCIONANDO',
-    criticidade: 4,
-    duracao_estimada: 0.5,
-    tempo_estimado: 0.5,
     sub_instrucoes: [
       'Conferir o nível de óleo no visor',
       'Inspecionar juntas, radiadores e buchas',
@@ -199,12 +145,6 @@ const INSTRUCOES = [
     nome: 'Verificação de comunicação e leitura do medidor',
     descricao:
       'Conferir se o medidor está publicando no supervisório e comparar a leitura local com a exibida no sistema.',
-    categoria: 'INSTRUMENTACAO',
-    tipo_manutencao: 'INSPECAO',
-    condicao_ativo: 'FUNCIONANDO',
-    criticidade: 3,
-    duracao_estimada: 0.5,
-    tempo_estimado: 0.5,
     sub_instrucoes: [
       'Conferir se há publicação recente no supervisório',
       'Comparar a leitura do display com a do sistema',
@@ -335,34 +275,28 @@ async function main() {
   for (const def of INSTRUCOES) {
     const existente = await prisma.instrucoes.findFirst({
       where: { nome: def.nome, deleted_at: null },
-      select: { id: true, tag: true },
+      select: { id: true, codigo: true },
     });
 
     if (existente) {
       instrucaoPorChave.set(def.chave, existente.id);
-      log(`  = ${existente.tag} ${def.nome} (já existia)`);
+      log(`  = ${existente.codigo} ${def.nome} (já existia)`);
       continue;
     }
 
     const criada = await instrucoesService.criar({
       nome: def.nome,
       descricao: def.descricao,
-      categoria: def.categoria,
-      tipo_manutencao: def.tipo_manutencao,
-      condicao_ativo: def.condicao_ativo,
-      criticidade: def.criticidade,
-      duracao_estimada: def.duracao_estimada,
-      tempo_estimado: def.tempo_estimado,
-      criado_por: usuarioId,
+      // SN-85: a instrução não tem mais categoria, tipo, criticidade nem tempo; a duração é dos passos
       sub_instrucoes: def.sub_instrucoes.map((descricao, i) => ({
         descricao,
         ordem: i + 1,
-        tempo_estimado: 0.25,
+        duracao_horas: 0.25,
       })),
-    } as Payload<InstrucoesService['criar']>);
+    } as Payload<InstrucoesService['criar']>, usuarioId);
 
     instrucaoPorChave.set(def.chave, criada.id);
-    log(`  + ${criada.tag} ${def.nome}`);
+    log(`  + ${criada.codigo} ${def.nome}`);
   }
 
   // ------------------------------------------------------ planos (templates)

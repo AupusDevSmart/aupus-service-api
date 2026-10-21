@@ -119,8 +119,16 @@ export class MaquinariosService {
    * vínculo chega no SN-85), não há o que bloquear; depois, o mesmo bloqueio do
    * recurso: em uso, desativa.
    */
+  /** Bloqueado enquanto alguma instrução usar o maquinário, como o recurso (SN-85): desativar é o caminho */
   async remover(id: string) {
     const maquinario = await this.buscarPorId(id);
+    const usos = await this.prisma.instrucao_maquinarios.count({ where: { maquinario_id: maquinario.id } });
+    if (usos > 0) {
+      throw new BadRequestException(
+        `Este maquinário está em uso em ${usos} ${usos === 1 ? 'instrução' : 'instruções'}. ` +
+          'Desative-o em vez de remover, ou troque o maquinário nessas instruções antes.',
+      );
+    }
     await this.prisma.maquinarios.update({ where: { id: maquinario.id }, data: { deleted_at: new Date(), ativo: false } });
     return { message: 'Maquinário removido com sucesso' };
   }

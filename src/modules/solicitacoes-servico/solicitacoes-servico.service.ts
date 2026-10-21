@@ -444,9 +444,8 @@ export class SolicitacoesServicoService {
             instrucao: {
               select: {
                 id: true,
-                tag: true,
-                nome: true,
-                criticidade: true
+                codigo: true,
+                nome: true
               }
             }
           },

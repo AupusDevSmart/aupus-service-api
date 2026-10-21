@@ -371,7 +371,7 @@ describe('ProgramacaoOSService', () => {
           frequencia: 'ANUAL',
           deleted_at: null,
           instrucao: {
-            tag: 'INST-052',
+            codigo: 'INST-052',
             nome: 'Ensaio TTR',
             descricao: 'Medição de relação de transformação em TP',
           },
@@ -548,7 +548,7 @@ describe('ProgramacaoOSService', () => {
           deleted_at: null,
         },
         include: {
-          instrucao: { select: { tag: true, nome: true, descricao: true } },
+          instrucao: { select: { codigo: true, nome: true, descricao: true } },
         },
       });
 

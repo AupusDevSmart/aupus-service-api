@@ -56,8 +56,7 @@ describe('Importação de equipamentos (banco real)', () => {
     await prisma.instrucoes.upsert({
       where: { id: INSTRUCAO }, update: { deleted_at: null },
       create: {
-        id: INSTRUCAO, tag: 'TST-IMP-EQ1', nome: 'Inspeção do inversor', descricao: 'Teste', categoria: 'INSPECAO',
-        tipo_manutencao: 'PREVENTIVA', condicao_ativo: 'QUALQUER', criticidade: 3, duracao_estimada: 1, tempo_estimado: 60,
+        id: INSTRUCAO, codigo: 'TST-IMP-EQ1', nome: 'Inspeção do inversor', descricao: 'Teste',
       },
     });
     await prisma.planos_manutencao.upsert({

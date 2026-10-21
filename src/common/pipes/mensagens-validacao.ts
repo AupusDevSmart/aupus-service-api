@@ -47,6 +47,16 @@ const NOMES: Record<string, string> = {
   valor_minimo: 'mínimo da faixa',
   valor_maximo: 'máximo da faixa',
   valor_lido: 'valor lido',
+  // SN-85: a instrução e as linhas dela, com os campos do AupusProject
+  codigo: 'código',
+  prazo_inicio_relativo: 'início (D+X)',
+  duracao_dias: 'duração em dias',
+  duracao_horas: 'duração em horas',
+  fator_perda: 'perda',
+  fornecido_pelo_cliente: 'fornecido pelo cliente',
+  distancia_km: 'distância em km',
+  preco_proprio: 'preço próprio',
+  maquinario_id: 'maquinário',
 };
 
 const nomeAmigavel = (campo: string) => NOMES[campo] ?? campo.replace(/_/g, ' ');
@@ -61,6 +71,8 @@ const nomeAmigavel = (campo: string) => NOMES[campo] ?? campo.replace(/_/g, ' ')
 function traduzir(campo: string, restricao: string, original: string): string {
   const nome = nomeAmigavel(campo);
   const numero = original.match(/-?\d+(\.\d+)?/)?.[0];
+  // A frase escrita no DTO sem o limite dentro: a tradução diria "no máximo undefined" (SN-85)
+  if ((restricao === 'min' || restricao === 'max') && numero === undefined) return original;
 
   switch (restricao) {
     case 'isNotEmpty':

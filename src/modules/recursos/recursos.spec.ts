@@ -2,7 +2,7 @@ import { BadRequestException, ConflictException, ValidationPipe } from '@nestjs/
 import { PrismaService } from '@/core';
 import { CreateRecursoDto, CategoriaRecurso } from './dto/recurso.dto';
 import { RecursosService } from './recursos.service';
-import { custoApurado, custoHora, normalizarRecurso, quantidadeNaBase, subtotalDaLinha } from './regras-do-recurso';
+import { custoApurado, custoHora, normalizarRecurso } from './regras-do-recurso';
 
 /**
  * O recurso com os campos e as regras do AupusProject (SN-83): as 6
@@ -21,18 +21,6 @@ describe('regras do recurso', () => {
   // Como o round($x, 2) do PHP: o Math.round em float dava 1,00 onde o AupusProject dá 1,01
   it('o meio centavo arredonda para cima, como no AupusProject', () => {
     expect(custoHora({ valor_aquisicao: 100.5, prazo_retorno_meses: 12, custos_anuais: 0, meta_utilizacao_horas: 100 })).toBe(1.01);
-  });
-
-  // O instrumento passou a diária: a linha antiga em horas vira diárias, não horas vezes a diária
-  it('a linha em horas de um recurso por diária vira diárias arredondadas para cima', () => {
-    const diaria = { base_calculo: 'diaria', horas_por_diaria: 8 };
-    expect(quantidadeNaBase(diaria, { quantidade: 2, unidade: 'h' })).toBe(1);
-    expect(quantidadeNaBase(diaria, { quantidade: 10, unidade: 'horas' })).toBe(2);
-    expect(quantidadeNaBase(diaria, { quantidade: 3, unidade: 'diária' })).toBe(3);
-    expect(quantidadeNaBase({ base_calculo: 'hora' }, { quantidade: 2, unidade: 'h' })).toBe(2);
-    // 2 h de megôhmetro a R$ 400 a diária = 1 diária, não R$ 800
-    expect(subtotalDaLinha({ categoria: 'INSTRUMENTO', base_calculo: 'diaria', horas_por_diaria: 8, preco_unitario: 400 }, { quantidade: 2, unidade: 'h' })).toBe(400);
-    expect(subtotalDaLinha({ categoria: 'MATERIAL', base_calculo: 'unidade', preco_unitario: null }, { quantidade: 2 })).toBeNull();
   });
 
   it('sem meta ou sem custo, nulo (nunca zero, que diria "de graça")', () => {

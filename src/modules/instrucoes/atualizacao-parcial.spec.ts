@@ -37,7 +37,9 @@ describe('PUT parcial não reseta o que não veio (banco real)', () => {
   let outraPlanta: Awaited<ReturnType<typeof criarPlantaDeTeste>>;
 
   const apagar = async () => {
-    await prisma.instrucoes.deleteMany({ where: { tag: { startsWith: PREFIXO } } });
+    await prisma.instrucoes.deleteMany({ where: { codigo: { startsWith: PREFIXO } } });
+    await prisma.recursos.deleteMany({ where: { nome: { startsWith: PREFIXO } } });
+    await prisma.maquinarios.deleteMany({ where: { nome: { startsWith: PREFIXO } } });
     await prisma.feriado_plantas.deleteMany({ where: { feriados: { nome: { startsWith: PREFIXO } } } });
     await prisma.feriados.deleteMany({ where: { nome: { startsWith: PREFIXO } } });
     await prisma.configuracao_plantas.deleteMany({ where: { configuracoes: { nome: { startsWith: PREFIXO } } } });
@@ -57,35 +59,41 @@ describe('PUT parcial não reseta o que não veio (banco real)', () => {
     await prisma.$disconnect();
   });
 
-  it('instrução: mantém status, ativo, sub-instruções e recursos', async () => {
+  it('instrução: mantém status, ativo, frente, D+X, passos, recursos e maquinários', async () => {
+    const pano = await prisma.recursos.create({
+      data: { categoria: 'MATERIAL', base_calculo: 'unidade', rubrica: 'materiais', nome: `${PREFIXO} Pano` },
+    });
+    const gerador = await prisma.maquinarios.create({
+      data: { nome: `${PREFIXO} Gerador`, tipo: 'proprio', base_calculo: 'diaria', rubrica: 'instrucoes' },
+    });
     const { id } = await prisma.instrucoes.create({
       data: {
-        tag: PREFIXO, nome: 'Limpeza', descricao: 'x', categoria: 'MECANICA', tipo_manutencao: 'PREVENTIVA',
-        condicao_ativo: 'PARADO', criticidade: 3, duracao_estimada: 1, tempo_estimado: 30,
+        codigo: PREFIXO, nome: 'Limpeza', descricao: 'x', frente: 'Civil', prazo_inicio_relativo: 3, duracao_dias: 4,
         status: 'INATIVA', ativo: false,
         sub_instrucoes: { create: [{ descricao: 'Passo 1', ordem: 1 }, { descricao: 'Passo 2', ordem: 2 }] },
-        recursos: { create: [{ tipo: 'MATERIAL', descricao: 'Pano' }] },
+        recursos: { create: [{ recurso_id: pano.id, quantidade: 3 }] },
+        maquinarios: { create: [{ maquinario_id: gerador.id, duracao_horas: 8 }] },
       },
     });
 
     await instrucoes.atualizar(id, await corpo(UpdateInstrucaoDto, { nome: 'Limpeza geral' }));
 
     const depois = await prisma.instrucoes.findUniqueOrThrow({ where: { id } });
-    expect(depois).toMatchObject({ nome: 'Limpeza geral', status: 'INATIVA', ativo: false });
+    expect(depois).toMatchObject({ nome: 'Limpeza geral', status: 'INATIVA', ativo: false, frente: 'Civil', prazo_inicio_relativo: 3, duracao_dias: 4 });
     expect(await prisma.sub_instrucoes.count({ where: { instrucao_id: id } })).toBe(2);
-    expect(await prisma.recursos_instrucao.count({ where: { instrucao_id: id } })).toBe(1);
+    expect(await prisma.instrucao_recursos.count({ where: { instrucao_id: id } })).toBe(1);
+    expect(await prisma.instrucao_maquinarios.count({ where: { instrucao_id: id } })).toBe(1);
   });
 
   describe('criar sem os campos aplica os mesmos padrões de antes', () => {
-    it('instrução nasce ATIVA, ativa e sem sub-instruções', async () => {
+    it('instrução nasce ATIVA, ativa, em D+0 por 1 dia e sem sub-instruções', async () => {
       const criada = await instrucoes.criar(
         await corpo(CreateInstrucaoDto, {
-          tag: `${PREFIXO}-NOVA`, nome: 'Nova', descricao: 'x', categoria: 'MECANICA', tipo_manutencao: 'PREVENTIVA',
-          condicao_ativo: 'PARADO', criticidade: 3, duracao_estimada: 1, tempo_estimado: 30,
+          codigo: `${PREFIXO}-NOVA`, nome: 'Nova', descricao: 'x',
         }),
       );
 
-      expect(criada).toMatchObject({ status: 'ATIVA', ativo: true });
+      expect(criada).toMatchObject({ status: 'ATIVA', ativo: true, prazo_inicio_relativo: 0, duracao_dias: 1, frente: null });
       expect(await prisma.sub_instrucoes.count({ where: { instrucao_id: criada.id } })).toBe(0);
     });
 

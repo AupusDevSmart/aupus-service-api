@@ -206,7 +206,7 @@ export class RecursosService {
   async remover(id: string) {
     const recurso = await this.buscarPorId(id);
 
-    const usos = await this.prisma.recursos_instrucao.count({
+    const usos = await this.prisma.instrucao_recursos.count({
       where: { recurso_id: recurso.id },
     });
 

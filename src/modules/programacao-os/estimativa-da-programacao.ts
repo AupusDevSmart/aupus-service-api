@@ -26,10 +26,10 @@ export interface HorasDasInstrucoes {
 }
 
 /**
- * Quantas horas as tarefas levam pelas instruções delas: a soma das
- * sub-instruções (`tempo_estimado` em minutos), a mesma duração que a tela da
- * instrução mostra. A tarefa conta a sua instrução uma vez por tarefa; sem
- * instrução ou sem sub-instrução com tempo, não soma (e entra em
+ * Quantas horas as tarefas levam pelas instruções delas: a soma das durações
+ * dos passos (`duracao_horas`, SN-85; era `tempo_estimado` em minutos), a mesma
+ * que a tela da instrução mostra. A tarefa conta a sua instrução uma vez por
+ * tarefa; sem instrução ou sem passo com duração, não soma (e entra em
  * `tarefasSemTempo`). Sem teto: quem grava corta no que a coluna guarda.
  *
  * Pelas variantes do id: `sub_instrucoes.instrucao_id` é Char(26) e
@@ -45,11 +45,11 @@ export async function horasDasInstrucoes(
   const linhas = await prisma.sub_instrucoes.groupBy({
     by: ['instrucao_id'],
     where: { instrucao_id: { in: variantesDeIds([...new Set(ids)]) } },
-    _sum: { tempo_estimado: true },
+    _sum: { duracao_horas: true },
   });
-  const minutosPorInstrucao = new Map(linhas.map((l) => [l.instrucao_id.trim(), l._sum.tempo_estimado ?? 0]));
+  const horasPorInstrucao = new Map(linhas.map((l) => [l.instrucao_id.trim(), Number(l._sum.duracao_horas ?? 0)]));
 
-  const minutos = ids.reduce((soma, id) => soma + (minutosPorInstrucao.get(id) ?? 0), 0);
-  const comTempo = ids.filter((id) => (minutosPorInstrucao.get(id) ?? 0) > 0).length;
-  return { horas: Math.round((minutos / 60) * 100) / 100, tarefasSemTempo: instrucoesDasTarefas.length - comTempo };
+  const horas = ids.reduce((soma, id) => soma + (horasPorInstrucao.get(id) ?? 0), 0);
+  const comTempo = ids.filter((id) => (horasPorInstrucao.get(id) ?? 0) > 0).length;
+  return { horas: Math.round(horas * 100) / 100, tarefasSemTempo: instrucoesDasTarefas.length - comTempo };
 }

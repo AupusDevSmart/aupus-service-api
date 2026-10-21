@@ -589,10 +589,8 @@ export class TarefasService {
       instrucao: {
         select: {
           id: true,
-          tag: true,
+          codigo: true,
           nome: true,
-          categoria: true,
-          tipo_manutencao: true,
           descricao: true
         }
       }
@@ -728,6 +726,6 @@ export class TarefasService {
   // 09/2026: nenhum era chamado, e tres agregavam por colunas droppadas no PR6
   // (`status`, `tipo_manutencao`, `categoria`) — se algum dashboard voltasse a
   // chama-los, agregaria por campo inexistente. O conteudo hoje e da INSTRUCAO,
-  // entao um dashboard por categoria tem de agrupar por `instrucao.categoria`.
+  // que tambem nao tem mais categoria nem tipo (SN-85, os campos do AupusProject).
 
 }

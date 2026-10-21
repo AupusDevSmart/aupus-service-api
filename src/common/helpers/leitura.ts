@@ -11,8 +11,9 @@ import type { Prisma } from '@/core';
  * Fora da faixa não é coluna: sai sempre desta conta, para a tela, a API e o
  * PDF não discordarem. Os limites fazem parte da faixa (10 a 20 aceita 10).
  */
-export const TIPOS_DE_PASSO = ['VERIFICACAO', 'LEITURA'] as const;
-export type TipoDePasso = (typeof TIPOS_DE_PASSO)[number];
+/** Como o passo se registra na OS. No passo da instrução é `registro` (SN-85: `tipo` é a disciplina); no item da OS, `tipo` */
+export const REGISTROS_DO_PASSO = ['VERIFICACAO', 'LEITURA'] as const;
+export type RegistroDoPasso = (typeof REGISTROS_DO_PASSO)[number];
 
 /** Decimal(14, 4): até 10 dígitos antes da vírgula. */
 export const LIMITE_DA_LEITURA = 9_999_999_999;

@@ -17,10 +17,7 @@ import { ApiProperty, ApiPropertyOptional, PartialType } from '@nestjs/swagger';
 import { CasasDecimais, VazioEhNulo } from '@/common/decorators/numero';
 import { BooleanoDoTexto } from '@/common/decorators/booleano';
 import { BASES, RUBRICAS } from '../regras-do-recurso';
-
-/** O maior valor de DECIMAL(12,2) e de DECIMAL(10,2): acima, o banco recusava com 500 */
-const DECIMAL_12_2 = 9_999_999_999.99;
-const DECIMAL_10_2 = 99_999_999.99;
+import { DECIMAL_10_2, DECIMAL_12_2 } from '@/common/helpers/limites-decimais';
 
 /**
  * As 6 categorias do AupusProject (SN-83). No banco o enum continua se
@@ -91,7 +88,7 @@ export class CreateRecursoDto {
   @IsNumber()
   @CasasDecimais(2, { message: 'Preço deve ter no máximo 2 casas decimais' })
   @Min(0, { message: 'Preço não pode ser negativo' })
-  @Max(DECIMAL_12_2, { message: 'Valor acima do que o cadastro guarda' })
+  @Max(DECIMAL_12_2)
   preco_unitario?: number | null;
 
   @ApiPropertyOptional({ description: 'Só instrumento: o investimento a amortizar.' })
@@ -101,7 +98,7 @@ export class CreateRecursoDto {
   @IsNumber()
   @CasasDecimais(2)
   @Min(0)
-  @Max(DECIMAL_12_2, { message: 'Valor acima do que o cadastro guarda' })
+  @Max(DECIMAL_12_2)
   valor_aquisicao?: number | null;
 
   @ApiPropertyOptional({ description: 'Só instrumento: em quantos meses o investimento se paga (1 a 600).' })
@@ -120,7 +117,7 @@ export class CreateRecursoDto {
   @IsNumber()
   @CasasDecimais(2)
   @Min(0)
-  @Max(DECIMAL_12_2, { message: 'Valor acima do que o cadastro guarda' })
+  @Max(DECIMAL_12_2)
   custos_anuais?: number | null;
 
   @ApiPropertyOptional({ description: 'Só instrumento: horas de uso previstas por ano.' })
@@ -130,7 +127,7 @@ export class CreateRecursoDto {
   @IsNumber()
   @CasasDecimais(2)
   @Min(0)
-  @Max(DECIMAL_10_2, { message: 'Valor acima do que o cadastro guarda' })
+  @Max(DECIMAL_10_2)
   meta_utilizacao_horas?: number | null;
 
   @ApiPropertyOptional({ description: 'Quantas horas formam uma diária (1 a 24). Padrão 8.' })

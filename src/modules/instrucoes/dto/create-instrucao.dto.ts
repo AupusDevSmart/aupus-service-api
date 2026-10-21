@@ -12,58 +12,60 @@ import {
   ValidateNested,
   IsArray,
 } from 'class-validator';
-import { Type, Transform } from 'class-transformer';
-import {
-  CategoriaTarefa,
-  TipoManutencao,
-  CondicaoAtivo,
-  StatusTarefa
-} from '@/core';
+import { Transform, Type } from 'class-transformer';
+import { StatusTarefa } from '@/core';
 import { CreateSubInstrucaoDto } from './create-sub-instrucao.dto';
-import { CreateRecursoInstrucaoDto } from './create-recurso-instrucao.dto';
+import { CreateMaquinarioInstrucaoDto, CreateRecursoInstrucaoDto } from './create-recurso-instrucao.dto';
 
+const aparado = ({ value }: { value: unknown }) => (typeof value === 'string' ? value.trim() || null : value);
+
+/**
+ * A instrução com os campos do AupusProject (SN-85): código, nome, descrição,
+ * frente, início D+X, duração em dias e ativo, e as listas de passos, recursos e
+ * maquinários. Status e observações são só do Service.
+ *
+ * Sem inicializador (SN-12): o PartialType os copiaria para o Update e um PUT
+ * parcial resetaria os campos. Os padrões de criação ficam no service.
+ */
 export class CreateInstrucaoDto {
-  @IsString()
+  /** O código na empresa (era tag). Vazio, o service gera INST-NNN */
   @IsOptional()
+  @Transform(aparado)
+  @IsString()
   @MaxLength(50)
-  tag?: string; // Se não fornecida, será gerada automaticamente (INST-001)
+  codigo?: string | null;
 
   @IsString()
   @IsNotEmpty()
-  @MaxLength(200)
+  @MaxLength(255)
   nome: string;
 
+  @IsOptional()
   @IsString()
-  @IsNotEmpty()
-  descricao: string;
+  descricao?: string | null;
 
-  @IsEnum(CategoriaTarefa)
-  categoria: CategoriaTarefa;
+  /** Frente de trabalho do cronograma (texto livre, como lá) */
+  @IsOptional()
+  @Transform(aparado)
+  @IsString()
+  @MaxLength(60)
+  frente?: string | null;
 
-  @IsEnum(TipoManutencao)
-  tipo_manutencao: TipoManutencao;
-
-  @IsEnum(CondicaoAtivo)
-  condicao_ativo: CondicaoAtivo;
-
-  @IsInt()
-  @Min(1)
-  @Max(5)
+  /** O X do D+X: dias corridos depois da data-base */
+  @IsOptional()
   @Type(() => Number)
-  criticidade: number;
-
-  @Transform(({ value }) => parseFloat(value))
-  @Min(0.1)
-  duracao_estimada: number;
-
-  // Min(0), e nao Min(1): o banco tem instrucoes com tempo_estimado zero, e
-  // exigir 1 as tornava impossiveis de salvar — abrir, mudar outra coisa e
-  // salvar era recusado por causa de um valor que ja estava la. Zero e um
-  // "ainda nao estimado" legitimo.
   @IsInt()
   @Min(0)
+  @Max(9999)
+  prazo_inicio_relativo?: number;
+
+  /** Dias que a instrução leva, inclusivos (mínimo 1: zero a tiraria do cronograma calada) */
+  @IsOptional()
   @Type(() => Number)
-  tempo_estimado: number;
+  @IsInt()
+  @Min(1)
+  @Max(9999)
+  duracao_dias?: number;
 
   @IsString()
   @IsOptional()
@@ -77,11 +79,10 @@ export class CreateInstrucaoDto {
   @IsOptional()
   ativo?: boolean;
 
-  @IsString()
-  @IsOptional()
-  criado_por?: string;
+  // A autoria (criado_por, atualizado_por) sai do token, no controller: pelo
+  // corpo, quem gravava escolhia em nome de quem (SN-85, como as associacoes no SN-40)
 
-  // Sub-estruturas
+  // Sub-estruturas: vindo, a lista inteira é trocada
   @IsArray()
   @ValidateNested({ each: true })
   @Type(() => CreateSubInstrucaoDto)
@@ -93,4 +94,10 @@ export class CreateInstrucaoDto {
   @Type(() => CreateRecursoInstrucaoDto)
   @IsOptional()
   recursos?: CreateRecursoInstrucaoDto[];
+
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => CreateMaquinarioInstrucaoDto)
+  @IsOptional()
+  maquinarios?: CreateMaquinarioInstrucaoDto[];
 }

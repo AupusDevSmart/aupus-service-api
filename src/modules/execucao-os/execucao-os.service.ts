@@ -1672,8 +1672,8 @@ export class ExecucaoOSService {
             instrucao_id: true,
             descricao: true,
             obrigatoria: true,
-            tempo_estimado: true,
-            tipo: true,
+            duracao_horas: true,
+            registro: true,
             unidade: true,
             valor_minimo: true,
             valor_maximo: true,
@@ -1720,11 +1720,13 @@ export class ExecucaoOSService {
           atividade: `${rotulo}: ${sub.descricao}`.slice(0, 500),
           ordem: ordem++,
           obrigatoria: sub.obrigatoria ?? false,
-          tempo_estimado: sub.tempo_estimado ?? null,
+          // O item guarda minutos; o passo, horas desde o SN-85
+          tempo_estimado: sub.duracao_horas == null ? null : Math.round(Number(sub.duracao_horas) * 60),
           // A tela agrupa por tarefa e exige os obrigatórios dela (D4)
           tarefa_os_id: vinculo.id,
-          // A leitura congela unidade e faixa da época, como o texto (SN-58)
-          tipo: sub.tipo,
+          // A leitura congela unidade e faixa da época, como o texto (SN-58). O
+          // item da OS chama de tipo o que no passo é o registro (SN-85)
+          tipo: sub.registro,
           unidade: sub.unidade,
           valor_minimo: sub.valor_minimo,
           valor_maximo: sub.valor_maximo,

@@ -45,8 +45,6 @@ export interface TarefaElegivel {
   data_ultima_execucao: Date | null;
   data_ancora: Date | null;
   created_at: Date;
-  // A duracao vem da instrucao: a tarefa nao guarda mais esse dado.
-  instrucao: { tempo_estimado: number; duracao_estimada: Prisma.Decimal } | null;
   equipamento_id: string;
   equipamento: {
     id: string;
@@ -116,10 +114,6 @@ export async function buscarTarefasElegiveis(
   const tarefas = await prisma.tarefas.findMany({
     where: ondeElegivel(filtro),
     include: {
-      // A duracao vem da instrucao: a tarefa nao guarda mais esse dado.
-      instrucao: {
-        select: { tempo_estimado: true, duracao_estimada: true },
-      },
       equipamento: {
         select: {
           id: true,

@@ -2,12 +2,7 @@
 // StatusTarefa, CondicaoAtivo, TipoRecurso e TipoAnexo sairam junto com as
 // colunas que os usavam: hoje quem tem status, condicao do ativo, recurso e
 // anexo e a INSTRUCAO, nao a tarefa.
-import {
-  CategoriaTarefa,
-  TipoManutencao,
-  FrequenciaTarefa,
-  OrigemTarefa
-} from '@/core';
+import { FrequenciaTarefa, OrigemTarefa } from '@/core';
 import type { EtapaDaInstrucao } from '../etapas-da-instrucao';
 
 export class UsuarioResumoDto {
@@ -37,10 +32,9 @@ export class PlantaResumoDto {
 
 export class InstrucaoResumoDto {
   id: string;
-  tag: string;
+  /** SN-85: era tag */
+  codigo: string;
   nome: string;
-  categoria: CategoriaTarefa;
-  tipo_manutencao: TipoManutencao;
   descricao?: string | null;
   /** As etapas, por consulta própria (`comEtapas`), com tipo, unidade e faixa (SN-58) */
   sub_instrucoes?: EtapaDaInstrucao[];

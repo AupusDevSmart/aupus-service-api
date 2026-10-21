@@ -138,35 +138,3 @@ export function custoApurado(r: {
   const origem = r.categoria === 'MAO_DE_OBRA' ? 'preco_fixo' : 'preco_unitario';
   return { custo_hora: null, preco_base: preco, custo_origem: preco === null ? null : origem };
 }
-
-/** A unidade da linha da instrução que conta em horas ("h", "hora", "horas", "hr", "hs") */
-const EM_HORAS = /^(h|hr|hrs|hs|hora|horas)$/;
-
-/**
- * Quantas unidades da cobrança a linha da instrução consome. Hoje a linha só
- * tem a quantidade, na unidade dela (o "2 h" do técnico): a duração, a perda e
- * o km da linha chegam no SN-85, com a conta inteira do AupusProject.
- *
- * O instrumento passou a ser cobrado por diária (SN-83). A linha antiga, em
- * horas, vira diárias arredondadas para cima — 2 h de megôhmetro é 1 diária —
- * e não 2 diárias: multiplicar as horas pelo preço da diária dava 8 vezes o
- * valor. A mesma regra vale para a mão de obra cobrada por diária.
- */
-export function quantidadeNaBase(
-  recurso: { base_calculo: string; horas_por_diaria?: number | null },
-  linha: { quantidade?: Prisma.Decimal | number | string | null; unidade?: string | null },
-): number {
-  const quantidade = Number(linha.quantidade ?? 1) || 1;
-  const emHoras = EM_HORAS.test((linha.unidade ?? '').trim().toLowerCase());
-  if (recurso.base_calculo === 'diaria' && emHoras) return Math.ceil(quantidade / Math.max(recurso.horas_por_diaria ?? 8, 1));
-  return quantidade;
-}
-
-/** O custo da linha: o preço de uma unidade da cobrança vezes as unidades. Nulo sem preço (nunca zero) */
-export function subtotalDaLinha(
-  recurso: Parameters<typeof custoApurado>[0],
-  linha: Parameters<typeof quantidadeNaBase>[1],
-): number | null {
-  const { preco_base } = custoApurado(recurso);
-  return preco_base === null ? null : centavos(preco_base * quantidadeNaBase(recurso, linha));
-}

@@ -2909,28 +2909,31 @@ model tarefas_solicitacoes {
 // INSTRUCOES (Templates de tarefas sem periodicidade)
 // ==========================================
 
+/// SN-85: os campos da instrucao do AupusProject (as planilhas de um importam
+/// no outro). Status, observacoes e autoria sao so do Service.
 model instrucoes {
-  id               String          @id @default(cuid()) @db.VarChar(26)
-  tag              String          @unique @db.VarChar(50)
-  nome             String          @db.VarChar(200)
-  descricao        String
-  categoria        CategoriaTarefa
-  tipo_manutencao  TipoManutencao
-  condicao_ativo   CondicaoAtivo
-  criticidade      Int             @db.SmallInt
-  duracao_estimada Decimal         @db.Decimal(5, 2)
-  tempo_estimado   Int
-  observacoes      String?
-  status           StatusTarefa    @default(ATIVA)
-  ativo            Boolean         @default(true)
-  created_at       DateTime        @default(now()) @db.Timestamp(0)
-  updated_at       DateTime        @updatedAt @db.Timestamp(0)
-  deleted_at       DateTime?       @db.Timestamp(0)
-  criado_por       String?         @db.Char(26)
-  atualizado_por   String?         @db.Char(26)
+  id                    String       @id @default(cuid()) @db.VarChar(26)
+  /// O codigo do AupusProject (era tag). Unico; vazio, o service gera INST-NNN
+  codigo                String       @unique @db.VarChar(50)
+  nome                  String       @db.VarChar(255)
+  descricao             String?
+  /// O D+X do cronograma do AupusProject: a frente (texto livre), o inicio em
+  /// dias depois da data-base e a duracao em dias (inclusiva)
+  frente                String?      @db.VarChar(60)
+  prazo_inicio_relativo Int          @default(0) @db.SmallInt
+  duracao_dias          Int          @default(1) @db.SmallInt
+  observacoes           String?
+  status                StatusTarefa @default(ATIVA)
+  ativo                 Boolean      @default(true)
+  created_at            DateTime     @default(now()) @db.Timestamp(0)
+  updated_at            DateTime     @updatedAt @db.Timestamp(0)
+  deleted_at            DateTime?    @db.Timestamp(0)
+  criado_por            String?      @db.Char(26)
+  atualizado_por        String?      @db.Char(26)
 
   sub_instrucoes          sub_instrucoes[]
-  recursos                recursos_instrucao[]
+  recursos                instrucao_recursos[]
+  maquinarios             instrucao_maquinarios[]
   anexos                  anexos_instrucao[]
   tarefas                 tarefas[]
   anomalias_instrucoes    anomalias_instrucoes[]
@@ -2939,7 +2942,7 @@ model instrucoes {
   usuario_atualizador     usuarios?                 @relation("instrucoes_atualizado_por", fields: [atualizado_por], references: [id])
 
   @@index([status, ativo])
-  @@index([categoria, tipo_manutencao])
+  @@index([frente])
   @@index([deleted_at])
 }
 
@@ -2948,11 +2951,15 @@ model sub_instrucoes {
   instrucao_id   String     @db.Char(26)
   descricao      String
   obrigatoria    Boolean    @default(false)
-  tempo_estimado Int?
   ordem          Int        @db.SmallInt
+  /// SN-85: a disciplina do passo, como no AupusProject: administrativo, civil,
+  /// eletrico ou mecanico (CHECK no banco)
+  tipo           String?    @db.VarChar(20)
+  /// SN-85: quanto o passo leva, em horas (era tempo_estimado em minutos)
+  duracao_horas  Decimal?   @db.Decimal(8, 2)
   /// SN-58: VERIFICACAO (marcar) ou LEITURA (digitar o valor medido). Unidade e
-  /// faixa só na leitura (CHECK no banco; a API responde 400 antes)
-  tipo           String     @default("VERIFICACAO") @db.VarChar(20)
+  /// faixa só na leitura (CHECK no banco; a API responde 400 antes). Era tipo
+  registro       String     @default("VERIFICACAO") @db.VarChar(20)
   unidade        String?    @db.VarChar(20)
   valor_minimo   Decimal?   @db.Decimal(14, 4)
   valor_maximo   Decimal?   @db.Decimal(14, 4)
@@ -2965,12 +2972,6 @@ model sub_instrucoes {
   @@index([instrucao_id, ordem])
 }
 
-/// Catalogo de recursos: o que se usa para executar uma instrucao, com o custo
-/// medio que alimenta o orcamento.
-///
-/// A unidade mora aqui, e nao no uso: tecnico e sempre por hora, cabo e sempre
-/// por metro. E ela que torna o preco legivel. A quantidade fica na instrucao,
-/// que e onde varia.
 /// SN-84: o cadastro de maquinarios do AupusProject (a maquina que uma
 /// instrucao usa). Tipo, base e rubrica com CHECK no banco; a API normaliza
 /// (regras-do-maquinario.ts). Nome unico entre os nao removidos (lower).
@@ -2991,8 +2992,10 @@ model maquinarios {
   horas_por_diaria      Int       @default(8) @db.SmallInt
   ativo                 Boolean   @default(true)
   created_at            DateTime  @default(now()) @db.Timestamp(0)
-  updated_at            DateTime  @updatedAt @db.Timestamp(0)
+  updated_at            DateTime  @default(now()) @updatedAt @db.Timestamp(0)
   deleted_at            DateTime? @db.Timestamp(0)
+
+  usos instrucao_maquinarios[]
 
   @@index([tipo])
   @@index([deleted_at])
@@ -3027,31 +3030,60 @@ model recursos {
   updated_at  DateTime    @updatedAt @db.Timestamp(0)
   deleted_at  DateTime?   @db.Timestamp(0)
 
-  usos recursos_instrucao[]
+  usos instrucao_recursos[]
 
   @@index([categoria])
   @@index([deleted_at])
   @@index([categoria, nome])
 }
 
-model recursos_instrucao {
-  id           String      @id @default(cuid()) @db.Char(26)
-  instrucao_id String      @db.Char(26)
-  /// Aponta para o catalogo. Nulo nas linhas antigas, digitadas a mao antes de
-  /// o catalogo existir: `tipo` e `descricao` continuam sendo a fonte delas.
-  recurso_id   String?     @db.Char(26)
-  tipo         TipoRecurso
-  descricao    String      @db.VarChar(200)
-  quantidade   Decimal?    @db.Decimal(10, 3)
-  unidade      String?     @db.VarChar(20)
-  obrigatorio  Boolean     @default(false)
-  created_at   DateTime    @default(now()) @db.Timestamp(0)
-  updated_at   DateTime    @updatedAt @db.Timestamp(0)
-  instrucao    instrucoes  @relation(fields: [instrucao_id], references: [id], onDelete: Cascade)
-  recurso      recursos?   @relation(fields: [recurso_id], references: [id])
+/// SN-85: a linha de recurso da instrucao, a `instrucao_recursos` do
+/// AupusProject (era recursos_instrucao). Duracao, perda, "fornecido pelo
+/// cliente" e km sao do USO, nao do cadastro: o mesmo cabo perde 10% numa obra e
+/// 25% na outra. Preco proprio nulo segue o cadastro. A conta da linha esta em
+/// modules/instrucoes/custo-da-instrucao.ts.
+model instrucao_recursos {
+  id                     String     @id @default(cuid()) @db.Char(26)
+  instrucao_id           String     @db.Char(26)
+  recurso_id             String     @db.Char(26)
+  /// Quantos (pessoas, equipamentos, unidades do material)
+  quantidade             Decimal    @default(1) @db.Decimal(10, 3)
+  /// Horas de uso de cada um (cobranca por hora ou diaria)
+  duracao_horas          Decimal    @default(0) @db.Decimal(10, 2)
+  /// Fracao: 0.10 = 10% (so material)
+  fator_perda            Decimal    @default(0) @db.Decimal(6, 4)
+  /// Faturamento direto: entra no escopo e fica fora do custo
+  fornecido_pelo_cliente Boolean    @default(false)
+  distancia_km           Decimal?   @db.Decimal(10, 2)
+  preco_proprio          Decimal?   @db.Decimal(12, 2)
+  created_at             DateTime   @default(now()) @db.Timestamp(0)
+  updated_at             DateTime   @updatedAt @db.Timestamp(0)
+  instrucao              instrucoes @relation(fields: [instrucao_id], references: [id], onDelete: Cascade)
+  /// Restrict: apagar um recurso em uso mudaria o custo da instrucao calado
+  recurso                recursos   @relation(fields: [recurso_id], references: [id], onDelete: Restrict)
 
-  @@index([instrucao_id, tipo])
+  @@unique([instrucao_id, recurso_id])
   @@index([recurso_id])
+}
+
+/// SN-85: o maquinario que a instrucao usa (a `instrucao_maquinarios` do
+/// AupusProject). instrucao_id VarChar(26), o tipo de instrucoes.id: com
+/// Char(26) o include do Prisma volta vazio para id de 25 caracteres.
+model instrucao_maquinarios {
+  id            String      @id @default(cuid()) @db.Char(26)
+  instrucao_id  String      @db.VarChar(26)
+  maquinario_id String      @db.Char(26)
+  quantidade    Decimal     @default(1) @db.Decimal(10, 2)
+  duracao_horas Decimal     @default(0) @db.Decimal(10, 2)
+  distancia_km  Decimal?    @db.Decimal(10, 2)
+  preco_proprio Decimal?    @db.Decimal(12, 2)
+  created_at    DateTime    @default(now()) @db.Timestamp(0)
+  updated_at    DateTime    @default(now()) @updatedAt @db.Timestamp(0)
+  instrucao     instrucoes  @relation(fields: [instrucao_id], references: [id], onDelete: Cascade)
+  maquinario    maquinarios @relation(fields: [maquinario_id], references: [id], onDelete: Restrict)
+
+  @@unique([instrucao_id, maquinario_id])
+  @@index([maquinario_id])
 }
 
 model anexos_instrucao {
@@ -3176,25 +3208,6 @@ enum StatusTarefa {
   ARQUIVADA
 }
 
-enum TipoManutencao {
-  PREVENTIVA
-  PREDITIVA
-  CORRETIVA
-  INSPECAO
-  VISITA_TECNICA
-}
-
-enum CategoriaTarefa {
-  MECANICA
-  ELETRICA
-  INSTRUMENTACAO
-  LUBRIFICACAO
-  LIMPEZA
-  INSPECAO
-  CALIBRACAO
-  OUTROS
-}
-
 enum FrequenciaTarefa {
   DIARIA
   SEMANAL
@@ -3205,12 +3218,6 @@ enum FrequenciaTarefa {
   SEMESTRAL
   ANUAL
   PERSONALIZADA
-}
-
-enum CondicaoAtivo {
-  PARADO
-  FUNCIONANDO
-  QUALQUER
 }
 
 /// As 6 categorias do AupusProject (SN-83)

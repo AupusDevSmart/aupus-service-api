@@ -95,7 +95,7 @@ type ReservaComVeiculo = Prisma.reserva_veiculoGetPayload<{ include: { veiculo: 
 
 /** A tarefa como `adicionarTarefas` a lê para congelar o pedido */
 type TarefaParaSnapshot = Prisma.tarefasGetPayload<{
-  include: { instrucao: { select: { tag: true; nome: true; descricao: true } } };
+  include: { instrucao: { select: { codigo: true; nome: true; descricao: true } } };
 }>;
 
 /**
@@ -1357,7 +1357,7 @@ export class ProgramacaoOSService {
       },
       include: {
         instrucao: {
-          select: { tag: true, nome: true, descricao: true },
+          select: { codigo: true, nome: true, descricao: true },
         },
       },
     });
@@ -1412,7 +1412,8 @@ export class ProgramacaoOSService {
       nome_snapshot: tarefa.nome ?? null,
       criticidade_snapshot: tarefa.criticidade ?? null,
       frequencia_snapshot: tarefa.frequencia ?? null,
-      instrucao_tag: tarefa.instrucao?.tag ?? null,
+      // A coluna do congelamento guarda o código da instrução (era a tag, SN-85)
+      instrucao_tag: tarefa.instrucao?.codigo ?? null,
       instrucao_nome: tarefa.instrucao?.nome ?? null,
       instrucao_descricao: tarefa.instrucao?.descricao ?? null,
     };

@@ -53,9 +53,10 @@ export class InstrucoesController {
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({ summary: 'Criar nova instrução' })
   @ApiResponse({ status: HttpStatus.CREATED, description: 'Instrução criada com sucesso', type: InstrucaoResponseDto })
-  @ApiResponse({ status: HttpStatus.CONFLICT, description: 'TAG já existe' })
-  async criar(@Body() createDto: CreateInstrucaoDto): Promise<InstrucaoResponseDto> {
-    return this.instrucoesService.criar(createDto);
+  @ApiResponse({ status: HttpStatus.CONFLICT, description: 'Código já existe' })
+  async criar(@Body() createDto: CreateInstrucaoDto, @CurrentUser() user?: ScopedUser): Promise<InstrucaoResponseDto> {
+    // O autor é quem está logado, não o que veio no corpo (SN-85)
+    return this.instrucoesService.criar(createDto, user?.id);
   }
 
   @Get()
@@ -71,6 +72,13 @@ export class InstrucoesController {
   @ApiResponse({ status: HttpStatus.OK, description: 'Dashboard obtido com sucesso', type: DashboardInstrucoesDto })
   async obterDashboard(): Promise<DashboardInstrucoesDto> {
     return this.instrucoesService.obterDashboard();
+  }
+
+  @Get('frentes')
+  @Permissions('manutencao.view', 'manutencao.manage')
+  @ApiOperation({ summary: 'As frentes de trabalho já usadas, para o formulário sugerir (SN-85)' })
+  async frentes(): Promise<string[]> {
+    return this.instrucoesService.frentes();
   }
 
   @Get(':id')
@@ -89,12 +97,13 @@ export class InstrucoesController {
   @ApiParam({ name: 'id', description: 'ID da instrução' })
   @ApiResponse({ status: HttpStatus.OK, description: 'Instrução atualizada com sucesso', type: InstrucaoResponseDto })
   @ApiResponse({ status: HttpStatus.NOT_FOUND, description: 'Instrução não encontrada' })
-  @ApiResponse({ status: HttpStatus.CONFLICT, description: 'TAG já existe' })
+  @ApiResponse({ status: HttpStatus.CONFLICT, description: 'Código já existe' })
   async atualizar(
     @Param('id') id: string,
-    @Body() updateDto: UpdateInstrucaoDto
+    @Body() updateDto: UpdateInstrucaoDto,
+    @CurrentUser() user?: ScopedUser,
   ): Promise<InstrucaoResponseDto> {
-    return this.instrucoesService.atualizar(id, updateDto);
+    return this.instrucoesService.atualizar(id, updateDto, user?.id);
   }
 
   @Put(':id/status')
@@ -105,9 +114,10 @@ export class InstrucoesController {
   @ApiResponse({ status: HttpStatus.NOT_FOUND, description: 'Instrução não encontrada' })
   async atualizarStatus(
     @Param('id') id: string,
-    @Body() updateStatusDto: UpdateStatusInstrucaoDto
+    @Body() updateStatusDto: UpdateStatusInstrucaoDto,
+    @CurrentUser() user?: ScopedUser,
   ): Promise<InstrucaoResponseDto> {
-    return this.instrucoesService.atualizarStatus(id, updateStatusDto);
+    return this.instrucoesService.atualizarStatus(id, updateStatusDto, user?.id);
   }
 
   @Delete(':id')

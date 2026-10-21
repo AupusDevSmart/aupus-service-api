@@ -1,41 +1,118 @@
 // src/modules/instrucoes/dto/create-recurso-instrucao.dto.ts
-import { IsString, IsEnum, IsOptional, IsBoolean } from 'class-validator';
-import { TipoRecurso } from '@/core';
-import { Transform } from 'class-transformer';
+import { IsBoolean, IsNotEmpty, IsNumber, IsOptional, IsString, Max, Min } from 'class-validator';
+import { Type } from 'class-transformer';
+import { CasasDecimais, VazioEhNulo } from '@/common/decorators/numero';
+import { DECIMAL_10_2, DECIMAL_10_3, DECIMAL_12_2 } from '@/common/helpers/limites-decimais';
 
 /**
- * Um recurso usado por uma instrução.
+ * Uma linha de recurso da instrução, a `instrucao_recursos` do AupusProject
+ * (SN-85). O recurso é do catálogo (nome, categoria, cobrança e preço vêm de
+ * lá); o resto é do USO: o mesmo cabo perde 10% numa obra e 25% na outra, o
+ * mesmo transformador é nosso numa e do cliente na outra.
  *
- * O caminho novo é mandar só `recurso_id`: categoria, nome e unidade vêm do
- * catálogo, e o servidor copia para as colunas antigas — elas continuam sendo o
- * que a tela lê enquanto a migração não terminar.
- *
- * `tipo` e `descricao` seguem aceitos para as instruções que ainda não foram
- * passadas para o catálogo. Um dos dois caminhos precisa vir.
+ * Os campos que a cobrança do recurso não usa são limpos ao gravar
+ * (`linhas-da-instrucao.ts`), como a tela do AupusProject faz.
  */
 export class CreateRecursoInstrucaoDto {
   @IsString()
-  @IsOptional()
-  recurso_id?: string;
+  @IsNotEmpty()
+  recurso_id: string;
 
-  @IsEnum(TipoRecurso)
+  /** Quantos (pessoas, equipamentos, unidades do material). Vazio = 1 */
   @IsOptional()
-  tipo?: TipoRecurso;
+  @VazioEhNulo()
+  @Type(() => Number)
+  @IsNumber()
+  @CasasDecimais(3)
+  @Min(0)
+  @Max(DECIMAL_10_3)
+  quantidade?: number | null;
 
-  @IsString()
+  /** Horas de uso de cada um, na cobrança por hora ou por diária. Vazio = 0 */
   @IsOptional()
-  descricao?: string;
+  @VazioEhNulo()
+  @Type(() => Number)
+  @IsNumber()
+  @CasasDecimais(2)
+  @Min(0)
+  @Max(DECIMAL_10_2)
+  duracao_horas?: number | null;
 
+  /** A perda do material, em fração: 0,10 = 10%. Vazio = 0 */
   @IsOptional()
-  @Transform(({ value }) => (value ? parseFloat(value) : undefined))
-  quantidade?: number;
+  @VazioEhNulo()
+  @Type(() => Number)
+  @IsNumber()
+  @CasasDecimais(4)
+  @Min(0)
+  @Max(1)
+  fator_perda?: number | null;
 
-  @IsString()
+  /** Faturamento direto: o cliente compra, entra no escopo e fica fora do custo */
   @IsOptional()
-  unidade?: string;
-
-  /** Quem decide se o recurso é indispensável é a instrução, não o catálogo. */
   @IsBoolean()
+  fornecido_pelo_cliente?: boolean;
+
+  /** Só na cobrança por km */
   @IsOptional()
-  obrigatorio?: boolean = false;
+  @VazioEhNulo()
+  @Type(() => Number)
+  @IsNumber()
+  @CasasDecimais(2)
+  @Min(0)
+  @Max(DECIMAL_10_2)
+  distancia_km?: number | null;
+
+  /** O preço de uma unidade da cobrança só nesta instrução. Vazio = o do cadastro */
+  @IsOptional()
+  @VazioEhNulo()
+  @Type(() => Number)
+  @IsNumber()
+  @CasasDecimais(2)
+  @Min(0)
+  @Max(DECIMAL_12_2)
+  preco_proprio?: number | null;
+}
+
+/** Uma linha de maquinário da instrução (a `instrucao_maquinarios` do AupusProject) */
+export class CreateMaquinarioInstrucaoDto {
+  @IsString()
+  @IsNotEmpty()
+  maquinario_id: string;
+
+  @IsOptional()
+  @VazioEhNulo()
+  @Type(() => Number)
+  @IsNumber()
+  @CasasDecimais(2)
+  @Min(0)
+  @Max(DECIMAL_10_2)
+  quantidade?: number | null;
+
+  @IsOptional()
+  @VazioEhNulo()
+  @Type(() => Number)
+  @IsNumber()
+  @CasasDecimais(2)
+  @Min(0)
+  @Max(DECIMAL_10_2)
+  duracao_horas?: number | null;
+
+  @IsOptional()
+  @VazioEhNulo()
+  @Type(() => Number)
+  @IsNumber()
+  @CasasDecimais(2)
+  @Min(0)
+  @Max(DECIMAL_10_2)
+  distancia_km?: number | null;
+
+  @IsOptional()
+  @VazioEhNulo()
+  @Type(() => Number)
+  @IsNumber()
+  @CasasDecimais(2)
+  @Min(0)
+  @Max(DECIMAL_12_2)
+  preco_proprio?: number | null;
 }

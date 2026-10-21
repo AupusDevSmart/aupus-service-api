@@ -53,29 +53,23 @@ describe('leituras no checklist da OS (banco real)', () => {
     await limpar();
     planta = await criarPlantaDeTeste(prisma, 'leiturasos', '95.000.000/0001-58');
     await prisma.tarefas.deleteMany({ where: { tag: { startsWith: 'TESTE-LEIT-' } } });
-    await prisma.sub_instrucoes.deleteMany({ where: { instrucao: { tag: TAG_INSTRUCAO } } });
-    await prisma.instrucoes.deleteMany({ where: { tag: TAG_INSTRUCAO } });
+    await prisma.sub_instrucoes.deleteMany({ where: { instrucao: { codigo: TAG_INSTRUCAO } } });
+    await prisma.instrucoes.deleteMany({ where: { codigo: TAG_INSTRUCAO } });
 
     instrucaoId = (
       await prisma.instrucoes.create({
         data: {
-          tag: TAG_INSTRUCAO,
+          codigo: TAG_INSTRUCAO,
           nome: 'Medição do inversor',
           descricao: 'Instrução de teste',
-          categoria: 'ELETRICA',
-          tipo_manutencao: 'PREVENTIVA',
-          condicao_ativo: 'FUNCIONANDO',
-          criticidade: 3,
-          duracao_estimada: 1,
-          tempo_estimado: 30,
         },
       })
     ).id;
     await prisma.sub_instrucoes.createMany({
       data: [
         { instrucao_id: instrucaoId, descricao: 'Desligar o disjuntor', ordem: 1, obrigatoria: true },
-        { instrucao_id: instrucaoId, descricao: 'Tensão CC da string', ordem: 2, obrigatoria: true, tipo: 'LEITURA', unidade: 'V', valor_minimo: 580, valor_maximo: 620 },
-        { instrucao_id: instrucaoId, descricao: 'Temperatura do dissipador', ordem: 3, tipo: 'LEITURA', unidade: '°C', valor_maximo: 70.5 },
+        { instrucao_id: instrucaoId, descricao: 'Tensão CC da string', ordem: 2, obrigatoria: true, registro: 'LEITURA', unidade: 'V', valor_minimo: 580, valor_maximo: 620 },
+        { instrucao_id: instrucaoId, descricao: 'Temperatura do dissipador', ordem: 3, registro: 'LEITURA', unidade: '°C', valor_maximo: 70.5 },
       ],
     });
     tarefaId = (
@@ -88,8 +82,8 @@ describe('leituras no checklist da OS (banco real)', () => {
   afterAll(async () => {
     await limpar();
     await prisma.tarefas.deleteMany({ where: { tag: { startsWith: 'TESTE-LEIT-' } } });
-    await prisma.sub_instrucoes.deleteMany({ where: { instrucao: { tag: TAG_INSTRUCAO } } });
-    await prisma.instrucoes.deleteMany({ where: { tag: TAG_INSTRUCAO } });
+    await prisma.sub_instrucoes.deleteMany({ where: { instrucao: { codigo: TAG_INSTRUCAO } } });
+    await prisma.instrucoes.deleteMany({ where: { codigo: TAG_INSTRUCAO } });
     await planta.apagar();
     await prisma.$disconnect();
   });
@@ -310,12 +304,12 @@ describe('leituras no checklist da OS (banco real)', () => {
     }
   });
 
-  it('a tarefa traz as etapas da instrução com o tipo e a faixa (o include voltava vazio no id de 25 caracteres)', async () => {
+  it('a tarefa traz as etapas da instrução com o registro e a faixa (o include voltava vazio no id de 25 caracteres)', async () => {
     expect(instrucaoId.trim()).toHaveLength(25);
 
     const tarefa = await new TarefasService(prisma, scope, {} as PropagacaoPlanosService).buscarPorId(tarefaId);
 
-    expect(tarefa.instrucao?.sub_instrucoes?.map((e) => [e.descricao, e.tipo, e.unidade, e.valor_minimo, e.valor_maximo])).toEqual([
+    expect(tarefa.instrucao?.sub_instrucoes?.map((e) => [e.descricao, e.registro, e.unidade, e.valor_minimo, e.valor_maximo])).toEqual([
       ['Desligar o disjuntor', 'VERIFICACAO', null, null, null],
       ['Tensão CC da string', 'LEITURA', 'V', 580, 620],
       ['Temperatura do dissipador', 'LEITURA', '°C', null, 70.5],

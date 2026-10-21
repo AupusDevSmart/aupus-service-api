@@ -8,9 +8,11 @@ export interface EtapaDaInstrucao {
   descricao: string;
   obrigatoria: boolean;
   ordem: number;
-  tempo_estimado: number | null;
-  /** SN-58: VERIFICACAO ou LEITURA, com unidade e faixa */
-  tipo: string;
+  /** SN-85: a disciplina e a duração em horas (era tempo_estimado, em minutos) */
+  tipo: string | null;
+  duracao_horas: number | null;
+  /** SN-58: VERIFICACAO ou LEITURA, com unidade e faixa (era tipo) */
+  registro: string;
   /** SN-59: o item da OS só é marcado com uma foto dele */
   exige_foto: boolean;
   unidade: string | null;
@@ -42,8 +44,9 @@ export async function comEtapas<T extends ComInstrucao>(
           descricao: true,
           obrigatoria: true,
           ordem: true,
-          tempo_estimado: true,
           tipo: true,
+          duracao_horas: true,
+          registro: true,
           exige_foto: true,
           unidade: true,
           valor_minimo: true,
@@ -53,11 +56,17 @@ export async function comEtapas<T extends ComInstrucao>(
     : [];
 
   const porInstrucao = new Map<string, EtapaDaInstrucao[]>();
-  for (const { instrucao_id, valor_minimo, valor_maximo, ...etapa } of etapas) {
+  for (const { instrucao_id, valor_minimo, valor_maximo, duracao_horas, ...etapa } of etapas) {
     const chave = instrucao_id.trim();
     porInstrucao.set(chave, [
       ...(porInstrucao.get(chave) ?? []),
-      { ...etapa, id: etapa.id.trim(), valor_minimo: numeroOuNulo(valor_minimo), valor_maximo: numeroOuNulo(valor_maximo) },
+      {
+        ...etapa,
+        id: etapa.id.trim(),
+        duracao_horas: numeroOuNulo(duracao_horas),
+        valor_minimo: numeroOuNulo(valor_minimo),
+        valor_maximo: numeroOuNulo(valor_maximo),
+      },
     ]);
   }
 

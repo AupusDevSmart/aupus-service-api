@@ -190,8 +190,7 @@ describe('planos vinculados pelo escopo da planta (banco real)', () => {
       instrucaoId = (
         await prisma.instrucoes.create({
           data: {
-            tag: `${PREFIXO}-INSTR`, nome: 'Instrução escopo', descricao: 'x', categoria: 'LIMPEZA', tipo_manutencao: 'PREVENTIVA',
-            condicao_ativo: 'QUALQUER', criticidade: 3, duracao_estimada: 1, tempo_estimado: 10, updated_at: new Date(),
+            codigo: `${PREFIXO}-INSTR`, nome: 'Instrução escopo', descricao: 'x',
           },
         })
       ).id;

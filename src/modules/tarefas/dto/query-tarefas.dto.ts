@@ -1,12 +1,7 @@
 // src/modules/tarefas/dto/query-tarefas.dto.ts
 import { IsOptional, IsEnum, IsString, IsInt, Min, Max, IsBoolean } from 'class-validator';
 import { Type } from 'class-transformer';
-import { 
-  StatusTarefa, 
-  CategoriaTarefa, 
-  TipoManutencao,
-  FrequenciaTarefa 
-} from '@/core';
+import { StatusTarefa, FrequenciaTarefa } from '@/core';
 import { BooleanoDoTexto } from '@/common/decorators/booleano';
 
 export class QueryTarefasDto {
@@ -42,14 +37,6 @@ export class QueryTarefasDto {
   @BooleanoDoTexto()
   @IsBoolean()
   ativo?: boolean;
-
-  @IsOptional()
-  @IsEnum(CategoriaTarefa)
-  categoria?: CategoriaTarefa;
-
-  @IsOptional()
-  @IsEnum(TipoManutencao)
-  tipo_manutencao?: TipoManutencao;
 
   @IsOptional()
   @IsEnum(FrequenciaTarefa)

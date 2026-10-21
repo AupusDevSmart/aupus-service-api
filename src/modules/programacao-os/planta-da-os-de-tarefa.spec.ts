@@ -54,8 +54,8 @@ describe('planta da programação e da OS de tarefa (banco real)', () => {
 
   const apagarFixos = async () => {
     await prisma.tarefas.deleteMany({ where: { tag: { startsWith: PREFIXO } } });
-    await prisma.sub_instrucoes.deleteMany({ where: { instrucao: { tag: `${PREFIXO}-INS` } } });
-    await prisma.instrucoes.deleteMany({ where: { tag: `${PREFIXO}-INS` } });
+    await prisma.sub_instrucoes.deleteMany({ where: { instrucao: { codigo: `${PREFIXO}-INS` } } });
+    await prisma.instrucoes.deleteMany({ where: { codigo: `${PREFIXO}-INS` } });
     await prisma.equipamentos.deleteMany({ where: { id: { in: [UAR_A, UC_A, UC_B] } } });
     await prisma.unidades.deleteMany({ where: { id: { in: [UNIDADE_A, UNIDADE_B] } } });
     await prisma.planta_operadores.deleteMany({ where: { usuario_id: { in: [TECNICO_A, TECNICO_B] } } });
@@ -82,17 +82,16 @@ describe('planta da programação e da OS de tarefa (banco real)', () => {
     tarefaUAR = (await tarefa('UAR', UAR_A)).id.trim();
     tarefaB = (await tarefa('B', UC_B)).id.trim();
 
-    // A instrução dura 2 h pelas sub-instruções (90 + 30 min); os campos dela, que a tela não mostra, dizem outra coisa
+    // A instrução dura 2 h pelos passos (1,5 + 0,5 h)
     const instrucao = await prisma.instrucoes.create({
       data: {
-        tag: `${PREFIXO}-INS`, nome: 'Revisão do inversor', descricao: 'x', categoria: 'ELETRICA', tipo_manutencao: 'PREVENTIVA',
-        condicao_ativo: 'PARADO', criticidade: 3, duracao_estimada: 9, tempo_estimado: 600,
+        codigo: `${PREFIXO}-INS`, nome: 'Revisão do inversor', descricao: 'x',
       },
     });
     await prisma.sub_instrucoes.createMany({
       data: [
-        { instrucao_id: instrucao.id, descricao: 'Limpar', ordem: 1, tempo_estimado: 90 },
-        { instrucao_id: instrucao.id, descricao: 'Medir', ordem: 2, tempo_estimado: 30 },
+        { instrucao_id: instrucao.id, descricao: 'Limpar', ordem: 1, duracao_horas: 1.5 },
+        { instrucao_id: instrucao.id, descricao: 'Medir', ordem: 2, duracao_horas: 0.5 },
         { instrucao_id: instrucao.id, descricao: 'Fotografar', ordem: 3 },
       ],
     });

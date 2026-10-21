@@ -1,11 +1,7 @@
 // src/modules/instrucoes/dto/query-instrucoes.dto.ts
 import { IsOptional, IsEnum, IsString, IsInt, Min, Max, IsBoolean } from 'class-validator';
 import { Type } from 'class-transformer';
-import {
-  StatusTarefa,
-  CategoriaTarefa,
-  TipoManutencao
-} from '@/core';
+import { StatusTarefa } from '@/core';
 import { BooleanoDoTexto } from '@/common/decorators/booleano';
 
 export class QueryInstrucoesDto {
@@ -22,20 +18,10 @@ export class QueryInstrucoesDto {
   @IsBoolean()
   ativo?: boolean;
 
+  /** SN-85: a frente de trabalho, exata */
   @IsOptional()
-  @IsEnum(CategoriaTarefa)
-  categoria?: CategoriaTarefa;
-
-  @IsOptional()
-  @IsEnum(TipoManutencao)
-  tipo_manutencao?: TipoManutencao;
-
-  @IsOptional()
-  @Type(() => Number)
-  @IsInt()
-  @Min(1)
-  @Max(5)
-  criticidade?: number;
+  @IsString()
+  frente?: string;
 
   @IsOptional()
   @Type(() => Number)

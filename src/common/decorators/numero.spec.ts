@@ -67,7 +67,7 @@ describe('CasasDecimais e VazioEhNulo', () => {
   });
 
   it('a faixa do passo: "" é sem limite', async () => {
-    const passo = await corpo(CreateSubInstrucaoDto, { descricao: 'Tensão', tipo: 'LEITURA', valor_minimo: '', valor_maximo: 620 });
+    const passo = await corpo(CreateSubInstrucaoDto, { descricao: 'Tensão', registro: 'LEITURA', valor_minimo: '', valor_maximo: 620 });
     expect([passo.valor_minimo, passo.valor_maximo]).toEqual([null, 620]);
   });
 });

@@ -59,20 +59,14 @@ describe('execução da OS: checklist por tarefa, concluir e executar (banco rea
     await limpar();
     planta = await criarPlantaDeTeste(prisma, 'execucaoos', '95.000.000/0001-03');
     await prisma.tarefas.deleteMany({ where: { tag: { startsWith: 'TESTE-EXEC-' } } });
-    await prisma.sub_instrucoes.deleteMany({ where: { instrucao: { tag: TAG_INSTRUCAO } } });
-    await prisma.instrucoes.deleteMany({ where: { tag: TAG_INSTRUCAO } });
+    await prisma.sub_instrucoes.deleteMany({ where: { instrucao: { codigo: TAG_INSTRUCAO } } });
+    await prisma.instrucoes.deleteMany({ where: { codigo: TAG_INSTRUCAO } });
 
     const instrucao = await prisma.instrucoes.create({
       data: {
-        tag: TAG_INSTRUCAO,
+        codigo: TAG_INSTRUCAO,
         nome: 'Lubrificação do mancal',
         descricao: 'Instrução de teste',
-        categoria: 'MECANICA',
-        tipo_manutencao: 'PREVENTIVA',
-        condicao_ativo: 'PARADO',
-        criticidade: 3,
-        duracao_estimada: 1,
-        tempo_estimado: 30,
       },
     });
     await prisma.sub_instrucoes.createMany({
@@ -96,8 +90,8 @@ describe('execução da OS: checklist por tarefa, concluir e executar (banco rea
   afterAll(async () => {
     await limpar();
     await prisma.tarefas.deleteMany({ where: { tag: { startsWith: 'TESTE-EXEC-' } } });
-    await prisma.sub_instrucoes.deleteMany({ where: { instrucao: { tag: TAG_INSTRUCAO } } });
-    await prisma.instrucoes.deleteMany({ where: { tag: TAG_INSTRUCAO } });
+    await prisma.sub_instrucoes.deleteMany({ where: { instrucao: { codigo: TAG_INSTRUCAO } } });
+    await prisma.instrucoes.deleteMany({ where: { codigo: TAG_INSTRUCAO } });
     await planta.apagar();
     await prisma.$disconnect();
   });

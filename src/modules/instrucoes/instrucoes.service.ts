@@ -1,5 +1,5 @@
 // src/modules/instrucoes/instrucoes.service.ts
-import { Injectable, NotFoundException, ConflictException, BadRequestException } from '@nestjs/common';
+import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
 import { PermissionScopeService, PrismaService, ScopedUser } from '@/core';
 import { equipamentoNasPlantas } from '@/core/modules/auth/planta-dos-equipamentos';
 import { PropagacaoPlanosService } from '../planos-manutencao/propagacao-planos.service';
@@ -10,13 +10,23 @@ import {
   UpdateStatusInstrucaoDto,
   InstrucaoResponseDto,
   DashboardInstrucoesDto,
-  CreateRecursoInstrucaoDto,
 } from './dto';
-import { StatusTarefa, TipoManutencao, CategoriaTarefa, Prisma } from '@/core';
-import type { anomalias_instrucoes, instrucoes, solicitacoes_instrucoes, sub_instrucoes } from '@prisma/client';
+import { StatusTarefa, Prisma } from '@/core';
+import type {
+  anomalias_instrucoes,
+  instrucao_maquinarios,
+  instrucao_recursos,
+  instrucoes,
+  maquinarios,
+  recursos,
+  solicitacoes_instrucoes,
+  sub_instrucoes,
+} from '@prisma/client';
 import { passoParaGravar, passoParaResposta } from './passos-da-instrucao';
-import { comCusto } from '../recursos/recursos.service';
-import { subtotalDaLinha } from '../recursos/regras-do-recurso';
+import { linhasDeMaquinario, linhasDeRecurso } from './linhas-da-instrucao';
+import { itemDoMaquinario, itemDoRecurso, linhaDoMaquinario, linhaDoRecurso, porGrupo, somar } from './custo-da-instrucao';
+import { variantesDeIds } from '../tarefas/ids';
+import { centavos } from '../recursos/regras-do-recurso';
 
 /**
  * Instrucao como as consultas deste service a leem. As relacoes e contadores
@@ -26,11 +36,14 @@ type InstrucaoLida = instrucoes & {
   usuario_criador?: InstrucaoResponseDto['usuario_criador'] | null;
   usuario_atualizador?: InstrucaoResponseDto['usuario_atualizador'] | null;
   sub_instrucoes?: sub_instrucoes[];
-  recursos?: InstrucaoResponseDto['recursos'];
+  recursos?: (instrucao_recursos & { recurso: recursos })[];
+  maquinarios?: (instrucao_maquinarios & { maquinario: maquinarios })[];
   anexos?: InstrucaoResponseDto['anexos'];
-  _count?: { sub_instrucoes?: number; recursos?: number; anexos?: number; tarefas?: number };
+  _count?: { sub_instrucoes?: number; recursos?: number; maquinarios?: number; anexos?: number; tarefas?: number };
   _tarefas_derivadas?: number;
 };
+
+const numero = (v: Prisma.Decimal | null) => (v === null ? null : Number(v));
 
 @Injectable()
 export class InstrucoesService {
@@ -40,48 +53,34 @@ export class InstrucoesService {
     private readonly scopeService: PermissionScopeService,
   ) {}
 
-  async criar(createDto: CreateInstrucaoDto): Promise<InstrucaoResponseDto> {
-    // Se não foi fornecida TAG, gerar automaticamente
-    if (!createDto.tag) {
-      createDto.tag = await this.gerarTagUnica();
-    } else {
-      await this.verificarTagUnica(createDto.tag);
-    }
+  /** `autorId`: quem está logado (o controller lê do token), nunca o corpo */
+  async criar(createDto: CreateInstrucaoDto, autorId?: string | null): Promise<InstrucaoResponseDto> {
+    // Sem código, o próximo INST-NNN; com ele, não pode ser de outra instrução
+    const codigo = createDto.codigo?.trim() || (await this.gerarCodigo());
+    if (createDto.codigo?.trim()) await this.verificarCodigoUnico(codigo);
 
-    // Transação para criar instrução com sub-estruturas
     const instrucao = await this.prisma.$transaction(async (tx) => {
       const novaInstrucao = await tx.instrucoes.create({
         data: {
-          tag: createDto.tag,
+          codigo,
           nome: createDto.nome,
-          descricao: createDto.descricao,
-          categoria: createDto.categoria,
-          tipo_manutencao: createDto.tipo_manutencao,
-          condicao_ativo: createDto.condicao_ativo,
-          criticidade: createDto.criticidade,
-          duracao_estimada: createDto.duracao_estimada,
-          tempo_estimado: createDto.tempo_estimado,
+          descricao: createDto.descricao?.trim() || null,
+          frente: createDto.frente ?? null,
+          prazo_inicio_relativo: createDto.prazo_inicio_relativo ?? 0,
+          duracao_dias: createDto.duracao_dias ?? 1,
           observacoes: createDto.observacoes,
           status: createDto.status || StatusTarefa.ATIVA,
           ativo: createDto.ativo !== undefined ? createDto.ativo : true,
-          criado_por: createDto.criado_por
+          criado_por: autorId?.trim() || null
         }
       });
 
-      // Criar sub-instruções se fornecidas
-      if (createDto.sub_instrucoes && createDto.sub_instrucoes.length > 0) {
+      if (createDto.sub_instrucoes?.length) {
         await tx.sub_instrucoes.createMany({
           data: createDto.sub_instrucoes.map((sub, index) => passoParaGravar(sub, novaInstrucao.id, index))
         });
       }
-
-      // Criar recursos se fornecidos
-      if (createDto.recursos && createDto.recursos.length > 0) {
-        const linhas = await this.montarLinhasDeRecurso(createDto.recursos);
-        await tx.recursos_instrucao.createMany({
-          data: linhas.map(linha => ({ instrucao_id: novaInstrucao.id, ...linha }))
-        });
-      }
+      await this.gravarLinhas(tx, novaInstrucao.id, createDto, false);
 
       return novaInstrucao;
     });
@@ -90,64 +89,21 @@ export class InstrucoesService {
   }
 
   /**
-   * Resolve as linhas de recurso de uma instrução.
-   *
-   * Com `recurso_id`, categoria, nome e unidade vêm do catálogo e são copiados
-   * para as colunas antigas — que continuam existindo e sendo lidas por quem
-   * ainda não migrou. Sem ele, valem os campos digitados.
-   *
-   * Uma consulta só para todos os ids: resolver um a um dentro do laço faria N
-   * idas ao banco dentro da transação de gravação.
+   * Troca as listas de recursos e de maquinários que vieram (a que não veio
+   * fica). As linhas são resolvidas ANTES de apagar as antigas: o recurso
+   * removido do catálogo que a instrução já usava continua valendo.
    */
-  private async montarLinhasDeRecurso(recursos: CreateRecursoInstrucaoDto[]) {
-    const ids = [
-      ...new Set(
-        recursos.map(r => r.recurso_id?.trim()).filter((id): id is string => !!id),
-      ),
-    ];
-
-    const catalogo = ids.length
-      ? await this.prisma.recursos.findMany({
-          where: { id: { in: ids }, deleted_at: null },
-        })
-      : [];
-
-    const porId = new Map(catalogo.map(r => [r.id.trim(), r]));
-
-    return recursos.map((recurso, indice) => {
-      const recursoId = recurso.recurso_id?.trim();
-
-      if (recursoId) {
-        const doCatalogo = porId.get(recursoId);
-        if (!doCatalogo) {
-          throw new BadRequestException(
-            `O recurso da linha ${indice + 1} não existe mais no catálogo.`,
-          );
-        }
-
-        return {
-          recurso_id: doCatalogo.id,
-          tipo: doCatalogo.categoria,
-          descricao: doCatalogo.nome,
-          unidade: doCatalogo.unidade,
-          quantidade: recurso.quantidade,
-          obrigatorio: recurso.obrigatorio || false,
-        };
-      }
-
-      if (!recurso.tipo || !recurso.descricao?.trim()) {
-        throw new BadRequestException(`Informe o recurso da linha ${indice + 1}.`);
-      }
-
-      return {
-        recurso_id: null,
-        tipo: recurso.tipo,
-        descricao: recurso.descricao.trim(),
-        unidade: recurso.unidade,
-        quantidade: recurso.quantidade,
-        obrigatorio: recurso.obrigatorio || false,
-      };
-    });
+  private async gravarLinhas(tx: Prisma.TransactionClient, instrucaoId: string, dto: UpdateInstrucaoDto, substituir: boolean) {
+    if (dto.recursos) {
+      const linhas = await linhasDeRecurso(tx, substituir ? instrucaoId : null, dto.recursos);
+      if (substituir) await tx.instrucao_recursos.deleteMany({ where: { instrucao_id: { in: variantesDeIds([instrucaoId]) } } });
+      if (linhas.length) await tx.instrucao_recursos.createMany({ data: linhas.map((l) => ({ instrucao_id: instrucaoId, ...l })) });
+    }
+    if (dto.maquinarios) {
+      const linhas = await linhasDeMaquinario(tx, substituir ? instrucaoId : null, dto.maquinarios);
+      if (substituir) await tx.instrucao_maquinarios.deleteMany({ where: { instrucao_id: instrucaoId.trim() } });
+      if (linhas.length) await tx.instrucao_maquinarios.createMany({ data: linhas.map((l) => ({ instrucao_id: instrucaoId.trim(), ...l })) });
+    }
   }
 
   async listar(queryDto: QueryInstrucoesDto): Promise<{
@@ -192,7 +148,10 @@ export class InstrucoesService {
   }
 
   async buscarPorId(id: string): Promise<InstrucaoResponseDto> {
-    const [instrucao, sub_instrucoes, recursos, anexos, totalTarefas] = await Promise.all([
+    // As listas por consulta própria e pelas variantes do id: as FKs dos filhos
+    // são Char(26) e instrucoes.id VarChar, e o include volta vazio para id de 25
+    const doId = { in: variantesDeIds([id]) };
+    const [instrucao, sub_instrucoes, recursos, maquinarios, anexos, totalTarefas] = await Promise.all([
       this.prisma.instrucoes.findFirst({
         where: { id, deleted_at: null },
         include: {
@@ -205,19 +164,23 @@ export class InstrucoesService {
         }
       }),
       this.prisma.sub_instrucoes.findMany({
-        where: { instrucao_id: id },
+        where: { instrucao_id: doId },
         orderBy: { ordem: 'asc' }
       }),
-      this.prisma.recursos_instrucao.findMany({
-        where: { instrucao_id: id },
-        // O catálogo vem junto: preço e unidade são lidos ao vivo, para que
-        // reajustar um custo se reflita nas instruções que o usam. O que
-        // congela é a OS, no momento em que é gerada.
+      // O cadastro vem junto: o preço é lido ao vivo, para que reajustar um
+      // custo se reflita nas instruções que o usam. O que congela é a OS.
+      this.prisma.instrucao_recursos.findMany({
+        where: { instrucao_id: doId },
         include: { recurso: true },
-        orderBy: [{ tipo: 'asc' }, { descricao: 'asc' }]
+        orderBy: [{ recurso: { nome: 'asc' } }, { id: 'asc' }]
+      }),
+      this.prisma.instrucao_maquinarios.findMany({
+        where: { instrucao_id: id.trim() },
+        include: { maquinario: true },
+        orderBy: [{ maquinario: { nome: 'asc' } }, { id: 'asc' }]
       }),
       this.prisma.anexos_instrucao.findMany({
-        where: { instrucao_id: id },
+        where: { instrucao_id: doId },
         orderBy: { created_at: 'desc' }
       }),
       this.prisma.tarefas.count({
@@ -233,6 +196,7 @@ export class InstrucoesService {
       ...instrucao,
       sub_instrucoes,
       recursos,
+      maquinarios,
       anexos,
       _tarefas_derivadas: totalTarefas
     };
@@ -240,47 +204,44 @@ export class InstrucoesService {
     return this.mapearParaResponse(instrucaoCompleta);
   }
 
-  async atualizar(id: string, updateDto: UpdateInstrucaoDto): Promise<InstrucaoResponseDto> {
+  async atualizar(id: string, updateDto: UpdateInstrucaoDto, autorId?: string | null): Promise<InstrucaoResponseDto> {
     const instrucaoExistente = await this.verificarInstrucaoExiste(id);
 
-    // Se mudou TAG, verificar unicidade
-    if (updateDto.tag && updateDto.tag !== instrucaoExistente.tag) {
-      await this.verificarTagUnica(updateDto.tag, id);
+    const { sub_instrucoes, recursos, maquinarios, codigo: codigoDigitado, descricao, ...dadosAtualizacao } = updateDto;
+    // O PartialType deixa passar null (IsOptional), e nestas colunas NOT NULL o Prisma daria 500: null mantém
+    for (const campo of ['nome', 'prazo_inicio_relativo', 'duracao_dias', 'status', 'ativo'] as const) {
+      if (dadosAtualizacao[campo] === null) delete dadosAtualizacao[campo];
     }
 
-    const { sub_instrucoes, recursos, ...dadosAtualizacao } = updateDto;
+    // Código trocado: não pode ser de outra instrução. Vazio mantém o gravado
+    const codigo = codigoDigitado?.trim() || undefined;
+    if (codigo && codigo !== instrucaoExistente.codigo) {
+      await this.verificarCodigoUnico(codigo, id);
+    }
 
     const instrucao = await this.prisma.$transaction(async (tx) => {
       const instrucaoAtualizada = await tx.instrucoes.update({
         where: { id },
         data: {
           ...dadosAtualizacao,
+          ...(codigo ? { codigo } : {}),
+          ...(descricao !== undefined ? { descricao: descricao?.trim() || null } : {}),
+          ...(autorId ? { atualizado_por: autorId.trim() } : {}),
           updated_at: new Date()
         }
       });
 
-      // Se fornecidas sub-instruções, substituir todas
-      if (updateDto.sub_instrucoes) {
-        await tx.sub_instrucoes.deleteMany({ where: { instrucao_id: id } });
+      // Vindo, a lista inteira é trocada
+      if (sub_instrucoes) {
+        await tx.sub_instrucoes.deleteMany({ where: { instrucao_id: { in: variantesDeIds([id]) } } });
 
-        if (updateDto.sub_instrucoes.length > 0) {
+        if (sub_instrucoes.length > 0) {
           await tx.sub_instrucoes.createMany({
-            data: updateDto.sub_instrucoes.map((sub, index) => passoParaGravar(sub, id, index))
+            data: sub_instrucoes.map((sub, index) => passoParaGravar(sub, id, index))
           });
         }
       }
-
-      // Se fornecidos recursos, substituir todos
-      if (updateDto.recursos) {
-        await tx.recursos_instrucao.deleteMany({ where: { instrucao_id: id } });
-
-        if (updateDto.recursos.length > 0) {
-          const linhas = await this.montarLinhasDeRecurso(updateDto.recursos);
-          await tx.recursos_instrucao.createMany({
-            data: linhas.map(linha => ({ instrucao_id: id, ...linha }))
-          });
-        }
-      }
+      await this.gravarLinhas(tx, id, { recursos, maquinarios }, true);
 
       return instrucaoAtualizada;
     });
@@ -288,7 +249,7 @@ export class InstrucoesService {
     return this.buscarPorId(instrucao.id);
   }
 
-  async atualizarStatus(id: string, updateStatusDto: UpdateStatusInstrucaoDto): Promise<InstrucaoResponseDto> {
+  async atualizarStatus(id: string, updateStatusDto: UpdateStatusInstrucaoDto, autorId?: string | null): Promise<InstrucaoResponseDto> {
     await this.verificarInstrucaoExiste(id);
 
     const instrucao = await this.prisma.instrucoes.update({
@@ -296,7 +257,7 @@ export class InstrucoesService {
       data: {
         status: updateStatusDto.status,
         ativo: updateStatusDto.status === StatusTarefa.ATIVA,
-        atualizado_por: updateStatusDto.atualizado_por,
+        ...(autorId ? { atualizado_por: autorId.trim() } : {}),
         updated_at: new Date()
       }
     });
@@ -498,45 +459,16 @@ export class InstrucoesService {
   // ==========================================
 
   async obterDashboard(): Promise<DashboardInstrucoesDto> {
-    const [statusStats, criticidadeStats, tipoStats, categoriaStats, gerais] = await Promise.all([
+    const viva = { instrucao: { deleted_at: null, ativo: true } };
+    const [statusStats, totalSubInstrucoes, totalRecursos, totalMaquinarios, totalTarefasDerivadas] = await Promise.all([
       this.prisma.instrucoes.groupBy({
         by: ['status'],
         where: { deleted_at: null },
         _count: true
       }),
-      this.prisma.instrucoes.groupBy({
-        by: ['criticidade'],
-        where: { deleted_at: null, ativo: true },
-        _count: true
-      }),
-      this.prisma.instrucoes.groupBy({
-        by: ['tipo_manutencao'],
-        where: { deleted_at: null, ativo: true },
-        _count: true
-      }),
-      this.prisma.instrucoes.groupBy({
-        by: ['categoria'],
-        where: { deleted_at: null, ativo: true },
-        _count: true
-      }),
-      this.prisma.instrucoes.aggregate({
-        where: { deleted_at: null, ativo: true },
-        _count: true,
-        _sum: { tempo_estimado: true },
-        _avg: {
-          tempo_estimado: true,
-          criticidade: true
-        }
-      })
-    ]);
-
-    const [totalSubInstrucoes, totalRecursos, totalTarefasDerivadas] = await Promise.all([
-      this.prisma.sub_instrucoes.count({
-        where: { instrucao: { deleted_at: null, ativo: true } }
-      }),
-      this.prisma.recursos_instrucao.count({
-        where: { instrucao: { deleted_at: null, ativo: true } }
-      }),
+      this.prisma.sub_instrucoes.count({ where: viva }),
+      this.prisma.instrucao_recursos.count({ where: viva }),
+      this.prisma.instrucao_maquinarios.count({ where: viva }),
       this.prisma.tarefas.count({
         where: {
           instrucao_id: { not: null },
@@ -545,47 +477,28 @@ export class InstrucoesService {
       })
     ]);
 
-    const totalInstrucoes = statusStats.reduce((acc, stat) => acc + stat._count, 0);
-
     return {
-      total_instrucoes: totalInstrucoes,
+      total_instrucoes: statusStats.reduce((acc, stat) => acc + stat._count, 0),
       instrucoes_ativas: this.contarPorStatus(statusStats, StatusTarefa.ATIVA),
       instrucoes_inativas: this.contarPorStatus(statusStats, StatusTarefa.INATIVA),
       instrucoes_em_revisao: this.contarPorStatus(statusStats, StatusTarefa.EM_REVISAO),
       instrucoes_arquivadas: this.contarPorStatus(statusStats, StatusTarefa.ARQUIVADA),
-
-      criticidade_muito_alta: this.contarPorCriticidade(criticidadeStats, 5),
-      criticidade_alta: this.contarPorCriticidade(criticidadeStats, 4),
-      criticidade_media: this.contarPorCriticidade(criticidadeStats, 3),
-      criticidade_baixa: this.contarPorCriticidade(criticidadeStats, 2),
-      criticidade_muito_baixa: this.contarPorCriticidade(criticidadeStats, 1),
-
-      distribuicao_tipos: {
-        preventiva: this.contarPorTipo(tipoStats, 'PREVENTIVA'),
-        preditiva: this.contarPorTipo(tipoStats, 'PREDITIVA'),
-        corretiva: this.contarPorTipo(tipoStats, 'CORRETIVA'),
-        inspecao: this.contarPorTipo(tipoStats, 'INSPECAO'),
-        visita_tecnica: this.contarPorTipo(tipoStats, 'VISITA_TECNICA')
-      },
-
-      distribuicao_categorias: {
-        mecanica: this.contarPorCategoria(categoriaStats, 'MECANICA'),
-        eletrica: this.contarPorCategoria(categoriaStats, 'ELETRICA'),
-        instrumentacao: this.contarPorCategoria(categoriaStats, 'INSTRUMENTACAO'),
-        lubrificacao: this.contarPorCategoria(categoriaStats, 'LUBRIFICACAO'),
-        limpeza: this.contarPorCategoria(categoriaStats, 'LIMPEZA'),
-        inspecao: this.contarPorCategoria(categoriaStats, 'INSPECAO'),
-        calibracao: this.contarPorCategoria(categoriaStats, 'CALIBRACAO'),
-        outros: this.contarPorCategoria(categoriaStats, 'OUTROS')
-      },
-
-      tempo_total_estimado: gerais._sum.tempo_estimado || 0,
-      media_tempo_por_instrucao: Math.round(gerais._avg.tempo_estimado || 0),
-      media_criticidade: Math.round((gerais._avg.criticidade || 0) * 10) / 10,
       total_sub_instrucoes: totalSubInstrucoes,
       total_recursos: totalRecursos,
+      total_maquinarios: totalMaquinarios,
       total_tarefas_derivadas: totalTarefasDerivadas
     };
+  }
+
+  /** As frentes já usadas, para o formulário sugerir (texto livre: a sugestão segura a grafia) */
+  async frentes(): Promise<string[]> {
+    const linhas = await this.prisma.instrucoes.findMany({
+      where: { deleted_at: null, frente: { not: null } },
+      select: { frente: true },
+      distinct: ['frente'],
+      orderBy: { frente: 'asc' }
+    });
+    return linhas.map((l) => l.frente).filter((f): f is string => !!f);
   }
 
   // ==========================================
@@ -604,54 +517,50 @@ export class InstrucoesService {
     return instrucao;
   }
 
-  private async verificarTagUnica(tag: string, excludeId?: string) {
-    const where: Prisma.instrucoesWhereInput = {
-      tag,
-      deleted_at: null
-    };
+  /**
+   * O índice único do código vale para TODAS as instruções, removidas
+   * inclusive: conferir só as vivas deixava o código de uma removida passar e o
+   * banco recusava com 500.
+   */
+  private async verificarCodigoUnico(codigo: string, excludeId?: string) {
+    const outra = await this.prisma.instrucoes.findFirst({
+      where: { codigo, ...(excludeId ? { id: { not: excludeId } } : {}) },
+      select: { deleted_at: true }
+    });
 
-    if (excludeId) {
-      where.id = { not: excludeId };
-    }
-
-    const instrucaoExistente = await this.prisma.instrucoes.findFirst({ where });
-
-    if (instrucaoExistente) {
-      throw new ConflictException(`A TAG "${tag}" já está sendo utilizada por outra instrução`);
+    if (outra) {
+      throw new ConflictException(
+        outra.deleted_at
+          ? `O código "${codigo}" é de uma instrução removida: use outro.`
+          : `O código "${codigo}" já é de outra instrução.`
+      );
     }
   }
 
   /**
-   * Próxima TAG a partir do MAIOR número já usado.
+   * Próximo INST-NNN a partir do MAIOR número já usado.
    *
    * Antes derivava da instrução "mais recente" por `created_at desc`. Esse
    * campo tem precisão de SEGUNDO: criando várias instruções no mesmo segundo,
    * a mais recente é arbitrária, o número repetia, a verificação de duplicata
-   * batia e a tag caía no fallback `INST-<timestamp>` — que foi como
-   * apareceram tags do tipo INST-1786559548512.
+   * batia e o código caía no fallback `INST-<timestamp>` — que foi como
+   * apareceram códigos do tipo INST-1786559548512.
    *
    * O maior número não depende de ordenação e não empata.
    */
-  private async gerarTagUnica(): Promise<string> {
-    return this.proximaTagSequencial('INST', await this.tagsExistentes('instrucoes'));
+  private async gerarCodigo(): Promise<string> {
+    const linhas = await this.prisma.instrucoes.findMany({ select: { codigo: true } });
+    return this.proximoSequencial('INST', linhas.map((l) => l.codigo).filter(Boolean));
   }
 
-  /** Números absurdos vêm de tags-timestamp do bug antigo e não devem virar base. */
+  /** Números absurdos vêm dos códigos-timestamp do bug antigo e não devem virar base. */
   private static readonly MAIOR_SEQUENCIAL = 100000;
 
-  private async tagsExistentes(modelo: 'instrucoes' | 'tarefas'): Promise<string[]> {
-    const linhas: { tag: string }[] =
-      modelo === 'instrucoes'
-        ? await this.prisma.instrucoes.findMany({ select: { tag: true } })
-        : await this.prisma.tarefas.findMany({ select: { tag: true } });
-    return linhas.map((l) => l.tag).filter(Boolean);
-  }
-
-  private proximaTagSequencial(prefixo: string, tags: string[]): string {
+  private proximoSequencial(prefixo: string, codigos: string[]): string {
     const padrao = new RegExp(`^${prefixo}-(\\d+)$`);
 
-    const maior = tags.reduce((max, tag) => {
-      const encontrado = tag.match(padrao);
+    const maior = codigos.reduce((max, codigo) => {
+      const encontrado = codigo.match(padrao);
       if (!encontrado) return max;
       const numero = parseInt(encontrado[1], 10);
       if (!Number.isFinite(numero) || numero > InstrucoesService.MAIOR_SEQUENCIAL) return max;
@@ -661,27 +570,19 @@ export class InstrucoesService {
     return `${prefixo}-${(maior + 1).toString().padStart(3, '0')}`;
   }
 
-  /**
-   * `tarefas.tag` é único no banco inteiro, então o maior número tem que ser
-   * procurado em todas as tarefas — não só nas do plano. Mesmo motivo do
-   * gerador de instrução: `created_at` de segundo empatava e derrubava no
-   * fallback com timestamp.
-   */
-  private async gerarTagTarefa(_planoId: string): Promise<string> {
-    return this.proximaTagSequencial('TRF', await this.tagsExistentes('tarefas'));
-  }
-
-  private includeRelacionamentosLista(): Prisma.instrucoesInclude {
+  /** Só as contagens: as listas vêm no detalhe. Tipado pelo `satisfies`, e não pelo retorno, para o resultado não ganhar as relações */
+  private includeRelacionamentosLista() {
     return {
       _count: {
         select: {
           sub_instrucoes: true,
           recursos: true,
+          maquinarios: true,
           anexos: true,
           tarefas: true
         }
       }
-    };
+    } satisfies Prisma.instrucoesInclude;
   }
 
   private construirFiltros(filters: Partial<QueryInstrucoesDto>, search?: string): Prisma.instrucoesWhereInput {
@@ -695,21 +596,13 @@ export class InstrucoesService {
       where.ativo = filters.ativo;
     }
 
-    if (filters.categoria) {
-      where.categoria = filters.categoria;
-    }
-
-    if (filters.tipo_manutencao) {
-      where.tipo_manutencao = filters.tipo_manutencao;
-    }
-
-    if (filters.criticidade) {
-      where.criticidade = filters.criticidade;
+    if (filters.frente?.trim()) {
+      where.frente = filters.frente.trim();
     }
 
     if (search) {
       where.OR = [
-        { tag: { contains: search, mode: 'insensitive' } },
+        { codigo: { contains: search, mode: 'insensitive' } },
         { nome: { contains: search, mode: 'insensitive' } },
         { descricao: { contains: search, mode: 'insensitive' } }
       ];
@@ -722,20 +615,16 @@ export class InstrucoesService {
     const orderBy: Prisma.instrucoesOrderByWithRelationInput = {};
 
     switch (sortBy) {
+      // "tag" é o nome antigo do código (SN-85): a ordenação salva no navegador continua valendo
+      case 'codigo':
       case 'tag':
-        orderBy.tag = sortOrder;
+        orderBy.codigo = sortOrder;
         break;
       case 'nome':
         orderBy.nome = sortOrder;
         break;
-      case 'categoria':
-        orderBy.categoria = sortOrder;
-        break;
-      case 'criticidade':
-        orderBy.criticidade = sortOrder;
-        break;
-      case 'tempo_estimado':
-        orderBy.tempo_estimado = sortOrder;
+      case 'frente':
+        orderBy.frente = sortOrder;
         break;
       case 'updated_at':
         orderBy.updated_at = sortOrder;
@@ -748,17 +637,19 @@ export class InstrucoesService {
   }
 
   private mapearParaResponse(instrucao: InstrucaoLida): InstrucaoResponseDto {
+    // O custo aberto de cada linha (custo-da-instrucao.ts): a tela, a planilha e a proposta leem estes números
+    const recursos = instrucao.recursos?.map((linha) => ({ linha, custo: linhaDoRecurso(linha) }));
+    const maquinarios = instrucao.maquinarios?.map((linha) => ({ linha, custo: linhaDoMaquinario(linha) }));
+    const custos = recursos && maquinarios ? [...recursos, ...maquinarios].map((l) => l.custo) : undefined;
+
     return {
       id: instrucao.id?.trim() || instrucao.id,
-      tag: instrucao.tag,
+      codigo: instrucao.codigo,
       nome: instrucao.nome,
       descricao: instrucao.descricao,
-      categoria: instrucao.categoria,
-      tipo_manutencao: instrucao.tipo_manutencao,
-      condicao_ativo: instrucao.condicao_ativo,
-      criticidade: instrucao.criticidade,
-      duracao_estimada: Number(instrucao.duracao_estimada),
-      tempo_estimado: instrucao.tempo_estimado,
+      frente: instrucao.frente,
+      prazo_inicio_relativo: instrucao.prazo_inicio_relativo,
+      duracao_dias: instrucao.duracao_dias,
       observacoes: instrucao.observacoes,
       status: instrucao.status,
       ativo: instrucao.ativo,
@@ -769,16 +660,46 @@ export class InstrucoesService {
       usuario_criador: instrucao.usuario_criador,
       usuario_atualizador: instrucao.usuario_atualizador,
       sub_instrucoes: instrucao.sub_instrucoes?.map(passoParaResposta),
-      // O recurso do catálogo com o custo apurado: a sugestão da proposta usa o mesmo preço do servidor (SN-83)
-      recursos: instrucao.recursos?.map((linha) => ({
-        ...linha,
-        recurso: linha.recurso ? comCusto(linha.recurso) : linha.recurso,
-        // O custo da linha, calculado aqui: a sugestão da proposta no front lê este número
-        subtotal: linha.recurso ? subtotalDaLinha(linha.recurso, linha) : null,
+      recursos: recursos?.map(({ linha, custo }) => ({
+        id: linha.id.trim(),
+        recurso_id: linha.recurso_id.trim(),
+        recurso: itemDoRecurso(linha.recurso),
+        quantidade: Number(linha.quantidade),
+        duracao_horas: Number(linha.duracao_horas),
+        fator_perda: Number(linha.fator_perda),
+        fornecido_pelo_cliente: linha.fornecido_pelo_cliente,
+        distancia_km: numero(linha.distancia_km),
+        preco_proprio: numero(linha.preco_proprio),
+        unidades: custo.unidades,
+        preco_base: custo.preco_base,
+        preco_cadastro: custo.preco_cadastro,
+        subtotal: custo.subtotal,
+        created_at: linha.created_at,
+        updated_at: linha.updated_at,
+      })),
+      maquinarios: maquinarios?.map(({ linha, custo }) => ({
+        id: linha.id.trim(),
+        maquinario_id: linha.maquinario_id.trim(),
+        maquinario: itemDoMaquinario(linha.maquinario),
+        quantidade: Number(linha.quantidade),
+        duracao_horas: Number(linha.duracao_horas),
+        distancia_km: numero(linha.distancia_km),
+        preco_proprio: numero(linha.preco_proprio),
+        unidades: custo.unidades,
+        preco_base: custo.preco_base,
+        preco_cadastro: custo.preco_cadastro,
+        subtotal: custo.subtotal,
+        created_at: linha.created_at,
+        updated_at: linha.updated_at,
       })),
       anexos: instrucao.anexos,
+      ...(custos ? { custo_por_grupo: porGrupo(custos), custo: somar(custos) } : {}),
+      ...(instrucao.sub_instrucoes
+        ? { horas_dos_passos: centavos(instrucao.sub_instrucoes.reduce((h, p) => h + Number(p.duracao_horas ?? 0), 0)) }
+        : {}),
       total_sub_instrucoes: instrucao._count?.sub_instrucoes ?? instrucao.sub_instrucoes?.length ?? 0,
       total_recursos: instrucao._count?.recursos ?? instrucao.recursos?.length ?? 0,
+      total_maquinarios: instrucao._count?.maquinarios ?? instrucao.maquinarios?.length ?? 0,
       total_anexos: instrucao._count?.anexos ?? instrucao.anexos?.length ?? 0,
       total_tarefas_derivadas: instrucao._count?.tarefas ?? instrucao._tarefas_derivadas ?? 0
     };
@@ -786,17 +707,5 @@ export class InstrucoesService {
 
   private contarPorStatus(stats: Array<{ status: StatusTarefa; _count: number }>, status: StatusTarefa): number {
     return stats.find(s => s.status === status)?._count || 0;
-  }
-
-  private contarPorCriticidade(stats: Array<{ criticidade: number; _count: number }>, criticidade: number): number {
-    return stats.find(s => s.criticidade === criticidade)?._count || 0;
-  }
-
-  private contarPorTipo(stats: Array<{ tipo_manutencao: TipoManutencao; _count: number }>, tipo: string): number {
-    return stats.find(s => s.tipo_manutencao === tipo)?._count || 0;
-  }
-
-  private contarPorCategoria(stats: Array<{ categoria: CategoriaTarefa; _count: number }>, categoria: string): number {
-    return stats.find(s => s.categoria === categoria)?._count || 0;
   }
 }

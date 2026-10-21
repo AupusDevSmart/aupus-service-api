@@ -6,10 +6,7 @@ import { CasasDecimais, VazioEhNulo } from '@/common/decorators/numero';
 import { BooleanoDoTexto } from '@/common/decorators/booleano';
 import { RUBRICAS } from '../../recursos/regras-do-recurso';
 import { BASES, TIPOS } from '../regras-do-maquinario';
-
-/** O maior valor de DECIMAL(12,2) e de DECIMAL(10,2): acima, o banco recusava com 500 */
-const DECIMAL_12_2 = 9_999_999_999.99;
-const DECIMAL_10_2 = 99_999_999.99;
+import { DECIMAL_10_2, DECIMAL_12_2 } from '@/common/helpers/limites-decimais';
 
 const aparado = ({ value }: { value: unknown }) => (typeof value === 'string' ? value.trim() || null : value);
 
@@ -51,7 +48,7 @@ export class CreateMaquinarioDto {
   @IsNumber()
   @CasasDecimais(2)
   @Min(0)
-  @Max(DECIMAL_12_2, { message: 'Valor acima do que o cadastro guarda' })
+  @Max(DECIMAL_12_2)
   preco_unitario?: number | null;
 
   @ApiPropertyOptional({ description: 'O investimento a amortizar.' })
@@ -61,7 +58,7 @@ export class CreateMaquinarioDto {
   @IsNumber()
   @CasasDecimais(2)
   @Min(0)
-  @Max(DECIMAL_12_2, { message: 'Valor acima do que o cadastro guarda' })
+  @Max(DECIMAL_12_2)
   valor_aquisicao?: number | null;
 
   @ApiPropertyOptional({ description: 'Em quantos meses o investimento se paga (1 a 600).' })
@@ -80,7 +77,7 @@ export class CreateMaquinarioDto {
   @IsNumber()
   @CasasDecimais(2)
   @Min(0)
-  @Max(DECIMAL_12_2, { message: 'Valor acima do que o cadastro guarda' })
+  @Max(DECIMAL_12_2)
   custos_anuais?: number | null;
 
   @ApiPropertyOptional({ description: 'Horas de uso previstas por ano.' })
@@ -90,7 +87,7 @@ export class CreateMaquinarioDto {
   @IsNumber()
   @CasasDecimais(2)
   @Min(0)
-  @Max(DECIMAL_10_2, { message: 'Valor acima do que o cadastro guarda' })
+  @Max(DECIMAL_10_2)
   meta_utilizacao_horas?: number | null;
 
   @ApiPropertyOptional({ description: 'Quantas horas formam uma diária (1 a 24). Padrão 8.' })

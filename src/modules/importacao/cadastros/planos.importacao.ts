@@ -90,15 +90,15 @@ export class PlanosImportacao implements CadastroImportavel<PlanoComTarefas> {
     return resultado;
   }
 
-  /** `instrucao` (TAG ou nome) + `instrucao_ref` → `instrucao_id`; nome vazio = o da instrução. */
+  /** `instrucao` (código ou nome) + `instrucao_ref` → `instrucao_id`; nome vazio = o da instrução. */
   private async resolverTarefas(linhas: Array<Record<string, unknown>>, atual: PlanoComTarefas | null) {
     const usadas = (atual?.tarefas ?? []).map((t) => t.instrucao_id).filter((id): id is string => !!id);
     const instrucoes = await this.prisma.instrucoes.findMany({
       where: { deleted_at: null, OR: [{ ativo: true }, { id: { in: usadas } }] },
-      select: { id: true, nome: true, tag: true },
+      select: { id: true, nome: true, codigo: true },
     });
     const catalogo = new CatalogoPorNome(
-      instrucoes.map((i) => ({ id: i.id, nome: i.nome, codigo: i.tag })),
+      instrucoes.map((i) => ({ id: i.id, nome: i.nome, codigo: i.codigo })),
       'instrução',
       'f',
     );

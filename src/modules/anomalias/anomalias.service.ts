@@ -158,7 +158,7 @@ export class AnomaliasService {
         anomalias_instrucoes: {
           include: {
             instrucao: {
-              select: { id: true, tag: true, nome: true, status: true, ativo: true }
+              select: { id: true, codigo: true, nome: true, status: true, ativo: true }
             }
           },
           orderBy: { created_at: 'desc' }
@@ -231,7 +231,7 @@ export class AnomaliasService {
           anomalias_instrucoes: {
             include: {
               instrucao: {
-                select: { id: true, tag: true, nome: true, status: true, ativo: true }
+                select: { id: true, codigo: true, nome: true, status: true, ativo: true }
               }
             }
           }
@@ -292,7 +292,7 @@ export class AnomaliasService {
         anomalias_instrucoes: {
           include: {
             instrucao: {
-              select: { id: true, tag: true, nome: true, status: true, ativo: true }
+              select: { id: true, codigo: true, nome: true, status: true, ativo: true }
             }
           },
           orderBy: { created_at: 'desc' }
