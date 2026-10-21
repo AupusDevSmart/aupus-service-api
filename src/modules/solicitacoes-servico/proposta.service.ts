@@ -94,7 +94,8 @@ export class PropostaService {
     ]);
 
     // O custo da instrução (a conta do AupusProject, SN-85), que vira a sugestão
-    // de valor. A linha sem preço entra como zero: é sugestão, e a pessoa ajusta
+    // de valor. A linha sem preço entra como zero: é sugestão, e a pessoa ajusta —
+    // a leitura da proposta diz quais instruções têm linha assim (`instrucoes_sem_preco`)
     const somaPorInstrucao = new Map<string, number>();
     const somar = (instrucaoId: string, custo: number | null) =>
       somaPorInstrucao.set(instrucaoId.trim(), (somaPorInstrucao.get(instrucaoId.trim()) ?? 0) + (custo ?? 0));
@@ -273,8 +274,30 @@ export class PropostaService {
   // LEITURA
   // ============================================================
 
+  /**
+   * As instruções vinculadas com alguma linha sem preço no cadastro (SN-86). A
+   * sugestão de valor conta essa linha como zero; sem o aviso, o valor parecia
+   * completo e a proposta saía abaixo do custo.
+   */
+  private async instrucoesSemPreco(solicitacaoId: string): Promise<string[]> {
+    const vinculos = await this.prisma.solicitacoes_instrucoes.findMany({
+      where: { solicitacao_id: solicitacaoId },
+      select: { instrucao_id: true },
+    });
+    const ids = vinculos.map((v) => v.instrucao_id.trim());
+    if (!ids.length) return [];
+    const [recursos, maquinarios] = await Promise.all([
+      this.prisma.instrucao_recursos.findMany({ where: { instrucao_id: { in: variantesDeIds(ids) } }, include: { recurso: true } }),
+      this.prisma.instrucao_maquinarios.findMany({ where: { instrucao_id: { in: variantesDeIds(ids) } }, include: { maquinario: true } }),
+    ]);
+    const sem = new Set<string>();
+    for (const r of recursos) if (linhaDoRecurso(r).subtotal === null) sem.add(r.instrucao_id.trim());
+    for (const m of maquinarios) if (linhaDoMaquinario(m).subtotal === null) sem.add(m.instrucao_id.trim());
+    return ids.filter((id) => sem.has(id));
+  }
+
   async obter(solicitacaoId: string) {
-    const [itens, outros, solicitacao] = await Promise.all([
+    const [itens, outros, solicitacao, instrucoesSemPreco] = await Promise.all([
       this.prisma.solicitacoes_itens.findMany({
         where: { solicitacao_id: solicitacaoId },
         orderBy: { ordem: 'asc' },
@@ -302,6 +325,7 @@ export class PropostaService {
           total_geral: true,
         },
       }),
+      this.instrucoesSemPreco(solicitacaoId),
     ]);
 
     if (!solicitacao) throw new NotFoundException('Solicitação não encontrada');
@@ -309,6 +333,8 @@ export class PropostaService {
     return {
       itens,
       outros_custos: outros,
+      /** As instruções cujo valor sugerido conta como zero alguma linha sem preço no cadastro */
+      instrucoes_sem_preco: instrucoesSemPreco,
       /**
        * OBSOLETO, e só por isso ainda está aqui.
        *
