@@ -3,6 +3,7 @@ import {
   UnauthorizedException,
   ForbiddenException,
   BadRequestException,
+  NotFoundException,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { UsuariosService } from '../usuarios/usuarios.service';
@@ -70,7 +71,6 @@ export class AuthService {
    * @throws ForbiddenException se usuário inativo
    */
   async validateUser(email: string, senha: string): Promise<UsuarioSemSenha> {
-    console.log(`🔐 [AUTH] Validando credenciais para: ${email}`);
 
     // Buscar usuário por email
     const usuario = await this.usuariosService.findByEmail(email);
@@ -82,19 +82,16 @@ export class AuthService {
     // tem conta (SN-38).
     const senhaValida = await bcrypt.compare(senha, usuario?.senha || (await hashParaComparar()));
     if (!usuario || !usuario.senha || !senhaValida) {
-      console.log(`❌ [AUTH] Credenciais inválidas para: ${email}`);
       throw new UnauthorizedException('Email ou senha inválidos');
     }
 
     // Só quem acertou a senha fica sabendo que a conta está inativa
     if (usuario.status !== 'Ativo' || !usuario.is_active || usuario.deleted_at) {
-      console.log(`🚫 [AUTH] Usuário inativo: ${email}`);
       throw new ForbiddenException(
         'Usuário inativo. Entre em contato com o administrador.',
       );
     }
 
-    console.log(`✅ [AUTH] Credenciais válidas para: ${email}`);
 
     // Remove senha do objeto antes de retornar
     const { senha: _, ...result } = usuario;
@@ -107,7 +104,6 @@ export class AuthService {
    * @returns Tokens de acesso e dados do usuário
    */
   async login(loginDto: LoginDto): Promise<RespostaDoLogin> {
-    console.log(`🚀 [AUTH] Iniciando login para: ${loginDto.email}`);
 
     // Validar credenciais
     const usuario = await this.validateUser(loginDto.email, loginDto.senha);
@@ -136,7 +132,6 @@ export class AuthService {
       permissions: permissoes.permissionNames || [],
     };
 
-    console.log(`🔑 [AUTH] Gerando tokens para usuário: ${usuario.id}`);
 
     // Gerar access token (1 hora)
     const access_token = this.jwtService.sign(payload, { expiresIn: '1h' });
@@ -147,7 +142,6 @@ export class AuthService {
       { expiresIn: '7d' },
     );
 
-    console.log(`✅ [AUTH] Login bem-sucedido para: ${loginDto.email}`);
 
     // Buscar dados completos do usuário para retornar
     const usuarioCompleto = await this.usuariosService
@@ -174,13 +168,6 @@ export class AuthService {
       plantas_vinculadas,
     });
 
-    console.log(`📦 [AUTH] Dados do usuário para retornar:`, {
-      id: usuarioCompleto.id,
-      nome: usuarioCompleto.nome,
-      email: usuarioCompleto.email,
-      has_all_permissions: !!usuarioCompleto.all_permissions,
-      permissions_count: usuarioCompleto.all_permissions?.length || 0,
-    });
 
     return {
       access_token,
@@ -200,7 +187,6 @@ export class AuthService {
   async refreshToken(
     refreshToken: string,
   ): Promise<{ access_token: string; refresh_token: string; token_type: string; expires_in: number }> {
-    console.log(`🔄 [AUTH] Renovando token...`);
 
     try {
       // Verificar e decodificar o refresh token
@@ -208,7 +194,6 @@ export class AuthService {
 
       // Validar que é realmente um refresh token
       if (payload.type !== 'refresh') {
-        console.log(`❌ [AUTH] Token fornecido não é um refresh token`);
         throw new UnauthorizedException('Token inválido');
       }
 
@@ -218,13 +203,11 @@ export class AuthService {
         .catch(() => null);
 
       if (!usuario) {
-        console.log(`❌ [AUTH] Usuário não encontrado para token: ${payload.sub}`);
         throw new UnauthorizedException('Usuário não encontrado');
       }
 
       // Verificar se usuário está ativo
       if (usuario.status !== 'Ativo') {
-        console.log(`🚫 [AUTH] Usuário inativo no refresh: ${payload.sub}`);
         throw new UnauthorizedException('Usuário inativo ou inválido');
       }
 
@@ -259,7 +242,6 @@ export class AuthService {
         { expiresIn: '7d' },
       );
 
-      console.log(`✅ [AUTH] Token renovado com sucesso para: ${usuario.id}`);
 
       return {
         access_token,
@@ -283,12 +265,13 @@ export class AuthService {
    * Usado pelo frontend para carregar o PermissionsContext no login/refresh.
    */
   async getCurrentUser(userId: string) {
-    console.log(`👤 [AUTH] Buscando dados do usuário: ${userId}`);
-
-    const usuario = await this.usuariosService.findOne(userId).catch(() => null);
+    // Só o "não existe" vira 401: uma queda do banco virava "Usuário não encontrado" calado
+    const usuario = await this.usuariosService.findOne(userId).catch((erro: unknown) => {
+      if (erro instanceof NotFoundException) return null;
+      throw erro;
+    });
 
     if (!usuario) {
-      console.log(`❌ [AUTH] Usuário não encontrado: ${userId}`);
       throw new UnauthorizedException('Usuário não encontrado');
     }
 
@@ -306,7 +289,6 @@ export class AuthService {
     // - demais roles: [] (sem filtro, backend nao restringe)
     const plantas_vinculadas = await this.getPlantasAcessiveis(userId, permissoes.role?.name);
 
-    console.log(`✅ [AUTH] /auth/me: ${userId} role=${permissoes.role?.name ?? 'none'} perms=${permissoes.permissionNames.length} plantas=${plantas_vinculadas.length}`);
 
     return {
       ...usuario,
@@ -352,11 +334,11 @@ export class AuthService {
     };
 
     const email = dto.email.trim();
-    const usuario = await this.usuariosService.findByEmail(email).catch(() => null);
+    // O inexistente já volta nulo; a falha do banco não vira "enviamos" calado (o e-mail nunca chegaria)
+    const usuario = await this.usuariosService.findByEmail(email);
 
     // Não revela se o email existe; só envia para contas ativas.
     if (!usuario || usuario.status !== 'Ativo' || !usuario.is_active || usuario.deleted_at) {
-      console.log(`🔑 [AUTH] forgot-password ignorado (inexistente/inativo): ${email}`);
       return mensagemGenerica;
     }
 
@@ -383,7 +365,6 @@ export class AuthService {
         console.error(`⚠️ [AUTH] Erro ao enviar email de redefinição: ${err.message}`),
       );
 
-    console.log(`📧 [AUTH] Email de redefinição enfileirado para: ${email}`);
     return mensagemGenerica;
   }
 
@@ -440,7 +421,6 @@ export class AuthService {
     });
     await this.prisma.password_reset_tokens.delete({ where: { email } }).catch(() => null);
 
-    console.log(`✅ [AUTH] Senha redefinida com sucesso para: ${email}`);
     return { message: 'Senha redefinida com sucesso' };
   }
 
@@ -448,8 +428,7 @@ export class AuthService {
    * Realiza logout (pode ser expandido para blacklist de tokens)
    * @param userId ID do usuário
    */
-  async logout(userId: string): Promise<{ message: string }> {
-    console.log(`👋 [AUTH] Logout do usuário: ${userId}`);
+  async logout(_userId: string): Promise<{ message: string }> {
 
     // TODO: Implementar blacklist de tokens se necessário
     // Por enquanto, o logout é gerenciado pelo frontend removendo o token

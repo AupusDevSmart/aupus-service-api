@@ -600,7 +600,6 @@ export class PlantasService {
               }
             });
           }
-          console.log(`✅ [PLANTAS SERVICE] ${equipamentosCount} equipamento(s) deletado(s) em cascata`);
         }
 
         // Deletar todas as unidades da planta
@@ -614,7 +613,6 @@ export class PlantasService {
               deleted_at: new Date()
             }
           });
-          console.log(`✅ [PLANTAS SERVICE] ${unidadesCount} unidade(s) deletada(s) em cascata`);
         }
 
         // Deletar a planta
@@ -628,7 +626,6 @@ export class PlantasService {
         return { unidadesCount, equipamentosCount };
       });
 
-      console.log(`✅ [PLANTAS SERVICE] Planta ${id} deletada com sucesso (soft delete)`);
 
       let message = 'Planta removida com sucesso';
       if (result.unidadesCount > 0) {

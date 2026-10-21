@@ -44,15 +44,6 @@ export class UnidadesService {
   async create(createDto: CreateUnidadeDto): Promise<UnidadeResponse> {
     const { planta_id, pontos_medicao, concessionaria_id, ...unidadeData } = createDto;
 
-    // 🔍 LOG DETALHADO - Dados recebidos
-    console.log('🏁 [CREATE UNIDADE] ===== INÍCIO =====');
-    console.log('📦 [CREATE UNIDADE] DTO completo recebido:', JSON.stringify(createDto, null, 2));
-    console.log('🔑 [CREATE UNIDADE] concessionaria_id extraído:', concessionaria_id);
-    console.log('🔍 [CREATE UNIDADE] Tipo de concessionaria_id:', typeof concessionaria_id);
-    console.log('📝 [CREATE UNIDADE] Valor é undefined?', concessionaria_id === undefined);
-    console.log('📝 [CREATE UNIDADE] Valor é null?', concessionaria_id === null);
-    console.log('📝 [CREATE UNIDADE] Valor é string vazia?', concessionaria_id === '');
-
     try {
       // Normalizar IDs (trim)
       const plantaIdTrimmed = planta_id?.trim();
@@ -77,7 +68,6 @@ export class UnidadesService {
 
       // 2. Se concessionaria_id foi fornecido, verificar se existe
       if (concessionariaIdTrimmed) {
-        console.log('✅ [CREATE UNIDADE] concessionaria_id fornecido, verificando se existe...');
         const concessionaria = await this.prisma.concessionarias_energia.findFirst({
           where: {
             id: concessionariaIdTrimmed,
@@ -88,9 +78,6 @@ export class UnidadesService {
         if (!concessionaria) {
           throw new NotFoundException(`Concessionária com ID ${concessionariaIdTrimmed} não encontrada`);
         }
-        console.log('✅ [CREATE UNIDADE] Concessionária encontrada:', concessionaria.nome);
-      } else {
-        console.log('⚠️ [CREATE UNIDADE] concessionaria_id NÃO fornecido ou é falsy');
       }
 
       // 3. Preparar dados para criação
@@ -103,8 +90,6 @@ export class UnidadesService {
         status: 'ativo',
       };
 
-      console.log('💾 [CREATE UNIDADE] Dados que serão salvos no banco:', JSON.stringify(dataToCreate, null, 2));
-      console.log('🔑 [CREATE UNIDADE] concessionaria_id no objeto final:', dataToCreate.concessionaria_id);
 
       // 4. Criar a unidade
       const novaUnidade = await this.prisma.unidades.create({
@@ -129,9 +114,6 @@ export class UnidadesService {
         },
       });
 
-      console.log('✅ [CREATE UNIDADE] Unidade criada no banco com ID:', novaUnidade.id);
-      console.log('🔑 [CREATE UNIDADE] concessionaria_id salvo no banco:', novaUnidade.concessionaria_id);
-      console.log('🏁 [CREATE UNIDADE] ===== FIM =====');
 
       return this.formatUnidadeResponse(novaUnidade);
     } catch (error) {
@@ -187,13 +169,11 @@ export class UnidadesService {
       if (plantaId) {
         const plantaIdTrimmed = plantaId.trim();
         whereClause.AND.push({ planta_id: plantaIdTrimmed });
-        console.log('🔍 [FINDALL UNIDADES] Filtrando por planta:', plantaIdTrimmed);
       }
       // Se não tem planta mas tem proprietário, filtrar por proprietário (via relação com planta)
       else if (proprietarioId) {
         const proprietarioIdTrimmed = proprietarioId.trim();
         whereClause.AND.push({ planta: { proprietario_id: proprietarioIdTrimmed } });
-        console.log('🔍 [FINDALL UNIDADES] Filtrando por proprietário:', proprietarioIdTrimmed);
       }
 
       if (tipo) whereClause.tipo = tipo;
@@ -408,16 +388,6 @@ export class UnidadesService {
   async update(id: string, updateDto: UpdateUnidadeDto): Promise<UnidadeResponse> {
     const { planta_id, pontos_medicao, concessionaria_id, ...unidadeData } = updateDto;
 
-    // 🔍 LOG DETALHADO - Dados recebidos
-    console.log('🏁 [UPDATE UNIDADE] ===== INÍCIO =====');
-    console.log('🆔 [UPDATE UNIDADE] ID da unidade:', id);
-    console.log('📦 [UPDATE UNIDADE] DTO completo recebido:', JSON.stringify(updateDto, null, 2));
-    console.log('🔑 [UPDATE UNIDADE] concessionaria_id extraído:', concessionaria_id);
-    console.log('🔍 [UPDATE UNIDADE] Tipo de concessionaria_id:', typeof concessionaria_id);
-    console.log('📝 [UPDATE UNIDADE] Valor é undefined?', concessionaria_id === undefined);
-    console.log('📝 [UPDATE UNIDADE] Valor é null?', concessionaria_id === null);
-    console.log('📝 [UPDATE UNIDADE] Valor é string vazia?', concessionaria_id === '');
-
     try {
       // Normalizar IDs (trim)
       const idTrimmed = id?.trim();
@@ -436,8 +406,6 @@ export class UnidadesService {
         throw new NotFoundException(`Unidade com ID ${idTrimmed} não encontrada`);
       }
 
-      console.log('📋 [UPDATE UNIDADE] Unidade existente encontrada:', unidadeExistente.nome);
-      console.log('🔑 [UPDATE UNIDADE] concessionaria_id atual no banco:', unidadeExistente.concessionaria_id);
 
       // 2. Se mudou de planta, verificar se a nova planta existe
       if (plantaIdTrimmed && plantaIdTrimmed !== unidadeExistente.planta_id?.trim()) {
@@ -456,10 +424,6 @@ export class UnidadesService {
       // 3. Se mudou de concessionária, verificar se existe
       const concessionariaAtualTrimmed = unidadeExistente.concessionaria_id?.trim();
       if (concessionaria_id !== undefined && concessionariaIdTrimmed !== concessionariaAtualTrimmed) {
-        console.log('🔄 [UPDATE UNIDADE] Mudança de concessionária detectada');
-        console.log('   Anterior:', concessionariaAtualTrimmed);
-        console.log('   Nova:', concessionariaIdTrimmed);
-
         if (concessionariaIdTrimmed) {
           const concessionaria = await this.prisma.concessionarias_energia.findFirst({
             where: {
@@ -471,14 +435,7 @@ export class UnidadesService {
           if (!concessionaria) {
             throw new NotFoundException(`Concessionária com ID ${concessionariaIdTrimmed} não encontrada`);
           }
-          console.log('✅ [UPDATE UNIDADE] Nova concessionária encontrada:', concessionaria.nome);
-        } else {
-          console.log('⚠️ [UPDATE UNIDADE] Removendo concessionária (setando para null)');
         }
-      } else if (concessionaria_id === undefined) {
-        console.log('ℹ️ [UPDATE UNIDADE] concessionaria_id undefined - mantendo valor atual');
-      } else {
-        console.log('ℹ️ [UPDATE UNIDADE] concessionaria_id sem alteração');
       }
 
       // 4. Preparar dados para atualização
@@ -490,8 +447,6 @@ export class UnidadesService {
       if (pontos_medicao !== undefined) updateData.pontos_medicao = pontos_medicao || null;
       if (concessionaria_id !== undefined) updateData.concessionaria_id = concessionariaIdTrimmed || null;
 
-      console.log('💾 [UPDATE UNIDADE] Dados que serão atualizados:', JSON.stringify(updateData, null, 2));
-      console.log('🔑 [UPDATE UNIDADE] concessionaria_id no objeto final:', updateData.concessionaria_id);
 
       // 5. Atualizar a unidade
       const unidadeAtualizada = await this.prisma.unidades.update({
@@ -522,9 +477,6 @@ export class UnidadesService {
         },
       });
 
-      console.log('✅ [UPDATE UNIDADE] Unidade atualizada no banco');
-      console.log('🔑 [UPDATE UNIDADE] concessionaria_id após atualização:', unidadeAtualizada.concessionaria_id);
-      console.log('🏁 [UPDATE UNIDADE] ===== FIM =====');
 
       return this.formatUnidadeResponse(unidadeAtualizada);
     } catch (error) {
@@ -582,7 +534,6 @@ export class UnidadesService {
               deleted_at: new Date(),
             },
           });
-          console.log(`✅ [UNIDADES SERVICE] ${equipamentosCount} equipamento(s) deletado(s) em cascata`);
         }
 
         // 2. Soft delete da unidade

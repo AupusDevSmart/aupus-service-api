@@ -4,6 +4,7 @@ import * as nodemailer from 'nodemailer';
 import { getWelcomeEmailHtml } from './templates/welcome.template';
 import { getPasswordResetEmailHtml } from './templates/password-reset.template';
 import { getNotificacaoEmailHtml } from './templates/notificacao.template';
+import { semEnderecos } from './sem-enderecos';
 
 @Injectable()
 export class MailService implements OnModuleInit {
@@ -64,7 +65,7 @@ export class MailService implements OnModuleInit {
 
   async sendWelcomeEmail(to: string, nome: string, senhaTemporaria: string): Promise<void> {
     if (!this.transporter) {
-      this.logger.warn(`SMTP not configured. Skipping welcome email to ${to}`);
+      this.logger.warn(`SMTP not configured. Skipping welcome email to ${semEnderecos(to)}`);
       return;
     }
 
@@ -79,9 +80,9 @@ export class MailService implements OnModuleInit {
         html,
       });
 
-      this.logger.log(`Welcome email sent to ${to}`);
+      this.logger.log(`Welcome email sent to ${semEnderecos(to)}`);
     } catch (error) {
-      this.logger.error(`Failed to send welcome email to ${to}: ${error.message}`);
+      this.logger.error(`Failed to send welcome email to ${semEnderecos(to)}: ${semEnderecos(String(error.message))}`);
     }
   }
 
@@ -101,7 +102,7 @@ export class MailService implements OnModuleInit {
     expiraEmMinutos = 60,
   ): Promise<void> {
     if (!this.transporter) {
-      this.logger.warn(`SMTP not configured. Skipping password reset email to ${to}`);
+      this.logger.warn(`SMTP not configured. Skipping password reset email to ${semEnderecos(to)}`);
       return;
     }
 
@@ -116,9 +117,9 @@ export class MailService implements OnModuleInit {
         html,
       });
 
-      this.logger.log(`Password reset email sent to ${to}`);
+      this.logger.log(`Password reset email sent to ${semEnderecos(to)}`);
     } catch (error) {
-      this.logger.error(`Failed to send password reset email to ${to}: ${error.message}`);
+      this.logger.error(`Failed to send password reset email to ${semEnderecos(to)}: ${semEnderecos(String(error.message))}`);
     }
   }
 }

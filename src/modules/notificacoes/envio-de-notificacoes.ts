@@ -1,6 +1,7 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { Interval } from '@nestjs/schedule';
 import { PrismaService } from '@/core';
+import { semEnderecos } from '@/core/mail/sem-enderecos';
 
 /** Quem manda o e-mail (o MailService; nos testes, um falso). */
 export interface Correio {
@@ -13,9 +14,6 @@ const ESPERA_MINUTOS = [1, 5, 15];
 const LOTE = 50;
 /** Reivindicado e sem desfecho depois disto: o processo caiu no meio do envio. */
 const ENVIO_INTERROMPIDO_MS = 30 * 60_000;
-
-/** O motivo do SMTP costuma trazer o endereço ("550 <fulano@...> rejected"): o log não leva. */
-const semEnderecos = (texto: string) => texto.replace(/[\w.+-]+@[\w-]+(\.[\w-]+)+/g, '<e-mail>');
 
 /**
  * Manda os e-mails da fila (SN-47), a cada 30 s. Falhou: tenta de novo depois

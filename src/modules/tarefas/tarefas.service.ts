@@ -160,9 +160,6 @@ export class TarefasService {
     const { page, limit, search, sort_by, sort_order, status_atrasada, ...filters } = queryDto;
     const skip = (page - 1) * limit;
 
-    // Log para debug
-    console.log('🔍 [TAREFAS] Filtro status_atrasada recebido:', status_atrasada, 'tipo:', typeof status_atrasada);
-
     // Construir filtros
     const scopeFragment = await this.scopeFragment(user);
     const where: Prisma.tarefasWhereInput = {
@@ -230,8 +227,6 @@ export class TarefasService {
 
   async buscarPorId(id: string, user?: ScopedUser): Promise<TarefaResponseDto> {
     if (user) await this.scopeService.assertEntityInScope('tarefa', id, user);
-    const inicio = Date.now();
-
     const tarefa = await this.prisma.tarefas.findFirst({
       where: {
         id,
@@ -239,9 +234,6 @@ export class TarefasService {
       },
       include: this.includeRelacionamentosLista(),
     });
-
-    const tempoQuery = Date.now() - inicio;
-    console.log(`⏱️ [BACKEND] buscarPorId levou ${tempoQuery}ms`);
 
     if (!tarefa) {
       throw new NotFoundException('Tarefa não encontrada');
