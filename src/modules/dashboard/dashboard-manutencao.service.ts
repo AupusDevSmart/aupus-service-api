@@ -576,7 +576,7 @@ export class DashboardManutencaoService {
     const porEquipamento = new Map<string, { ativo: string; custo: number }>();
 
     for (const o of ordens) {
-      // O mesmo custo do gráfico de custo: pelas linhas, mais os adicionais
+      // O mesmo custo do gráfico de custo: pelas linhas, mais os outros custos
       const custo = custos.get(o.id)?.total ?? 0;
       if (!custo || o.equipamentos.length === 0) continue;
 

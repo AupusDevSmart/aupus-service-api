@@ -11,11 +11,13 @@ import {
   Max,
   Length,
   ArrayMaxSize,
+  IsIn,
 } from 'class-validator';
 import { Type } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { CondicaoOS, TipoOS, PrioridadeOS, OrigemOS, Prisma } from '@/core';
-import { CasasDecimais } from '@/common/decorators/numero';
+import { CasasDecimais, VazioEhNulo } from '@/common/decorators/numero';
+import { NATUREZAS_DOS_OUTROS_CUSTOS, type NaturezaDoOutroCusto } from '@/modules/execucao-os/natureza-do-custo';
 import { DiaDeCalendario } from '@/common/decorators/dia-de-calendario';
 import { HoraDoDia, InstanteComFuso } from '@/common/decorators/instante';
 
@@ -103,6 +105,8 @@ export class TecnicoProgramacaoDto {
   @IsNumber()
   @CasasDecimais(2)
   @Min(0)
+  // O teto da coluna (Decimal(8,2)): acima dele o Prisma recusava e o 400 virava 500
+  @Max(999_999.99)
   custo_hora?: number;
 
   @ApiPropertyOptional({ description: 'Usuário escalado (equipe da planta ou apoio); o nome vem do cadastro', example: 'clrx1234567890123456789012' })
@@ -124,6 +128,41 @@ export class ItemOrcamentoProgramacaoDto {
   @CasasDecimais(2)
   @Min(0)
   valor: number;
+
+  /** SN-93: sem ela (a tela de antes), sai do prefixo da descrição ("Veículo: ...") */
+  @ApiPropertyOptional({ description: 'Natureza do custo', enum: NATUREZAS_DOS_OUTROS_CUSTOS })
+  @IsOptional()
+  @IsIn(NATUREZAS_DOS_OUTROS_CUSTOS)
+  natureza?: NaturezaDoOutroCusto;
+}
+
+/**
+ * SN-93 (D1): o valor de uma instrução só nesta programação, sem mexer no padrão
+ * dela. A linha é a da tarefa (`tarefa_id`) ou a da instrução avulsa
+ * (`instrucao_id`): as duas são únicas na programação, e valem já na criação,
+ * antes de a linha ter id.
+ */
+export class ValorDaInstrucaoDto {
+  @ApiPropertyOptional({ description: 'A tarefa da linha (a que vem pelo plano)' })
+  @IsOptional()
+  @IsString()
+  @Length(1, 26)
+  tarefa_id?: string;
+
+  @ApiPropertyOptional({ description: 'A instrução da linha avulsa' })
+  @IsOptional()
+  @IsString()
+  @Length(1, 26)
+  instrucao_id?: string;
+
+  @ApiProperty({ description: 'O valor nesta programação; null volta ao do cadastro', example: 902.08, nullable: true })
+  @VazioEhNulo()
+  @IsOptional()
+  @IsNumber()
+  @CasasDecimais(2)
+  @Min(0)
+  @Max(99_999_999)
+  valor: number | null;
 }
 
 export class CreateProgramacaoDto {
@@ -357,6 +396,15 @@ export class CreateProgramacaoDto {
   @ValidateNested({ each: true })
   @Type(() => ItemOrcamentoProgramacaoDto)
   itens_orcamento?: ItemOrcamentoProgramacaoDto[];
+
+  /** SN-93: o valor ajustado de cada instrução; a que não vem fica com o do cadastro */
+  @ApiPropertyOptional({ description: 'Valores das instruções ajustados nesta programação', type: [ValorDaInstrucaoDto] })
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(2000)
+  @ValidateNested({ each: true })
+  @Type(() => ValorDaInstrucaoDto)
+  valores_das_instrucoes?: ValorDaInstrucaoDto[];
 
   // Custos
   @ApiPropertyOptional({ description: 'Orçamento previsto', example: 15000.00 })

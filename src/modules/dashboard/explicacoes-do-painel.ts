@@ -61,7 +61,7 @@ export function explicacoesDosGraficos(c: ContagensDoPainel): Explicacao[] {
     {
       id: 'custoPorOS',
       rotulo: 'Custo médio por OS',
-      formula: 'Das OS concluídas no período que tiveram custo: o custo (mão de obra + material + adicionais) dividido pela quantidade, no mês em que terminaram. A corretiva separada das demais.',
+      formula: 'Das OS concluídas no período que tiveram custo: o custo (mão de obra + material + outros custos) dividido pela quantidade, no mês em que terminaram. A corretiva separada das demais.',
       base: `${plural(c.concluidasComCusto, 'OS concluída com custo', 'OS concluídas com custo')} no período.`,
     },
     {

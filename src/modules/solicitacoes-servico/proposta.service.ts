@@ -2,8 +2,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '@/core';
 import { Prisma } from '@prisma/client';
-import { variantesDeIds } from '../tarefas/ids';
-import { linhaDoMaquinario, linhaDoRecurso } from '../instrucoes/custo-da-instrucao';
+import { valoresDasInstrucoes } from '../instrucoes/valor-da-instrucao';
 
 /**
  * A proposta comercial de uma solicitação de serviço.
@@ -76,31 +75,16 @@ export class PropostaService {
       return;
     }
 
-    // As linhas pelas variantes do id: instrucao_recursos.instrucao_id é Char(26)
-    // e o id de 25 caracteres cru não casava (a sugestão saía zero)
-    const [instrucoes, recursos, maquinarios] = await Promise.all([
+    // O custo da instrução (a conta do AupusProject, SN-85), que vira a sugestão
+    // de valor. A linha sem preço entra como zero: é sugestão, e a pessoa ajusta —
+    // a leitura da proposta diz quais instruções têm linha assim (`instrucoes_sem_preco`)
+    const [instrucoes, valores] = await Promise.all([
       db.instrucoes.findMany({
         where: { id: { in: instrucaoIds } },
         select: { id: true, codigo: true, nome: true },
       }),
-      db.instrucao_recursos.findMany({
-        where: { instrucao_id: { in: variantesDeIds(instrucaoIds) } },
-        include: { recurso: true },
-      }),
-      db.instrucao_maquinarios.findMany({
-        where: { instrucao_id: { in: instrucaoIds } },
-        include: { maquinario: true },
-      }),
+      valoresDasInstrucoes(db, instrucaoIds),
     ]);
-
-    // O custo da instrução (a conta do AupusProject, SN-85), que vira a sugestão
-    // de valor. A linha sem preço entra como zero: é sugestão, e a pessoa ajusta —
-    // a leitura da proposta diz quais instruções têm linha assim (`instrucoes_sem_preco`)
-    const somaPorInstrucao = new Map<string, number>();
-    const somar = (instrucaoId: string, custo: number | null) =>
-      somaPorInstrucao.set(instrucaoId.trim(), (somaPorInstrucao.get(instrucaoId.trim()) ?? 0) + (custo ?? 0));
-    for (const r of recursos) somar(r.instrucao_id, linhaDoRecurso(r).subtotal);
-    for (const m of maquinarios) somar(m.instrucao_id, linhaDoMaquinario(m).subtotal);
 
     const porId = new Map(instrucoes.map((i) => [i.id.trim(), i]));
 
@@ -110,7 +94,7 @@ export class PropostaService {
       .filter((id) => porId.has(id))
       .map((id, indice) => {
         const instrucao = porId.get(id)!;
-        const valor = this.centavos(somaPorInstrucao.get(id) ?? 0);
+        const valor = valores.get(id)?.valor ?? 0;
         return {
           solicitacao_id: solicitacaoId,
           instrucao_id: id,
@@ -286,14 +270,8 @@ export class PropostaService {
     });
     const ids = vinculos.map((v) => v.instrucao_id.trim());
     if (!ids.length) return [];
-    const [recursos, maquinarios] = await Promise.all([
-      this.prisma.instrucao_recursos.findMany({ where: { instrucao_id: { in: variantesDeIds(ids) } }, include: { recurso: true } }),
-      this.prisma.instrucao_maquinarios.findMany({ where: { instrucao_id: { in: variantesDeIds(ids) } }, include: { maquinario: true } }),
-    ]);
-    const sem = new Set<string>();
-    for (const r of recursos) if (linhaDoRecurso(r).subtotal === null) sem.add(r.instrucao_id.trim());
-    for (const m of maquinarios) if (linhaDoMaquinario(m).subtotal === null) sem.add(m.instrucao_id.trim());
-    return ids.filter((id) => sem.has(id));
+    const valores = await valoresDasInstrucoes(this.prisma, ids);
+    return ids.filter((id) => valores.get(id)?.semPreco);
   }
 
   async obter(solicitacaoId: string) {

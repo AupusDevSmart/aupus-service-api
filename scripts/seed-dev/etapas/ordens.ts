@@ -1,4 +1,4 @@
-import { TipoAnexoOS } from '@prisma/client';
+import { Prisma, TipoAnexoOS } from '@prisma/client';
 import { AprovarProgramacaoDto, CancelarProgramacaoDto } from '@/modules/programacao-os/dto/programacao-actions.dto';
 import { UpdateProgramacaoDto } from '@/modules/programacao-os/dto/update-programacao.dto';
 import {
@@ -384,14 +384,39 @@ async function trabalhar(c: Cenario, ordem: Ordem, parte: number): Promise<void>
 /** Arredonda para o quarto de hora, como o técnico anota */
 const quartoDeHora = (horas: number) => Math.max(0.25, Math.round(horas * 4) / 4);
 
+/** O que o campo gasta além do orçamento (SN-93): vez por outra, um destes entra como não previsto */
+const NAO_PREVISTOS = [
+  { descricao: 'Pedágio', natureza: 'VEICULO', de: 18, ate: 96 },
+  { descricao: 'Estacionamento no centro da cidade', natureza: 'VEICULO', de: 15, ate: 45 },
+  { descricao: 'Lanche da equipe na espera da liberação', natureza: 'DESPESA_CAMPO', de: 60, ate: 180 },
+  { descricao: 'Conector MC4 comprado na loja da cidade', natureza: 'OUTRO', de: 35, ate: 140 },
+] as const;
+
+/**
+ * Os outros custos conferidos no Executar (SN-93, D2), como a equipe faria: o
+ * instrumento e o maquinário saem pelo previsto (é a hora do cadastro); o
+ * veículo e a despesa de campo variam com a viagem; às vezes um não previsto.
+ */
+function outrosCustosConferidos(c: Cenario, itens: { id: string; valor: Prisma.Decimal; natureza: string }[]) {
+  const conferidos = itens.map((i) => {
+    const varia = i.natureza === 'VEICULO' || i.natureza === 'DESPESA_CAMPO';
+    const valor = varia ? Number(i.valor) * c.sorteio.decimal(0.85, 1.15, 3) : Number(i.valor);
+    return { id: i.id.trim(), valor_real: Math.round(valor * 100) / 100 };
+  });
+  if (!c.sorteio.chance(0.18)) return conferidos;
+  const extra = c.sorteio.um([...NAO_PREVISTOS]);
+  return [...conferidos, { descricao: extra.descricao, natureza: extra.natureza, valor_real: c.sorteio.inteiro(extra.de, extra.ate) }];
+}
+
 async function executar(c: Cenario, linha: LinhaDoTempo, ordem: Ordem): Promise<void> {
   const { h } = ordem;
   const fim = c.relogio.passoEmCurso()!;
   await trabalhar(c, ordem, 1);
-  const [tecnicos, materiais, ferramentas] = await Promise.all([
+  const [tecnicos, materiais, ferramentas, itens] = await Promise.all([
     c.prisma.tecnicos_os.findMany({ where: { os_id: ordem.osId }, select: { id: true, horas_estimadas: true } }),
     c.prisma.materiais_os.findMany({ where: { os_id: ordem.osId }, select: { id: true, quantidade_planejada: true } }),
     c.prisma.ferramentas_os.findMany({ where: { os_id: ordem.osId }, select: { id: true } }),
+    c.prisma.itens_orcamento_os.findMany({ where: { os_id: ordem.osId }, select: { id: true, valor: true, natureza: true }, orderBy: { created_at: 'asc' } }),
   ]);
   if (h.falha?.troca) await trocarEquipamento(c, ordem, h.falha.equipamento);
   if (h.falha) await foto(c, ordem, TipoAnexoOS.FOTO_DEPOIS, 'depois', `${h.falha.equipamento.nome}: após o reparo`);
@@ -411,6 +436,7 @@ async function executar(c: Cenario, linha: LinhaDoTempo, ordem: Ordem): Promise<
   ordem.falhaInformada = falhaInformada;
   const horasDosTecnicos = tecnicos.map((t) => ({ id: t.id.trim(), horas: quartoDeHora(Number(t.horas_estimadas) * c.sorteio.decimal(0.85, 1.25, 3)) }));
   ordem.horasInformadas = horasDosTecnicos;
+  const outrosCustos = outrosCustosConferidos(c, itens);
 
   await c.s.execucoes.executar(
     ordem.osId,
@@ -425,6 +451,7 @@ async function executar(c: Cenario, linha: LinhaDoTempo, ordem: Ordem): Promise<
         horas_dos_tecnicos: horasDosTecnicos,
         materiais_consumidos: materiais.map((m) => ({ id: m.id.trim(), quantidade_consumida: Math.max(0.001, Number((Number(m.quantidade_planejada) * c.sorteio.decimal(0.7, 1, 3)).toFixed(3))) })),
         ferramentas_utilizadas: ferramentas.map((f) => ({ id: f.id.trim(), condicao_depois: c.sorteio.chance(0.9) ? 'Em bom estado' : 'Com desgaste: avaliar a substituição' })),
+        ...(outrosCustos.length > 0 && { outros_custos: outrosCustos }),
         ...(km !== undefined && ordem.kmInicial !== undefined && { km_final: ordem.kmInicial + km }),
         ...falhaInformada,
       },

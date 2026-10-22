@@ -11,12 +11,14 @@ import {
   MaxLength,
   ArrayMaxSize,
   ValidateNested,
+  IsIn,
 } from 'class-validator';
 import { Type } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { LIMITE_DA_LEITURA } from '@/common/helpers/leitura';
 import { InstanteComFuso } from '@/common/decorators/instante';
 import { CasasDecimais, VazioEhNulo } from '@/common/decorators/numero';
+import { NATUREZAS_DOS_OUTROS_CUSTOS, type NaturezaDoOutroCusto } from '../natureza-do-custo';
 
 export class IniciarExecucaoDto {
   @ApiPropertyOptional({ description: 'Equipe presente na execução' })
@@ -277,6 +279,62 @@ export class TecnicoExtraDto {
   @Max(999.99)
   @CasasDecimais(2)
   horas: number;
+
+  /**
+   * SN-93: sem ele, a pessoa entrava sem valor/hora e o custo dela era R$ 0,
+   * calado. Sem ele aqui, vale o de quem tem a mesma especialidade na equipe.
+   */
+  @ApiPropertyOptional({ description: 'Valor da hora de quem entrou (sem ele, o de quem tem a mesma especialidade na equipe)', example: 78 })
+  @VazioEhNulo()
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  @Max(99_999.99)
+  @CasasDecimais(2)
+  custo_hora?: number | null;
+}
+
+/**
+ * Um outro custo da OS no Executar (SN-93, D2): o previsto (do orçamento) com o
+ * valor que custou, ou o não previsto, lançado ali com descrição.
+ */
+export class OutroCustoDto {
+  @ApiPropertyOptional({ description: 'O item que já está na OS (sem ele, é um não previsto novo)' })
+  @IsOptional()
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(30)
+  id?: string;
+
+  @ApiPropertyOptional({ description: 'A descrição do não previsto (a do previsto não muda)' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(255)
+  descricao?: string;
+
+  @ApiPropertyOptional({ description: 'A natureza do não previsto (a do previsto não muda)', enum: NATUREZAS_DOS_OUTROS_CUSTOS })
+  @IsOptional()
+  @IsIn(NATUREZAS_DOS_OUTROS_CUSTOS)
+  natureza?: NaturezaDoOutroCusto;
+
+  @ApiProperty({ description: 'O que custou (0 = não houve)', example: 1402.5 })
+  @VazioEhNulo()
+  @IsNumber()
+  @Min(0)
+  // Por item, com folga no total: 200 itens no teto ainda cabem no custo_real (Decimal(12,2)); acima, o 400 virava 500
+  @Max(9_999_999.99)
+  @CasasDecimais(2)
+  valor_real: number;
+}
+
+/** Os outros custos registrados depois de executar (no editar da OS, como o consumo de material) */
+export class RegistrarOutrosCustosDto {
+  @ApiProperty({ description: 'A lista inteira: o não previsto que não vem sai da OS', type: [OutroCustoDto] })
+  @IsArray()
+  @ArrayMaxSize(200)
+  @ValidateNested({ each: true })
+  @Type(() => OutroCustoDto)
+  outros_custos: OutroCustoDto[];
 }
 
 export class ExecutarOSDto {
@@ -414,12 +472,25 @@ export class ExecutarOSDto {
   @IsString()
   incidentes_seguranca?: string | null;
 
-  @ApiPropertyOptional({ description: 'Custos adicionais não planejados' })
+  /** Antes do SN-93: um número só, sem descrição. A tela de agora lança o não previsto em `outros_custos` */
+  @ApiPropertyOptional({ description: 'Custos adicionais não planejados (antigo: use outros_custos)' })
   @IsOptional()
   @IsNumber()
   @CasasDecimais(2)
   @Min(0)
+  @Max(9_999_999.99)
   custos_adicionais?: number;
+
+  @ApiPropertyOptional({
+    description: 'SN-93: os outros custos conferidos (o previsto com o valor real) e os não previstos. O não previsto que já existia e não vem sai.',
+    type: [OutroCustoDto],
+  })
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(200)
+  @ValidateNested({ each: true })
+  @Type(() => OutroCustoDto)
+  outros_custos?: OutroCustoDto[];
 }
 
 export class AuditarOSDto {

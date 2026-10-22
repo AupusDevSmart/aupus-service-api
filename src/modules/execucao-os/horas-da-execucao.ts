@@ -1,4 +1,4 @@
-import { BadRequestException, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, NotFoundException } from '@nestjs/common';
 import { Prisma, type tecnicos_os } from '@prisma/client';
 import { PAPEIS } from '@/core/modules/permissions/matriz-de-permissoes';
 import { pessoasQuePodemAtuar } from '@/modules/programacao-os/pessoas-da-os';
@@ -94,7 +94,8 @@ export function horasDaEquipe(
 
 export interface HorasDoPedido {
   horas_dos_tecnicos?: { id: string; horas: number }[];
-  tecnicos_extras?: { tecnico_id: string; horas: number }[];
+  /** SN-93: o valor da hora de quem entrou (sem ele, o da mesma especialidade na equipe, ou nenhum) */
+  tecnicos_extras?: { tecnico_id: string; horas: number; custo_hora?: number | null }[];
 }
 
 type TecnicoDaOS = Pick<tecnicos_os, 'id' | 'nome' | 'especialidade' | 'tecnico_id' | 'custo_hora' | 'horas_trabalhadas'>;
@@ -131,6 +132,13 @@ export async function gravacaoDasHoras(
   plantaId: string | null,
   equipe: TecnicoDaOS[],
   pedido: HorasDoPedido,
+  /**
+   * Quem gerencia a OS (`execucao_os.manage`). O valor da hora é custo, e custo
+   * quem define é o planejamento (na programação, `programacao_os.manage`): o
+   * técnico que executa só informa horas. Sem a trava, quem executa punha
+   * R$ 99.999/h em si mesmo e o custo real, o painel e o PDF do cliente saíam com isso.
+   */
+  podeInformarValorDaHora = false,
 ): Promise<GravacaoDasHoras> {
   const porId = new Map(equipe.map((t) => [t.id.trim(), t]));
   const horas = new Map<string, number>();
@@ -161,6 +169,9 @@ export async function gravacaoDasHoras(
   if (extras.some((e) => e.horas <= 0)) {
     throw new BadRequestException('Quem entrou na execução precisa de horas maiores que zero.');
   }
+  if (!podeInformarValorDaHora && extras.some((e) => e.custo_hora != null)) {
+    throw new ForbiddenException('Só quem gerencia a OS informa o valor da hora de quem entrou na execução.');
+  }
   const pessoas = new Map<string, { id: string; nome: string; papel: string }>();
   if (extras.length > 0) {
     const { equipe: daPlanta, apoio } = await pessoasQuePodemAtuar(prisma, plantaId);
@@ -174,22 +185,34 @@ export async function gravacaoDasHoras(
     const h = horas.get(t.id.trim())!;
     return { id: t.id, data: { horas_trabalhadas: h, presente: h > 0, custo_total: custo(h, t.custo_hora) } };
   });
+  const valoresDaHora: string[] = [];
   const novos = extras.map((e) => {
     const pessoa = pessoas.get(e.tecnico_id.trim())!;
+    const especialidade = ESPECIALIDADE_DO_PAPEL.get(pessoa.papel) ?? 'Entrou na execução';
+    // SN-93: sem valor/hora o custo da pessoa saía R$ 0, calado. O informado; sem ele, o de quem tem a
+    // mesma especialidade na equipe; sem os dois, nenhum (o resumo do custo diz que ficou de fora)
+    const daEquipe = equipe.find((t) => t.especialidade.trim() === especialidade && t.custo_hora)?.custo_hora ?? null;
+    const custoHora = e.custo_hora != null ? new Prisma.Decimal(e.custo_hora) : daEquipe;
+    // A trilha diz de onde veio o valor da hora: é custo, e quem audita quer saber quem o pôs
+    valoresDaHora.push(
+      custoHora === null ? 'sem valor/hora' : `R$ ${custoHora.toFixed(2).replace('.', ',')}/h ${e.custo_hora != null ? 'informado' : 'da equipe'}`,
+    );
     return {
       nome: pessoa.nome,
-      especialidade: ESPECIALIDADE_DO_PAPEL.get(pessoa.papel) ?? 'Entrou na execução',
+      especialidade,
       tecnico_id: pessoa.id,
       horas_estimadas: 0,
       horas_trabalhadas: e.horas,
       presente: true,
+      custo_hora: custoHora,
+      custo_total: custo(e.horas, custoHora) ?? null,
     };
   });
 
   const mudou = extras.length > 0 || equipe.some((t) => t.horas_trabalhadas === null || Number(t.horas_trabalhadas) !== horas.get(t.id.trim()));
   const linhas = [
     ...equipe.map((t) => `${nomeDoTecnico(t)} ${horasEmTexto(horas.get(t.id.trim())!)}`),
-    ...novos.map((n) => `${n.nome} ${horasEmTexto(n.horas_trabalhadas)} (entrou na execução)`),
+    ...novos.map((n, i) => `${n.nome} ${horasEmTexto(n.horas_trabalhadas)} (entrou na execução, ${valoresDaHora[i]})`),
   ];
   const total = somar([...horas.values(), ...extras.map((e) => e.horas)]);
   return {

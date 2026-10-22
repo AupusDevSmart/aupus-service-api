@@ -85,7 +85,11 @@ describe('ExecucaoOSService', () => {
       updateMany: jest.fn().mockResolvedValue({ count: 1 }),
       count: jest.fn(),
       groupBy: jest.fn(),
+      // SN-93: o custo real lê o orçamento e os adicionais da OS
+      findUniqueOrThrow: jest.fn().mockResolvedValue({ custos_adicionais: null, orcamento_previsto: null }),
     },
+    // SN-93: os outros custos entram no custo real
+    itens_orcamento_os: { findMany: jest.fn().mockResolvedValue([]) },
     tarefas_os: {
       findFirst: jest.fn(),
       findMany: jest.fn().mockResolvedValue([]),
@@ -798,7 +802,8 @@ describe('ExecucaoOSService', () => {
       // A consulta tem que filtrar por CONCLUIDA: OS pode fechar com tarefa
       // pendente ou cancelada, e marcar todas como executadas faria a
       // periodicidade contar a partir de algo que nunca aconteceu
-      const where = mockPrismaService.tarefas_os.findMany.mock.calls[0][0].where;
+      // A consulta que filtra pela situação (antes dela, o SN-93 lê as linhas sem valor para selar)
+      const where = mockPrismaService.tarefas_os.findMany.mock.calls.map((c) => c[0].where).find((w) => w.status);
       expect(where.status).toBe('CONCLUIDA');
 
       // A data e a da conclusao da tarefa, nao a da finalizacao da OS: OS

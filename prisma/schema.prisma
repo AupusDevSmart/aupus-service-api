@@ -2127,6 +2127,13 @@ model tarefas_programacao_os {
   origem_item          String          @default("TAREFA") @map("origem_item") @db.VarChar(12)
   /// SN-86: a instrucao congelada (rastro; o conteudo e o snapshot)
   instrucao_id         String?         @map("instrucao_id") @db.VarChar(26)
+  /// SN-93 (D1): o valor da instrucao nesta programacao — o do cadastro ao vincular,
+  /// ajustavel so aqui. Nulo: a linha de antes do SN-93 (vale o do cadastro de agora)
+  valor                Decimal?        @db.Decimal(12, 2)
+  /// SN-93: o do cadastro no vinculo, para a tela mostrar o ajuste
+  valor_original       Decimal?        @map("valor_original") @db.Decimal(12, 2)
+  /// SN-93: o nome do equipamento congelado (o da posicao, como a tela mostra)
+  equipamento_nome     String?         @map("equipamento_nome") @db.VarChar(255)
   created_at           DateTime        @default(now()) @map("created_at")
   updated_at           DateTime        @updatedAt @map("updated_at")
   programacao          programacoes_os @relation(fields: [programacao_id], references: [id], onDelete: Cascade)
@@ -2170,6 +2177,12 @@ model tarefas_os {
   origem_item          String         @default("TAREFA") @map("origem_item") @db.VarChar(12)
   /// SN-86: a instrucao congelada (rastro; o conteudo e o snapshot)
   instrucao_id         String?        @map("instrucao_id") @db.VarChar(26)
+  /// SN-93 (D1): o valor da instrucao nesta OS, vindo da programacao
+  valor                Decimal?       @db.Decimal(12, 2)
+  /// SN-93: o do cadastro no vinculo
+  valor_original       Decimal?       @map("valor_original") @db.Decimal(12, 2)
+  /// SN-93: o nome do equipamento congelado (o da posicao)
+  equipamento_nome     String?        @map("equipamento_nome") @db.VarChar(255)
   created_at           DateTime       @default(now()) @map("created_at")
   updated_at           DateTime       @updatedAt @map("updated_at")
   ordem_servico        ordens_servico @relation(fields: [os_id], references: [id], onDelete: Cascade)
@@ -2277,6 +2290,8 @@ model itens_orcamento_programacao_os {
   programacao_id String          @map("programacao_id")
   descricao      String          @db.VarChar(255)
   valor          Decimal         @db.Decimal(12, 2)
+  /// SN-93: INSTRUMENTO, MAQUINARIO, VEICULO, TERCEIRO, DESPESA_CAMPO ou OUTRO
+  natureza       String          @default("OUTRO") @db.VarChar(20)
   created_at     DateTime        @default(now()) @map("created_at")
   updated_at     DateTime        @updatedAt @map("updated_at")
   programacao    programacoes_os @relation(fields: [programacao_id], references: [id], onDelete: Cascade)
@@ -2289,7 +2304,14 @@ model itens_orcamento_os {
   id            String         @id @default(cuid())
   os_id         String         @map("os_id")
   descricao     String         @db.VarChar(255)
+  /// O previsto (0 no nao previsto)
   valor         Decimal        @db.Decimal(12, 2)
+  /// SN-93: INSTRUMENTO, MAQUINARIO, VEICULO, TERCEIRO, DESPESA_CAMPO ou OUTRO
+  natureza      String         @default("OUTRO") @db.VarChar(20)
+  /// SN-93 (D2): o que custou, conferido no Executar. Nulo = nao conferido (o custo usa o previsto)
+  valor_real    Decimal?       @map("valor_real") @db.Decimal(12, 2)
+  /// SN-93: lancado no Executar, fora do orcamento
+  nao_previsto  Boolean        @default(false) @map("nao_previsto")
   created_at    DateTime       @default(now()) @map("created_at")
   updated_at    DateTime       @updatedAt @map("updated_at")
   ordem_servico ordens_servico @relation(fields: [os_id], references: [id], onDelete: Cascade)

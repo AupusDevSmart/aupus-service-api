@@ -1,5 +1,6 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { StatusProgramacaoOS, TipoOS, PrioridadeOS, OrigemOS, CondicaoOS, Prisma, type ordens_servico, type veiculo } from '@/core';
+import { NATUREZAS_DOS_OUTROS_CUSTOS, type NaturezaDoOutroCusto } from '@/modules/execucao-os/natureza-do-custo';
 
 export class UsuarioSimpleDto {
   @ApiProperty({ description: 'ID do usuário' })
@@ -82,6 +83,21 @@ export class TarefaProgramacaoResponseDto {
 
   @ApiProperty({ description: 'Dados da tarefa', type: TarefaSimpleDto })
   tarefa: TarefaSimpleDto;
+
+  @ApiPropertyOptional({ description: 'Código da instrução congelado (SN-85)', nullable: true })
+  instrucao_tag?: string | null;
+
+  @ApiPropertyOptional({ description: 'Nome da tarefa congelado', nullable: true })
+  nome_snapshot?: string | null;
+
+  @ApiPropertyOptional({ description: 'SN-93: valor da instrução nesta programação (o do cadastro, ou o ajustado)', nullable: true })
+  valor?: number | null;
+
+  @ApiPropertyOptional({ description: 'SN-93: valor do cadastro no vínculo', nullable: true })
+  valor_original?: number | null;
+
+  @ApiPropertyOptional({ description: 'SN-93: nome do equipamento congelado', nullable: true })
+  equipamento_nome?: string | null;
 }
 
 export class MaterialProgramacaoResponseDto {
@@ -198,6 +214,9 @@ export class ItemOrcamentoProgramacaoResponseDto {
 
   @ApiProperty({ description: 'Valor do item' })
   valor: number;
+
+  @ApiPropertyOptional({ description: 'SN-93: natureza do custo', enum: NATUREZAS_DOS_OUTROS_CUSTOS })
+  natureza?: NaturezaDoOutroCusto;
 
   @ApiProperty({ description: 'Data de criação' })
   created_at: Date;
@@ -411,7 +430,18 @@ export class ProgramacaoResponseDto {
 
   /** SN-86: as instruções avulsas (da origem e as acrescentadas), congeladas */
   @ApiPropertyOptional({ description: 'Instruções avulsas da programação' })
-  instrucoes?: Array<{ id: string; instrucao_id: string | null; codigo: string | null; nome: string | null; descricao: string | null; ordem: number }>;
+  instrucoes?: Array<{
+    id: string;
+    instrucao_id: string | null;
+    codigo: string | null;
+    nome: string | null;
+    descricao: string | null;
+    ordem: number;
+    /** SN-93: o valor nesta programação, o do cadastro no vínculo e o equipamento */
+    valor: number | null;
+    valor_original: number | null;
+    equipamento_nome: string | null;
+  }>;
 
   // Auditoria
   @ApiPropertyOptional({ description: 'Criado por' })

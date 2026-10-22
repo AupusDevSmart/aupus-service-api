@@ -63,13 +63,18 @@ import {
   ITEM_DA_INSTRUCAO,
   ITEM_DA_TAREFA,
   acertarAvulsasDepoisDasTarefas,
+  ajustarValoresDasInstrucoes,
+  congelarValoresDaProgramacao,
   equipamentoDasAvulsas,
   gravarInstrucoesDaProgramacao,
   linhasDaProgramacao,
   instrucaoDaResposta,
   instrucoesDaOrigem,
+  valorDaLinha,
   vinculoDaOS,
 } from './instrucoes-da-programacao';
+import { congelamentoDasLinhas, nomesDosEquipamentos } from './congelamento-da-linha';
+import { naturezaDoItem, naturezaPeloPrefixo } from '../execucao-os/natureza-do-custo';
 
 /** A programação como as consultas deste service a trazem para a resposta */
 type ProgramacaoParaResposta = programacoes_os & {
@@ -482,6 +487,8 @@ export class ProgramacaoOSService {
       if (instrucoes.length) {
         await gravarInstrucoesDaProgramacao(prisma, programacao.id, instrucoes, await equipamentoDasAvulsas(prisma, programacao), daOrigem);
       }
+      // SN-93: o valor das instruções ajustado já na criação (as linhas acabaram de nascer com o do cadastro)
+      const valoresAjustados = await ajustarValoresDasInstrucoes(prisma, programacao.id, createDto.valores_das_instrucoes ?? []);
 
       // Criar materiais
       if (createDto.materiais && createDto.materiais.length > 0) {
@@ -519,6 +526,9 @@ export class ProgramacaoOSService {
         null,
         StatusProgramacaoOS.PENDENTE,
       );
+      if (valoresAjustados.length) {
+        await this.registrarHistorico(prisma, programacao.id, 'VALOR_DA_INSTRUCAO', 'Sistema', usuarioId, `Valor ajustado nesta programação: ${valoresAjustados.join('; ')}.`);
+      }
 
       // Anomalia/solicitacao -> PROGRAMADA, na mesma transacao. Recusa a origem
       // que ja tem programacao em aberto: antes a mesma anomalia chegava a ter
@@ -575,7 +585,17 @@ export class ProgramacaoOSService {
     // Prepare data without undefined fields to avoid Prisma issues
     // ✅ Separar campos de relacionamentos (materiais, ferramentas, tecnicos)
     // unidade_id está no DTO, mas não é coluna: ia para o update e o Prisma recusava (500)
-    const { materiais, ferramentas, tecnicos, itens_orcamento, tarefas_ids, instrucoes_ids, unidade_id: _unidadeId, ...restDto } = updateDto;
+    const {
+      materiais,
+      ferramentas,
+      tecnicos,
+      itens_orcamento,
+      tarefas_ids,
+      instrucoes_ids,
+      valores_das_instrucoes,
+      unidade_id: _unidadeId,
+      ...restDto
+    } = updateDto;
     const updateData: Record<string, unknown> = {};
 
     Object.keys(restDto).forEach(key => {
@@ -596,6 +616,15 @@ export class ProgramacaoOSService {
     this.normalizarOrigemDaEdicao(updateData);
 
     return await this.prisma.$transaction(async (prisma) => {
+      // O status de novo, travando a linha: aprovada no meio da edição, a OS já copiou as linhas, e a
+      // edição gravaria depois (a programação com um valor da instrução e a OS com outro)
+      const pendente = await prisma.programacoes_os.updateMany({
+        where: { id, status: StatusProgramacaoOS.PENDENTE },
+        data: { atualizado_em: new Date() },
+      });
+      if (pendente.count === 0) {
+        throw new ConflictException('A programação já não está pendente (aprovada por outra pessoa agora há pouco?): recarregue a tela.');
+      }
       const programacaoAtualizada = await prisma.programacoes_os.update({
         where: { id },
         // As chaves vêm do DTO, que espelha as colunas da tabela
@@ -621,11 +650,17 @@ export class ProgramacaoOSService {
         await gravarInstrucoesDaProgramacao(prisma, id, instrucoes_ids, await equipamentoDasAvulsas(prisma, programacaoAtualizada), daOrigem);
       } else if (restDto.equipamento_id !== undefined || restDto.anomalia_id !== undefined || restDto.solicitacao_servico_id !== undefined) {
         // A avulsa é do equipamento da programação (ou da origem): sem a lista, segue a troca dele
+        const equipamento = await equipamentoDasAvulsas(prisma, programacaoAtualizada);
         await prisma.tarefas_programacao_os.updateMany({
           where: { programacao_id: id, origem_item: ITEM_DA_INSTRUCAO },
-          data: { equipamento_id: await equipamentoDasAvulsas(prisma, programacaoAtualizada) },
+          data: {
+            equipamento_id: equipamento,
+            equipamento_nome: equipamento ? ((await nomesDosEquipamentos(prisma, [equipamento])).get(equipamento) ?? null) : null,
+          },
         });
       }
+      // SN-93: o valor das instruções ajustado só nesta programação
+      const valoresAjustados = await ajustarValoresDasInstrucoes(prisma, id, valores_das_instrucoes ?? []);
 
       // Atualizar recursos (delete + recreate)
       if (materiais !== undefined) {
@@ -690,6 +725,9 @@ export class ProgramacaoOSService {
         usuarioId,
         'Programação atualizada',
       );
+      if (valoresAjustados.length) {
+        await this.registrarHistorico(prisma, id, 'VALOR_DA_INSTRUCAO', 'Sistema', usuarioId, `Valor ajustado nesta programação: ${valoresAjustados.join('; ')}.`);
+      }
 
       await this.trocarOrigem(
         prisma,
@@ -779,8 +817,10 @@ export class ProgramacaoOSService {
     }
 
     await this.prisma.$transaction(async (prisma) => {
-      await prisma.programacoes_os.update({
-        where: { id },
+      // A troca de status só da PENDENTE, dentro da transação: com o status conferido só antes, dois
+      // "Aprovar" juntos geravam duas OS, e a edição que corria junto gravava depois da cópia para a OS
+      const aprovada = await prisma.programacoes_os.updateMany({
+        where: { id, status: StatusProgramacaoOS.PENDENTE },
         data: {
           status: StatusProgramacaoOS.APROVADA,
           aprovado_por: nomeAprovador,
@@ -797,6 +837,9 @@ export class ProgramacaoOSService {
             : programacao.data_hora_programada,
         },
       });
+      if (aprovada.count === 0) {
+        throw new ConflictException('A programação já não está pendente (aprovada ou editada por outra pessoa agora há pouco?): recarregue a tela.');
+      }
 
       // Registrar histórico
       await this.registrarHistorico(
@@ -809,6 +852,9 @@ export class ProgramacaoOSService {
         StatusProgramacaoOS.PENDENTE,
         StatusProgramacaoOS.APROVADA,
       );
+
+      // SN-93: a linha de antes, sem valor, entra na OS com o do cadastro de agora
+      await congelarValoresDaProgramacao(prisma, id);
 
       // Gerar OS automaticamente com status PENDENTE
       const osId = await this.gerarOrdemServico(prisma, id);
@@ -1412,12 +1458,21 @@ export class ProgramacaoOSService {
 
     // Adicionar tarefas ja congelando o conteudo pedido
     const porId = new Map(tarefas.map((t) => [t.id?.trim(), t] as const));
+    // SN-93: o valor da instrução de cada tarefa (o do cadastro agora) e o nome do equipamento
+    const congeladas = await congelamentoDasLinhas(
+      prisma,
+      tarefasIds.map((tarefaId) => {
+        const tarefa = porId.get(tarefaId?.trim());
+        return { instrucao_id: tarefa?.instrucao_id, equipamento_id: tarefa?.equipamento_id };
+      }),
+    );
 
     const dados = tarefasIds.map((tarefaId, index) => ({
       programacao_id: programacaoId,
       tarefa_id: tarefaId,
       ordem: index + 1,
       ...this.montarSnapshotTarefa(porId.get(tarefaId?.trim())),
+      ...congeladas[index],
     }));
 
     await prisma.tarefas_programacao_os.createMany({ data: dados });
@@ -1589,6 +1644,8 @@ export class ProgramacaoOSService {
       programacao_id: programacaoId,
       descricao: item.descricao,
       valor: item.valor,
+      // SN-93: a tela de antes não manda a natureza; ela sai do prefixo ("Veículo: ...")
+      natureza: item.natureza ?? naturezaPeloPrefixo(item.descricao),
     }));
 
     await prisma.itens_orcamento_programacao_os.createMany({ data: dados });
@@ -1777,6 +1834,7 @@ export class ProgramacaoOSService {
         os_id: os.id,
         descricao: i.descricao,
         valor: i.valor,
+        natureza: i.natureza,
       }));
       await prisma.itens_orcamento_os.createMany({ data: itensOrcamentoOS });
     }
@@ -2085,6 +2143,10 @@ export class ProgramacaoOSService {
           id: tp.tarefa.id,
           nome: tp.tarefa.nome,
         } : null,
+        // SN-93: o código da instrução congelado, o valor dela nesta programação e o equipamento
+        instrucao_tag: tp.instrucao_tag,
+        nome_snapshot: tp.nome_snapshot,
+        ...valorDaLinha(tp),
       })) || [],
       criado_por: programacao.criado_por,
       criado_por_id: programacao.criado_por_id,
@@ -2158,6 +2220,7 @@ export class ProgramacaoOSService {
         programacao_id: i.programacao_id,
         descricao: i.descricao,
         valor: Number(i.valor),
+        natureza: naturezaDoItem(i.natureza),
         created_at: i.created_at,
         updated_at: i.updated_at,
       })) || [],

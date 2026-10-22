@@ -15,20 +15,25 @@ import {
   somaDoArquivo,
   somaDoDisco,
   somaGravadaOuDoDisco,
+  VERSAO_DO_CONTEUDO,
   type ConteudoDaOS,
   type Somar,
 } from './conteudo-da-os';
+import { complementoDaVersao1, dadosDoCustoDoConteudo } from './dados-do-custo';
+import { comOCustoRegistrado, resumoDoCusto, type ResumoDoCusto } from './resumo-do-custo';
 
 /**
  * O PDF da OS e a conferência do código (SN-62). A conta do conteúdo e do
  * código fica em `conteudo-da-os.ts`; aqui, quando ela é gravada e lida.
  */
 
-/** O conteúdo como o PDF o usa: sem o custo da hora e o custo unitário, que o PDF não imprime */
-export type ConteudoDoPdf = Omit<ConteudoDaOS, 'equipe' | 'materiais'> & {
-  equipe: Omit<ConteudoDaOS['equipe'][number], 'custo_hora'>[];
-  materiais: Omit<ConteudoDaOS['materiais'][number], 'custo_unitario'>[];
-};
+/**
+ * O conteúdo como o PDF o usa. Inteiro desde o SN-93 (D3: o PDF mostra o
+ * valor/hora de cada pessoa e o custo unitário de cada material); na versão 1,
+ * com o equipamento de cada tarefa lido do sistema na emissão (fora do código,
+ * como os nomes da planta e da instalação).
+ */
+export type ConteudoDoPdf = ConteudoDaOS;
 
 export interface RelatorioDaOS {
   os_id: string;
@@ -40,6 +45,8 @@ export interface RelatorioDaOS {
   /** A OS ainda não foi finalizada: o documento é prévia, sem código */
   previa: boolean;
   conteudo: ConteudoDoPdf;
+  /** SN-93: o custo aberto, pela mesma conta do sheet e do custo real gravado */
+  custos: ResumoDoCusto;
 }
 
 export interface ConferenciaDoCodigo {
@@ -63,7 +70,18 @@ const NAO_ENCONTRADO = 'Código não encontrado: confira se foi copiado inteiro 
 
 type Cliente = Pick<
   Prisma.TransactionClient,
-  'ordens_servico' | 'tarefas_os' | 'checklist_atividades_os' | 'anexos_os' | 'tecnicos_os' | 'materiais_os' | 'ferramentas_os' | 'historico_os'
+  | 'ordens_servico'
+  | 'tarefas_os'
+  | 'checklist_atividades_os'
+  | 'anexos_os'
+  | 'tecnicos_os'
+  | 'materiais_os'
+  | 'ferramentas_os'
+  | 'historico_os'
+  | 'itens_orcamento_os'
+  | 'instrucao_recursos'
+  | 'instrucao_maquinarios'
+  | 'tarefas'
 >;
 
 /**
@@ -93,12 +111,22 @@ export async function gravarCodigoDeVerificacao(tx: Cliente, osId: string, somas
   return conteudo.anexos.filter((a) => !a.sha256).map((a) => a.nome_original);
 }
 
-/** Só o que o PDF imprime: a cópia gravada fica inteira no banco (é ela que o código prova) */
-function paraOPdf(conteudo: ConteudoDaOS): ConteudoDoPdf {
+/**
+ * O conteúdo e o custo como o PDF os usa. Na versão 1, o que ela não registrou
+ * (os outros custos, o equipamento e o valor de cada tarefa) vem do sistema na
+ * emissão e fica fora do total: o código prova o registro, não o complemento.
+ */
+async function paraOPdf(prisma: Cliente, osId: string, conteudo: ConteudoDaOS): Promise<Pick<RelatorioDaOS, 'conteudo' | 'custos'>> {
+  const complemento = await complementoDaVersao1(prisma, osId);
+  const custos = resumoDoCusto(dadosDoCustoDoConteudo(conteudo, complemento));
+  if (conteudo.versao >= 2) return { conteudo, custos };
   return {
-    ...conteudo,
-    equipe: conteudo.equipe.map(({ custo_hora: _custo, ...t }) => t),
-    materiais: conteudo.materiais.map(({ custo_unitario: _custo, ...m }) => m),
+    conteudo: {
+      ...conteudo,
+      tarefas: conteudo.tarefas.map((t) => ({ ...t, equipamento: complemento.tarefas.get(t.id)?.equipamento ?? null })),
+    },
+    // A conta pelas linhas pode não ser o custo real que o registro guarda (e que o código prova)
+    custos: comOCustoRegistrado(custos, conteudo.os.custo_real),
   };
 }
 
@@ -142,10 +170,13 @@ export async function relatorioDaOS(prisma: Cliente, id: string): Promise<Relato
     if (codigoDoConteudo(gravado) !== codigo) {
       throw new ConflictException(`O conteúdo guardado da OS ${os.numero_os} não confere com o código dela: o PDF não pode ser emitido.`);
     }
-    return { ...base, codigo, previa: false, conteudo: paraOPdf(gravado) };
+    return { ...base, codigo, previa: false, ...(await paraOPdf(prisma, os.id, gravado)) };
   }
-  // Antes de finalizar (prévia), ou finalizada antes do código existir: o de agora, sem código
-  return { ...base, codigo: null, previa: os.status !== 'FINALIZADA', conteudo: paraOPdf(await conteudoDaOS(prisma, os.id)) };
+  // Antes de finalizar (prévia), ou finalizada antes do código existir: o de agora, sem código. A
+  // finalizada pelas regras de antes do SN-93: o custo real dela não tinha os outros custos
+  const versao = os.status === 'FINALIZADA' ? 1 : VERSAO_DO_CONTEUDO;
+  const conteudo = await conteudoDaOS(prisma, os.id, somaGravadaOuDoDisco, versao);
+  return { ...base, codigo: null, previa: os.status !== 'FINALIZADA', ...(await paraOPdf(prisma, os.id, conteudo)) };
 }
 
 /**
@@ -176,7 +207,8 @@ export async function conferirCodigo(
   }
 
   const gravado = conteudoGravado(os.conteudo_finalizado);
-  const atual = await conteudoDaOS(prisma, os.id, somaDoDisco);
+  // Refeito com as regras da versão da OS: a conta de hoje daria outro texto para a OS da versão 1
+  const atual = await conteudoDaOS(prisma, os.id, somaDoDisco, gravado?.versao ?? VERSAO_DO_CONTEUDO);
   // A cópia guardada também é conferida: mexer nela e no resto junto não passa
   const copiaIntegra = !!gravado && codigoDoConteudo(gravado) === codigo;
   const finalizada = os.status === 'FINALIZADA';

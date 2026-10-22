@@ -119,6 +119,8 @@ describe('ProgramacaoOSService', () => {
       findUniqueOrThrow: jest.fn(),
       create: jest.fn(),
       update: jest.fn(),
+      // SN-93: editar e aprovar trocam/conferem o status dentro da transação
+      updateMany: jest.fn().mockResolvedValue({ count: 1 }),
       delete: jest.fn(),
       count: jest.fn(),
       groupBy: jest.fn(),
@@ -128,7 +130,12 @@ describe('ProgramacaoOSService', () => {
     },
     equipamentos: {
       findFirst: jest.fn(),
+      // SN-93: o nome do equipamento congelado na linha
+      findMany: jest.fn().mockResolvedValue([]),
     },
+    // SN-93: o valor da instrução congelado na linha
+    instrucao_recursos: { findMany: jest.fn().mockResolvedValue([]) },
+    instrucao_maquinarios: { findMany: jest.fn().mockResolvedValue([]) },
     anomalias: {
       findFirst: jest.fn(),
     },
@@ -699,8 +706,9 @@ describe('ProgramacaoOSService', () => {
 
       await service.aprovar('clrx1234567890123456789012', aprovarDto, 'user123');
 
-      expect(mockPrismaService.programacoes_os.update).toHaveBeenCalledWith({
-        where: { id: 'clrx1234567890123456789012' },
+      // Só da PENDENTE, dentro da transação (SN-93: dois "Aprovar" juntos geravam duas OS)
+      expect(mockPrismaService.programacoes_os.updateMany).toHaveBeenCalledWith({
+        where: { id: 'clrx1234567890123456789012', status: StatusProgramacaoOS.PENDENTE },
         data: expect.objectContaining({
           status: StatusProgramacaoOS.APROVADA,
           aprovado_por_id: 'user123',

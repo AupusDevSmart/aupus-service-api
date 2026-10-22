@@ -1,4 +1,4 @@
-import { BadRequestException, ConflictException, NotFoundException, ValidationPipe } from '@nestjs/common';
+import { BadRequestException, ConflictException, ForbiddenException, NotFoundException, ValidationPipe } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { CondicaoOS, PermissionScopeService, PrioridadeOS, PrismaService, TipoOS } from '@/core';
 import { apagarSolicitacoesDeTeste, solicitacaoDeTeste } from '../../../test/planta-de-teste';
@@ -194,7 +194,11 @@ describe('horas ao executar a OS (banco real)', () => {
     return { osId: os.id, ana: equipe.find((t) => t.tecnico_id?.trim() === ANA)?.id, auxiliar: equipe.find((t) => !t.tecnico_id)?.id, linha };
   };
 
-  const executar = (osId: string, extra: Record<string, unknown>) => execucoes.executar(osId, { resultado_servico: 'ok', ...extra } as never);
+  const executar = (osId: string, extra: Record<string, unknown>, user?: { id: string; permissions: string[] }) =>
+    execucoes.executar(osId, { resultado_servico: 'ok', ...extra } as never, user?.id, user);
+  // SN-93: o valor da hora de quem entrou é custo, e só quem gerencia a OS o informa
+  const GERENTE = { id: 'gerente', permissions: ['execucao_os.manage'] };
+  const TECNICO = { id: 'tecnico', permissions: ['execucao_os.executar'] };
 
   it('não executa sem as horas de toda a equipe; a mensagem diz de quem', async () => {
     const { osId, ana } = await osEmExecucao();
@@ -233,8 +237,42 @@ describe('horas ao executar a OS (banco real)', () => {
 
     const trilha = await prisma.historico_os.findFirst({ where: { os_id: osId, acao: 'HORAS_TRABALHADAS' } });
     expect(trilha?.observacoes).toBe(
-      'Horas trabalhadas (5h30 no total): Ana Técnica 3h30; Auxiliar (sem pessoa) 0h; Paula Planejadora 2h (entrou na execução).',
+      'Horas trabalhadas (5h30 no total): Ana Técnica 3h30; Auxiliar (sem pessoa) 0h; Paula Planejadora 2h (entrou na execução, sem valor/hora).',
     );
+  });
+
+  // SN-93: sem valor/hora, o custo de quem entrou saía R$ 0, calado
+  it('quem entrou na hora com o valor/hora informado; sem ele, o de quem tem a mesma especialidade na equipe', async () => {
+    const informado = await osEmExecucao();
+    const pedido = {
+      horas_dos_tecnicos: [{ id: informado.ana, horas: 1 }, { id: informado.auxiliar, horas: 0 }],
+      tecnicos_extras: [{ tecnico_id: PAULA, horas: 2, custo_hora: 60 }],
+    };
+    // Quem só executa não põe o valor da hora (revisão de segurança: R$ 99.999/h em si mesmo)
+    await expect(executar(informado.osId, pedido, TECNICO)).rejects.toThrow(ForbiddenException);
+    await executar(informado.osId, pedido, GERENTE);
+    const paula = await prisma.tecnicos_os.findFirstOrThrow({ where: { os_id: informado.osId, tecnico_id: PAULA } });
+    expect([Number(paula.custo_hora), Number(paula.custo_total)]).toEqual([60, 120]);
+    expect((await execucoes.buscarPorId(informado.osId)).custo_real).toBe(50 + 120);
+    // A trilha diz de onde veio o valor da hora
+    const trilha = await prisma.historico_os.findFirstOrThrow({ where: { os_id: informado.osId, acao: 'HORAS_TRABALHADAS' } });
+    expect(trilha.observacoes).toContain('Paula Planejadora 2h (entrou na execução, R$ 60,00/h informado)');
+
+    const pelaEquipe = await osEmExecucao([
+      { tecnico_id: ANA, especialidade: 'Técnico Elétrico', horas_estimadas: 4, custo_hora: 50 },
+      { especialidade: 'Planejador PCM', horas_estimadas: 2, custo_hora: 90 },
+    ]);
+    // Sem o valor informado, quem só executa registra: vale o da mesma especialidade
+    await executar(
+      pelaEquipe.osId,
+      {
+        horas_dos_tecnicos: [{ id: pelaEquipe.ana, horas: 1 }, { id: pelaEquipe.linha('Planejador PCM'), horas: 0 }],
+        tecnicos_extras: [{ tecnico_id: PAULA, horas: 1 }],
+      },
+      TECNICO,
+    );
+    const daEquipe = await prisma.tecnicos_os.findFirstOrThrow({ where: { os_id: pelaEquipe.osId, tecnico_id: PAULA } });
+    expect(Number(daEquipe.custo_hora)).toBe(90);
   });
 
   it('o custo real sai das horas trabalhadas, não das estimadas', async () => {

@@ -98,8 +98,11 @@ describe('painel de manutenção pelos filtros (banco real)', () => {
     // Concluída hoje, pela anomalia no UC da instalação 1 (criticidade 5)
     const anomalia = await prisma.anomalias.create({ data: { descricao: `${PREFIXO} vazamento`, local: 'x', ativo: 'x', origem: 'OPERADOR', planta_id: a.id, equipamento_id: UC_1 } });
     // ...e que parou o equipamento meia hora (SN-80)
+    // Finalizada já pela regra do SN-93 (conteúdo da versão 2): os adicionais entram no custo. Na de antes
+    // (sem código, ou versão 1) ficam fora, como no sheet e no PDF dela
     await ordem(a.id, {
       ...concluida(0), origem: 'ANOMALIA', tipo: 'CORRETIVA', anomalia_id: anomalia.id, custos_adicionais: 1000,
+      codigo_verificacao: 'c'.repeat(64), conteudo_finalizado: { versao: 2 }, custo_real: 1000,
       equipamento_parou: true, parada_inicio: new Date(Date.now() - 60 * 60_000), parada_fim: new Date(Date.now() - 30 * 60_000),
     });
     // Anomalia de 40 dias, ainda aberta, cuja única OS foi cancelada: aberta AGORA e "sem OS"
@@ -112,8 +115,9 @@ describe('painel de manutenção pelos filtros (banco real)', () => {
     // Programada para agora e cancelada: não conta no plano do período
     await ordem(a.id, { status: 'CANCELADA' });
     // Concluída há 40 dias, no UC da instalação 2 (na coluna): no trimestre, fora do mês. Sem
-    // horas registradas (anterior ao SN-61) e com o custo real gravado sem a mão de obra
-    const antes = await ordem(a.id, { ...concluida(40), equipamento_id: UC_2 });
+    // horas registradas (anterior ao SN-61) e com o custo real gravado sem a mão de obra. Finalizada
+    // antes do SN-93 (sem código): os adicionais dela ficam fora do custo, como no sheet e no PDF
+    const antes = await ordem(a.id, { ...concluida(40), equipamento_id: UC_2, custos_adicionais: 500 });
     await prisma.tecnicos_os.create({ data: { os_id: antes, especialidade: 'Mecânico', horas_estimadas: 4, custo_hora: 50 } });
     // Concluída há 200 dias: só nos 12 meses
     await ordem(a.id, { ...concluida(200), equipamento_id: UC_2 });
@@ -203,6 +207,8 @@ describe('painel de manutenção pelos filtros (banco real)', () => {
     const { custo, graficos } = await ler({ periodo: 'trimestre', plantaId: a.id });
     expect(custo.maoObra.reduce((s, v) => s + v, 0)).toBeCloseTo(2.2, 6);
     expect(graficos.find((g) => g.id === 'custo')?.base).toContain('1 OS tem o custo real gravado diferente da soma das linhas');
+    // SN-93: os R$ 500 de adicionais da finalizada antes da regra nova ficam fora; os R$ 1.000 da de agora, dentro
+    expect(custo.adicionais.reduce((s, v) => s + v, 0)).toBeCloseTo(1, 6);
   });
 
   it('equipe: o filtro conta só a dela, e o combo só traz as do escopo', async () => {

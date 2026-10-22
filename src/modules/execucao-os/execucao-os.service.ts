@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, ConflictException, BadRequestException, Logger } from '@nestjs/common';
+import { Injectable, NotFoundException, ConflictException, BadRequestException, ForbiddenException, Logger } from '@nestjs/common';
 import { equipamentoEComponentes, ordemDasPlantas, ordemDoEquipamento, periodoDoFiltro } from '../../common/helpers/filtros-da-os';
 import { PrismaService, PermissionScopeService, ScopedUser } from '@/core';
 import {
@@ -9,6 +9,7 @@ import {
   AtualizarChecklistDto,
   RegistrarMateriaisDto,
   RegistrarFerramentasDto,
+  RegistrarOutrosCustosDto,
   ConcluirTarefaDto,
   CancelarTarefaDto,
   ExecutarOSDto,
@@ -46,7 +47,12 @@ import { cancelarOS } from './cancelar-os';
 import { exigirOSAlteravel, travarOSAlteravel } from './os-alteravel';
 import { dadosDaOS, dadosDeFalha, equipamentoDaCorretiva, minutosParado, mudancasNaFalha } from './dados-de-falha';
 import { MARCOS_DO_TEMPO, gravacaoDasHoras, horasDaEquipe, minutosEfetivos } from './horas-da-execucao';
-import { custoDasLinhas, reais } from './custo-da-os';
+import { reais } from './custo-da-os';
+import { congelarValoresDasInstrucoes, custoRealDaOS, dadosDoCustoDaOS } from './dados-do-custo';
+import { SELECAO_DA_TAREFA, tarefasDasLinhas } from './tarefas-das-linhas';
+import { gravarOutrosCustos } from './outros-custos';
+import { naturezaDoItem } from './natureza-do-custo';
+import { comOCustoRegistrado, resumoDoCusto } from './resumo-do-custo';
 import { conferirCodigo, gravarCodigoDeVerificacao, relatorioDaOS, somasDosAnexosSemSoma, type ConferenciaDoCodigo, type RelatorioDaOS } from './verificacao-da-os';
 import { pessoasQuePodemAtuar } from '@/modules/programacao-os/pessoas-da-os';
 import type { PessoasDaOS } from './horas-da-execucao';
@@ -75,6 +81,15 @@ const nomeDaTarefa = (vinculo: VinculoComNome | null | undefined): string =>
 
 /** O que `nomeDaTarefa` lê do vínculo da tarefa na OS */
 type VinculoComNome = Pick<tarefas_os, 'nome_snapshot' | 'instrucao_nome'> & { tarefa?: { nome: string } | null };
+
+/** O usuário da requisição: o controller passa o `user` do JWT, com as permissões */
+type UsuarioDaOS = ScopedUser & { permissions?: string[] };
+
+/**
+ * Quem gerencia a OS (SN-93): define o valor da hora de quem entrou na execução e
+ * corrige os outros custos da OS auditada — custo que o técnico não decide sozinho
+ */
+const gerenciaAOS = (user?: UsuarioDaOS) => !!user?.permissions?.includes('execucao_os.manage');
 
 /** A reserva da OS como as consultas deste service a trazem: com o resumo da viatura */
 type ReservaDaOS = reserva_veiculo & { veiculo: Pick<veiculo, 'id' | 'placa' | 'modelo' | 'marca'> };
@@ -510,16 +525,10 @@ export class ExecucaoOSService {
         },
         tarefas_os: {
           include: {
-            tarefa: {
-              select: {
-                id: true,
-                nome: true,
-                // O id da instrucao nao esta no congelamento, e e ele que abre
-                // o sheet com etapas, recursos e anexos.
-                instrucao_id: true,
-                plano_manutencao: { select: { id: true, nome: true } },
-              },
-            },
+            // O id da instrucao nao esta no congelamento, e e ele que abre o sheet com etapas,
+            // recursos e anexos. O include so casa o id de 26 caracteres: o resto vem por
+            // `tarefasDasLinhas`, logo abaixo
+            tarefa: { select: SELECAO_DA_TAREFA },
           },
           // Sem `where: { tarefa_id: { not: null } }`. O vinculo fica orfao
           // quando a copia do plano e apagada, mas o que foi PEDIDO continua
@@ -530,7 +539,8 @@ export class ExecucaoOSService {
         materiais: true,
         ferramentas: true,
         tecnicos: true,
-        itens_orcamento: true,
+        // SN-93: na ordem em que entraram (o previsto, depois o não previsto): o quadro de custos sai igual sempre
+        itens_orcamento: { orderBy: [{ created_at: 'asc' }, { id: 'asc' }] },
         checklist_atividades: {
           orderBy: { ordem: 'asc' },
         },
@@ -573,9 +583,33 @@ export class ExecucaoOSService {
       }
     }
 
+    // A tarefa de cada linha pelo id (tarefas_os.tarefa_id é Char(26)): com o id de 25 caracteres o
+    // include volta null, e a linha perdia a instrução, o plano e o valor do cadastro (SN-93)
+    const semTarefa = os.tarefas_os.filter((t) => !t.tarefa && t.tarefa_id?.trim());
+    if (semTarefa.length > 0) {
+      const tarefas = await tarefasDasLinhas(this.prisma, semTarefa.map((t) => t.tarefa_id));
+      for (const linha of semTarefa) linha.tarefa = tarefas.get(linha.tarefa_id!.trim()) ?? null;
+    }
+
     const instalacoes = await instalacoesDasOrdens(this.prisma, [os.id]);
 
-    return this.mapearParaDetalhes(os, instalacoes.get(os.id) ?? []);
+    // SN-93: o custo aberto, pela conta do PDF e do custo real gravado. A OS finalizada pelas regras de
+    // antes (conteúdo da versão 1, ou sem código) não tinha os outros custos no custo real: o sheet diz
+    // o mesmo que o PDF dela
+    const outrosNoReal = os.status !== StatusOS.FINALIZADA || (await this.versaoDoConteudo(os.id)) >= 2;
+    const apurado = ([StatusOS.EXECUTADA, StatusOS.AUDITADA, StatusOS.FINALIZADA] as string[]).includes(os.status);
+    const resumo = resumoDoCusto({ ...(await dadosDoCustoDaOS(this.prisma, os, outrosNoReal)), apurado });
+    // A finalizada pelas regras de antes: o registrado pode não ser a conta das linhas (o PDF diz o mesmo)
+    const custos = outrosNoReal ? resumo : comOCustoRegistrado(resumo, os.custo_real === null ? null : Number(os.custo_real));
+
+    return { ...this.mapearParaDetalhes(os, instalacoes.get(os.id) ?? []), custos };
+  }
+
+  /** A versão do conteúdo registrado na finalização (0 = sem conteúdo); o JSON inteiro não precisa sair do banco */
+  private async versaoDoConteudo(id: string): Promise<number> {
+    const [linha] = await this.prisma.$queryRaw<{ versao: string | null }[]>`
+      SELECT conteudo_finalizado->>'versao' AS versao FROM ordens_servico WHERE id = ${id}`;
+    return Number(linha?.versao ?? 0) || 0;
   }
 
   /**
@@ -809,6 +843,7 @@ export class ExecucaoOSService {
             os_id: osId,
             descricao: i.descricao,
             valor: i.valor,
+            natureza: i.natureza,
           })),
         });
       }
@@ -982,6 +1017,41 @@ export class ExecucaoOSService {
         `Consumo registrado: ${dto.materiais.length} material(is).${mudancaDoCusto}`,
       );
       // O tempo do executar: ele segura a OS até 15 s, e o padrão (5 s) virava 500 (P2028)
+    }, { timeout: 15000, maxWait: 15000 });
+  }
+
+  /**
+   * SN-93: os outros custos registrados fora do Executar (no editar da OS), como
+   * o consumo de material: na executada ou auditada, o custo real é refeito e a
+   * trilha diz de quanto para quanto.
+   */
+  /**
+   * A correção dos outros custos depois do Executar (SN-93). Só depois dele: em
+   * execução, quem confere é o painel do Executar, que manda a lista inteira — a
+   * correção feita com ele aberto era sobrescrita pela lista que ele já tinha. Na
+   * auditada, só quem gerencia a OS: o auditor aprovou um custo.
+   */
+  async registrarOutrosCustos(id: string, dto: RegistrarOutrosCustosDto, usuarioId?: string, user?: UsuarioDaOS): Promise<void> {
+    if (user) await this.scopeService.assertEntityInScope('ordem_servico', id, user);
+    const os = await this.buscarPorId(id);
+    exigirOSAlteravel(os.status);
+
+    await this.prisma.$transaction(async (prisma) => {
+      const status = await travarOSAlteravel(prisma, id, 'gravar');
+      if (status !== StatusOS.EXECUTADA && status !== StatusOS.AUDITADA) {
+        throw new ConflictException('Os outros custos se conferem no Executar; corrigir é depois dele, antes de finalizar.');
+      }
+      if (status === StatusOS.AUDITADA && user && !gerenciaAOS(user)) {
+        throw new ForbiddenException('A OS já foi auditada: só quem gerencia a OS corrige os outros custos.');
+      }
+      const mudancas = await gravarOutrosCustos(prisma, id, dto.outros_custos);
+      if (!mudancas) return;
+
+      const antes = (await prisma.ordens_servico.findUniqueOrThrow({ where: { id }, select: { custo_real: true } })).custo_real;
+      const custo = await this.calcularCustoReal(prisma, id);
+      await prisma.ordens_servico.update({ where: { id }, data: { custo_real: custo } });
+      const mudancaDoCusto = custo.equals(antes ?? 0) ? '' : ` Custo real de R$ ${reais(antes)} para R$ ${reais(custo)}.`;
+      await this.registrarHistorico(prisma, id, 'OUTROS_CUSTOS', 'Sistema', usuarioId, `${mudancas}${mudancaDoCusto}`);
     }, { timeout: 15000, maxWait: 15000 });
   }
 
@@ -1171,7 +1241,7 @@ export class ExecucaoOSService {
     return usuario?.nome ?? 'Sistema';
   }
 
-  async executar(id: string, dto: ExecutarOSDto, usuarioId?: string, user?: ScopedUser): Promise<void> {
+  async executar(id: string, dto: ExecutarOSDto, usuarioId?: string, user?: UsuarioDaOS): Promise<void> {
     if (user) await this.scopeService.assertEntityInScope('ordem_servico', id, user);
     const os = await this.buscarPorId(id);
 
@@ -1258,7 +1328,7 @@ export class ExecucaoOSService {
       // "Executar" via a equipe já com quem o primeiro acrescentou e pedia as
       // horas dele, em vez de dizer que a OS já tinha sido executada
       const equipe = await prisma.tecnicos_os.findMany({ where: { os_id: id }, orderBy: [{ created_at: 'asc' }, { id: 'asc' }] });
-      const horas = await gravacaoDasHoras(prisma, os.planta_id, equipe, dto);
+      const horas = await gravacaoDasHoras(prisma, os.planta_id, equipe, dto, gerenciaAOS(user));
       for (const { id: tecnicoId, data } of horas.atualizacoes) {
         await prisma.tecnicos_os.update({ where: { id: tecnicoId }, data });
       }
@@ -1296,6 +1366,9 @@ export class ExecucaoOSService {
           if (count === 0) throw new NotFoundException(`Ferramenta ${ferramenta.id} não pertence a esta OS`);
         }
       }
+
+      // SN-93 (D2): os outros custos conferidos e os não previstos, antes da conta do custo real
+      const outrosCustos = dto.outros_custos ? await gravarOutrosCustos(prisma, id, dto.outros_custos) : null;
 
       // Viatura volta: reserva finalizada com o km final, quilometragem da
       // viatura atualizada e viatura disponível. É aqui que ela fica livre (D3).
@@ -1336,6 +1409,7 @@ export class ExecucaoOSService {
       // Reexecutar depois de reabrir: o auditor vê o que mudou na falha
       if (mudancaNaFalha) await this.registrarHistorico(prisma, id, 'DADOS_DE_FALHA', 'Sistema', usuarioId, mudancaNaFalha);
       if (horas.resumo) await this.registrarHistorico(prisma, id, 'HORAS_TRABALHADAS', 'Sistema', usuarioId, horas.resumo);
+      if (outrosCustos) await this.registrarHistorico(prisma, id, 'OUTROS_CUSTOS', 'Sistema', usuarioId, outrosCustos);
     }, {
       // Até 100 linhas da equipe, tarefas, materiais e a viatura; e no toque
       // duplo o segundo espera a trava da OS no próprio relógio (P2028 = 500, não 409)
@@ -1475,15 +1549,21 @@ export class ExecucaoOSService {
       // O custo real refeito antes de selar o conteúdo (SN-81): a OS executada
       // pelo código antigo, com consumo registrado depois, ficaria no documento
       // provado com o custo de antes do consumo
-      await prisma.ordens_servico.update({ where: { id }, data: { custo_real: await this.calcularCustoReal(prisma, id) } });
+      const custoAntes = (await prisma.ordens_servico.findUniqueOrThrow({ where: { id }, select: { custo_real: true } })).custo_real;
+      const custoFinal = await this.calcularCustoReal(prisma, id);
+      await prisma.ordens_servico.update({ where: { id }, data: { custo_real: custoFinal } });
+      // SN-93: a linha de antes, sem valor, sela com o do cadastro de agora
+      await congelarValoresDasInstrucoes(prisma, id);
 
+      // O auditor aprovou um custo: se a finalização o refez (a OS executada antes da regra de agora), a trilha diz
+      const mudancaDoCusto = custoFinal.equals(custoAntes ?? 0) ? '' : ` Custo real refeito de R$ ${reais(custoAntes)} para R$ ${reais(custoFinal)}.`;
       await this.registrarHistorico(
         prisma,
         id,
         'FINALIZACAO',
         nomeFinalizador || 'Sistema',
         usuarioId,
-        dto.observacoes || 'OS finalizada',
+        `${dto.observacoes || 'OS finalizada'}${mudancaDoCusto}`,
         StatusOS.AUDITADA,
         StatusOS.FINALIZADA,
       );
@@ -1754,22 +1834,13 @@ export class ExecucaoOSService {
   }
 
   /**
-   * Material consumido mais mão de obra. Lido na transação do executar, depois
+   * O custo real pelo resumo do custo (SN-93): mão de obra, material, os outros
+   * custos conferidos e os não previstos. Lido na transação do executar, depois
    * de gravar: antes era calculado antes dela, com as horas estimadas e o
-   * consumo de material de antes do pedido.
+   * consumo de material de antes do pedido. Até o SN-93, só mão de obra e material.
    */
-  private async calcularCustoReal(prisma: Prisma.TransactionClient, osId: string): Promise<Prisma.Decimal> {
-    const materiais = await prisma.materiais_os.findMany({
-      where: { os_id: osId },
-    });
-
-    const tecnicos = await prisma.tecnicos_os.findMany({
-      where: { os_id: osId },
-    });
-
-    // A mesma conta do custo por natureza do painel (SN-81)
-    const { maoDeObra, material } = custoDasLinhas(materiais, tecnicos);
-    return maoDeObra.add(material);
+  private calcularCustoReal(prisma: Prisma.TransactionClient, osId: string): Promise<Prisma.Decimal> {
+    return custoRealDaOS(prisma, osId);
   }
 
   /**
@@ -1993,6 +2064,10 @@ export class ExecucaoOSService {
         instrucao_id: to.instrucao_id?.trim() ?? to.tarefa?.instrucao_id ?? null,
         // SN-86: TAREFA ou INSTRUCAO (a avulsa, sem tarefa)
         origem_item: to.origem_item,
+        // SN-93: o valor da instrução nesta OS e o equipamento congelado
+        valor: to.valor === null ? null : Number(to.valor),
+        valor_original: to.valor_original === null ? null : Number(to.valor_original),
+        equipamento_nome: to.equipamento_nome?.trim() || null,
         plano_id: to.tarefa?.plano_manutencao?.id ?? null,
         plano_nome: to.tarefa?.plano_manutencao?.nome ?? null,
         // Só id e nome: `categoria` e `tipo_manutencao` foram droppadas da
@@ -2114,6 +2189,9 @@ export class ExecucaoOSService {
         os_id: i.os_id,
         descricao: i.descricao,
         valor: Number(i.valor),
+        natureza: naturezaDoItem(i.natureza),
+        valor_real: i.valor_real === null ? null : Number(i.valor_real),
+        nao_previsto: i.nao_previsto,
         created_at: i.created_at,
         updated_at: i.updated_at,
       })) || [],

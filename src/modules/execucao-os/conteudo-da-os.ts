@@ -26,14 +26,20 @@ import { MARCOS_DO_TEMPO, minutosEfetivos } from './horas-da-execucao';
  *
  * `versao` existe para o dia em que o conteúdo ganhar campo: a conta de uma OS
  * finalizada tem de ser refeita com as regras da versão dela, senão toda OS
- * antiga deixaria de conferir.
+ * antiga deixaria de conferir. A versão 2 (SN-93) acrescenta o custo aberto: o
+ * orçamento e os adicionais da OS, os outros custos (previsto e real) e, em cada
+ * tarefa, o equipamento e o valor da instrução. Na versão 1 esses campos não
+ * existem (ficam `undefined`, que o JSON canônico descarta): o texto, e o
+ * código, de toda OS finalizada antes continuam os mesmos.
  */
-export const VERSAO_DO_CONTEUDO = 1;
+export const VERSAO_DO_CONTEUDO = 2;
+export type VersaoDoConteudo = 1 | 2;
+const VERSOES_CONHECIDAS: readonly unknown[] = [1, 2];
 
 type Data = string | null;
 
 export interface ConteudoDaOS {
-  versao: typeof VERSAO_DO_CONTEUDO;
+  versao: VersaoDoConteudo;
   os: {
     numero_os: string;
     tipo: string;
@@ -71,6 +77,9 @@ export interface ConteudoDaOS {
     data_aprovacao: Data;
     finalizado_por: string | null;
     finalizada_em: Data;
+    /** Versão 2: o orçamento aprovado e os adicionais de antes do SN-93 (o número sem descrição) */
+    orcamento_previsto?: number | null;
+    custos_adicionais?: number | null;
   };
   tarefas: {
     id: string;
@@ -81,6 +90,10 @@ export interface ConteudoDaOS {
     data_conclusao: Data;
     concluida_por: string | null;
     observacoes: string | null;
+    /** Versão 2: o equipamento congelado e o valor da instrução na OS (o ajustado e o do cadastro) */
+    equipamento?: string | null;
+    valor?: number | null;
+    valor_original?: number | null;
   }[];
   checklist: {
     id: string;
@@ -140,6 +153,16 @@ export interface ConteudoDaOS {
     condicao_depois: string | null;
     observacoes: string | null;
   }[];
+  /** Versão 2 (SN-93): os outros custos — instrumento, maquinário, veículo, terceiro, despesa —, previsto e real */
+  outros_custos?: {
+    id: string;
+    descricao: string;
+    natureza: string;
+    previsto: number;
+    /** null = não conferido */
+    real: number | null;
+    nao_previsto: boolean;
+  }[];
 }
 
 /** O que cada parte do conteúdo é, para dizer em que a OS mudou. */
@@ -151,6 +174,7 @@ export const PARTES_DO_CONTEUDO: Record<Exclude<keyof ConteudoDaOS, 'versao'>, s
   equipe: 'equipe e horas',
   materiais: 'materiais',
   ferramentas: 'ferramentas',
+  outros_custos: 'outros custos',
 };
 
 const texto = (v: string | null | undefined) => v?.trim() || null;
@@ -161,7 +185,15 @@ const numero = (v: Prisma.Decimal | number | bigint | null | undefined) => (v ==
 /** O conteúdo lido pelo client de uma transação (finalizar) ou pelo de fora (conferir). */
 type Leitor = Pick<
   Prisma.TransactionClient,
-  'ordens_servico' | 'tarefas_os' | 'checklist_atividades_os' | 'anexos_os' | 'tecnicos_os' | 'materiais_os' | 'ferramentas_os' | 'historico_os'
+  | 'ordens_servico'
+  | 'tarefas_os'
+  | 'checklist_atividades_os'
+  | 'anexos_os'
+  | 'tecnicos_os'
+  | 'materiais_os'
+  | 'ferramentas_os'
+  | 'historico_os'
+  | 'itens_orcamento_os'
 >;
 
 /** SHA-256 do arquivo, lido em partes (os anexos vão a 10 MB); null se não está no disco. */
@@ -205,9 +237,19 @@ const porNumeroEId = (a: { ordem: number; id: string }, b: { ordem: number; id: 
 const porDataEId = <T extends { id: string }>(data: (x: T) => Date | null) => (a: T, b: T) =>
   (data(a)?.getTime() ?? 0) - (data(b)?.getTime() ?? 0) || porTexto(a.id, b.id);
 
-export async function conteudoDaOS(prisma: Leitor, osId: string, somar: Somar = somaGravadaOuDoDisco): Promise<ConteudoDaOS> {
+/**
+ * O conteúdo da OS com as regras de uma versão: a de agora para finalizar, a da
+ * OS para conferir o código dela (a conta da versão 1 não lê o que a 2 acrescentou).
+ */
+export async function conteudoDaOS(
+  prisma: Leitor,
+  osId: string,
+  somar: Somar = somaGravadaOuDoDisco,
+  versao: VersaoDoConteudo = VERSAO_DO_CONTEUDO,
+): Promise<ConteudoDaOS> {
+  const comCusto = versao >= 2;
   const os = await prisma.ordens_servico.findUniqueOrThrow({ where: { id: osId }, omit: { conteudo_finalizado: true } });
-  const [tarefasLidas, checklistLido, anexosLidos, equipeLida, materiaisLidos, ferramentasLidas, marcos] = await Promise.all([
+  const [tarefasLidas, checklistLido, anexosLidos, equipeLida, materiaisLidos, ferramentasLidas, marcos, outrosLidos] = await Promise.all([
     prisma.tarefas_os.findMany({ where: { os_id: osId } }),
     prisma.checklist_atividades_os.findMany({ where: { os_id: osId } }),
     prisma.anexos_os.findMany({ where: { os_id: osId, deletado_em: null } }),
@@ -215,6 +257,7 @@ export async function conteudoDaOS(prisma: Leitor, osId: string, somar: Somar = 
     prisma.materiais_os.findMany({ where: { os_id: osId } }),
     prisma.ferramentas_os.findMany({ where: { os_id: osId } }),
     prisma.historico_os.findMany({ where: { os_id: osId, acao: { in: MARCOS_DO_TEMPO } }, select: { acao: true, data: true } }),
+    comCusto ? prisma.itens_orcamento_os.findMany({ where: { os_id: osId } }) : Promise.resolve([]),
   ]);
   // Ordem estável em cada lista: a mesma OS tem de dar o mesmo texto, sempre
   const tarefas = [...tarefasLidas].sort(porNumeroEId);
@@ -223,13 +266,14 @@ export async function conteudoDaOS(prisma: Leitor, osId: string, somar: Somar = 
   const equipe = [...equipeLida].sort(porDataEId((t) => t.created_at));
   const materiais = [...materiaisLidos].sort(porDataEId((m) => m.created_at));
   const ferramentas = [...ferramentasLidas].sort(porDataEId((f) => f.created_at));
+  const outros = [...outrosLidos].sort(porDataEId((i) => i.created_at));
 
   // Um arquivo por vez: 50 fotos de 10 MB lidas juntas iriam para a memória juntas
   const somas: (string | null)[] = [];
   for (const anexo of anexos) somas.push(await somar(anexo));
 
   return {
-    versao: VERSAO_DO_CONTEUDO,
+    versao,
     os: {
       numero_os: os.numero_os,
       tipo: os.tipo,
@@ -262,6 +306,7 @@ export async function conteudoDaOS(prisma: Leitor, osId: string, somar: Somar = 
       data_aprovacao: data(os.data_aprovacao),
       finalizado_por: texto(os.finalizado_por),
       finalizada_em: data(os.finalizada_em),
+      ...(comCusto && { orcamento_previsto: numero(os.orcamento_previsto), custos_adicionais: numero(os.custos_adicionais) }),
     },
     tarefas: tarefas.map((t) => ({
       id: t.id.trim(),
@@ -272,6 +317,7 @@ export async function conteudoDaOS(prisma: Leitor, osId: string, somar: Somar = 
       data_conclusao: data(t.data_conclusao),
       concluida_por: texto(t.concluida_por),
       observacoes: texto(t.observacoes),
+      ...(comCusto && { equipamento: texto(t.equipamento_nome), valor: numero(t.valor), valor_original: numero(t.valor_original) }),
     })),
     checklist: checklist.map((c) => ({
       id: c.id.trim(),
@@ -330,6 +376,16 @@ export async function conteudoDaOS(prisma: Leitor, osId: string, somar: Somar = 
       condicao_depois: texto(f.condicao_depois),
       observacoes: texto(f.observacoes),
     })),
+    ...(comCusto && {
+      outros_custos: outros.map((i) => ({
+        id: i.id.trim(),
+        descricao: i.descricao.trim(),
+        natureza: i.natureza,
+        previsto: Number(i.valor),
+        real: numero(i.valor_real),
+        nao_previsto: i.nao_previsto,
+      })),
+    }),
   };
 }
 
@@ -363,5 +419,5 @@ export function diferencasDoConteudo(finalizado: ConteudoDaOS, atual: ConteudoDa
 /** O conteúdo gravado no JSONB, se tem a forma de um (versão conhecida). */
 export function conteudoGravado(valor: Prisma.JsonValue | null): ConteudoDaOS | null {
   const objeto = valor as { versao?: unknown } | null;
-  return objeto && typeof objeto === 'object' && objeto.versao === VERSAO_DO_CONTEUDO ? (valor as unknown as ConteudoDaOS) : null;
+  return objeto && typeof objeto === 'object' && VERSOES_CONHECIDAS.includes(objeto.versao) ? (valor as unknown as ConteudoDaOS) : null;
 }

@@ -38,6 +38,7 @@ import {
   RetomarExecucaoDto,
   AtualizarChecklistDto,
   RegistrarMateriaisDto,
+  RegistrarOutrosCustosDto,
   RegistrarFerramentasDto,
   ConcluirTarefaDto,
   CancelarTarefaDto,
@@ -227,6 +228,23 @@ export class ExecucaoOSController {
   ): Promise<{ message: string }> {
     await this.execucaoOSService.registrarMateriais(id.trim(), dto, user?.id, user);
     return { message: 'Consumo de materiais registrado' };
+  }
+
+  @Patch(':id/outros-custos')
+  @Permissions('execucao_os.manage', 'execucao_os.executar')
+  @ApiOperation({
+    summary: 'Registrar os outros custos',
+    description: 'SN-93: o valor real dos outros custos previstos (veículo, hospedagem, instrumentos...) e os não previstos. A lista inteira: o não previsto que não vem sai.',
+  })
+  @ApiParam({ name: 'id', description: 'ID da OS' })
+  @ApiResponse({ status: HttpStatus.OK, description: 'Outros custos registrados' })
+  async registrarOutrosCustos(
+    @Param('id') id: string,
+    @Body() dto: RegistrarOutrosCustosDto,
+    @CurrentUser() user?: Solicitante,
+  ): Promise<{ message: string }> {
+    await this.execucaoOSService.registrarOutrosCustos(id.trim(), dto, user?.id, user);
+    return { message: 'Outros custos registrados' };
   }
 
   @Patch(':id/ferramentas')

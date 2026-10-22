@@ -14,6 +14,8 @@ import {
   type programacoes_os,
   type solicitacoes_servico,
 } from '@/core';
+import { NATUREZAS_DOS_OUTROS_CUSTOS, type NaturezaDoOutroCusto } from '../natureza-do-custo';
+import type { ResumoDoCusto } from '../resumo-do-custo';
 
 export class TarefaOSResponseDto {
   @ApiProperty({ description: 'ID do relacionamento' })
@@ -59,6 +61,18 @@ export class TarefaOSResponseDto {
   /** Abre o sheet da instrucao; nao esta no congelamento. */
   @ApiPropertyOptional()
   instrucao_id?: string;
+
+  @ApiPropertyOptional({ description: 'SN-86: TAREFA (do plano) ou INSTRUCAO (avulsa)', enum: ['TAREFA', 'INSTRUCAO'] })
+  origem_item?: string;
+
+  @ApiPropertyOptional({ description: 'SN-93: valor da instrução nesta OS (o do cadastro no vínculo, ou o ajustado)', nullable: true })
+  valor?: number | null;
+
+  @ApiPropertyOptional({ description: 'SN-93: valor do cadastro no vínculo', nullable: true })
+  valor_original?: number | null;
+
+  @ApiPropertyOptional({ description: 'SN-93: nome do equipamento congelado', nullable: true })
+  equipamento_nome?: string | null;
 
   @ApiPropertyOptional()
   plano_id?: string;
@@ -366,8 +380,17 @@ export class ItemOrcamentoOSResponseDto {
   @ApiProperty({ description: 'Descrição do item de orçamento' })
   descricao: string;
 
-  @ApiProperty({ description: 'Valor do item' })
+  @ApiProperty({ description: 'Valor previsto (0 no não previsto)' })
   valor: number;
+
+  @ApiProperty({ description: 'SN-93: natureza do custo', enum: NATUREZAS_DOS_OUTROS_CUSTOS })
+  natureza: NaturezaDoOutroCusto;
+
+  @ApiPropertyOptional({ description: 'SN-93: o que custou, conferido no Executar (null = não conferido)', nullable: true })
+  valor_real: number | null;
+
+  @ApiProperty({ description: 'SN-93: lançado no Executar, fora do orçamento' })
+  nao_previsto: boolean;
 
   @ApiProperty({ description: 'Data de criação' })
   created_at: Date;
@@ -787,6 +810,10 @@ export class OrdemServicoDetalhesResponseDto extends OrdemServicoResponseDto {
 
   @ApiProperty({ description: 'Itens de orçamento da OS', type: [ItemOrcamentoOSResponseDto] })
   itens_orcamento: ItemOrcamentoOSResponseDto[];
+
+  /** SN-93: o custo aberto — por natureza, por instrução, previsto e real —, a mesma conta do PDF */
+  @ApiPropertyOptional({ description: 'Custo da OS por natureza e por instrução (SN-93)' })
+  custos?: ResumoDoCusto;
 
   @ApiProperty({ description: 'Checklist de atividades', type: [ChecklistAtividadeResponseDto] })
   checklist: ChecklistAtividadeResponseDto[];

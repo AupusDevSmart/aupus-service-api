@@ -238,15 +238,18 @@ describe('código de verificação ao finalizar a OS (banco real)', () => {
     await expect(execucoes.relatorio(osId)).rejects.toBeInstanceOf(ConflictException);
   });
 
-  it('a resposta do relatório não leva o custo unitário (a cópia gravada leva: é ela que o código prova)', async () => {
+  // SN-93 (D3): o PDF mostra tudo; até ali o relatório tirava o custo unitário e o valor/hora
+  it('a resposta do relatório leva o custo unitário, e o custo aberto pela mesma conta', async () => {
     const { osId } = await osExecutada();
     await prisma.ordens_servico.update({ where: { id: osId }, data: { status: 'AUDITADA' } });
-    await prisma.materiais_os.create({ data: { os_id: osId, descricao: 'Graxa', quantidade_planejada: 1, unidade: 'UN', custo_unitario: 12.5 } });
+    await prisma.materiais_os.create({
+      data: { os_id: osId, descricao: 'Graxa', quantidade_planejada: 1, quantidade_consumida: 2, unidade: 'UN', custo_unitario: 12.5 },
+    });
 
     const previa = await execucoes.relatorio(osId);
 
-    expect(previa.conteudo.materiais[0]).toMatchObject({ descricao: 'Graxa' });
-    expect(previa.conteudo.materiais[0]).not.toHaveProperty('custo_unitario');
+    expect(previa.conteudo.materiais[0]).toMatchObject({ descricao: 'Graxa', custo_unitario: 12.5 });
+    expect(previa.custos.materiais[0]).toMatchObject({ descricao: 'Graxa', real: 25 });
   });
 
   it('anexo sem arquivo ao finalizar: entra sem soma e a trilha diz qual', async () => {
