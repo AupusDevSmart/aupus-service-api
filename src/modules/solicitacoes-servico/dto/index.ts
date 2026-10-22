@@ -3,3 +3,4 @@ export * from './update-solicitacao.dto';
 export * from './solicitacao-filters.dto';
 export * from './solicitacao-response.dto';
 export * from './solicitacao-actions.dto';
+export * from './proposta.dto';

@@ -619,8 +619,8 @@ export class SolicitacoesServicoService {
   /**
    * Remover solicitação (soft delete)
    */
-  async remove(id: string, usuarioId?: string): Promise<void> {
-    const solicitacao = await this.findOne(id);
+  async remove(id: string, usuarioId?: string, user?: ScopedUser): Promise<void> {
+    const solicitacao = await this.findOne(id, user);
 
     if (solicitacao.status !== StatusSolicitacaoServico.REGISTRADA) {
       throw new ConflictException('Apenas solicitações registradas podem ser excluídas');

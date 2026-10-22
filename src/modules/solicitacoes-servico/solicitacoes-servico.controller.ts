@@ -11,23 +11,16 @@ import {
   HttpStatus,
   HttpCode,
   Request,
-  UseInterceptors,
-  UploadedFile,
-  Res,
-  BadRequestException,
   ConflictException,
+  NotImplementedException,
 } from '@nestjs/common';
 import {
   ApiTags,
   ApiOperation,
   ApiResponse,
   ApiParam,
-  ApiConsumes,
-  ApiBody,
 } from '@nestjs/swagger';
 import { Permissions, ScopedUser, StatusSolicitacaoServico } from '@/core';
-import { FileInterceptor } from '@nestjs/platform-express';
-import { Response } from 'express';
 import { SolicitacoesServicoService } from './solicitacoes-servico.service';
 import { PropostaService } from './proposta.service';
 import {
@@ -38,7 +31,12 @@ import {
   ListarSolicitacoesResponseDto,
   SolicitacaoStatsDto,
   GerarProgramacaoOSDto,
+  CondicoesDaPropostaDto,
+  SalvarItensDaPropostaDto,
+  SalvarOutrosCustosDaPropostaDto,
 } from './dto';
+
+const ANEXOS_AINDA_NAO_EXISTEM = 'O anexo de solicitação ainda não existe: anexe as fotos e os documentos na OS.';
 
 /** O que este controller lê da requisição: o usuário que a JwtStrategy pôs nela */
 type RequisicaoAutenticada = { user?: ScopedUser };
@@ -160,8 +158,9 @@ export class SolicitacoesServicoController {
     @Param('id') id: string,
     @Request() req?: RequisicaoAutenticada,
   ): Promise<void> {
-    const usuarioId = req?.user?.id;
-    await this.solicitacoesService.remove(id, usuarioId);
+    // Com o usuário: sem ele o findOne não conferia o escopo, e quem tinha solicitacoes.manage numa
+    // planta excluía a solicitação de outra pelo id (achado no SN-94)
+    await this.solicitacoesService.remove(id, req?.user?.id, req?.user);
   }
 
   // Comentários: ComentariosDaSolicitacaoController (modules/comentarios, SN-48)
@@ -240,62 +239,18 @@ export class SolicitacoesServicoController {
   }
 
   // =================== ANEXOS ===================
+  //
+  // Ainda não existem (a solicitação não guarda arquivo). As rotas dizem isso
+  // com 501: o upload respondia 201 sem gravar nada e o remover, 204 "Anexo
+  // removido com sucesso" sem remover (SN-94). A lista é vazia, e é verdade.
 
   @Post(':id/anexos')
   @Permissions('solicitacoes.manage', 'solicitacoes.create')
-  @UseInterceptors(FileInterceptor('file'))
-  @ApiOperation({ summary: 'Upload de anexo para a solicitação' })
-  @ApiConsumes('multipart/form-data')
+  @ApiOperation({ summary: 'Upload de anexo para a solicitação (ainda não existe: 501)' })
   @ApiParam({ name: 'id', description: 'ID da solicitação' })
-  @ApiBody({
-    schema: {
-      type: 'object',
-      properties: {
-        file: {
-          type: 'string',
-          format: 'binary',
-        },
-        descricao: {
-          type: 'string',
-          description: 'Descrição do anexo',
-        },
-        tipo_documento: {
-          type: 'string',
-          description: 'Tipo de documento (FOTO, DOCUMENTO, ORCAMENTO, etc)',
-        },
-      },
-      required: ['file'],
-    },
-  })
-  @ApiResponse({
-    status: HttpStatus.CREATED,
-    description: 'Anexo enviado com sucesso',
-  })
-  async uploadAnexo(
-    @Param('id') id: string,
-    @UploadedFile() file: Express.Multer.File,
-    @Body() body: { descricao?: string; tipo_documento?: string },
-    @Request() req?: RequisicaoAutenticada,
-  ): Promise<{
-    message: string;
-    filename: string;
-    solicitacao_id: string;
-    descricao?: string;
-    tipo_documento?: string;
-  }> {
-    if (!file) {
-      throw new BadRequestException('Arquivo não fornecido');
-    }
-
-    // Por enquanto, retornar mensagem informativa
-    // O serviço de anexos será implementado posteriormente
-    return {
-      message: 'Serviço de anexos será implementado',
-      filename: file.originalname,
-      solicitacao_id: id,
-      descricao: body.descricao,
-      tipo_documento: body.tipo_documento,
-    };
+  @ApiResponse({ status: HttpStatus.NOT_IMPLEMENTED, description: 'Anexo de solicitação ainda não existe' })
+  uploadAnexo(): never {
+    throw new NotImplementedException(ANEXOS_AINDA_NAO_EXISTEM);
   }
 
   @Get(':id/anexos')
@@ -303,69 +258,38 @@ export class SolicitacoesServicoController {
   @ApiParam({ name: 'id', description: 'ID da solicitação' })
   @ApiResponse({
     status: HttpStatus.OK,
-    description: 'Lista de anexos',
+    description: 'Lista de anexos (sempre vazia: o anexo de solicitação ainda não existe)',
   })
-  async listarAnexos(@Param('id') id: string): Promise<unknown[]> {
-    // Por enquanto, retornar lista vazia
-    // O serviço de anexos será implementado posteriormente
+  async listarAnexos(): Promise<unknown[]> {
     return [];
   }
 
   @Get(':id/anexos/:anexoId')
-  @ApiOperation({ summary: 'Buscar anexo específico' })
+  @ApiOperation({ summary: 'Buscar anexo específico (ainda não existe: 501)' })
   @ApiParam({ name: 'id', description: 'ID da solicitação' })
   @ApiParam({ name: 'anexoId', description: 'ID do anexo' })
-  @ApiResponse({
-    status: HttpStatus.OK,
-    description: 'Anexo encontrado',
-  })
-  async buscarAnexo(
-    @Param('id') id: string,
-    @Param('anexoId') anexoId: string,
-  ): Promise<{ message: string }> {
-    // Por enquanto, retornar mensagem informativa
-    // O serviço de anexos será implementado posteriormente
-    return { message: 'Serviço de anexos será implementado' };
+  @ApiResponse({ status: HttpStatus.NOT_IMPLEMENTED, description: 'Anexo de solicitação ainda não existe' })
+  buscarAnexo(): never {
+    throw new NotImplementedException(ANEXOS_AINDA_NAO_EXISTEM);
   }
 
   @Get(':id/anexos/:anexoId/download')
-  @ApiOperation({ summary: 'Download de anexo' })
+  @ApiOperation({ summary: 'Download de anexo (ainda não existe: 501)' })
   @ApiParam({ name: 'id', description: 'ID da solicitação' })
   @ApiParam({ name: 'anexoId', description: 'ID do anexo' })
-  @ApiResponse({
-    status: HttpStatus.OK,
-    description: 'Download do anexo',
-  })
-  async downloadAnexo(
-    @Param('id') id: string,
-    @Param('anexoId') anexoId: string,
-    @Res() res: Response,
-  ): Promise<void> {
-    // Por enquanto, retornar mensagem informativa
-    // O serviço de anexos será implementado posteriormente
-    res.status(HttpStatus.NOT_IMPLEMENTED).json({
-      message: 'Serviço de anexos será implementado',
-    });
+  @ApiResponse({ status: HttpStatus.NOT_IMPLEMENTED, description: 'Anexo de solicitação ainda não existe' })
+  downloadAnexo(): never {
+    throw new NotImplementedException(ANEXOS_AINDA_NAO_EXISTEM);
   }
 
   @Delete(':id/anexos/:anexoId')
   @Permissions('solicitacoes.manage')
-  @HttpCode(HttpStatus.NO_CONTENT)
-  @ApiOperation({ summary: 'Remover anexo' })
+  @ApiOperation({ summary: 'Remover anexo (ainda não existe: 501)' })
   @ApiParam({ name: 'id', description: 'ID da solicitação' })
   @ApiParam({ name: 'anexoId', description: 'ID do anexo' })
-  @ApiResponse({
-    status: HttpStatus.NO_CONTENT,
-    description: 'Anexo removido com sucesso',
-  })
-  async removerAnexo(
-    @Param('id') id: string,
-    @Param('anexoId') anexoId: string,
-    @Request() req?: RequisicaoAutenticada,
-  ): Promise<void> {
-    // Por enquanto, não fazer nada
-    // O serviço de anexos será implementado posteriormente
-    return;
+  @ApiResponse({ status: HttpStatus.NOT_IMPLEMENTED, description: 'Anexo de solicitação ainda não existe' })
+  removerAnexo(): never {
+    throw new NotImplementedException(ANEXOS_AINDA_NAO_EXISTEM);
   }
 
   // ==========================================================================
@@ -375,6 +299,10 @@ export class SolicitacoesServicoController {
   // GRAVADOS pelo servico a cada escrita: a tela, a listagem e o PDF precisam
   // do mesmo numero, e recalcular em tres lugares e como eles comecam a
   // divergir.
+  //
+  // Toda escrita confere o escopo, como a leitura (SN-94): antes, quem tinha
+  // solicitacoes.manage numa planta reescrevia a proposta de qualquer outra
+  // pelo id. Fora do escopo e 404, com a mensagem do que nao existe.
   // ==========================================================================
 
   @Get(':id/proposta')
@@ -391,15 +319,17 @@ export class SolicitacoesServicoController {
     description:
       'O front manda o estado final da lista. Recalcula os totais em seguida.',
   })
-  async salvarItensDaProposta(@Param('id') id: string, @Body() body: { itens: Parameters<PropostaService['salvarItens']>[1] }) {
-    return this.propostaService.salvarItens(id, body?.itens ?? []);
+  async salvarItensDaProposta(@Param('id') id: string, @Body() body: SalvarItensDaPropostaDto, @Request() req?: RequisicaoAutenticada) {
+    await this.solicitacoesService.garantirNoEscopo(id, req?.user);
+    return this.propostaService.salvarItens(id, body.itens);
   }
 
   @Put(':id/proposta/outros-custos')
   @Permissions('solicitacoes.manage')
   @ApiOperation({ summary: 'Substitui a lista de outros custos' })
-  async salvarOutrosCustos(@Param('id') id: string, @Body() body: { custos: Parameters<PropostaService['salvarOutrosCustos']>[1] }) {
-    return this.propostaService.salvarOutrosCustos(id, body?.custos ?? []);
+  async salvarOutrosCustos(@Param('id') id: string, @Body() body: SalvarOutrosCustosDaPropostaDto, @Request() req?: RequisicaoAutenticada) {
+    await this.solicitacoesService.garantirNoEscopo(id, req?.user);
+    return this.propostaService.salvarOutrosCustos(id, body.custos);
   }
 
   @Put(':id/proposta/condicoes')
@@ -409,11 +339,9 @@ export class SolicitacoesServicoController {
     description:
       'Aceita bdi_regime e os nove percentuais. Recalcula os totais em seguida.',
   })
-  async salvarCondicoes(
-    @Param('id') id: string,
-    @Body() body: Parameters<PropostaService['salvarCondicoes']>[1],
-  ) {
-    return this.propostaService.salvarCondicoes(id, body ?? {});
+  async salvarCondicoes(@Param('id') id: string, @Body() body: CondicoesDaPropostaDto, @Request() req?: RequisicaoAutenticada) {
+    await this.solicitacoesService.garantirNoEscopo(id, req?.user);
+    return this.propostaService.salvarCondicoes(id, body);
   }
 
   @Post(':id/proposta/recarregar')
@@ -424,8 +352,8 @@ export class SolicitacoesServicoController {
       'DESCARTA as edicoes de preco dos itens que vieram de instrucao — quem ' +
       'recarrega esta redefinindo o escopo. Itens avulsos sobrevivem.',
   })
-  async recarregarProposta(@Param('id') id: string) {
-    await this.propostaService.materializarDeInstrucoes(id);
-    return this.propostaService.obter(id);
+  async recarregarProposta(@Param('id') id: string, @Request() req?: RequisicaoAutenticada) {
+    await this.solicitacoesService.garantirNoEscopo(id, req?.user);
+    return this.propostaService.recarregar(id);
   }
 }

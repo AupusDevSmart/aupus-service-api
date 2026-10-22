@@ -1,8 +1,9 @@
 // src/modules/solicitacoes-servico/proposta.service.ts
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '@/core';
 import { Prisma } from '@prisma/client';
 import { valoresDasInstrucoes } from '../instrucoes/valor-da-instrucao';
+import type { CondicoesDaPropostaDto } from './dto/proposta.dto';
 
 /**
  * A proposta comercial de uma solicitação de serviço.
@@ -24,6 +25,10 @@ import { valoresDasInstrucoes } from '../instrucoes/valor-da-instrucao';
  * hora de gerar. Escopo é descrição do serviço, não preço — e quem corrige uma
  * instrução quer a correção valendo.
  */
+/** Os tetos das colunas dos totais: `bdi_percentual` Decimal(6, 3) e os totais Decimal(14, 2) */
+const TETO_DO_BDI = 999.999;
+const TETO_DO_TOTAL = 999_999_999_999.99;
+
 @Injectable()
 export class PropostaService {
   constructor(private readonly prisma: PrismaService) {}
@@ -33,6 +38,26 @@ export class PropostaService {
     if (valor === null || valor === undefined) return 0;
     const n = typeof valor === 'object' ? valor.toNumber() : Number(valor);
     return Number.isFinite(n) ? n : 0;
+  }
+
+  /**
+   * Trava a solicitação para escrever a proposta (SN-94), dentro da transação da escrita:
+   * - a que não existe é 404 (a lista de itens numa que não existe dava erro de chave
+   *   estrangeira, 500; o BDI, registro não encontrado no update);
+   * - só a REGISTRADA se edita (409), como o PATCH da solicitação e a tela, que só abre a
+   *   edição nela: a programada tem a proposta que o cliente aceitou;
+   * - o FOR UPDATE enfileira duas gravações da mesma proposta. Sem ele, as duas apagavam a
+   *   lista antiga, cada uma inseria a sua, e a proposta saía com as linhas em dobro.
+   */
+  private async travarParaEditar(tx: Prisma.TransactionClient, solicitacaoId: string): Promise<void> {
+    const [solicitacao] = await tx.$queryRaw<{ status: string }[]>`
+      SELECT status::text AS status FROM solicitacoes_servico
+       WHERE id = ${solicitacaoId} AND deleted_at IS NULL
+       FOR UPDATE`;
+    if (!solicitacao) throw new NotFoundException('Solicitação não encontrada');
+    if (solicitacao.status !== 'REGISTRADA') {
+      throw new ConflictException('A proposta só se edita com a solicitação registrada: depois de programada, é a que o cliente aceitou.');
+    }
   }
 
   /** Centavos. Somar float sem arredondar acumula erro e o total não fecha. */
@@ -235,9 +260,22 @@ export class PropostaService {
     // lucro. Entra no total como repasse puro.
     const baseDoBdi = custoItens + custoComum;
 
-    const bdi = this.calcularBdi(this.componentesBdi(solicitacao));
+    const componentes = this.componentesBdi(solicitacao);
+    // Os impostos com 100% ou mais: a fórmula divide por (1 - I), e o BDI saía zero calado
+    if (componentes.i >= 1) {
+      throw new BadRequestException('Os impostos do BDI (PIS, COFINS, CPRB e ISSQN) somam 100% ou mais: a conta do BDI não fecha.');
+    }
+    const bdi = this.calcularBdi(componentes);
     const totalBdi = this.centavos(baseDoBdi * bdi);
     const totalGeral = this.centavos(baseDoBdi + totalBdi + custoFD);
+    const bdiPercentual = Math.round(bdi * 100 * 1000) / 1000;
+
+    // O que as colunas guardam (Decimal(6, 3) e Decimal(14, 2)): passou disso, o banco recusava com 500
+    if (bdiPercentual > TETO_DO_BDI || Math.max(totalCusto, totalBdi, totalGeral) > TETO_DO_TOTAL) {
+      throw new BadRequestException(
+        'A proposta passa do que se guarda (BDI até 999,999% e total até R$ 999.999.999.999,99): confira os percentuais do BDI e os valores.',
+      );
+    }
 
     await db.solicitacoes_servico.update({
       where: { id: solicitacaoId },
@@ -246,7 +284,7 @@ export class PropostaService {
         total_bdi: totalBdi,
         // Três casas: 30,44% arredondado para 30,4% já move o total de uma
         // proposta grande em dezenas de reais.
-        bdi_percentual: Math.round(bdi * 100 * 1000) / 1000,
+        bdi_percentual: bdiPercentual,
         total_geral: totalGeral,
       },
     });
@@ -361,16 +399,17 @@ export class PropostaService {
     }>,
   ) {
     await this.prisma.$transaction(async (tx) => {
+      await this.travarParaEditar(tx, solicitacaoId);
       await tx.solicitacoes_itens.deleteMany({ where: { solicitacao_id: solicitacaoId } });
 
       if (itens.length > 0) {
         await tx.solicitacoes_itens.createMany({
           data: itens.map((i, indice) => ({
             solicitacao_id: solicitacaoId,
-            instrucao_id: i.instrucao_id ?? null,
-            recurso_id: i.recurso_id ?? null,
-            descricao: i.descricao,
-            unidade: i.unidade ?? null,
+            instrucao_id: i.instrucao_id?.trim() || null,
+            recurso_id: i.recurso_id?.trim() || null,
+            descricao: i.descricao.trim(),
+            unidade: i.unidade?.trim() || null,
             quantidade: i.quantidade,
             preco_unitario: i.preco_unitario,
             preco_unitario_original: i.preco_unitario_original ?? null,
@@ -390,6 +429,7 @@ export class PropostaService {
     custos: Array<{ descricao: string; valor: number; faturamento_direto?: boolean }>,
   ) {
     await this.prisma.$transaction(async (tx) => {
+      await this.travarParaEditar(tx, solicitacaoId);
       await tx.solicitacoes_outros_custos.deleteMany({
         where: { solicitacao_id: solicitacaoId },
       });
@@ -398,7 +438,7 @@ export class PropostaService {
         await tx.solicitacoes_outros_custos.createMany({
           data: custos.map((c, indice) => ({
             solicitacao_id: solicitacaoId,
-            descricao: c.descricao,
+            descricao: c.descricao.trim(),
             valor: c.valor,
             faturamento_direto: c.faturamento_direto ?? false,
             ordem: indice + 1,
@@ -421,7 +461,7 @@ export class PropostaService {
    */
   async salvarCondicoes(
     solicitacaoId: string,
-    dados: Record<string, number | string | undefined>,
+    dados: CondicoesDaPropostaDto,
   ) {
     const numericos = [
       'bdi_administracao_central',
@@ -438,10 +478,9 @@ export class PropostaService {
     const data: Record<string, number | string> = {};
 
     for (const campo of numericos) {
+      // Vazio chega null (`VazioEhNulo`): não muda o gravado
       const valor = dados[campo];
-      if (valor !== undefined && valor !== null && valor !== '') {
-        data[campo] = Number(valor);
-      }
+      if (valor !== undefined && valor !== null) data[campo] = valor;
     }
 
     if (dados.bdi_regime === 'COM_REIDI' || dados.bdi_regime === 'SEM_REIDI') {
@@ -453,11 +492,28 @@ export class PropostaService {
       if (data.bdi_cofins === undefined) data.bdi_cofins = dados.bdi_regime === 'COM_REIDI' ? 0 : 3.0;
     }
 
-    if (Object.keys(data).length > 0) {
-      await this.prisma.solicitacoes_servico.update({ where: { id: solicitacaoId }, data });
-    }
+    // Numa transação: o BDI que estoura a conta é 400 no `recalcular`, e antes o update já tinha
+    // gravado o percentual ruim, que travava toda escrita seguinte da proposta
+    await this.prisma.$transaction(async (tx) => {
+      await this.travarParaEditar(tx, solicitacaoId);
+      if (Object.keys(data).length > 0) {
+        await tx.solicitacoes_servico.update({ where: { id: solicitacaoId }, data });
+      }
+      await this.recalcular(solicitacaoId, tx);
+    });
+    return this.obter(solicitacaoId);
+  }
 
-    await this.recalcular(solicitacaoId);
+  /**
+   * Refaz a lista pelas instruções vinculadas (a rota "recarregar"), na mesma
+   * transação da trava: antes apagava os itens e, se a conta falhasse, a
+   * proposta ficava sem eles.
+   */
+  async recarregar(solicitacaoId: string) {
+    await this.prisma.$transaction(async (tx) => {
+      await this.travarParaEditar(tx, solicitacaoId);
+      await this.materializarDeInstrucoes(solicitacaoId, tx);
+    });
     return this.obter(solicitacaoId);
   }
 }
