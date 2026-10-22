@@ -7,6 +7,7 @@ import type { QueryDashboardManutencaoDto } from './dto/query-dashboard-manutenc
 import { calcularConfiabilidade, frotaDoRecorte, type Confiabilidade, type Frota } from './confiabilidade';
 import { custosDasOrdens, montarCusto, montarCustoPorOS, type CustosDoPainel } from './custo-do-painel';
 import { explicacoesDosGraficos } from './explicacoes-do-painel';
+import { passouDoPrazo, terminouNoPrazo } from '@/common/helpers/prazo-da-os';
 import { ordensDaConta } from './exportacao-do-painel';
 import {
   STATUS_CONCLUIDO,
@@ -296,11 +297,12 @@ export class DashboardManutencaoService {
     const doPlano = programadas.filter((o) => o.origem === 'PLANO_MANUTENCAO' || o.origem === 'TAREFA');
     const planoConcluidas = doPlano.filter((o) => STATUS_CONCLUIDO.includes(o.status));
 
-    const atrasadas = emAberto.filter(
-      (o) => o.data_hora_programada && new Date(o.data_hora_programada) < new Date(),
-    ).length;
+    // O prazo é o fim do dia programado ou o término previsto (`prazoDaOrdem`): comparar com a hora de
+    // começar dava "0% no prazo" e a OS em execução já contava como atrasada
+    const agora = new Date();
+    const atrasadas = emAberto.filter((o) => passouDoPrazo(o, agora)).length;
 
-    const noPrazo = concluidas.filter((o) => o.data_hora_programada && new Date(fimDaOrdem(o)!) <= new Date(o.data_hora_programada)).length;
+    const noPrazo = concluidas.filter((o) => terminouNoPrazo(o, fimDaOrdem(o))).length;
 
     // Backlog em HH: em semanas exigiria a capacidade das equipes, que não é
     // cadastrada — pode ir gente de fora (decisão do usuário, 20/out/2026)
@@ -334,7 +336,7 @@ export class DashboardManutencaoService {
         valor: String(emAberto.length),
         nota: atrasadas > 0 ? `${atrasadas} atrasadas` : 'nenhuma atrasada',
         status: atrasadas > 0 ? 'bad' : 'ok',
-        formula: 'OS pendentes, em execução ou pausadas agora, de qualquer data. Atrasada: programada para antes de agora.',
+        formula: 'OS pendentes, em execução ou pausadas agora, de qualquer data. Atrasada: passou do prazo (o fim do dia programado, ou o término previsto pela duração estimada, se for depois).',
       },
       {
         id: 'os_concluida',
@@ -343,7 +345,7 @@ export class DashboardManutencaoService {
         valor: String(concluidas.length),
         nota: concluidas.length > 0 ? `${this.pct(noPrazo, concluidas.length)}% no prazo` : 'sem conclusões',
         status: null,
-        formula: 'OS executadas, auditadas ou finalizadas no período, pela data de fim (sem ela, a de início). No prazo: terminou até a data programada.',
+        formula: 'OS executadas, auditadas ou finalizadas no período, pela data de fim (sem ela, a de início). No prazo: terminou até o fim do dia programado (ou até o término previsto pela duração estimada, se for depois).',
       },
       {
         id: 'backlog',
@@ -608,9 +610,7 @@ export class DashboardManutencaoService {
 
       const atual = porEquipe.get(equipe) ?? { total: 0, noPrazo: 0 };
       atual.total += 1;
-      if (o.data_hora_programada && new Date(fimDaOrdem(o)!) <= new Date(o.data_hora_programada)) {
-        atual.noPrazo += 1;
-      }
+      if (terminouNoPrazo(o, fimDaOrdem(o))) atual.noPrazo += 1;
       porEquipe.set(equipe, atual);
     }
 

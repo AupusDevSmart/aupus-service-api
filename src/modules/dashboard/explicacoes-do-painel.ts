@@ -86,7 +86,7 @@ export function explicacoesDosGraficos(c: ContagensDoPainel): Explicacao[] {
     {
       id: 'prazoPorEquipe',
       rotulo: 'OS no prazo, por equipe',
-      formula: `Das OS concluídas no período com equipe registrada: as que terminaram até a data programada, sobre o total da equipe. Meta: ${c.metaPrazo}%.`,
+      formula: `Das OS concluídas no período com equipe registrada: as que terminaram até o fim do dia programado (ou até o término previsto, se for depois), sobre o total da equipe. Meta: ${c.metaPrazo}%.`,
       base: `${plural(c.concluidasComEquipe, 'OS concluída com equipe', 'OS concluídas com equipe')} no período.`,
     },
   ];

@@ -275,28 +275,42 @@ describe('ExecucaoOSService', () => {
       });
     });
 
-    it('deve filtrar OS atrasadas', async () => {
+    it('deve filtrar OS atrasadas: abertas com o prazo vencido (a regra do painel)', async () => {
       const filters: OSFiltersDto = {
         atrasadas: true,
       };
-
+      const ontem = new Date(Date.now() - 36 * 3_600_000);
+      // A consulta das atrasadas pede só o prazo (data e duração); a da lista, a OS inteira
+      mockPrismaService.ordens_servico.findMany.mockImplementation((args: { select?: Record<string, boolean> }) =>
+        Promise.resolve(
+          args?.select?.duracao_estimada
+            ? [
+                { id: 'OS_VENCIDA', data_hora_programada: ontem, duracao_estimada: 2 },
+                { id: 'OS_DE_HOJE', data_hora_programada: new Date(), duracao_estimada: 2 },
+              ]
+            : [],
+        ),
+      );
       mockPrismaService.ordens_servico.count.mockResolvedValue(0);
-      mockPrismaService.ordens_servico.findMany.mockResolvedValue([]);
       mockPrismaService.ordens_servico.groupBy.mockResolvedValue([]);
 
       const result = await service.listar(filters);
 
+      // Só as que ainda pedem trabalho: a executada esperando auditoria contava como atrasada
+      expect(prisma.ordens_servico.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { AND: [{ deletado_em: null }, { status: { in: [StatusOS.PENDENTE, StatusOS.EM_EXECUCAO, StatusOS.PAUSADA] }, data_hora_programada: { not: null } }] },
+        }),
+      );
       expect(prisma.ordens_servico.count).toHaveBeenCalledWith({
         where: expect.objectContaining({
           deletado_em: null,
-          AND: [
-            { data_hora_programada: { lt: expect.any(Date) } },
-            { status: { notIn: [StatusOS.FINALIZADA, StatusOS.CANCELADA] } },
-          ],
+          AND: [{ id: { in: ['OS_VENCIDA'] } }],
         }),
       });
 
       expect(result.data).toEqual([]);
+      mockPrismaService.ordens_servico.findMany.mockReset();
     });
 
     it('deve filtrar por responsável', async () => {

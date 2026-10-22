@@ -63,6 +63,7 @@ import { devolverViatura } from '../reservas/ocupacao-da-viatura';
 import type { Evento } from '../notificacoes/catalogo';
 import { registrarNotificacao } from '../notificacoes/registrar-notificacao';
 import { vinculoDaOS } from '../programacao-os/instrucoes-da-programacao';
+import { idsDasAtrasadas } from './os-atrasadas';
 
 /**
  * Nome da tarefa dentro de uma OS, sem depender da tarefa viva.
@@ -276,13 +277,9 @@ export class ExecucaoOSService {
     // A planta pela mesma regra do escopo: a da OS ou, na antiga sem planta, a do equipamento
     if (planta_id?.trim()) doEquipamento.push(ordemDasPlantas([planta_id.trim()]));
 
+    // A mesma regra do painel e do cartão (`idsDasAtrasadas`): aberta e com o prazo vencido
     if (atrasadas) {
-      const hoje = new Date();
-      hoje.setHours(0, 0, 0, 0);
-      where.AND = [
-        { data_hora_programada: { lt: hoje } },
-        { status: { notIn: [StatusOS.FINALIZADA, StatusOS.CANCELADA] } },
-      ];
+      where.AND = [{ id: { in: await idsDasAtrasadas(this.prisma, { deletado_em: null }) } }];
     }
     // AND: a busca já usa o OR de cima
     if (doEquipamento.length) where.AND = [...((where.AND as Prisma.ordens_servicoWhereInput[] | undefined) ?? []), ...doEquipamento];
@@ -1942,16 +1939,8 @@ export class ExecucaoOSService {
       }
     });
 
-    // Contar atrasadas (data programada < hoje, excluindo finalizadas/canceladas)
-    const hoje = new Date();
-    hoje.setHours(0, 0, 0, 0);
-    resultado.atrasadas = await this.prisma.ordens_servico.count({
-      where: {
-        ...base,
-        data_hora_programada: { lt: hoje },
-        status: { notIn: [StatusOS.FINALIZADA, StatusOS.CANCELADA] },
-      },
-    });
+    // Atrasadas: abertas e com o prazo vencido, a regra do painel (`idsDasAtrasadas`)
+    resultado.atrasadas = (await idsDasAtrasadas(this.prisma, base)).length;
 
     // Contar críticas
     resultado.criticas = await this.prisma.ordens_servico.count({
