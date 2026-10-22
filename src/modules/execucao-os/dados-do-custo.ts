@@ -26,7 +26,7 @@ export interface LinhasDoCusto {
   >[];
 }
 
-type Leitor = Pick<Prisma.TransactionClient, 'instrucao_recursos' | 'instrucao_maquinarios' | 'tarefas'>;
+type Leitor = Pick<Prisma.TransactionClient, 'instrucao_recursos' | 'instrucao_maquinarios' | 'tarefas' | 'instrucoes'>;
 
 const outroDaLinha = (i: LinhasDoCusto['itens_orcamento'][number]): OutroCustoDoCusto => ({
   descricao: i.descricao.trim(),
@@ -110,7 +110,7 @@ export async function custoRealDaOS(tx: Prisma.TransactionClient, osId: string):
 export async function congelarValoresDasInstrucoes(tx: Prisma.TransactionClient, osId: string): Promise<void> {
   const linhas = await tx.tarefas_os.findMany({
     where: { os_id: osId, valor: null },
-    select: { id: true, instrucao_id: true, tarefa_id: true },
+    select: { id: true, instrucao_id: true, instrucao_tag: true, tarefa_id: true },
   });
   for (const { id, valor } of await valoresParaCongelar(tx, linhas)) {
     await tx.tarefas_os.update({ where: { id }, data: { valor, valor_original: valor } });
@@ -171,7 +171,7 @@ export function dadosDoCustoDoConteudo(conteudo: ConteudoDaOS, complemento?: Com
 
 /** O complemento da versão 1: os outros custos, os adicionais e o equipamento e o valor de hoje de cada tarefa */
 export async function complementoDaVersao1(
-  db: Pick<Prisma.TransactionClient, 'ordens_servico' | 'itens_orcamento_os' | 'tarefas_os' | 'tarefas' | 'instrucao_recursos' | 'instrucao_maquinarios'>,
+  db: Pick<Prisma.TransactionClient, 'ordens_servico' | 'itens_orcamento_os' | 'tarefas_os' | 'tarefas' | 'instrucoes' | 'instrucao_recursos' | 'instrucao_maquinarios'>,
   osId: string,
 ): Promise<ComplementoDaVersao1> {
   const [os, itens, tarefas] = await Promise.all([
@@ -179,7 +179,7 @@ export async function complementoDaVersao1(
     db.itens_orcamento_os.findMany({ where: { os_id: osId }, orderBy: [{ created_at: 'asc' }, { id: 'asc' }] }),
     db.tarefas_os.findMany({
       where: { os_id: osId },
-      select: { id: true, equipamento_nome: true, instrucao_id: true, tarefa_id: true, valor: true },
+      select: { id: true, equipamento_nome: true, instrucao_id: true, instrucao_tag: true, tarefa_id: true, valor: true },
     }),
   ]);
   const instrucoes = await instrucoesDasLinhas(db, tarefas);

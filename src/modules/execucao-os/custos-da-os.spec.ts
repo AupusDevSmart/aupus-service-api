@@ -342,7 +342,7 @@ describe('custo da OS por instrução e por natureza (banco real)', () => {
         data: { tag: `${CODIGO}T${sequencia}`, nome: 'Termografia do plano', criticidade: 3, ordem: 1, instrucao_id: instrucoes.A },
       });
     };
-    const comLinhaDeTarefa = async () => {
+    const comLinhaDeTarefa = async (instrucao_tag?: string) => {
       const tarefa = await novaTarefa();
       expect(tarefa.id.trim()).toHaveLength(25);
       const prog = await programar({ instrucoes_ids: [instrucoes.B] });
@@ -355,6 +355,7 @@ describe('custo da OS por instrução e por natureza (banco real)', () => {
           ordem: 0,
           nome_snapshot: 'Termografia do plano',
           equipamento_id: EQUIPAMENTO,
+          instrucao_tag,
         },
       });
       return { prog, tarefa };
@@ -368,6 +369,36 @@ describe('custo da OS por instrução e por natureza (banco real)', () => {
       expect([numero(daProgramacao.valor), numero(daProgramacao.valor_original)]).toEqual([285, 285]);
       const os = await prisma.ordens_servico.findUniqueOrThrow({ where: { programacao_id: prog.id } });
       expect(numero((await linhaDaTarefa(os.id)).valor)).toBe(285);
+    });
+
+    it('a programação de antes mostra o do cadastro de hoje (e a instrução da tarefa), sem gravar', async () => {
+      const { prog, tarefa } = await comLinhaDeTarefa();
+      const detalhe = await programacoes.buscarPorId(prog.id);
+      const daTarefa = detalhe.tarefas_programacao!.find((t) => t.tarefa_id?.trim() === tarefa.id.trim())!;
+      // A tela mostrava os campos vazios e "Total das instruções: R$ 0,00"
+      expect([daTarefa.valor, daTarefa.valor_original, daTarefa.do_cadastro_hoje]).toEqual([285, 285, true]);
+      expect([daTarefa.tarefa?.id, daTarefa.tarefa?.instrucao_id, daTarefa.instrucao_id]).toEqual([tarefa.id.trim(), instrucoes.A, instrucoes.A]);
+      // A avulsa, com o valor congelado na criação, não é tocada
+      const avulsa = detalhe.instrucoes!.find((i) => i.instrucao_id === instrucoes.B)!;
+      expect([avulsa.valor, avulsa.do_cadastro_hoje]).toEqual([10, false]);
+      // Ler não grava: quem congela é a aprovação
+      const gravada = await prisma.tarefas_programacao_os.findFirstOrThrow({ where: { programacao_id: prog.id, origem_item: 'TAREFA' } });
+      expect([gravada.valor, gravada.valor_original]).toEqual([null, null]);
+    });
+
+    it('a tarefa que trocou de instrução depois do vínculo: vale a do código congelado na linha', async () => {
+      const { prog, tarefa } = await comLinhaDeTarefa(`${CODIGO}A`);
+      // O template trocou a instrução da tarefa, e a propagação leva a troca às cópias
+      await prisma.tarefas.update({ where: { id: tarefa.id }, data: { instrucao_id: instrucoes.B } });
+      const detalhe = await programacoes.buscarPorId(prog.id);
+      const daTarefa = detalhe.tarefas_programacao!.find((t) => t.tarefa_id?.trim() === tarefa.id.trim())!;
+      // O preço e o atalho são os da instrução que a linha pediu (o código e o checklist dela), não os da B
+      expect([daTarefa.valor, daTarefa.instrucao_id]).toEqual([285, instrucoes.A]);
+      await programacoes.aprovar(prog.id, {});
+      const os = await prisma.ordens_servico.findUniqueOrThrow({ where: { programacao_id: prog.id } });
+      expect(numero((await linhaDaTarefa(os.id)).valor)).toBe(285);
+      const daOS = (await execucoes.buscarPorId(os.id)).tarefas_os!.find((t) => t.origem_item === 'TAREFA')!;
+      expect(daOS.instrucao_id).toBe(instrucoes.A);
     });
 
     it('a OS de antes mostra o do cadastro de hoje (e o atalho para a instrução), e o finalizar congela', async () => {
@@ -400,9 +431,12 @@ describe('custo da OS por instrução e por natureza (banco real)', () => {
 
     it('ajustar a linha sem o do cadastro grava os dois: o ajuste aparece como ajuste', async () => {
       const { prog, tarefa } = await comLinhaDeTarefa();
-      await programacoes.atualizar(prog.id, { valores_das_instrucoes: [{ tarefa_id: tarefa.id.trim(), valor: 300 }] } as never);
+      const resposta = await programacoes.atualizar(prog.id, { valores_das_instrucoes: [{ tarefa_id: tarefa.id.trim(), valor: 300 }] } as never);
       const linha = await prisma.tarefas_programacao_os.findFirstOrThrow({ where: { programacao_id: prog.id, origem_item: 'TAREFA' } });
       expect([numero(linha.valor), numero(linha.valor_original)]).toEqual([300, 285]);
+      // A resposta do salvar (relida dentro da transação) já traz a tarefa e o ajuste
+      const naResposta = resposta.tarefas_programacao!.find((t) => t.tarefa_id?.trim() === tarefa.id.trim())!;
+      expect([naResposta.valor, naResposta.valor_original, naResposta.do_cadastro_hoje, naResposta.tarefa?.instrucao_id]).toEqual([300, 285, false, instrucoes.A]);
     });
 
     it('a avulsa ajustada que passa a vir por tarefa leva o valor para a linha da tarefa', async () => {

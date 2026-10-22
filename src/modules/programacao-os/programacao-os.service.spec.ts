@@ -501,7 +501,9 @@ describe('ProgramacaoOSService', () => {
         duracao_estimada: createDto.duracao_estimada,
         criado_por_id: 'user123',
       }));
-      expect(createCall.include).toBeDefined();
+      // Sem include das linhas: a resposta as relê depois de gravar tudo (`linhasDaProgramacao`), com a tarefa
+      // por consulta própria (o include voltava null com o id de 25 caracteres)
+      expect(createCall.include).toBeUndefined();
 
       expect(result).toEqual(expect.objectContaining({
         id: mockProgramacaoData.id,

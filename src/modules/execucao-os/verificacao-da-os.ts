@@ -82,6 +82,7 @@ type Cliente = Pick<
   | 'instrucao_recursos'
   | 'instrucao_maquinarios'
   | 'tarefas'
+  | 'instrucoes'
 >;
 
 /**

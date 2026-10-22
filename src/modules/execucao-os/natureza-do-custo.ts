@@ -21,6 +21,16 @@ export const ROTULO_DA_NATUREZA: Record<NaturezaDoCusto, string> = {
   OUTRO: 'Outros',
 };
 
+/** A natureza de UM item ("Instrumento · previsto R$ 160,00"); a de cima é a da soma, no plural */
+export const ROTULO_DO_ITEM: Record<NaturezaDoOutroCusto, string> = {
+  INSTRUMENTO: 'Instrumento',
+  MAQUINARIO: 'Maquinário',
+  VEICULO: 'Veículo',
+  TERCEIRO: 'Terceiro',
+  DESPESA_CAMPO: 'Despesa de campo',
+  OUTRO: 'Outro',
+};
+
 /**
  * O prefixo que a tela grava na descrição do item que veio da instrução
  * ("Veículo: Picape 4x4", `recursos-das-instrucoes.ts`). É a natureza do item que

@@ -49,7 +49,7 @@ import { dadosDaOS, dadosDeFalha, equipamentoDaCorretiva, minutosParado, mudanca
 import { MARCOS_DO_TEMPO, gravacaoDasHoras, horasDaEquipe, minutosEfetivos } from './horas-da-execucao';
 import { reais } from './custo-da-os';
 import { congelarValoresDasInstrucoes, custoRealDaOS, dadosDoCustoDaOS } from './dados-do-custo';
-import { SELECAO_DA_TAREFA, tarefasDasLinhas } from './tarefas-das-linhas';
+import { SELECAO_DA_TAREFA, instrucoesDasLinhas, tarefasDasLinhas } from './tarefas-das-linhas';
 import { gravarOutrosCustos } from './outros-custos';
 import { naturezaDoItem } from './natureza-do-custo';
 import { comOCustoRegistrado, resumoDoCusto } from './resumo-do-custo';
@@ -107,6 +107,8 @@ type OSParaResposta = Omit<ordens_servico, 'conteudo_finalizado'> & {
         instrucao_id?: string | null;
         plano_manutencao?: { id: string; nome: string } | null;
       } | null;
+      /** A instrução da linha pela regra do valor (o código congelado primeiro), no detalhe */
+      instrucao_da_linha?: string | null;
     }
   >;
   materiais?: materiais_os[];
@@ -602,7 +604,9 @@ export class ExecucaoOSService {
     // A finalizada pelas regras de antes: o registrado pode não ser a conta das linhas (o PDF diz o mesmo)
     const custos = outrosNoReal ? resumo : comOCustoRegistrado(resumo, os.custo_real === null ? null : Number(os.custo_real));
 
-    return { ...this.mapearParaDetalhes(os, instalacoes.get(os.id) ?? []), custos };
+    const instrucoesDaLinha = await instrucoesDasLinhas(this.prisma, os.tarefas_os);
+    const tarefas_os = os.tarefas_os.map((t, i) => ({ ...t, instrucao_da_linha: instrucoesDaLinha[i] }));
+    return { ...this.mapearParaDetalhes({ ...os, tarefas_os }, instalacoes.get(os.id) ?? []), custos };
   }
 
   /** A versão do conteúdo registrado na finalização (0 = sem conteúdo); o JSON inteiro não precisa sair do banco */
@@ -2061,7 +2065,9 @@ export class ExecucaoOSService {
         // Ponte para a instrução e para o plano: o congelamento guarda o nome
         // e a descrição do que foi pedido, mas não os ids — e é o id que abre
         // o sheet da instrução com etapas, recursos e anexos.
-        instrucao_id: to.instrucao_id?.trim() ?? to.tarefa?.instrucao_id ?? null,
+        // A do código congelado (`instrucoesDasLinhas`, no detalhe): a tarefa de hoje pode ter trocado de
+        // instrução, e o atalho abria uma enquanto o custo mostrava o valor da outra
+        instrucao_id: to.instrucao_id?.trim() || to.instrucao_da_linha || to.tarefa?.instrucao_id?.trim() || null,
         // SN-86: TAREFA ou INSTRUCAO (a avulsa, sem tarefa)
         origem_item: to.origem_item,
         // SN-93: o valor da instrução nesta OS e o equipamento congelado

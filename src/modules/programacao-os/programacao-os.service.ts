@@ -68,6 +68,7 @@ import {
   equipamentoDasAvulsas,
   gravarInstrucoesDaProgramacao,
   linhasDaProgramacao,
+  linhasParaAResposta,
   instrucaoDaResposta,
   instrucoesDaOrigem,
   valorDaLinha,
@@ -75,16 +76,26 @@ import {
 } from './instrucoes-da-programacao';
 import { congelamentoDasLinhas, nomesDosEquipamentos } from './congelamento-da-linha';
 import { naturezaDoItem, naturezaPeloPrefixo } from '../execucao-os/natureza-do-custo';
+import type { TarefaDaLinha } from '../execucao-os/tarefas-das-linhas';
 
 /** A programação como as consultas deste service a trazem para a resposta */
 type ProgramacaoParaResposta = programacoes_os & {
-  tarefas_programacao?: Array<tarefas_programacao_os & { tarefa?: { id: string; nome: string } | null }>;
+  // O detalhe traz a tarefa com a instrução e o plano (`linhasParaAResposta`); a listagem, pelo include,
+  // id e nome (null com o id de 25 caracteres: a tela abre o sheet pelo detalhe)
+  tarefas_programacao?: Array<
+    tarefas_programacao_os & {
+      tarefa?: (Pick<TarefaDaLinha, 'id' | 'nome'> & Partial<TarefaDaLinha>) | null;
+      instrucao_da_linha?: string | null;
+      do_cadastro_hoje?: boolean;
+    }
+  >;
 };
 
 /** A programação com tudo o que `buscarPorId` inclui */
 type ProgramacaoComDetalhes = Prisma.programacoes_osGetPayload<{
   include: {
-    tarefas_programacao: { include: { tarefa: { select: { id: true; nome: true } } } };
+    // A tarefa vem por `linhasParaAResposta`, não pelo include (o id de 25 caracteres no Char(26))
+    tarefas_programacao: { orderBy: [{ ordem: 'asc' }, { id: 'asc' }] };
     materiais: true;
     ferramentas: true;
     tecnicos: true;
@@ -297,16 +308,7 @@ export class ProgramacaoOSService {
         deletado_em: null,
       },
       include: {
-        tarefas_programacao: {
-          include: {
-            tarefa: {
-              select: {
-                id: true,
-                nome: true,
-              },
-            },
-          },
-        },
+        tarefas_programacao: { orderBy: [{ ordem: 'asc' }, { id: 'asc' }] },
         materiais: true,
         ferramentas: true,
         tecnicos: true,
@@ -351,7 +353,9 @@ export class ProgramacaoOSService {
 
     const instalacoes = await instalacoesDasProgramacoes(this.prisma, [programacao.id]);
 
-    return this.mapearParaDetalhes(programacao, reserva, instalacoes.get(programacao.id) ?? []);
+    // A tarefa de cada linha e o valor do cadastro da linha de antes do SN-93 (`linhasParaAResposta`)
+    const tarefas_programacao = await linhasParaAResposta(this.prisma, programacao.tarefas_programacao);
+    return this.mapearParaDetalhes({ ...programacao, tarefas_programacao }, reserva, instalacoes.get(programacao.id) ?? []);
   }
 
   async buscarPorUnidade(unidadeId: string, filters?: ProgramacaoFiltersDto, user?: ScopedUser): Promise<ListarProgramacoesResponseDto> {
@@ -460,18 +464,6 @@ export class ProgramacaoOSService {
           justificativa: createDto.justificativa,
           criado_por: nomeCriador,
           criado_por_id: usuarioId,
-        },
-        include: {
-          tarefas_programacao: {
-            include: {
-              tarefa: {
-                select: {
-                  id: true,
-                  nome: true,
-                },
-              },
-            },
-          },
         },
       });
 
@@ -629,19 +621,8 @@ export class ProgramacaoOSService {
         where: { id },
         // As chaves vêm do DTO, que espelha as colunas da tabela
         data: updateData as Prisma.programacoes_osUncheckedUpdateInput,
-        include: {
-          tarefas_programacao: {
-            include: {
-              tarefa: {
-                select: {
-                  id: true,
-                  nome: true,
-                },
-              },
-            },
-          },
-          ordem_servico: true,
-        },
+        // As linhas da resposta vêm de `linhasDaProgramacao`, depois de gravar tudo
+        include: { ordem_servico: true },
       });
 
       // SN-86: as instruções avulsas, trocadas pela lista que veio
@@ -2139,12 +2120,22 @@ export class ProgramacaoOSService {
         // porque `Number(undefined)` não é nulo — e NaN vira `null` no JSON,
         // então nada estourava e a tela só mostrava vazio. O conteúdo vive na
         // instrução.
+        // SN-93: a instrução e o plano da tarefa, que abrem o sheet de cada um (no detalhe)
         tarefa: tp.tarefa ? {
           id: tp.tarefa.id,
           nome: tp.tarefa.nome,
+          // Só quando a leitura trouxe (o detalhe): a listagem não lê, e null diria "sem instrução"
+          ...(tp.tarefa.instrucao_id !== undefined && { instrucao_id: tp.tarefa.instrucao_id?.trim() ?? null }),
+          ...(tp.tarefa.plano_manutencao !== undefined && {
+            plano_manutencao: tp.tarefa.plano_manutencao
+              ? { id: tp.tarefa.plano_manutencao.id.trim(), nome: tp.tarefa.plano_manutencao.nome }
+              : null,
+          }),
         } : null,
-        // SN-93: o código da instrução congelado, o valor dela nesta programação e o equipamento
+        // SN-93: o código da instrução congelado, a instrução da linha (a do valor, que o atalho abre),
+        // o valor dela nesta programação e o equipamento
         instrucao_tag: tp.instrucao_tag,
+        ...(tp.instrucao_da_linha !== undefined && { instrucao_id: tp.instrucao_da_linha }),
         nome_snapshot: tp.nome_snapshot,
         ...valorDaLinha(tp),
       })) || [],

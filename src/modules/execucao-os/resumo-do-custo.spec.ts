@@ -85,7 +85,8 @@ describe('resumoDoCusto: outros custos (D2)', () => {
     expect(natureza(r, 'VEICULO')).toMatchObject({ previsto: 1316, real: 1402.5 });
     expect(natureza(r, 'DESPESA_CAMPO')).toMatchObject({ rotulo: 'Despesas de campo', previsto: 1848, real: 1380 });
     expect(r.real).toBe(2782.5);
-    expect(r.outros.find((o) => o.natureza === 'DESPESA_CAMPO' && !o.conferido)).toMatchObject({ no_real: 1380, real: null });
+    // A soma no plural, o item no singular (o sheet dizia "Instrumentos · previsto R$ 160,00" de um item só)
+    expect(r.outros.find((o) => o.natureza === 'DESPESA_CAMPO' && !o.conferido)).toMatchObject({ no_real: 1380, real: null, rotulo: 'Despesa de campo' });
     expect(r.pendencias).toContain('1 outro custo não foi conferido e entra pelo previsto.');
   });
 

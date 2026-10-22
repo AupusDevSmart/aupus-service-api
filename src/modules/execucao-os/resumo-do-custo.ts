@@ -1,6 +1,6 @@
 import { Prisma } from '@prisma/client';
 import { emCentavos } from './horas-da-execucao';
-import { NATUREZAS_DOS_OUTROS_CUSTOS, ROTULO_DA_NATUREZA, type NaturezaDoCusto, type NaturezaDoOutroCusto } from './natureza-do-custo';
+import { NATUREZAS_DOS_OUTROS_CUSTOS, ROTULO_DA_NATUREZA, ROTULO_DO_ITEM, type NaturezaDoCusto, type NaturezaDoOutroCusto } from './natureza-do-custo';
 
 /**
  * O custo da OS aberto (SN-93): o sheet e o PDF leem daqui, e o `custo_real`
@@ -197,7 +197,7 @@ export function resumoDoCusto(dados: DadosDoCusto): ResumoDoCusto {
     return {
       descricao: o.descricao,
       natureza: o.natureza,
-      rotulo: ROTULO_DA_NATUREZA[o.natureza],
+      rotulo: ROTULO_DO_ITEM[o.natureza],
       previsto: emCentavos(D(o.nao_previsto ? 0 : o.previsto)),
       real: o.real,
       no_real: noReal,

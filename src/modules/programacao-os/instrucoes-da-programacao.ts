@@ -2,7 +2,7 @@ import { BadRequestException } from '@nestjs/common';
 import { Prisma, type tarefas_programacao_os } from '@prisma/client';
 import { origemDaProgramacao, type OrigemDaOS } from '@/common/helpers/status-da-origem';
 import { reais } from '../execucao-os/custo-da-os';
-import { instrucoesDasLinhas, valoresParaCongelar } from '../execucao-os/tarefas-das-linhas';
+import { instrucoesDasLinhas, tarefasDasLinhas, valoresParaCongelar, type TarefaDaLinha } from '../execucao-os/tarefas-das-linhas';
 import { valoresDasInstrucoes } from '../instrucoes/valor-da-instrucao';
 import { variantesDeIds } from '../tarefas/ids';
 import { congelamentoDasLinhas, nomesDosEquipamentos } from './congelamento-da-linha';
@@ -222,13 +222,51 @@ export async function acertarAvulsasDepoisDasTarefas(cliente: Cliente, programac
   }
 }
 
+/** A linha da programação na resposta, com a tarefa (`linhasParaAResposta`) */
+export type LinhaDaResposta = tarefas_programacao_os & {
+  tarefa: TarefaDaLinha | null;
+  /** A instrução da linha pela regra do valor (o código congelado primeiro): é a que o atalho abre */
+  instrucao_da_linha: string | null;
+  /**
+   * O valor não está congelado na linha: é o do cadastro de hoje. Na pendente, a
+   * aprovação congela o daquele dia; na aprovada de antes, a OS congela no finalizar
+   */
+  do_cadastro_hoje: boolean;
+};
+
+/**
+ * As linhas como a resposta as lê (SN-93). A tarefa por consulta própria: com o
+ * id de 25 caracteres no Char(26) o include voltava null, e a tela perdia a
+ * instrução e o plano da tarefa. E a linha de antes do SN-93, sem valor, sai com
+ * o do cadastro de hoje, marcada (`do_cadastro_hoje`): a tela mostrava os campos
+ * vazios e "Total das instruções: R$ 0,00". Só na resposta: ler não grava.
+ */
+export async function linhasParaAResposta(cliente: Cliente, linhas: tarefas_programacao_os[]): Promise<LinhaDaResposta[]> {
+  const tarefas = await tarefasDasLinhas(cliente, linhas.map((l) => l.tarefa_id));
+  const instrucoes = await instrucoesDasLinhas(cliente, linhas, tarefas);
+  const semValor = instrucoes.filter((instrucao, i) => instrucao && linhas[i].valor === null);
+  const doCadastro = semValor.length ? await valoresDasInstrucoes(cliente, semValor) : new Map<string, { valor: number }>();
+  return linhas.map((l, i) => {
+    const deHoje = l.valor === null && instrucoes[i] ? doCadastro.get(instrucoes[i]!)?.valor : undefined;
+    const valorDeHoje = deHoje === undefined ? null : new Prisma.Decimal(deHoje);
+    return {
+      ...l,
+      tarefa: tarefas.get(l.tarefa_id?.trim() ?? '') ?? null,
+      instrucao_da_linha: instrucoes[i],
+      valor: l.valor ?? valorDeHoje,
+      valor_original: l.valor_original ?? valorDeHoje,
+      do_cadastro_hoje: valorDeHoje !== null,
+    };
+  });
+}
+
 /** As linhas da programação como a resposta as lê (as de tarefa e as avulsas), relidas depois de gravar */
-export function linhasDaProgramacao(cliente: Cliente, programacaoId: string) {
-  return cliente.tarefas_programacao_os.findMany({
+export async function linhasDaProgramacao(cliente: Cliente, programacaoId: string) {
+  const linhas = await cliente.tarefas_programacao_os.findMany({
     where: { programacao_id: programacaoId },
-    include: { tarefa: { select: { id: true, nome: true } } },
     orderBy: [{ ordem: 'asc' }, { id: 'asc' }],
   });
+  return linhasParaAResposta(cliente, linhas);
 }
 
 /** A linha da programação levada à OS, com o congelamento dela (as duas portas que criam a OS usam esta) */
@@ -258,15 +296,21 @@ export function vinculoDaOS(tp: tarefas_programacao_os, osId: string) {
 
 const numeroOuNulo = (v: Prisma.Decimal | null | undefined) => (v === null || v === undefined ? null : Number(v));
 
-/** O valor da linha na resposta (SN-93): o da programação e o do cadastro no vínculo */
-export const valorDaLinha = (tp: Pick<tarefas_programacao_os, 'valor' | 'valor_original' | 'equipamento_nome'>) => ({
+/**
+ * O valor da linha na resposta (SN-93): o da programação e o do cadastro no
+ * vínculo, e se é o do cadastro de hoje (a linha de antes, `linhasParaAResposta`)
+ */
+export const valorDaLinha = (
+  tp: Pick<tarefas_programacao_os, 'valor' | 'valor_original' | 'equipamento_nome'> & { do_cadastro_hoje?: boolean },
+) => ({
   valor: numeroOuNulo(tp.valor),
   valor_original: numeroOuNulo(tp.valor_original),
   equipamento_nome: tp.equipamento_nome?.trim() || null,
+  do_cadastro_hoje: tp.do_cadastro_hoje ?? false,
 });
 
 /** A instrução avulsa na resposta da programação (a das tarefas continua em `tarefas_programacao`) */
-export function instrucaoDaResposta(tp: tarefas_programacao_os) {
+export function instrucaoDaResposta(tp: tarefas_programacao_os & { do_cadastro_hoje?: boolean }) {
   return {
     id: tp.id,
     instrucao_id: tp.instrucao_id?.trim() ?? null,
@@ -283,12 +327,12 @@ export function instrucaoDaResposta(tp: tarefas_programacao_os) {
  * agora, e a OS nasce com ele (o vínculo copia o valor da linha)
  */
 export async function congelarValoresDaProgramacao(
-  cliente: Pick<Prisma.TransactionClient, 'tarefas_programacao_os' | 'tarefas' | 'instrucao_recursos' | 'instrucao_maquinarios'>,
+  cliente: Pick<Prisma.TransactionClient, 'tarefas_programacao_os' | 'tarefas' | 'instrucoes' | 'instrucao_recursos' | 'instrucao_maquinarios'>,
   programacaoId: string,
 ): Promise<void> {
   const linhas = await cliente.tarefas_programacao_os.findMany({
     where: { programacao_id: programacaoId, valor: null },
-    select: { id: true, instrucao_id: true, tarefa_id: true },
+    select: { id: true, instrucao_id: true, instrucao_tag: true, tarefa_id: true },
   });
   for (const { id, valor } of await valoresParaCongelar(cliente, linhas)) {
     await cliente.tarefas_programacao_os.update({ where: { id }, data: { valor, valor_original: valor } });
@@ -311,7 +355,7 @@ const emReais = (v: number | null) => (v === null ? 'o do cadastro' : `R$ ${reai
  * quem audita quer saber quem mexeu e de quanto para quanto.
  */
 export async function ajustarValoresDasInstrucoes(
-  cliente: Pick<Prisma.TransactionClient, 'tarefas_programacao_os' | 'tarefas' | 'instrucao_recursos' | 'instrucao_maquinarios'>,
+  cliente: Pick<Prisma.TransactionClient, 'tarefas_programacao_os' | 'tarefas' | 'instrucoes' | 'instrucao_recursos' | 'instrucao_maquinarios'>,
   programacaoId: string,
   ajustes: AjusteDeValor[],
 ): Promise<string[]> {

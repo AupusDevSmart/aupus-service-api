@@ -20,8 +20,14 @@ export class TarefaSimpleDto {
   @ApiProperty({ description: 'Nome da tarefa' })
   nome: string;
 
-  // Só id e nome: categoria, tipo de manutenção e tempos saíram da tabela
-  // `tarefas` no PR6 e nunca mais vieram na resposta. O conteúdo vive na instrução.
+  @ApiPropertyOptional({ description: 'SN-93: a instrução da tarefa (no detalhe), que abre o sheet dela', nullable: true })
+  instrucao_id?: string | null;
+
+  @ApiPropertyOptional({ description: 'SN-93: o plano da tarefa (no detalhe)', nullable: true })
+  plano_manutencao?: { id: string; nome: string } | null;
+
+  // Categoria, tipo de manutenção e tempos saíram da tabela `tarefas` no PR6 e
+  // nunca mais vieram na resposta. O conteúdo vive na instrução.
 }
 
 export class SolicitacaoServicoSimpleDto {
@@ -98,6 +104,12 @@ export class TarefaProgramacaoResponseDto {
 
   @ApiPropertyOptional({ description: 'SN-93: nome do equipamento congelado', nullable: true })
   equipamento_nome?: string | null;
+
+  @ApiPropertyOptional({ description: 'SN-93: a instrução da linha (a do código congelado; no detalhe), a que o atalho abre', nullable: true })
+  instrucao_id?: string | null;
+
+  @ApiPropertyOptional({ description: 'SN-93: o valor é o do cadastro de hoje (linha de antes, sem valor congelado)' })
+  do_cadastro_hoje?: boolean;
 }
 
 export class MaterialProgramacaoResponseDto {
@@ -441,6 +453,8 @@ export class ProgramacaoResponseDto {
     valor: number | null;
     valor_original: number | null;
     equipamento_nome: string | null;
+    /** O valor é o do cadastro de hoje (linha de antes, sem valor congelado) */
+    do_cadastro_hoje: boolean;
   }>;
 
   // Auditoria

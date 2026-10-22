@@ -1,7 +1,7 @@
 import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { reais } from './custo-da-os';
-import { naturezaDoItem, ROTULO_DA_NATUREZA, type NaturezaDoOutroCusto } from './natureza-do-custo';
+import { naturezaDoItem, ROTULO_DO_ITEM, type NaturezaDoOutroCusto } from './natureza-do-custo';
 
 /**
  * Os outros custos da OS — instrumento, maquinário, veículo, terceiro, despesa
@@ -66,7 +66,7 @@ export async function gravarOutrosCustos(
     await tx.itens_orcamento_os.create({
       data: { os_id: osId, descricao, natureza, valor: 0, valor_real: pedido.valor_real, nao_previsto: true },
     });
-    mudancas.push(`não previsto ${descricao} (${ROTULO_DA_NATUREZA[natureza]}): ${emReais(pedido.valor_real)}`);
+    mudancas.push(`não previsto ${descricao} (${ROTULO_DO_ITEM[natureza]}): ${emReais(pedido.valor_real)}`);
   }
 
   // O não previsto que não veio sai: era a lista inteira
