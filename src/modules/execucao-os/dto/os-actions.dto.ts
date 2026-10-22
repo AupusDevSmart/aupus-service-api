@@ -17,6 +17,7 @@ import { Type } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { LIMITE_DA_LEITURA } from '@/common/helpers/leitura';
 import { InstanteComFuso } from '@/common/decorators/instante';
+import { KM_MAXIMO } from '@/common/helpers/km';
 import { CasasDecimais, VazioEhNulo } from '@/common/decorators/numero';
 import { NATUREZAS_DOS_OUTROS_CUSTOS, type NaturezaDoOutroCusto } from '../natureza-do-custo';
 
@@ -46,6 +47,7 @@ export class IniciarExecucaoDto {
   @IsOptional()
   @IsInt()
   @Min(0)
+  @Max(KM_MAXIMO)
   km_inicial?: number;
 }
 
@@ -441,10 +443,12 @@ export class ExecutarOSDto {
   @Type(() => FerramentaFinalizacaoDto)
   ferramentas_utilizadas?: FerramentaFinalizacaoDto[];
 
+  // Inteiro, como a coluna (Int): 1260,5 passava aqui e o Prisma recusava com 500
   @ApiPropertyOptional({ description: 'KM final do veículo' })
   @IsOptional()
-  @IsNumber()
+  @IsInt()
   @Min(0)
+  @Max(KM_MAXIMO)
   km_final?: number;
 
   @ApiPropertyOptional({ description: 'Observações sobre o veículo' })

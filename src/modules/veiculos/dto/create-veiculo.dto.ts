@@ -13,6 +13,7 @@ import { Type, Transform } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { TipoVeiculo, TipoCombustivel } from '@/core';
 import { DiaComoData } from '@/common/decorators/dia-de-calendario';
+import { KM_MAXIMO } from '@/common/helpers/km';
 
 export class CreateVeiculoDto {
   @ApiProperty({
@@ -231,6 +232,7 @@ export class CreateVeiculoDto {
   })
   @IsInt({ message: 'Quilometragem deve ser um número inteiro' })
   @Min(0, { message: 'Quilometragem deve ser maior ou igual a 0' })
+  @Max(KM_MAXIMO, { message: 'Quilometragem acima de 9.999.999 km' })
   @Type(() => Number)
   @IsOptional()
   quilometragem?: number;
