@@ -15,6 +15,7 @@ import { LoginDto } from './dto/login.dto';
 import { AuthResponseDto } from './dto/auth-response.dto';
 import { ForgotPasswordDto } from './dto/forgot-password.dto';
 import { ResetPasswordWithTokenDto } from './dto/reset-password.dto';
+import { RECUSA_DA_SENHA_PADRAO, SENHA_PADRAO_ANTIGA } from '../usuarios/senha-provisoria';
 import type { usuarios } from '@prisma/client';
 import type { UsuarioResponseDto } from '../usuarios/dto/usuario-response.dto';
 import type { UserRoleDto } from '../usuarios/dto/user-permissions-response.dto';
@@ -413,11 +414,19 @@ export class AuthService {
       throw new BadRequestException('Token inválido ou expirado');
     }
 
-    // Atualiza a senha e invalida o token (uso único).
+    // A senha padrão antiga está no repositório público. O token continua valendo
+    // para a pessoa escolher outra (deploy de 23/out/2026: as contas que ainda a
+    // usavam tiveram a senha anulada e entram por aqui)
+    if (dto.novaSenha === SENHA_PADRAO_ANTIGA) {
+      throw new BadRequestException(RECUSA_DA_SENHA_PADRAO);
+    }
+
+    // Atualiza a senha e invalida o token (uso único). Quem escolheu a senha pelo
+    // e-mail já tem uma só dela: acabou a troca obrigatória
     const novaSenhaHash = await bcrypt.hash(dto.novaSenha, 12);
     await this.prisma.usuarios.update({
       where: { email },
-      data: { senha: novaSenhaHash, updated_at: new Date() },
+      data: { senha: novaSenhaHash, deve_trocar_senha: false, updated_at: new Date() },
     });
     await this.prisma.password_reset_tokens.delete({ where: { email } }).catch(() => null);
 

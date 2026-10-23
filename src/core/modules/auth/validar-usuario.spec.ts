@@ -95,3 +95,41 @@ describe('resetPassword só de conta ativa', () => {
     expect(tokens.findUnique).not.toHaveBeenCalled();
   });
 });
+
+/**
+ * As contas que ainda usavam a senha padrão antiga tiveram a senha anulada no
+ * deploy de 23/out/2026 e entram pelo "esqueci a senha": a redefinição não pode
+ * aceitar de volta a senha que está no repositório público, e quem escolheu a
+ * senha pelo e-mail não é forçado a trocá-la de novo.
+ */
+describe('resetPassword: senha padrão antiga e troca obrigatória', () => {
+  const montar = () => {
+    const tokens = {
+      findUnique: jest.fn().mockResolvedValue({ email: 'ana@teste.com', token: bcrypt.hashSync('t', 4), created_at: new Date() }),
+      delete: jest.fn().mockResolvedValue(undefined),
+    };
+    const usuarios = { update: jest.fn().mockResolvedValue(undefined) };
+    const findByEmail = jest.fn().mockResolvedValue({ id: 'u1', email: 'ana@teste.com', status: 'Ativo', is_active: true, deleted_at: null });
+    const auth = new AuthService(
+      { findByEmail } as unknown as UsuariosService,
+      {} as JwtService,
+      { password_reset_tokens: tokens, usuarios } as unknown as PrismaService,
+      {} as MailService,
+    );
+    return { auth, tokens, usuarios };
+  };
+
+  it('recusa a senha padrão antiga e o token continua valendo', async () => {
+    const { auth, tokens, usuarios } = montar();
+    const pedido = { email: 'ana@teste.com', token: 't', novaSenha: 'Aupus123!', confirmarSenha: 'Aupus123!' };
+    await expect(auth.resetPassword(pedido)).rejects.toThrow('Essa era a senha padrão de todos os usuários');
+    expect(usuarios.update).not.toHaveBeenCalled();
+    expect(tokens.delete).not.toHaveBeenCalled();
+  });
+
+  it('grava a senha nova e desliga a troca obrigatória', async () => {
+    const { auth, usuarios } = montar();
+    await auth.resetPassword({ email: 'ana@teste.com', token: 't', novaSenha: 'NovaSenha1', confirmarSenha: 'NovaSenha1' });
+    expect(usuarios.update.mock.calls[0][0].data).toMatchObject({ deve_trocar_senha: false });
+  });
+});

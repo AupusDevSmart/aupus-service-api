@@ -1,5 +1,12 @@
 import { randomInt } from 'crypto';
 
+/**
+ * A senha que todo usuário recebia até o SN-34, e que está no repositório
+ * público: nem a troca nem a redefinição pelo e-mail aceitam voltar a ela.
+ */
+export const SENHA_PADRAO_ANTIGA = 'Aupus123!';
+export const RECUSA_DA_SENHA_PADRAO = 'Essa era a senha padrão de todos os usuários: escolha outra.';
+
 /** Sem caracteres que se confundem ao ler (0/O, 1/l/I). */
 const CARACTERES = 'abcdefghjkmnpqrstuvwxyzABCDEFGHJKMNPQRSTUVWXYZ23456789';
 

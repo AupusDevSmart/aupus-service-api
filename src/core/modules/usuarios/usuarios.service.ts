@@ -37,7 +37,7 @@ import * as bcrypt from 'bcryptjs';
 import { customAlphabet } from 'nanoid';
 import { MailService } from '../../mail/mail.service';
 import { AtualizarPerfilDto } from './dto/atualizar-perfil.dto';
-import { gerarSenhaProvisoria } from './senha-provisoria';
+import { gerarSenhaProvisoria, RECUSA_DA_SENHA_PADRAO, SENHA_PADRAO_ANTIGA } from './senha-provisoria';
 import {
   PAPEL_TOPO,
   Solicitante,
@@ -618,8 +618,8 @@ export class UsuariosService {
       if (data.novaSenha === data.senhaAtual) {
         throw new BadRequestException('A nova senha precisa ser diferente da atual.');
       }
-      if (data.novaSenha === 'Aupus123!') {
-        throw new BadRequestException('Essa era a senha padrão de todos os usuários: escolha outra.');
+      if (data.novaSenha === SENHA_PADRAO_ANTIGA) {
+        throw new BadRequestException(RECUSA_DA_SENHA_PADRAO);
       }
 
       // Hash da nova senha

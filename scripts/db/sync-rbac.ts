@@ -14,11 +14,18 @@
  *   já dá. O formulário antigo gravava todas as permissões do papel como
  *   diretas; com elas, mudar o papel não mudava o acesso.
  * - --fix-guards: corrige guard_name de papel divergente (só DEV)
+ * - --sem-escrita-direta: tira de cliente e técnico (proprietario, operador)
+ *   a permissão direta de ESCRITA que o papel não dá. O formulário antigo
+ *   gravava as permissões do papel de então como diretas, e o cliente seguia
+ *   gestor (plantas.manage, programacao_os.manage...) depois da matriz. A de
+ *   leitura (.view) fica. Rodar depois do --limpar-diretas (deploy de 23/out/2026).
  *
  * Uso:
  *   npx ts-node -r tsconfig-paths/register scripts/db/sync-rbac.ts                       # prévia
  *   npx ts-node -r tsconfig-paths/register scripts/db/sync-rbac.ts --limpar-diretas      # prévia com a limpeza
  *   npx ts-node -r tsconfig-paths/register scripts/db/sync-rbac.ts --apply --limpar-diretas
+ *   npx ts-node -r tsconfig-paths/register scripts/db/sync-rbac.ts --sem-escrita-direta              # prévia
+ *   npx ts-node -r tsconfig-paths/register scripts/db/sync-rbac.ts --apply --sem-escrita-direta
  */
 
 import { PrismaClient } from '@prisma/client';
@@ -29,6 +36,9 @@ const prisma = new PrismaClient();
 const APPLY = process.argv.includes('--apply');
 const LIMPAR_DIRETAS = process.argv.includes('--limpar-diretas');
 const FIX_GUARDS = process.argv.includes('--fix-guards');
+const SEM_ESCRITA_DIRETA = process.argv.includes('--sem-escrita-direta');
+/** Papéis que não escrevem além do que o papel dá: cliente e técnico de campo */
+const PAPEIS_RESTRITOS = new Set(['proprietario', 'operador']);
 const TARGET_GUARD = 'api';
 const MODEL_TYPE = 'App\\Models\\User';
 
@@ -141,9 +151,42 @@ async function limparDiretasRedundantes() {
   console.log(`  = ${mantidas} permissoes diretas ficam (nao vem do papel)`);
 }
 
+/** Leitura é o que termina em `.view`; o resto (manage, executar, create_*, report...) escreve. */
+const ehLeitura = (permissao: string) => permissao.endsWith('.view');
+
+async function tirarEscritaDiretaDosRestritos() {
+  const doPapel = new Map(PAPEIS.map((p) => [p.name, new Set(p.permissoes)]));
+  const vinculos = await prisma.model_has_roles.findMany({ where: { model_type: MODEL_TYPE }, include: { roles: true } });
+  const papeisDoUsuario = new Map<string, Set<string>>();
+  for (const v of vinculos) {
+    const id = v.model_id.trim();
+    papeisDoUsuario.set(id, (papeisDoUsuario.get(id) ?? new Set()).add(v.roles.name));
+  }
+  // Só quem tem SOMENTE papéis restritos: um gerente que também é cliente não perde nada
+  const restritos = [...papeisDoUsuario].filter(([, papeis]) => [...papeis].every((p) => PAPEIS_RESTRITOS.has(p)));
+  const usuarios = await prisma.usuarios.findMany({ where: { id: { in: restritos.map(([id]) => id) } }, select: { id: true, email: true } });
+  const emailDe = new Map(usuarios.map((u) => [u.id.trim(), u.email?.trim() ?? '']));
+
+  const diretas = await prisma.model_has_permissions.findMany({
+    where: { model_type: MODEL_TYPE, model_id: { in: restritos.map(([id]) => id) } },
+    include: { permissions: true },
+  });
+  for (const d of diretas) {
+    const papeis = papeisDoUsuario.get(d.model_id.trim()) ?? new Set<string>();
+    const nome = d.permissions.name;
+    if (ehLeitura(nome) || [...papeis].some((p) => doPapel.get(p)?.has(nome))) continue;
+    log(`  - direta ${emailDe.get(d.model_id.trim()) || d.model_id.trim()} (${[...papeis].join(', ')}) -= ${nome} (escrita que o papel nao da)`);
+    if (APPLY) {
+      await prisma.model_has_permissions.delete({
+        where: { permission_id_model_id_model_type: { permission_id: d.permission_id, model_id: d.model_id, model_type: MODEL_TYPE } },
+      });
+    }
+  }
+}
+
 async function main() {
   console.log('='.repeat(70));
-  console.log(`SYNC RBAC ${APPLY ? '[APLICANDO]' : '[PREVIA]'}${LIMPAR_DIRETAS ? ' [+limpar diretas]' : ''}${FIX_GUARDS ? ' [+fix guards]' : ''}`);
+  console.log(`SYNC RBAC ${APPLY ? '[APLICANDO]' : '[PREVIA]'}${LIMPAR_DIRETAS ? ' [+limpar diretas]' : ''}${SEM_ESCRITA_DIRETA ? ' [+sem escrita direta]' : ''}${FIX_GUARDS ? ' [+fix guards]' : ''}`);
   console.log('='.repeat(70));
   try {
     console.log('\n[1] Permissoes');
@@ -159,6 +202,10 @@ async function main() {
     if (LIMPAR_DIRETAS) {
       console.log('\n[4] Permissoes diretas que o papel ja da');
       await limparDiretasRedundantes();
+    }
+    if (SEM_ESCRITA_DIRETA) {
+      console.log('\n[5] Escrita direta de cliente e tecnico que o papel nao da');
+      await tirarEscritaDiretaDosRestritos();
     }
     console.log('\n' + '='.repeat(70));
     console.log(APPLY ? `Concluido: ${acoes} acoes aplicadas.` : `PREVIA: ${acoes} acoes seriam aplicadas. Rode com --apply para aplicar.`);
