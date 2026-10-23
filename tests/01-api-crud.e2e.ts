@@ -3,6 +3,7 @@
 
 import axios, { AxiosInstance } from 'axios';
 import { erroDaApi } from './erro-da-api';
+import { credenciaisDoAdmin } from './credenciais';
 
 interface TestResult {
   test: string;
@@ -37,8 +38,7 @@ async function setup() {
   try {
     console.log('🔐 Tentando autenticar como admin...');
     const loginResponse = await api.post('/auth/login', {
-      email: process.env.ADMIN_EMAIL || 'admin@email.com',
-      senha: process.env.ADMIN_PASSWORD || 'Aupus123!'
+      ...credenciaisDoAdmin()
     });
 
     const responseData = loginResponse.data.data || loginResponse.data;

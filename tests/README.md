@@ -86,8 +86,8 @@ cp .env.example .env
 Edite o `.env` com suas configurações:
 ```env
 API_BASE_URL=http://localhost:3000
-ADMIN_EMAIL=admin@aupus.com
-ADMIN_PASSWORD=admin123
+ADMIN_EMAIL=admin@email.com
+ADMIN_PASSWORD=a senha que voce definiu para esse admin (nunca no .env.example)
 ```
 
 ### 3. Executar Todos os Testes

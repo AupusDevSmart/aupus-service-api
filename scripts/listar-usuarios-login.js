@@ -63,7 +63,8 @@ async function listarUsuarios() {
     if (ativos.length > 0) {
       console.log(`\n🔐 Para fazer login, use:`);
       console.log(`   Email: ${ativos[0].email}`);
-      console.log(`   Senha: Aupus123! (senha padrão)`);
+      // Não existe mais senha padrão: o usuário novo recebe uma provisória por e-mail (SN-34)
+      console.log(`   Senha: a da própria pessoa (esqueceu: "Esqueci a senha" na tela de login)`);
     } else {
       console.log(`\n⚠️  Nenhum usuário ativo encontrado.`);
       console.log(`\n💡 Para ativar um usuário, use:`);

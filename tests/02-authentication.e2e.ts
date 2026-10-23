@@ -4,6 +4,7 @@
 import axios, { AxiosInstance } from 'axios';
 import * as jwt from 'jsonwebtoken';
 import { erroDaApi } from './erro-da-api';
+import { credenciaisDoAdmin } from './credenciais';
 
 interface TestResult {
   test: string;
@@ -64,11 +65,12 @@ async function setup() {
   } catch (e) {
     const error = erroDaApi(e);
     console.error('❌ Erro ao criar usuário de teste:', error.response?.data?.message || error.message);
-    console.log('   Tentando continuar com credenciais padrão...\n');
+    console.log('   Tentando continuar com o admin do tests/.env...\n');
 
-    // Fallback para credenciais padrão
-    testUserEmail = 'admin@email.com';
-    testUserPassword = 'Aupus123!';
+    // Sem usuário de teste, segue com o admin do tests/.env (a senha não fica no código: SN-9)
+    const admin = credenciaisDoAdmin();
+    testUserEmail = admin.email;
+    testUserPassword = admin.senha;
   }
 }
 
