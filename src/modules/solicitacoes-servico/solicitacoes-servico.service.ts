@@ -21,12 +21,11 @@ import { Prisma, type solicitacoes_servico } from '@/core';
 import { StatusSolicitacaoServico } from '@/core';
 import { comDataNecessidadeNormalizada } from './data-necessidade';
 import { periodoDoFiltro } from '../../common/helpers/filtros-da-os';
-import { comOLugarAparado, mudouOLugar, plantaDaSolicitacao } from './lugar-da-solicitacao';
+import { comAsRelacoes, comOLugarAparado, mudouOLugar, plantaDaSolicitacao } from './lugar-da-solicitacao';
 import { registrarNotificacao } from '../notificacoes/registrar-notificacao';
 
-/** A planta e a unidade que a linha da lista mostra */
+/** A planta que a linha da lista mostra */
 interface PlantaDaLinha { id: string; nome: string; cidade: string; uf: string }
-interface UnidadeDaLinha { id: string; nome: string; tipo: string; cidade: string; estado: string }
 
 @Injectable()
 export class SolicitacoesServicoService {
@@ -196,14 +195,6 @@ export class SolicitacoesServicoService {
           solicitante_id: usuarioId || null,
           solicitante_nome: solicitante_nome,
         } as Prisma.solicitacoes_servicoUncheckedCreateInput,
-        include: {
-          // Removido planta do include pois pode estar com deleted_at
-          equipamento: true,
-          unidade: true, // Incluir unidade
-          // Nunca a linha inteira do usuario: levava o hash da senha na resposta
-          proprietario: { select: { id: true, nome: true, email: true } },
-          solicitante: { select: { id: true, nome: true, email: true } },
-        },
       });
       // Aberta avisa quem programa (SN-47), na mesma transação
       await registrarNotificacao(prisma, { evento: 'solicitacao.aberta', entidade: 'solicitacao_servico', entidadeId: solicitacao.id, atorId: usuarioId });
@@ -229,9 +220,10 @@ export class SolicitacoesServicoService {
         await this.propostaService.materializarDeInstrucoes(solicitacao.id, prisma);
       }
 
-      // Adicionar a planta ao objeto de resposta
+      // A planta e as relações por consulta própria: o include perdia o id antigo (comAsRelacoes)
+      const [comRelacoes] = await comAsRelacoes(prisma, [solicitacao]);
       const solicitacaoCompleta = {
-        ...solicitacao,
+        ...comRelacoes,
         planta: planta,
       };
 
@@ -331,16 +323,7 @@ export class SolicitacoesServicoService {
     const solicitacoes = await this.prisma.solicitacoes_servico.findMany({
       where,
       include: {
-        // Removido planta e unidade do include - serão buscados manualmente
-        equipamento: {
-          select: {
-            id: true,
-            nome: true,
-            tag: true,
-            tipo_equipamento: true,
-          },
-        },
-        proprietario: { select: { id: true, nome: true, email: true } },
+        // Planta, unidade, equipamento e proprietário por consulta própria, depois
         anexos: {
           select: {
             id: true,
@@ -361,31 +344,23 @@ export class SolicitacoesServicoService {
       orderBy: [{ [sortBy]: sortOrder }, { id: 'asc' }],
     });
 
-    // Plantas e unidades por consulta própria, com TRIM (soft delete e ids com
-    // espaço): uma por tabela. Eram duas por linha, em paralelo — com o seletor
-    // de origem buscando a cada letra, 100 consultas por busca (SN-77)
-    const aparados = (campo: 'planta_id' | 'unidade_id') =>
-      [...new Set(solicitacoes.map((s) => s[campo]?.trim()).filter((id): id is string => Boolean(id)))];
-    const idsDePlanta = aparados('planta_id');
-    const idsDeUnidade = aparados('unidade_id');
-    const [plantas, unidades] = await Promise.all([
+    // Plantas, unidades, equipamentos e pessoas por consulta própria, com o id
+    // aparado (soft delete e ids com espaço): uma por tabela. Eram duas por
+    // linha, em paralelo — com o seletor de origem buscando a cada letra, 100
+    // consultas por busca (SN-77)
+    const idsDePlanta = [...new Set(solicitacoes.map((s) => s.planta_id?.trim()).filter((id): id is string => Boolean(id)))];
+    const [plantas, comRelacoes] = await Promise.all([
       idsDePlanta.length
         ? this.prisma.$queryRaw<PlantaDaLinha[]>`
             SELECT id, nome, cidade, uf FROM plantas
             WHERE TRIM(id) = ANY(${idsDePlanta}) AND deleted_at IS NULL`
         : Promise.resolve<PlantaDaLinha[]>([]),
-      idsDeUnidade.length
-        ? this.prisma.$queryRaw<UnidadeDaLinha[]>`
-            SELECT id, nome, tipo, cidade, estado FROM unidades
-            WHERE TRIM(id) = ANY(${idsDeUnidade}) AND deleted_at IS NULL`
-        : Promise.resolve<UnidadeDaLinha[]>([]),
+      comAsRelacoes(this.prisma, solicitacoes),
     ]);
     const plantaPorId = new Map(plantas.map((p) => [p.id.trim(), p]));
-    const unidadePorId = new Map(unidades.map((u) => [u.id.trim(), u]));
-    const solicitacoesCompletas = solicitacoes.map((solicitacao) => ({
+    const solicitacoesCompletas = comRelacoes.map((solicitacao) => ({
       ...solicitacao,
       planta: (solicitacao.planta_id && plantaPorId.get(solicitacao.planta_id.trim())) || null,
-      unidade: (solicitacao.unidade_id && unidadePorId.get(solicitacao.unidade_id.trim())) || null,
     }));
 
     return {
@@ -416,10 +391,7 @@ export class SolicitacoesServicoService {
     const solicitacao = await this.prisma.solicitacoes_servico.findUnique({
       where: { id },
       include: {
-        // Removido planta e unidade do include - serão buscados manualmente
-        equipamento: true,
-        proprietario: { select: { id: true, nome: true, email: true } },
-        solicitante: { select: { id: true, nome: true, email: true } },
+        // Planta, unidade, equipamento e pessoas por consulta própria, depois
         anexos: true,
         historico: {
           orderBy: { data: 'desc' },
@@ -473,18 +445,8 @@ export class SolicitacoesServicoService {
       planta = plantaResult[0] || null;
     }
 
-    // Buscar a unidade manualmente usando TRIM
-    let unidade = null;
-    if (solicitacao.unidade_id) {
-      const unidadeResult = await this.prisma.$queryRaw`
-        SELECT id, nome, tipo, cidade, estado, potencia, status
-        FROM unidades
-        WHERE TRIM(id) = TRIM(${solicitacao.unidade_id})
-          AND deleted_at IS NULL
-        LIMIT 1
-      `;
-      unidade = unidadeResult[0] || null;
-    }
+    // Unidade, equipamento e pessoas com o id aparado (o include perdia o id antigo)
+    const [comRelacoes] = await comAsRelacoes(this.prisma, [solicitacao]);
 
     // Mapear tarefas associadas
     const tarefas = solicitacao.tarefas?.map(ts => ({
@@ -501,9 +463,8 @@ export class SolicitacoesServicoService {
     })) || [];
 
     const solicitacaoCompleta = {
-      ...solicitacao,
+      ...comRelacoes,
       planta: planta,
-      unidade: unidade,
       tarefas: tarefas,
       instrucoes: instrucoes
     };
@@ -553,12 +514,6 @@ export class SolicitacoesServicoService {
       const solicitacaoAtualizada = await prisma.solicitacoes_servico.update({
         where: { id },
         data: prismaData as Prisma.solicitacoes_servicoUncheckedUpdateInput,
-        include: {
-          // Removido planta do include para evitar erro com soft delete
-          equipamento: true,
-          unidade: true, // Incluir unidade
-          proprietario: { select: { id: true, nome: true, email: true } },
-        },
       });
 
       // Atualizar instruções vinculadas se fornecidas
@@ -597,8 +552,9 @@ export class SolicitacoesServicoService {
         });
       }
 
+      const [comRelacoes] = await comAsRelacoes(prisma, [solicitacaoAtualizada]);
       const solicitacaoCompleta = {
-        ...solicitacaoAtualizada,
+        ...comRelacoes,
         planta: planta
       };
 

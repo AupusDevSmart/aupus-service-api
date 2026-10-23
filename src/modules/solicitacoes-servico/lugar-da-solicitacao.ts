@@ -1,5 +1,5 @@
 import { BadRequestException, NotFoundException } from '@nestjs/common';
-import type { PermissionScopeService, PrismaService, ScopedUser } from '@/core';
+import type { PermissionScopeService, Prisma, PrismaService, ScopedUser } from '@/core';
 import { plantasDosEquipamentos } from '@/core/modules/auth/planta-dos-equipamentos';
 
 export interface LugarDaSolicitacao {
@@ -81,4 +81,70 @@ export function comOLugarAparado<T extends Record<string, unknown>>(dados: T): T
     if (typeof valor === 'string') aparados[campo] = valor.trim() || null;
   }
   return aparados as T;
+}
+
+type ComOsCadastros = Pick<Prisma.TransactionClient, 'equipamentos' | 'unidades' | 'usuarios'>;
+
+const EQUIPAMENTO_DA_SOLICITACAO = { id: true, nome: true, tag: true, tipo_equipamento: true, unidade_id: true } as const;
+const UNIDADE_DA_SOLICITACAO = { id: true, nome: true, tipo: true, cidade: true, estado: true, potencia: true, status: true } as const;
+const PESSOA_DA_SOLICITACAO = { id: true, nome: true, email: true } as const;
+
+type EquipamentoDaSolicitacao = Prisma.equipamentosGetPayload<{ select: typeof EQUIPAMENTO_DA_SOLICITACAO }>;
+type UnidadeDaSolicitacao = Prisma.unidadesGetPayload<{ select: typeof UNIDADE_DA_SOLICITACAO }>;
+type PessoaDaSolicitacao = Prisma.usuariosGetPayload<{ select: typeof PESSOA_DA_SOLICITACAO }>;
+
+interface IdsDaSolicitacao {
+  equipamento_id?: string | null;
+  unidade_id?: string | null;
+  proprietario_id?: string | null;
+  solicitante_id?: string | null;
+}
+
+export interface RelacoesDaSolicitacao {
+  equipamento: EquipamentoDaSolicitacao | null;
+  unidade: UnidadeDaSolicitacao | null;
+  proprietario: PessoaDaSolicitacao | null;
+  solicitante: PessoaDaSolicitacao | null;
+}
+
+/**
+ * O equipamento, a unidade e as pessoas de cada solicitação por consulta
+ * própria, com o id aparado, uma por tabela. Com o lugar gravado aparado
+ * (SN-77), o `include` — que o Prisma casa em JavaScript, depois de buscar —
+ * perdia o registro de id antigo (25 caracteres no Char(26), que volta com o
+ * espaço): a resposta saía com `equipamento: null` e a programação criada da
+ * solicitação, com "N/A" no ativo. O `in` é SQL e, no Char(26), casa com e sem
+ * o espaço.
+ */
+export async function comAsRelacoes<T extends IdsDaSolicitacao>(
+  prisma: ComOsCadastros,
+  solicitacoes: T[],
+): Promise<(T & RelacoesDaSolicitacao)[]> {
+  const aparados = (...campos: (keyof IdsDaSolicitacao)[]) => [
+    ...new Set(solicitacoes.flatMap((s) => campos.map((c) => s[c]?.trim())).filter((id): id is string => Boolean(id))),
+  ];
+  const idsDeEquipamento = aparados('equipamento_id');
+  const idsDeUnidade = aparados('unidade_id');
+  const idsDePessoa = aparados('proprietario_id', 'solicitante_id');
+  const [equipamentos, unidades, pessoas] = await Promise.all([
+    idsDeEquipamento.length
+      ? prisma.equipamentos.findMany({ where: { id: { in: idsDeEquipamento } }, select: EQUIPAMENTO_DA_SOLICITACAO })
+      : Promise.resolve<EquipamentoDaSolicitacao[]>([]),
+    idsDeUnidade.length
+      ? prisma.unidades.findMany({ where: { id: { in: idsDeUnidade }, deleted_at: null }, select: UNIDADE_DA_SOLICITACAO })
+      : Promise.resolve<UnidadeDaSolicitacao[]>([]),
+    idsDePessoa.length
+      ? prisma.usuarios.findMany({ where: { id: { in: idsDePessoa } }, select: PESSOA_DA_SOLICITACAO })
+      : Promise.resolve<PessoaDaSolicitacao[]>([]),
+  ]);
+  const porId = <R extends { id: string }>(linhas: R[]) => new Map(linhas.map((r) => [r.id.trim(), { ...r, id: r.id.trim() }]));
+  const [equipamentoPorId, unidadePorId, pessoaPorId] = [porId(equipamentos), porId(unidades), porId(pessoas)];
+  const achar = <R>(mapa: Map<string, R>, id?: string | null) => (id && mapa.get(id.trim())) || null;
+  return solicitacoes.map((s) => ({
+    ...s,
+    equipamento: achar(equipamentoPorId, s.equipamento_id),
+    unidade: achar(unidadePorId, s.unidade_id),
+    proprietario: achar(pessoaPorId, s.proprietario_id),
+    solicitante: achar(pessoaPorId, s.solicitante_id),
+  }));
 }

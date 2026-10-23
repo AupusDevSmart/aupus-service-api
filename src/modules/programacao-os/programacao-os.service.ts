@@ -36,6 +36,7 @@ import {
 import { avancarAncoraDosCiclos, cancelarOS } from '../execucao-os/cancelar-os';
 import type { Evento } from '../notificacoes/catalogo';
 import { registrarNotificacao } from '../notificacoes/registrar-notificacao';
+import { comAsRelacoes } from '../solicitacoes-servico/lugar-da-solicitacao';
 import { tipoDaOSDaSolicitacao } from './tipo-da-os-da-solicitacao';
 import {
   AdicionarTarefasDto,
@@ -1026,18 +1027,12 @@ export class ProgramacaoOSService {
     usuarioId?: string,
     user?: ScopedUser,
   ): Promise<ProgramacaoResponseDto> {
-    // Buscar solicitação do serviço de solicitações
-    // Por enquanto vamos simular a busca
-    const solicitacao = await this.prisma.solicitacoes_servico.findUnique({
-      where: { id: solicitacaoId },
-      include: {
-        equipamento: true,
-      },
-    });
-
-    if (!solicitacao) {
+    const lida = await this.prisma.solicitacoes_servico.findUnique({ where: { id: solicitacaoId } });
+    if (!lida) {
       throw new NotFoundException('Solicitação de serviço não encontrada');
     }
+    // O equipamento pelo id aparado: o include perdia o de id antigo, e o ativo saía "N/A"
+    const [solicitacao] = await comAsRelacoes(this.prisma, [lida]);
     // O escopo antes do status, como na anomalia (SN-57)
     if (user) await this.scopeService.assertEntityInScope('solicitacao_servico', solicitacao.id, user);
 
