@@ -30,6 +30,7 @@ import { InstrucoesModule } from './modules/instrucoes/instrucoes.module';
 import { RecursosModule } from './modules/recursos/recursos.module';
 import { MaquinariosModule } from './modules/maquinarios/maquinarios.module';
 import { ImportacaoModule } from './modules/importacao/importacao.module';
+import { IntegracoesNexonModule } from './modules/integracoes-nexon/integracoes-nexon.module';
 
 // Modulos do nucleo (src/core)
 import {
@@ -93,6 +94,7 @@ import {
     RecursosModule,
     MaquinariosModule,
     ImportacaoModule,
+    IntegracoesNexonModule,
     DashboardModule,
     UploadsModule,
     NotificacoesModule,
