@@ -5,10 +5,12 @@ import { UpdateEquipamentoDto } from '@/core/modules/equipamentos/dto/update-equ
 import { conferirCriticidade, criticidadeSugerida, type CriticidadeDoEquipamento } from '@/core/modules/equipamentos/criticidade-pela-matriz';
 import { PlanosManutencaoService } from '@/modules/planos-manutencao/planos-manutencao.service';
 import { ErroDeCampo } from '@/common/pipes/mensagens-validacao';
-import { CadastroImportavel, ErrosDaLinha, UsuarioDaImportacao } from '../importacao.types';
+import { CadastroImportavel, CatalogosDaPlanilha, ErrosDaLinha, UsuarioDaImportacao } from '../importacao.types';
 import { validarComoOFormulario } from '../importacao.service';
 import { CatalogoPorNome, chave } from '../catalogo-por-nome';
 import { semOQueNaoMudou } from '../sem-o-que-nao-mudou';
+import { PlanosImportacao } from './planos.importacao';
+import { itensDosPlanosCitados } from './planos-citados';
 
 type EquipamentoComListas = equipamentos & {
   componentes: equipamentos[];
@@ -128,7 +130,13 @@ export class EquipamentosImportacao implements CadastroImportavel<EquipamentoCom
     private readonly planos: PlanosManutencaoService,
     private readonly escopo: PermissionScopeService,
     private readonly prisma: PrismaService,
+    private readonly planosDaPlanilha: PlanosImportacao,
   ) {}
+
+  /** O plano que a coluna PLANO cita e não existe: criado com as TAREFAS DO PLANO da aba (SN-98) */
+  async itensDosCatalogos({ planos = [] }: CatalogosDaPlanilha, usuario: UsuarioDaImportacao) {
+    return itensDosPlanosCitados(this.prisma, this.planosDaPlanilha, planos, usuario);
+  }
 
   async buscar(id: string, usuario: UsuarioDaImportacao) {
     await this.equipamentos.findOne(id, usuario);

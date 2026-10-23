@@ -1,9 +1,11 @@
 import { EquipamentosService, PermissionScopeService, PrismaService } from '@/core';
 import { PlanosManutencaoService } from '@/modules/planos-manutencao/planos-manutencao.service';
 import { PropagacaoPlanosService } from '@/modules/planos-manutencao/propagacao-planos.service';
+import { TarefasService } from '@/modules/tarefas/tarefas.service';
 import { ImportacaoService } from '../importacao.service';
-import { RegistroImportado, UsuarioDaImportacao } from '../importacao.types';
+import { PlanoDaPlanilha, RegistroImportado, UsuarioDaImportacao } from '../importacao.types';
 import { EquipamentosImportacao } from './equipamentos.importacao';
+import { PlanosImportacao } from './planos.importacao';
 
 /**
  * Equipamentos pela planilha — a ficha da UC com dados técnicos, componentes
@@ -14,11 +16,14 @@ describe('Importação de equipamentos (banco real)', () => {
   const prisma = new PrismaService();
   const escopo = new PermissionScopeService(prisma);
   const importacao = new ImportacaoService(prisma);
+  const propagacao = new PropagacaoPlanosService(prisma);
+  const planosService = new PlanosManutencaoService(prisma, escopo, propagacao);
   const equipamentos = new EquipamentosImportacao(
     new EquipamentosService(prisma, escopo),
-    new PlanosManutencaoService(prisma, escopo, new PropagacaoPlanosService(prisma)),
+    planosService,
     escopo,
     prisma,
+    new PlanosImportacao(planosService, new TarefasService(prisma, escopo, propagacao), prisma),
   );
 
   const P = 'TESTEIMPEQUIP';
@@ -320,5 +325,206 @@ describe('Importação de equipamentos (banco real)', () => {
 
     expect(r.erros[0]).toMatchObject({ campo: 'unidade' });
     expect(await uc()).toBeNull();
+  });
+
+  /**
+   * SN-98 (decisão do usuário, 23/out/2026): o plano da coluna PLANO que não
+   * existe é criado antes do equipamento — o template da CATEGORIA da aba, com as
+   * TAREFAS DO PLANO — e o equipamento é vinculado a ele no mesmo confirmar.
+   */
+  describe('planos citados pela planilha', () => {
+    const NOVO = 'Plano novo pela planilha (teste)';
+    const citado = (extra: Partial<PlanoDaPlanilha> = {}): PlanoDaPlanilha => ({
+      nome: NOVO,
+      categoria: 'Inversor Importação',
+      tarefas: [{ nome: 'Inspeção semestral', instrucao: 'TST-IMP-EQ1', frequencia: 'SEMESTRAL', frequencia_personalizada: null, criticidade: 4 }],
+      aba: '01',
+      linha: 25,
+      linha_das_tarefas: 40,
+      plano_ref: null,
+      equipamento_id: null,
+      problemas: [],
+      ...extra,
+    });
+    const outraTarefa = { nome: 'Limpeza mensal', instrucao: 'TST-IMP-EQ1', frequencia: 'MENSAL', frequencia_personalizada: null, criticidade: 2 };
+    const template = () => prisma.planos_manutencao.findFirst({ where: { nome: NOVO, plano_origem_id: null, deleted_at: null } });
+    afterEach(async () => {
+      await limpar();
+      const criados = await prisma.planos_manutencao.findMany({ where: { nome: NOVO } });
+      await prisma.tarefas.deleteMany({ where: { plano_manutencao_id: { in: criados.map((c) => c.id) } } });
+      await prisma.propagacoes_plano.deleteMany({ where: { plano_id: { in: criados.map((c) => c.id) } } });
+      await prisma.planos_manutencao.deleteMany({ where: { nome: NOVO } });
+    });
+
+    it('o que não existe é criado na categoria da aba, com as tarefas, e o equipamento já é vinculado a ele', async () => {
+      const r = await importacao.importar(equipamentos, [ficha({ plano: NOVO })], true, admin, { planos: [citado()] });
+
+      expect(r).toMatchObject({ confirmado: true, novos: 1, erros: [] });
+      expect(r.outros_cadastros).toEqual([
+        { cadastro: 'plano', acao: 'novo', nome: NOVO, detalhe: 'categoria Inversor Importação, 1 tarefa', aba: '01', linha: 25 },
+      ]);
+      const t = (await template())!;
+      expect(t.categoria_id?.trim()).toBe(CATEGORIA);
+      const tarefasDoTemplate = await prisma.tarefas.findMany({ where: { plano_manutencao_id: t.id, deleted_at: null } });
+      expect(tarefasDoTemplate.map((x) => [x.nome, x.instrucao_id?.trim(), x.frequencia, x.criticidade])).toEqual([
+        ['Inspeção semestral', INSTRUCAO, 'SEMESTRAL', 4],
+      ]);
+      expect((await copiaDoPlano())!.plano_origem_id?.trim()).toBe(t.id.trim());
+      expect((await tarefasDaCopia()).map((x) => [x.nome, x.origem_status])).toEqual([['Inspeção semestral', 'HERDADA']]);
+    });
+
+    it('a prévia mostra e desfaz: o plano não fica', async () => {
+      const r = await importacao.importar(equipamentos, [ficha({ plano: NOVO })], false, admin, { planos: [citado()] });
+
+      expect(r).toMatchObject({ novos: 1, erros: [] });
+      expect(r.outros_cadastros).toHaveLength(1);
+      expect(await template()).toBeNull();
+    });
+
+    it('o que já existe não é recriado nem mexido', async () => {
+      const r = await importacao.importar(equipamentos, [ficha()], false, admin, {
+        planos: [citado({ nome: 'Plano do inversor (teste)', tarefas: [] })],
+      });
+
+      expect(r).toMatchObject({ erros: [], outros_cadastros: [] });
+    });
+
+    it('no que já existe, tarefas diferentes entre abas e linha ilegível não são erro (as cópias customizadas)', async () => {
+      const r = await importacao.importar(equipamentos, [ficha()], false, admin, {
+        planos: [
+          citado({ nome: 'Plano do inversor (teste)', equipamento_id: 'E1' }),
+          citado({
+            nome: 'plano do INVERSOR (teste)', aba: '02', equipamento_id: 'E2', tarefas: [outraTarefa],
+            problemas: [{ linha: 44, mensagem: 'PERIODICIDADE "A cada ? dias" ...' }],
+          }),
+        ],
+      });
+      // Equipamentos que já existem: as tarefas são as da cópia de cada um, e não há o que avisar
+      expect(r.avisos).toEqual([]);
+
+      expect(r).toMatchObject({ erros: [], outros_cadastros: [] });
+    });
+
+    it('equipamento novo com tarefas que não são as do plano que existe: aviso de que ficam de fora', async () => {
+      const doPlano = { nome: 'Inspeção mensal', instrucao: 'Inspeção do inversor', frequencia: 'MENSAL', frequencia_personalizada: null, criticidade: 3 };
+
+      const diferentes = await importacao.importar(equipamentos, [ficha()], false, admin, {
+        planos: [citado({ nome: 'Plano do inversor (teste)', tarefas: [doPlano, outraTarefa] })],
+      });
+      expect(diferentes.avisos).toEqual([expect.objectContaining({ aba: '01', linha: 40, mensagem: expect.stringContaining('ficam de fora') })]);
+      expect(diferentes.outros_cadastros).toEqual([]);
+
+      // As do plano (a instrução pelo código ou pelo nome): nada a avisar
+      const iguais = await importacao.importar(equipamentos, [ficha()], false, admin, {
+        planos: [citado({ nome: 'Plano do inversor (teste)', tarefas: [{ ...doPlano, instrucao: 'tst-imp-eq1' }] })],
+      });
+      expect(iguais.avisos).toEqual([]);
+    });
+
+    it('o ID DO PLANO de um template que hoje tem outro nome é erro (o renomeado): não cria o duplicado', async () => {
+      const r = await importacao.importar(equipamentos, [ficha({ plano: NOVO })], false, admin, { planos: [citado({ plano_ref: `${TEMPLATE} ` })] });
+
+      expect(r.erros).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ aba: '01', linha: 25, mensagem: expect.stringContaining('é do plano "Plano do inversor (teste)"') }),
+        ]),
+      );
+      expect(r.outros_cadastros).toEqual([]);
+      expect(await template()).toBeNull();
+    });
+
+    it('equipamento que tem plano e vai para um que a importação cria: aviso (pode ser o renomeado sem o ID DO PLANO)', async () => {
+      await importacao.importar(equipamentos, [ficha()], true, admin);
+      const id = (await uc())!.id.trim();
+
+      const r = await importacao.importar(equipamentos, [ficha({ plano: NOVO }, id)], false, admin, { planos: [citado({ equipamento_id: id })] });
+
+      expect(r.outros_cadastros).toEqual([expect.objectContaining({ nome: NOVO, acao: 'novo' })]);
+      expect(r.avisos).toEqual(
+        expect.arrayContaining([expect.objectContaining({ aba: '01', linha: 25, mensagem: expect.stringContaining('sai do plano "Plano do inversor (teste)"') })]),
+      );
+    });
+
+    it('o plano de hoje do equipamento não é recriado: a cópia com outro nome, e o template dela excluído', async () => {
+      await importacao.importar(equipamentos, [ficha()], true, admin);
+      const id = (await uc())!.id.trim();
+      const copia = (await copiaDoPlano())!;
+      const comoExportado = (plano: string) => [ficha({ plano }, id)];
+
+      // A cópia com o nome de antes da propagação
+      await prisma.planos_manutencao.update({ where: { id: copia.id }, data: { nome: NOVO } });
+      const daCopia = await importacao.importar(equipamentos, comoExportado(NOVO), false, admin, { planos: [citado({ equipamento_id: id })] });
+      expect(daCopia).toMatchObject({ erros: [], outros_cadastros: [] });
+      expect(await template()).toBeNull();
+      await prisma.planos_manutencao.update({ where: { id: copia.id }, data: { nome: 'Plano do inversor (teste)' } });
+
+      // O template excluído: a exportação escreve o nome dele (ou o da cópia), e ele não volta
+      await prisma.planos_manutencao.update({ where: { id: TEMPLATE }, data: { deleted_at: new Date() } });
+      try {
+        const doExcluido = await importacao.importar(equipamentos, comoExportado('Plano do inversor (teste)'), false, admin, {
+          planos: [citado({ nome: 'Plano do inversor (teste)', equipamento_id: id, plano_ref: TEMPLATE })],
+        });
+        expect(doExcluido).toMatchObject({ erros: [], outros_cadastros: [] });
+      } finally {
+        await prisma.planos_manutencao.update({ where: { id: TEMPLATE }, data: { deleted_at: null } });
+      }
+    });
+
+    it('no novo, a aba com a seção vazia aceita as tarefas da outra', async () => {
+      const r = await importacao.importar(equipamentos, [ficha({ plano: NOVO })], false, admin, {
+        planos: [citado({ tarefas: [], categoria: null }), citado({ aba: '02' })],
+      });
+
+      expect(r).toMatchObject({ erros: [] });
+      expect(r.outros_cadastros).toEqual([expect.objectContaining({ nome: NOVO, detalhe: 'categoria Inversor Importação, 1 tarefa', aba: '01' })]);
+    });
+
+    it('no novo, abas com tarefas ou categorias diferentes são erro na aba que discorda', async () => {
+      const r = await importacao.importar(equipamentos, [ficha({ plano: NOVO })], false, admin, {
+        planos: [citado(), citado({ aba: '02', tarefas: [outraTarefa] }), citado({ aba: '03', categoria: 'Outra categoria' })],
+      });
+
+      expect(r.erros).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ aba: '02', linha: 40, mensagem: expect.stringContaining('diferentes das da aba 01') }),
+          expect.objectContaining({ aba: '03', linha: 25, mensagem: expect.stringContaining('categoria Outra categoria') }),
+        ]),
+      );
+      expect(r.outros_cadastros).toEqual([]);
+    });
+
+    it('no novo, a linha de tarefa que o front não leu é erro onde ela está', async () => {
+      const r = await importacao.importar(equipamentos, [ficha({ plano: NOVO })], false, admin, {
+        planos: [citado({ problemas: [{ linha: 42, mensagem: 'PERIODICIDADE "Toda hora" não é uma das periodicidades.' }] })],
+      });
+
+      expect(r.erros).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ aba: '01', linha: 42, mensagem: 'Plano "Plano novo pela planilha (teste)": PERIODICIDADE "Toda hora" não é uma das periodicidades.' }),
+        ]),
+      );
+      expect(await template()).toBeNull();
+    });
+
+    it('a instrução que não existe é erro, com a tarefa no texto', async () => {
+      const r = await importacao.importar(equipamentos, [ficha({ plano: NOVO })], false, admin, {
+        planos: [citado({ tarefas: [{ nome: 'Limpeza', instrucao: 'INSTRUÇÃO QUE NÃO EXISTE', frequencia: 'MENSAL', frequencia_personalizada: null, criticidade: 3 }] })],
+      });
+
+      expect(r.erros).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ aba: '01', linha: 40, mensagem: expect.stringMatching(/^Plano "Plano novo pela planilha \(teste\)": tarefa 1 \(Limpeza\): /) }),
+        ]),
+      );
+      expect(await template()).toBeNull();
+    });
+
+    it('sem manutencao.manage, criar o plano é recusado', async () => {
+      const semPlanos: UsuarioDaImportacao = { ...admin, permissions: ['equipamentos.manage'] };
+
+      const r = await importacao.importar(equipamentos, [ficha({ plano: NOVO })], false, semPlanos, { planos: [citado()] });
+
+      expect(r.erros).toEqual(expect.arrayContaining([expect.objectContaining({ linha: 25, mensagem: expect.stringContaining('manutencao.manage') })]));
+    });
   });
 });

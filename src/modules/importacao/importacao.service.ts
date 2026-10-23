@@ -7,7 +7,10 @@ import { TransacaoEmCurso } from '@/core/prisma/transacao-em-curso';
 import { errosPorCampo } from '@/common/pipes/mensagens-validacao';
 import {
   CadastroImportavel,
+  CatalogosDaPlanilha,
+  ErroNaPlanilha,
   ErrosDaLinha,
+  ItemDeCatalogo,
   ProblemaDaImportacao,
   RegistroImportado,
   ResultadoDaImportacao,
@@ -51,6 +54,7 @@ export class ImportacaoService {
     registros: RegistroImportado[],
     confirmar: boolean,
     usuario: UsuarioDaImportacao,
+    catalogos?: CatalogosDaPlanilha,
   ): Promise<ResultadoDaImportacao> {
     const resultado: ResultadoDaImportacao = {
       confirmado: false,
@@ -60,6 +64,7 @@ export class ImportacaoService {
       registros: [],
       erros: [],
       avisos: [],
+      outros_cadastros: [],
     };
 
     let emCurso: TransacaoEmCurso | null = null;
@@ -68,7 +73,13 @@ export class ImportacaoService {
       await this.prisma.$transaction(
         async (tx) => {
           emCurso = new TransacaoEmCurso(tx);
-          await emCurso.rodar(() => this.processarTodos(cadastro, registros, usuario, resultado, emCurso!));
+          await emCurso.rodar(async () => {
+            // Antes dos registros: o recurso ou o plano que eles citam já tem de existir (SN-98)
+            if (catalogos && cadastro.itensDosCatalogos) {
+              await this.gravarCatalogos(await cadastro.itensDosCatalogos(catalogos, usuario), resultado, emCurso!);
+            }
+            await this.processarTodos(cadastro, registros, usuario, resultado, emCurso!);
+          });
 
           if (!confirmar || resultado.erros.length > 0) throw new DesfazerTudo();
         },
@@ -82,6 +93,37 @@ export class ImportacaoService {
     if (resultado.confirmado && emCurso) await (emCurso as TransacaoEmCurso).executarPendentes();
 
     return resultado;
+  }
+
+  /**
+   * Cada item de catálogo no seu savepoint, como os registros: o erro de um
+   * (e o efeito fora do banco que ele agendou) é desfeito sem tocar nos outros.
+   */
+  private async gravarCatalogos(itens: ItemDeCatalogo[], resultado: ResultadoDaImportacao, emCurso: TransacaoEmCurso) {
+    for (const item of itens) {
+      const marca = emCurso.marca();
+      await emCurso.tx.$executeRawUnsafe('SAVEPOINT item_de_catalogo');
+      try {
+        const gravado = await item.gravar();
+        await emCurso.tx.$executeRawUnsafe('RELEASE SAVEPOINT item_de_catalogo');
+        if (gravado?.feito) resultado.outros_cadastros.push({ ...gravado.feito, aba: item.aba, linha: item.linha });
+        for (const aviso of gravado?.avisos ?? []) {
+          resultado.avisos.push({ aba: aviso.aba ?? item.aba, linha: aviso.linha ?? item.linha, campo: item.campo, mensagem: aviso.mensagem });
+        }
+      } catch (erro) {
+        await emCurso.tx.$executeRawUnsafe('ROLLBACK TO SAVEPOINT item_de_catalogo');
+        await emCurso.tx.$executeRawUnsafe('RELEASE SAVEPOINT item_de_catalogo');
+        emCurso.descartarDesde(marca);
+        for (const problema of problemasDoErro(erro, this.logger)) {
+          resultado.erros.push({
+            aba: problema.aba ?? item.aba,
+            linha: problema.linha ?? item.linha,
+            campo: item.campo,
+            mensagem: `${item.rotulo}: ${problema.mensagem}`,
+          });
+        }
+      }
+    }
   }
 
   private async processarTodos<T>(
@@ -191,41 +233,10 @@ export class ImportacaoService {
       resultado.registros.push({ aba: registro.aba, linha: registro.linha, id, nome, acao });
     } catch (erro) {
       await desfazer();
-      for (const problema of this.problemasDe(erro)) {
+      for (const problema of problemasDoErro(erro, this.logger)) {
         this.erro(resultado, registro, problema.campo, problema.mensagem, linhaDoItem(linhas, problema.campo));
       }
     }
-  }
-
-  /** Cada forma de erro que um service ou a validação lança, em frases para a planilha. */
-  private problemasDe(erro: unknown): Array<{ campo: string; mensagem: string }> {
-    if (erro instanceof ErrosDaLinha) return erro.erros;
-
-    if (erro instanceof HttpException) {
-      const resposta = erro.getResponse();
-      const mensagem =
-        typeof resposta === 'string' ? resposta : (resposta as { message?: string | string[] }).message;
-      const mensagens = Array.isArray(mensagem) ? mensagem : [mensagem ?? erro.message];
-      return mensagens.map((m) => ({ campo: 'dados', mensagem: String(m) }));
-    }
-
-    if (erro instanceof Prisma.PrismaClientKnownRequestError) {
-      const motivo =
-        erro.code === 'P2002'
-          ? 'já existe outro registro com o mesmo valor num campo que não pode repetir'
-          : erro.code === 'P2003'
-            ? 'aponta para um registro que não existe'
-            : `código ${erro.code}`;
-      return [{ campo: 'dados', mensagem: `O banco recusou esta linha: ${motivo}.` }];
-    }
-
-    this.logger.error('Erro inesperado na importação', erro instanceof Error ? erro.stack : String(erro));
-    return [
-      {
-        campo: 'dados',
-        mensagem: `Erro inesperado ao gravar esta linha: ${erro instanceof Error ? erro.message : String(erro)}`,
-      },
-    ];
   }
 
   /**
@@ -271,6 +282,46 @@ export class ImportacaoService {
     };
     resultado.erros.push(problema);
   }
+}
+
+/** Cada forma de erro que um service ou a validação lança, em frases para a planilha (também nos catálogos, SN-98). */
+export function problemasDoErro(erro: unknown, logger: Logger): ErroNaPlanilha[] {
+  if (erro instanceof ErrosDaLinha) return erro.erros;
+
+  if (erro instanceof HttpException) {
+    const resposta = erro.getResponse();
+    const mensagem =
+      typeof resposta === 'string' ? resposta : (resposta as { message?: string | string[] }).message;
+    const mensagens = Array.isArray(mensagem) ? mensagem : [mensagem ?? erro.message];
+    return mensagens.map((m) => ({ campo: 'dados', mensagem: String(m) }));
+  }
+
+  if (erro instanceof Prisma.PrismaClientKnownRequestError) {
+    const motivo =
+      erro.code === 'P2002'
+        ? 'já existe outro registro com o mesmo valor num campo que não pode repetir'
+        : erro.code === 'P2003'
+          ? 'aponta para um registro que não existe'
+          : `código ${erro.code}`;
+    return [{ campo: 'dados', mensagem: `O banco recusou esta linha: ${motivo}.` }];
+  }
+
+  logger.error('Erro inesperado na importação', erro instanceof Error ? erro.stack : String(erro));
+  // O texto dos outros erros do Prisma traz a consulta (model, argumentos): fica no log
+  if (
+    erro instanceof Prisma.PrismaClientValidationError ||
+    erro instanceof Prisma.PrismaClientUnknownRequestError ||
+    erro instanceof Prisma.PrismaClientRustPanicError ||
+    erro instanceof Prisma.PrismaClientInitializationError
+  ) {
+    return [{ campo: 'dados', mensagem: 'Erro inesperado do banco ao gravar esta linha (o detalhe ficou no registro do servidor).' }];
+  }
+  return [
+    {
+      campo: 'dados',
+      mensagem: `Erro inesperado ao gravar esta linha: ${erro instanceof Error ? erro.message : String(erro)}`,
+    },
+  ];
 }
 
 /**

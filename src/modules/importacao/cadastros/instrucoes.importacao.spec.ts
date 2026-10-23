@@ -1,9 +1,10 @@
 import { PermissionScopeService, PrismaService } from '@/core';
 import { InstrucoesService } from '@/modules/instrucoes/instrucoes.service';
+import { RecursosService } from '@/modules/recursos/recursos.service';
 import { PropagacaoPlanosService } from '@/modules/planos-manutencao/propagacao-planos.service';
 import { variantesDeIds } from '@/modules/tarefas/ids';
 import { ImportacaoService } from '../importacao.service';
-import { RegistroImportado, UsuarioDaImportacao } from '../importacao.types';
+import { RecursoDaPlanilha, RegistroImportado, UsuarioDaImportacao } from '../importacao.types';
 import { InstrucoesImportacao } from './instrucoes.importacao';
 
 /**
@@ -16,6 +17,7 @@ describe('Importação de instruções (banco real)', () => {
   const importacao = new ImportacaoService(prisma);
   const instrucoes = new InstrucoesImportacao(
     new InstrucoesService(prisma, {} as PropagacaoPlanosService, new PermissionScopeService(prisma)),
+    new RecursosService(prisma),
     prisma,
   );
   const usuario: UsuarioDaImportacao = { id: 'TESTEIMPINSTRUCAOUSUARIO1', role: 'admin', permissions: ['manutencao.manage'] };
@@ -301,5 +303,247 @@ describe('Importação de instruções (banco real)', () => {
     );
 
     expect(r.erros).toEqual([expect.objectContaining({ mensagem: expect.stringContaining('aparece duas vezes') })]);
+  });
+
+  /**
+   * SN-98 (decisão do usuário, 23/out/2026): o recurso que as linhas citam é
+   * criado (categoria da REFERÊNCIAS) ou tem o cadastro acertado (cobrança e
+   * preço das linhas) antes da instrução — na mesma transação, com a prévia
+   * desfazendo junto e o bloco "Outros cadastros" dizendo o que muda.
+   */
+  describe('recursos citados pela planilha', () => {
+    const citado = (extra: Partial<RecursoDaPlanilha>): RecursoDaPlanilha => ({
+      nome: `${PREFIXO} Ajudante`,
+      id: null,
+      grupo: 'recursos',
+      categoria: 'MAO_DE_OBRA',
+      base_calculo: 'hora',
+      preco: 30.77,
+      unidade: null,
+      aba: '01',
+      linha: 16,
+      problemas: [],
+      ...extra,
+    });
+    // Alterar o cadastro do recurso é da tela de Recursos
+    const comRecursos: UsuarioDaImportacao = { ...usuario, permissions: ['manutencao.manage', 'recursos.manage'] };
+    const comAjudante = () =>
+      ficha({ recursos: [{ _linha: 16, grupo: 'recursos', recurso: `${PREFIXO} Ajudante`, quantidade: 2, duracao_horas: 4.5 }], maquinarios: [] });
+    const ajudante = () => prisma.recursos.findFirst({ where: { nome: `${PREFIXO} Ajudante`, deleted_at: null } });
+    afterEach(async () => {
+      await limpar();
+      await prisma.recursos.deleteMany({ where: { nome: { in: [`${PREFIXO} Ajudante`, `${PREFIXO} Medidor`] } } });
+    });
+
+    it('o que não existe é criado com a categoria da REFERÊNCIAS, e a instrução já o usa', async () => {
+      const r = await importacao.importar(instrucoes, [comAjudante()], true, usuario, { recursos: [citado({})] });
+
+      expect(r).toMatchObject({ confirmado: true, novos: 1, erros: [] });
+      expect(r.outros_cadastros).toEqual([
+        { cadastro: 'recurso', acao: 'novo', nome: `${PREFIXO} Ajudante`, detalhe: 'Mão de obra, por hora, R$ 30,77', aba: '01', linha: 16 },
+      ]);
+      const criado = (await ajudante())!;
+      expect([criado.categoria, criado.base_calculo, Number(criado.preco_unitario)]).toEqual(['MAO_DE_OBRA', 'hora', 30.77]);
+      expect((await doBanco())!.recursos.map((x) => x.recurso_id.trim())).toEqual([criado.id.trim()]);
+    });
+
+    it('a prévia mostra e desfaz: o recurso não fica no cadastro', async () => {
+      const r = await importacao.importar(instrucoes, [comAjudante()], false, usuario, { recursos: [citado({})] });
+
+      expect(r).toMatchObject({ confirmado: false, novos: 1, erros: [] });
+      expect(r.outros_cadastros).toHaveLength(1);
+      expect(await ajudante()).toBeNull();
+    });
+
+    it('o que existe com cobrança ou preço diferente tem o cadastro acertado', async () => {
+      await prisma.recursos.create({
+        data: { categoria: 'MAO_DE_OBRA', base_calculo: 'diaria', rubrica: 'instrucoes', nome: `${PREFIXO} Ajudante`, preco_unitario: 25 },
+      });
+
+      const r = await importacao.importar(instrucoes, [comAjudante()], true, comRecursos, { recursos: [citado({})] });
+
+      expect(r.erros).toEqual([]);
+      expect(r.outros_cadastros).toEqual([
+        expect.objectContaining({ acao: 'alterado', detalhe: 'cobrança por diária → por hora · preço R$ 25,00 → R$ 30,77' }),
+      ]);
+      const acertado = (await ajudante())!;
+      expect([acertado.base_calculo, Number(acertado.preco_unitario)]).toEqual(['hora', 30.77]);
+    });
+
+    it('sem recursos.manage, o cadastro diferente fica como está, com aviso (criar segue como o "+" do formulário)', async () => {
+      await prisma.recursos.create({
+        data: { categoria: 'MAO_DE_OBRA', base_calculo: 'hora', rubrica: 'instrucoes', nome: `${PREFIXO} Ajudante`, preco_unitario: 25 },
+      });
+
+      const r = await importacao.importar(instrucoes, [comAjudante()], true, usuario, { recursos: [citado({})] });
+
+      expect(r.erros).toEqual([]);
+      expect(r.outros_cadastros).toEqual([]);
+      expect(r.avisos).toEqual([
+        expect.objectContaining({ linha: 16, mensagem: expect.stringContaining('pede a permissão da tela de Recursos (recursos.manage)') }),
+      ]);
+      expect(Number((await ajudante())!.preco_unitario)).toBe(25);
+    });
+
+    it('o ID DO ITEM de um recurso que hoje tem outro nome é erro: não cria o duplicado', async () => {
+      const renomeado = await prisma.recursos.create({
+        data: { categoria: 'MAO_DE_OBRA', base_calculo: 'hora', rubrica: 'instrucoes', nome: `${PREFIXO} Medidor`, preco_unitario: 25 },
+      });
+
+      const r = await importacao.importar(instrucoes, [ficha({ recursos: [], maquinarios: [] })], false, comRecursos, {
+        recursos: [citado({ id: renomeado.id })],
+      });
+
+      expect(r.erros).toEqual([expect.objectContaining({ linha: 16, mensagem: expect.stringContaining(`é do recurso "${PREFIXO} Medidor"`) })]);
+      expect(r.outros_cadastros).toEqual([]);
+    });
+
+    it('com o nome trocado para outro que existe, vale o nome (o ID antigo não trava)', async () => {
+      const antigo = await prisma.recursos.create({
+        data: { categoria: 'MAO_DE_OBRA', base_calculo: 'hora', rubrica: 'instrucoes', nome: `${PREFIXO} Medidor`, preco_unitario: 25 },
+      });
+      await prisma.recursos.create({
+        data: { categoria: 'MAO_DE_OBRA', base_calculo: 'hora', rubrica: 'instrucoes', nome: `${PREFIXO} Ajudante`, preco_unitario: 30.77 },
+      });
+
+      const r = await importacao.importar(instrucoes, [comAjudante()], false, comRecursos, { recursos: [citado({ id: antigo.id })] });
+
+      expect(r).toMatchObject({ erros: [], outros_cadastros: [] });
+    });
+
+    it('duas linhas no mesmo recurso, só a segunda diz o preço: vale o preço dela', async () => {
+      await prisma.recursos.create({
+        data: { categoria: 'MAO_DE_OBRA', base_calculo: 'hora', rubrica: 'instrucoes', nome: `${PREFIXO} Ajudante`, preco_unitario: 25 },
+      });
+
+      const r = await importacao.importar(instrucoes, [ficha({ recursos: [], maquinarios: [] })], true, comRecursos, {
+        recursos: [citado({ id: '12', preco: null }), citado({ id: '40', preco: 35, aba: '02', linha: 18 })],
+      });
+
+      expect(r.erros).toEqual([]);
+      expect(r.outros_cadastros).toEqual([expect.objectContaining({ detalhe: 'preço R$ 25,00 → R$ 35,00', aba: '02', linha: 18 })]);
+      expect(Number((await ajudante())!.preco_unitario)).toBe(35);
+    });
+
+    it('a categoria da REFERÊNCIAS diferente da do cadastro não muda o recurso: aviso', async () => {
+      await prisma.recursos.create({
+        data: { categoria: 'MAO_DE_OBRA', base_calculo: 'hora', rubrica: 'instrucoes', nome: `${PREFIXO} Ajudante`, preco_unitario: 30.77 },
+      });
+
+      const r = await importacao.importar(instrucoes, [ficha({ recursos: [], maquinarios: [] })], false, comRecursos, {
+        recursos: [citado({ categoria: 'DESPESA_CAMPO' })],
+      });
+
+      expect(r.outros_cadastros).toEqual([]);
+      expect(r.avisos).toEqual([expect.objectContaining({ linha: 16, mensagem: expect.stringContaining('A categoria não muda pela planilha') })]);
+    });
+
+    it('o removido que a linha aponta pelo ID vale como está: não cria outro nem acerta', async () => {
+      const removido = await prisma.recursos.create({
+        data: {
+          categoria: 'MAO_DE_OBRA', base_calculo: 'hora', rubrica: 'instrucoes', nome: `${PREFIXO} Ajudante`, preco_unitario: 25, deleted_at: new Date(),
+        },
+      });
+
+      const r = await importacao.importar(instrucoes, [ficha({ recursos: [], maquinarios: [] })], false, comRecursos, {
+        recursos: [citado({ id: removido.id })],
+      });
+
+      expect(r).toMatchObject({ erros: [], avisos: [], outros_cadastros: [] });
+    });
+
+    it('duas linhas (IDs de outro sistema) que chegam ao mesmo recurso com preços diferentes: erro na segunda', async () => {
+      await prisma.recursos.create({
+        data: { categoria: 'MAO_DE_OBRA', base_calculo: 'hora', rubrica: 'instrucoes', nome: `${PREFIXO} Ajudante`, preco_unitario: 25 },
+      });
+
+      const r = await importacao.importar(instrucoes, [ficha({ recursos: [], maquinarios: [] })], false, comRecursos, {
+        recursos: [citado({ id: '12', preco: 30 }), citado({ id: '40', preco: 35, aba: '02', linha: 18 })],
+      });
+
+      expect(r.erros).toEqual([
+        expect.objectContaining({ aba: '02', linha: 18, mensagem: expect.stringContaining('é o mesmo recurso da aba 01, linha 16') }),
+      ]);
+    });
+
+    it('a REFERÊNCIAS que o front não leu só é erro para o recurso novo', async () => {
+      const problemas = ['CATEGORIA "MO" não é uma das categorias.'];
+
+      const novo = await importacao.importar(instrucoes, [ficha({ recursos: [], maquinarios: [] })], false, comRecursos, {
+        recursos: [citado({ categoria: null, problemas })],
+      });
+      expect(novo.erros).toEqual([expect.objectContaining({ linha: 16, mensagem: expect.stringContaining('CATEGORIA "MO"') })]);
+
+      await prisma.recursos.create({
+        data: { categoria: 'MAO_DE_OBRA', base_calculo: 'hora', rubrica: 'instrucoes', nome: `${PREFIXO} Ajudante`, preco_unitario: 30.77 },
+      });
+      const existente = await importacao.importar(instrucoes, [ficha({ recursos: [], maquinarios: [] })], false, comRecursos, {
+        recursos: [citado({ categoria: null, problemas })],
+      });
+      expect(existente).toMatchObject({ erros: [], outros_cadastros: [] });
+    });
+
+    it('igual ao cadastro: nada em "Outros cadastros"', async () => {
+      await prisma.recursos.create({
+        data: { categoria: 'MAO_DE_OBRA', base_calculo: 'hora', rubrica: 'instrucoes', nome: `${PREFIXO} Ajudante`, preco_unitario: 30.77 },
+      });
+
+      const r = await importacao.importar(instrucoes, [comAjudante()], false, usuario, { recursos: [citado({})] });
+
+      expect(r).toMatchObject({ erros: [], outros_cadastros: [] });
+    });
+
+    it('sem categoria na REFERÊNCIAS, o recurso novo é erro na linha que o cita', async () => {
+      const r = await importacao.importar(instrucoes, [comAjudante()], false, usuario, { recursos: [citado({ categoria: null })] });
+
+      expect(r.erros).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ aba: '01', linha: 16, mensagem: expect.stringContaining('a aba REFERÊNCIAS não diz a categoria dele') }),
+        ]),
+      );
+      expect(r.outros_cadastros).toEqual([]);
+    });
+
+    it('instrumento com o custo pela amortização: avisa e não muda o cadastro', async () => {
+      await prisma.recursos.create({
+        data: {
+          categoria: 'INSTRUMENTO',
+          base_calculo: 'diaria',
+          rubrica: 'instrucoes',
+          nome: `${PREFIXO} Medidor`,
+          valor_aquisicao: 38700,
+          prazo_retorno_meses: 12,
+          custos_anuais: 2500,
+          meta_utilizacao_horas: 150,
+          horas_por_diaria: 8,
+        },
+      });
+
+      const r = await importacao.importar(instrucoes, [ficha({ recursos: [], maquinarios: [] })], false, usuario, {
+        recursos: [citado({ nome: `${PREFIXO} Medidor`, categoria: 'INSTRUMENTO', base_calculo: 'diaria', preco: 10 })],
+      });
+
+      expect(r.outros_cadastros).toEqual([]);
+      expect(r.avisos).toEqual([expect.objectContaining({ linha: 16, mensagem: expect.stringContaining('vem da amortização') })]);
+    });
+
+    it('nome repetido no cadastro (categorias diferentes): o ID DO ITEM desempata; sem ele, é erro', async () => {
+      const dados = { base_calculo: 'diaria', rubrica: 'instrucoes', nome: `${PREFIXO} Ajudante`, preco_unitario: 25 } as const;
+      await prisma.recursos.create({ data: { ...dados, categoria: 'MAO_DE_OBRA' } });
+      const despesa = await prisma.recursos.create({ data: { ...dados, categoria: 'DESPESA_CAMPO' } });
+
+      const peloId = await importacao.importar(instrucoes, [ficha({ recursos: [], maquinarios: [] })], true, comRecursos, {
+        recursos: [citado({ id: `${despesa.id.trim()} `, categoria: 'DESPESA_CAMPO' })],
+      });
+      expect(peloId.erros).toEqual([]);
+      const depois = await prisma.recursos.findMany({ where: { nome: `${PREFIXO} Ajudante` }, orderBy: { categoria: 'asc' } });
+      expect(depois.map((x) => [x.categoria, Number(x.preco_unitario)])).toEqual([
+        ['MAO_DE_OBRA', 25],
+        ['DESPESA_CAMPO', 30.77],
+      ]);
+
+      const semId = await importacao.importar(instrucoes, [ficha({ recursos: [], maquinarios: [] })], false, comRecursos, { recursos: [citado({})] });
+      expect(semId.erros).toEqual([expect.objectContaining({ linha: 16, mensagem: expect.stringContaining('há 2 com esse nome') })]);
+    });
   });
 });

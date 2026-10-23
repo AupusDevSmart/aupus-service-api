@@ -20,7 +20,10 @@ import { CreateRecursoDto, UpdateRecursoDto, QueryRecursosDto } from './dto/recu
  * Duas permissões que já existem, em vez de uma nova: `recursos.manage` é a da
  * seção Administração, onde a tela mora; `manutencao.manage` entra porque quem
  * edita instrução precisa ler o catálogo para escolher os recursos, e ficaria
- * travado no combobox sem ela.
+ * travado no combobox sem ela — e cadastrar o que falta pelo "+" do formulário.
+ * Alterar e remover (o preço e a cobrança que valem para todas as instruções)
+ * é só da tela de Recursos: `recursos.manage` no método (SN-98; até ali a
+ * classe deixava `manutencao.manage` mudar o preço do catálogo pela API).
  *
  * Criar permissão nova exigiria inserir linhas de RBAC nos dois guards ('web' e
  * 'api') — terreno que já deu problema antes e não vale o risco por uma tela de
@@ -67,6 +70,7 @@ export class RecursosController {
   }
 
   @Put(':id')
+  @Permissions('recursos.manage')
   @ApiOperation({ summary: 'Atualizar recurso' })
   @ApiParam({ name: 'id' })
   atualizar(@Param('id') id: string, @Body() dto: UpdateRecursoDto) {
@@ -74,6 +78,7 @@ export class RecursosController {
   }
 
   @Delete(':id')
+  @Permissions('recursos.manage')
   @ApiOperation({
     summary: 'Remover recurso',
     description:

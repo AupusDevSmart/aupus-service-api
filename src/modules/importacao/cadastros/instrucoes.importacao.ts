@@ -4,8 +4,10 @@ import { InstrucoesService } from '@/modules/instrucoes/instrucoes.service';
 import { CreateInstrucaoDto } from '@/modules/instrucoes/dto/create-instrucao.dto';
 import { UpdateInstrucaoDto } from '@/modules/instrucoes/dto/update-instrucao.dto';
 import { variantesDeIds } from '@/modules/tarefas/ids';
-import { CadastroImportavel, ErrosDaLinha, UsuarioDaImportacao } from '../importacao.types';
+import { RecursosService } from '@/modules/recursos/recursos.service';
+import { CadastroImportavel, CatalogosDaPlanilha, ErrosDaLinha, UsuarioDaImportacao } from '../importacao.types';
 import { CatalogoPorNome, chave } from '../catalogo-por-nome';
+import { itensDosRecursosCitados, ROTULO_DA_BASE } from './recursos-citados';
 
 type InstrucaoComListas = instrucoes & {
   passos: sub_instrucoes[];
@@ -15,8 +17,6 @@ type InstrucaoComListas = instrucoes & {
 type Linha = Record<string, unknown>;
 
 const numero = (v: unknown) => (v === null || v === undefined ? null : Number(v));
-
-const ROTULO_DA_BASE: Record<string, string> = { hora: 'por hora', diaria: 'por diária', unidade: 'por unidade', km: 'por km', fechado: 'valor fechado' };
 
 /**
  * O valor que a planilha trouxe num campo que a cobrança do item não usa é erro
@@ -60,8 +60,14 @@ export class InstrucoesImportacao implements CadastroImportavel<InstrucaoComList
 
   constructor(
     private readonly instrucoes: InstrucoesService,
+    private readonly recursos: RecursosService,
     private readonly prisma: PrismaService,
   ) {}
+
+  /** Os recursos que as linhas citam: cria o que falta e acerta cobrança e preço no cadastro (SN-98) */
+  async itensDosCatalogos({ recursos = [] }: CatalogosDaPlanilha, usuario: UsuarioDaImportacao) {
+    return itensDosRecursosCitados(this.prisma, this.recursos, recursos, usuario);
+  }
 
   async buscar(id: string) {
     await this.instrucoes.buscarPorId(id);

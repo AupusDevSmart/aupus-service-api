@@ -8,7 +8,9 @@ import { CreateMaquinarioDto, QueryMaquinariosDto, UpdateMaquinarioDto } from '.
 /**
  * As permissões do cadastro de recursos, como o próprio recurso faz:
  * `recursos.manage` é a da seção onde a tela mora; `manutencao.manage` entra
- * porque quem edita instrução lê o catálogo para escolher a máquina (SN-85).
+ * porque quem edita instrução lê o catálogo para escolher a máquina (SN-85) e
+ * cadastra a que falta pelo "+". Alterar e remover é só da tela: `recursos.manage`
+ * no método (SN-98).
  * Premissa (SN-84): permissão nova exigiria linhas de RBAC nos dois guards, e
  * o recurso já escolheu não pagar esse risco por uma tela de cadastro.
  */
@@ -48,6 +50,7 @@ export class MaquinariosController {
   }
 
   @Put(':id')
+  @Permissions('recursos.manage')
   @ApiOperation({ summary: 'Atualizar maquinário' })
   @ApiParam({ name: 'id' })
   atualizar(@Param('id') id: string, @Body() dto: UpdateMaquinarioDto) {
@@ -55,6 +58,7 @@ export class MaquinariosController {
   }
 
   @Delete(':id')
+  @Permissions('recursos.manage')
   @ApiOperation({ summary: 'Remover maquinário (exclusão lógica)' })
   @ApiParam({ name: 'id' })
   remover(@Param('id') id: string) {

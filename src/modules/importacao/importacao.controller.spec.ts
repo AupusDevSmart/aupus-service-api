@@ -22,8 +22,8 @@ describe('ImportacaoController — permissões', () => {
     }) as unknown as ExecutionContext;
 
   const rotas: Array<[string, string[]]> = [
-    ['importarRecursos', ['recursos.manage', 'manutencao.manage']],
-    ['importarMaquinarios', ['recursos.manage', 'manutencao.manage']],
+    ['importarRecursos', ['recursos.manage']],
+    ['importarMaquinarios', ['recursos.manage']],
     ['importarVeiculos', ['recursos.manage']],
     ['importarFeriados', ['agenda.manage']],
     ['importarConcessionarias', ['equipamentos.manage']],

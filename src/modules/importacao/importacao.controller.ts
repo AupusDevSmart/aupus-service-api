@@ -38,9 +38,10 @@ export class ImportacaoController {
     private readonly equipamentos: EquipamentosImportacao,
   ) {}
 
+  // A planilha altera preço e cobrança: a permissão da tela de Recursos, como o PUT (SN-98)
   @Post('recursos')
   @HttpCode(HttpStatus.OK)
-  @Permissions('recursos.manage', 'manutencao.manage')
+  @Permissions('recursos.manage')
   @ApiOperation({ summary: 'Prévia ou gravação da planilha de recursos' })
   importarRecursos(@Body() corpo: ImportarPlanilhaDto, @CurrentUser() usuario: UsuarioDaImportacao) {
     return this.importacao.importar(this.recursos, corpo.registros, corpo.confirmar, usuario);
@@ -49,7 +50,7 @@ export class ImportacaoController {
   // A permissão da tela de maquinários, a mesma do cadastro de recursos (SN-84)
   @Post('maquinarios')
   @HttpCode(HttpStatus.OK)
-  @Permissions('recursos.manage', 'manutencao.manage')
+  @Permissions('recursos.manage')
   @ApiOperation({ summary: 'Prévia ou gravação da planilha de maquinários' })
   importarMaquinarios(@Body() corpo: ImportarPlanilhaDto, @CurrentUser() usuario: UsuarioDaImportacao) {
     return this.importacao.importar(this.maquinarios, corpo.registros, corpo.confirmar, usuario);
@@ -107,7 +108,7 @@ export class ImportacaoController {
   @Permissions('manutencao.manage')
   @ApiOperation({ summary: 'Prévia ou gravação da planilha de instruções' })
   importarInstrucoes(@Body() corpo: ImportarPlanilhaDto, @CurrentUser() usuario: UsuarioDaImportacao) {
-    return this.importacao.importar(this.instrucoes, corpo.registros, corpo.confirmar, usuario);
+    return this.importacao.importar(this.instrucoes, corpo.registros, corpo.confirmar, usuario, corpo.catalogos);
   }
 
   @Post('planos-manutencao')
@@ -133,6 +134,6 @@ export class ImportacaoController {
   @Permissions('equipamentos.manage')
   @ApiOperation({ summary: 'Prévia ou gravação da planilha de equipamentos (UC com componentes)' })
   importarEquipamentos(@Body() corpo: ImportarPlanilhaDto, @CurrentUser() usuario: UsuarioDaImportacao) {
-    return this.importacao.importar(this.equipamentos, corpo.registros, corpo.confirmar, usuario);
+    return this.importacao.importar(this.equipamentos, corpo.registros, corpo.confirmar, usuario, corpo.catalogos);
   }
 }
