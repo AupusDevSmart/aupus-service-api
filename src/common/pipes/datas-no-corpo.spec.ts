@@ -11,6 +11,7 @@ import { UpdateFeriadoDto } from '../../modules/agenda/dto/update-feriado.dto';
 import { ProximosDiasUteisDto, VerificarDiaUtilDto } from '../../modules/agenda/dto/verificar-dia-util.dto';
 import { CreateAnomaliaDto } from '../../modules/anomalias/dto/create-anomalia.dto';
 import { UpdateAnomaliaDto } from '../../modules/anomalias/dto/update-anomalia.dto';
+import { ChamadoNexonDto } from '../../modules/integracoes-nexon/dto/chamado-nexon.dto';
 import { ExecutarOSDto, IniciarExecucaoDto } from '../../modules/execucao-os/dto/os-actions.dto';
 import { OSFiltersDto } from '../../modules/execucao-os/dto/os-filters.dto';
 import { CreateCalibracaoDto } from '../../modules/ferramentas/dto/create-calibracao.dto';
@@ -69,6 +70,7 @@ const CAMPOS: Array<[Dto, string, Forma, Record<string, unknown>?]> = [
   [UpdateEquipamentoDto, 'garantia_ate', 'dia'],
   [CreateAnomaliaDto, 'prazo', 'instante'],
   [UpdateAnomaliaDto, 'prazo', 'instante'],
+  [ChamadoNexonDto, 'aberto_em', 'instante'],
   [IniciarExecucaoDto, 'data_hora_inicio_real', 'instante'],
   [ExecutarOSDto, 'data_hora_fim_real', 'instante'],
   [ExecutarOSDto, 'parada_inicio', 'instante'],

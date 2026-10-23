@@ -1,5 +1,7 @@
-import { UnauthorizedException, UnprocessableEntityException } from '@nestjs/common';
+import { ConflictException, ExecutionContext, UnauthorizedException, UnprocessableEntityException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
+import type { PrismaService } from '@/core';
+import type { SolicitacoesServicoService } from '../solicitacoes-servico/solicitacoes-servico.service';
 import { montarSolicitacao } from './chamados-nexon';
 import { ChamadosNexonService } from './chamados-nexon.service';
 import { TokenNexonGuard } from './token-nexon.guard';
@@ -25,6 +27,7 @@ const chamado = (extra: Partial<ChamadoNexonDto> = {}): ChamadoNexonDto => ({
 describe('montarSolicitacao', () => {
   it('vira manutenção corretiva de origem SISTEMA com os ids sincronizados', () => {
     const s = montarSolicitacao(chamado(), {
+      planta_id: 'PL1',
       equipamento: { id: 'EQ1', nome: 'Inversor 01' },
       unidade_id: 'UN1',
       proprietario_id: 'US1',
@@ -44,13 +47,27 @@ describe('montarSolicitacao', () => {
       faltando: [],
     });
     expect(s.data_solicitacao.toISOString()).toBe('2026-10-20T13:00:00.000Z');
-    expect(s.observacoes).toContain('Chamado #12 do NexON');
-    expect(s.observacoes).toContain('Motivo: Falha no equipamento.');
-    expect(s.observacoes).toContain('Urgente, cliente ligou');
   });
 
-  it('id que não existe aqui vira texto, não derruba a entrega', () => {
+  // Nenhuma tela mostra as observações da solicitação, e a programação copia a descrição
+  it('o contexto do chamado vai no fim da descrição, que a programação e o cartão da origem mostram', () => {
+    const s = montarSolicitacao(chamado(), {
+      planta_id: 'PL1',
+      equipamento: { id: 'EQ1', nome: 'Inversor 01' },
+      unidade_id: 'UN1',
+      proprietario_id: 'US1',
+      planta_nome: 'Fazenda X',
+    });
+    expect(s.descricao.startsWith('Parou às 10h\n\n')).toBe(true);
+    expect(s.descricao).toContain('Chamado #12 do NexON (chm_1).');
+    expect(s.descricao).toContain('Motivo: Falha no equipamento.');
+    expect(s.descricao).toContain('Observação do encaminhamento: Urgente, cliente ligou');
+    expect(s).not.toHaveProperty('observacoes');
+  });
+
+  it('id que não existe aqui vira texto na descrição, não derruba a entrega', () => {
     const s = montarSolicitacao(chamado({ prioridade: null, autor_nome: null }), {
+      planta_id: 'PL1',
       equipamento: null,
       unidade_id: null,
       proprietario_id: null,
@@ -63,14 +80,34 @@ describe('montarSolicitacao', () => {
     expect(s.prioridade).toBe('MEDIA');
     expect(s.solicitante_nome).toBe('NexON (NexON)');
     expect(s.faltando).toEqual(['equipamento EQ1', 'unidade UN1', 'proprietário US1']);
-    expect(s.observacoes).toContain('Não sincronizado com o Smart Service: equipamento EQ1');
+    expect(s.descricao).toContain('Não sincronizado com o Smart Service: equipamento EQ1');
+  });
+
+  it('unidade informada que não existe aqui: fica a do equipamento, e a informada segue como faltando', () => {
+    const s = montarSolicitacao(chamado({ unidade_id: 'UN9' }), {
+      planta_id: 'PL1',
+      equipamento: { id: 'EQ1', nome: 'Inversor 01' },
+      unidade_id: 'UN1',
+      proprietario_id: 'US1',
+      planta_nome: 'Fazenda X',
+    });
+    expect(s.unidade_id).toBe('UN1');
+    expect(s.faltando).toEqual(['unidade UN9']);
+  });
+
+  it('a planta gravada é a lida do banco, não a do pedido', () => {
+    const s = montarSolicitacao(chamado({ planta_id: ' PL1 ' }), { planta_id: 'PL1', planta_nome: 'Fazenda X' });
+    expect(s.planta_id).toBe('PL1');
   });
 });
 
 describe('TokenNexonGuard', () => {
   const ctx = (authorization?: string) =>
-    ({ switchToHttp: () => ({ getRequest: () => ({ headers: { authorization } }) }) }) as any;
+    ({
+      switchToHttp: () => ({ getRequest: () => ({ headers: { authorization }, ip: '10.0.0.1' }) }),
+    }) as unknown as ExecutionContext;
   const guard = new TokenNexonGuard();
+  const TOKEN = 'a'.repeat(40);
   const anterior = process.env.NEXON_CHAMADOS_TOKEN;
   afterEach(() => {
     process.env.NEXON_CHAMADOS_TOKEN = anterior;
@@ -81,27 +118,48 @@ describe('TokenNexonGuard', () => {
     expect(() => guard.canActivate(ctx('Bearer qualquer'))).toThrow(UnauthorizedException);
   });
 
-  it('aceita só o Bearer certo', () => {
+  it('segredo curto conta como não configurado, mesmo com o Bearer igual', () => {
     process.env.NEXON_CHAMADOS_TOKEN = 'segredo-123';
-    expect(guard.canActivate(ctx('Bearer segredo-123'))).toBe(true);
-    expect(() => guard.canActivate(ctx('Bearer segredo-124'))).toThrow(UnauthorizedException);
-    expect(() => guard.canActivate(ctx(undefined))).toThrow(UnauthorizedException);
+    expect(() => guard.canActivate(ctx('Bearer segredo-123'))).toThrow(UnauthorizedException);
+  });
+
+  it('aceita só o Bearer certo, com a mesma recusa para tudo', () => {
+    process.env.NEXON_CHAMADOS_TOKEN = TOKEN;
+    expect(guard.canActivate(ctx(`Bearer ${TOKEN}`))).toBe(true);
+    expect(() => guard.canActivate(ctx(`Bearer ${TOKEN}b`))).toThrow('Token de integração inválido');
+    expect(() => guard.canActivate(ctx(undefined))).toThrow('Token de integração inválido');
+    delete process.env.NEXON_CHAMADOS_TOKEN;
+    expect(() => guard.canActivate(ctx(`Bearer ${TOKEN}`))).toThrow('Token de integração inválido');
   });
 });
 
 describe('ChamadosNexonService', () => {
-  const montar = (existente: any = null) => {
-    const prisma: any = {
+  type Existente = { id: string; numero: string; status: string; deleted_at: Date | null };
+  const montar = (existente: Existente | null = null) => {
+    const prisma = {
       solicitacoes_servico: { findUnique: jest.fn().mockResolvedValue(existente), create: jest.fn() },
       historico_solicitacao_servico: { create: jest.fn() },
+      notificacoes_eventos: { create: jest.fn() },
       plantas: { findFirst: jest.fn().mockResolvedValue({ id: 'PL1', nome: 'Fazenda X', proprietario_id: 'US1' }) },
       equipamentos: { findFirst: jest.fn().mockResolvedValue({ id: 'EQ1', nome: 'Inversor 01', unidade_id: 'UN1' }) },
       unidades: { findFirst: jest.fn().mockResolvedValue({ id: 'UN1' }) },
+      $transaction: jest.fn(),
     };
-    prisma.$transaction = jest.fn((fn: any) => fn(prisma));
-    const solicitacoes: any = { gerarNumeroSolicitacao: jest.fn().mockResolvedValue('2026-0005') };
-    return { prisma, solicitacoes, service: new ChamadosNexonService(prisma, solicitacoes) };
+    prisma.$transaction.mockImplementation((fn: (tx: typeof prisma) => unknown) => fn(prisma));
+    const solicitacoes = { gerarNumeroSolicitacao: jest.fn().mockResolvedValue('2026-0005') };
+    const service = new ChamadosNexonService(
+      prisma as unknown as PrismaService,
+      solicitacoes as unknown as SolicitacoesServicoService,
+    );
+    return { prisma, solicitacoes, service };
   };
+  const aberta = (extra: Partial<Existente> = {}): Existente => ({
+    id: 'S1',
+    numero: '2026-0005',
+    status: 'REGISTRADA',
+    deleted_at: null,
+    ...extra,
+  });
 
   it('cria a solicitação e grava a trilha RECEBIDA_NEXON', async () => {
     const { prisma, service } = montar();
@@ -118,10 +176,43 @@ describe('ChamadosNexonService', () => {
     expect(h.dados_extras).toMatchObject({ nexon_chamado_id: 'chm_1', nexon_numero: 12, ip: '127.0.0.1' });
   });
 
-  it('segunda entrega do mesmo chamado devolve a mesma solicitação', async () => {
-    const { prisma, service } = montar({ id: 'S1', numero: '2026-0005' });
+  // O Char(26) devolve o id com espaço: gravado assim, a busca e o escopo perdiam a solicitação (SN-77)
+  it('grava os ids do lugar aparados e avisa quem programa, como a do formulário', async () => {
+    const { prisma, service } = montar();
+    prisma.plantas.findFirst.mockResolvedValue({ id: 'PL1 ', nome: 'Fazenda X', proprietario_id: 'US1 ' });
+    prisma.equipamentos.findFirst.mockResolvedValue({ id: 'EQ1 ', nome: 'Inversor 01', unidade_id: 'UN1 ' });
+    prisma.unidades.findFirst.mockResolvedValue({ id: 'UN1 ' });
+    prisma.solicitacoes_servico.create.mockResolvedValue({ id: 'S1', numero: '2026-0005' });
+    await service.receber(chamado({ planta_id: 'PL1 ', proprietario_id: 'US1 ' }));
+    expect(prisma.solicitacoes_servico.create.mock.calls[0][0].data).toMatchObject({
+      planta_id: 'PL1',
+      unidade_id: 'UN1',
+      equipamento_id: 'EQ1',
+      proprietario_id: 'US1',
+    });
+    expect(prisma.notificacoes_eventos.create.mock.calls[0][0].data).toMatchObject({
+      evento: 'solicitacao.aberta',
+      entidade: 'solicitacao_servico',
+      entidade_id: 'S1',
+      ator_id: null,
+    });
+  });
+
+  it('segunda entrega do chamado com a solicitação aberta devolve a mesma', async () => {
+    const { prisma, service } = montar(aberta({ status: 'PROGRAMADA' }));
     const r = await service.receber(chamado());
     expect(r).toEqual({ id: 'S1', numero: '2026-0005', criada: false });
+    expect(prisma.solicitacoes_servico.create).not.toHaveBeenCalled();
+  });
+
+  // O equipamento voltou a falhar e o operador encaminhou de novo: antes, 200 e nada no Service
+  it.each([
+    ['finalizada', aberta({ status: 'FINALIZADA' })],
+    ['excluída', aberta({ deleted_at: new Date('2026-10-21T12:00:00Z') })],
+  ])('reencaminhar o chamado de uma solicitação %s é 409, não 200 calado', async (estado, existente) => {
+    const { prisma, service } = montar(existente);
+    await expect(service.receber(chamado())).rejects.toBeInstanceOf(ConflictException);
+    await expect(service.receber(chamado())).rejects.toThrow(`solicitação 2026-0005, ${estado}`);
     expect(prisma.solicitacoes_servico.create).not.toHaveBeenCalled();
   });
 
@@ -129,7 +220,7 @@ describe('ChamadosNexonService', () => {
     const { prisma, service } = montar();
     prisma.solicitacoes_servico.findUnique
       .mockResolvedValueOnce(null)
-      .mockResolvedValueOnce({ id: 'S9', numero: '2026-0009' });
+      .mockResolvedValueOnce(aberta({ id: 'S9', numero: '2026-0009' }));
     prisma.solicitacoes_servico.create.mockRejectedValue(
       new Prisma.PrismaClientKnownRequestError('dup', {
         code: 'P2002',
@@ -140,20 +231,28 @@ describe('ChamadosNexonService', () => {
     expect(await service.receber(chamado())).toEqual({ id: 'S9', numero: '2026-0009', criada: false });
   });
 
+  it('equipamento pela regra da planta do formulário (unidade, UC pai, coluna antiga só sem unidade)', async () => {
+    const { prisma, service } = montar();
+    prisma.solicitacoes_servico.create.mockResolvedValue({ id: 'S1', numero: '2026-0005' });
+    await service.receber(chamado());
+    const onde = prisma.equipamentos.findFirst.mock.calls[0][0].where;
+    expect(onde.OR).toEqual([
+      { unidade: { planta_id: { in: ['PL1'] } } },
+      { unidade_id: null, equipamento_pai: { unidade: { planta_id: { in: ['PL1'] } } } },
+      { unidade_id: null, planta_id: { in: ['PL1'] }, OR: [{ equipamento_pai_id: null }, { equipamento_pai: { unidade_id: null } }] },
+    ]);
+  });
+
   it('equipamento, unidade e proprietário de outra planta não entram', async () => {
     const { prisma, service } = montar();
     prisma.equipamentos.findFirst.mockResolvedValue(null);
     prisma.unidades.findFirst.mockResolvedValue(null);
     prisma.solicitacoes_servico.create.mockResolvedValue({ id: 'S1', numero: '2026-0005' });
     await service.receber(chamado({ proprietario_id: 'OUTRO' }));
-    expect(prisma.equipamentos.findFirst.mock.calls[0][0].where.OR).toEqual([
-      { planta_id: 'PL1' },
-      { unidade: { planta_id: 'PL1' } },
-    ]);
     expect(prisma.unidades.findFirst.mock.calls[0][0].where.planta_id).toBe('PL1');
     const data = prisma.solicitacoes_servico.create.mock.calls[0][0].data;
     expect(data).toMatchObject({ equipamento_id: null, unidade_id: null, proprietario_id: null });
-    expect(data.observacoes).toContain('proprietário OUTRO');
+    expect(data.descricao).toContain('proprietário OUTRO');
   });
 
   it('planta que não está no Service é 422', async () => {

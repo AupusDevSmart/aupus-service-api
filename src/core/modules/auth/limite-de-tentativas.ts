@@ -63,6 +63,14 @@ export const LIMITE_DA_RENOVACAO = { ip: { limit: 120, ttl: MINUTO } };
 export const SO_O_IP = { conta: true, email: true };
 
 /**
+ * Chamados do NexON (integração de serviço): o worker de lá manda até 80 por
+ * minuto. O teto segura token errado em sequência e o laço que encheria o
+ * sininho e o e-mail de quem programa; conta só o IP (revisão de segurança da
+ * integração, 22/out/2026).
+ */
+export const LIMITE_DOS_CHAMADOS_DO_NEXON = { ip: { limit: 120, ttl: MINUTO } };
+
+/**
  * Comentar (SN-48): cada comentário avisa os envolvidos e quem programa. 20
  * por minuto por conta é folga para conversa e trava o laço que encheria o
  * sininho (e o e-mail) da equipe.

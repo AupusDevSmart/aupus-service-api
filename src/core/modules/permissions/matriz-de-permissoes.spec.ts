@@ -84,6 +84,8 @@ const PUBLICAS = [
   // Canal entre os dois servidores: autenticado pelo TokenServicoGuard, não por JWT
   'GET /sincronizacao/ping',
   'POST /sincronizacao/eventos',
+  // Chamados do NexON viram solicitação: autenticado pelo TokenNexonGuard (NEXON_CHAMADOS_TOKEN)
+  'POST /integracoes/nexon/chamados',
   // Arquivos servidos pelo nome (fotos de equipamento, avatar, arquivos de tarefa)
   'GET /uploads/avatars/:filename',
   'GET /uploads/equipamentos/:filename',

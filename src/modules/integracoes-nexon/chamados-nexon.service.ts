@@ -1,6 +1,9 @@
-import { Injectable, Logger, UnprocessableEntityException } from '@nestjs/common';
+import { ConflictException, Injectable, Logger, UnprocessableEntityException } from '@nestjs/common';
 import { Prisma, PrismaService, StatusSolicitacaoServico } from '@/core';
+import { equipamentoNasPlantas } from '@/core/modules/auth/planta-dos-equipamentos';
 import { SolicitacoesServicoService } from '../solicitacoes-servico/solicitacoes-servico.service';
+import { comOLugarAparado } from '../solicitacoes-servico/lugar-da-solicitacao';
+import { registrarNotificacao } from '../notificacoes/registrar-notificacao';
 import { ChamadoNexonDto } from './dto/chamado-nexon.dto';
 import { montarSolicitacao } from './chamados-nexon';
 
@@ -35,7 +38,7 @@ export class ChamadosNexonService {
 
   async receber(dto: ChamadoNexonDto, origem: OrigemRequisicao = {}) {
     const existente = await this.buscar(dto.nexon_chamado_id);
-    if (existente) return { ...existente, criada: false };
+    if (existente) return this.jaRecebida(dto, existente);
 
     for (let tentativa = 1; ; tentativa++) {
       try {
@@ -46,10 +49,11 @@ export class ChamadosNexonService {
         // Duas entregas do mesmo chamado ao mesmo tempo: a outra ganhou.
         if (alvo.includes('nexon_chamado_id')) {
           const ganhou = await this.buscar(dto.nexon_chamado_id);
-          if (ganhou) return { ...ganhou, criada: false };
+          if (ganhou) return this.jaRecebida(dto, ganhou);
         }
         // Numero da solicitacao colidiu com uma criacao simultanea: tenta o seguinte.
         if (!alvo.includes('numero') || tentativa >= 3) throw erro;
+        this.logger.warn(`Numero de solicitacao colidiu; tentativa ${tentativa + 1}`);
       }
     }
   }
@@ -57,13 +61,33 @@ export class ChamadosNexonService {
   private buscar(nexonChamadoId: string) {
     return this.prisma.solicitacoes_servico.findUnique({
       where: { nexon_chamado_id: nexonChamadoId },
-      select: { id: true, numero: true },
+      select: { id: true, numero: true, status: true, deleted_at: true },
     });
+  }
+
+  /**
+   * O chamado ja virou solicitacao. Aberta, a entrega repetida (a fila do NexON
+   * tenta de novo quando a resposta nao chega) devolve a mesma. Finalizada ou
+   * excluida, o reencaminhamento (o equipamento voltou a falhar) era descartado
+   * com 200 e ninguem no Service ficava sabendo: agora e 409, e o NexON mostra
+   * a falha do encaminhamento.
+   */
+  private jaRecebida(
+    dto: ChamadoNexonDto,
+    existente: { id: string; numero: string; status: StatusSolicitacaoServico; deleted_at: Date | null },
+  ) {
+    const fechada = existente.deleted_at ? 'excluída' : existente.status === StatusSolicitacaoServico.FINALIZADA ? 'finalizada' : null;
+    if (fechada) {
+      throw new ConflictException(
+        `O chamado #${dto.numero} já virou a solicitação ${existente.numero}, ${fechada} no Smart Service. Abra um chamado novo no NexON.`,
+      );
+    }
+    return { id: existente.id, numero: existente.numero, criada: false };
   }
 
   private async criar(dto: ChamadoNexonDto, origem: OrigemRequisicao) {
     const planta = await this.prisma.plantas.findFirst({
-      where: { id: dto.planta_id, deleted_at: null },
+      where: { id: dto.planta_id.trim(), deleted_at: null },
       select: { id: true, nome: true, proprietario_id: true },
     });
     // Sem planta nao existe solicitacao (coluna obrigatoria). 422 e definitivo
@@ -77,31 +101,33 @@ export class ChamadosNexonService {
 
     // Equipamento, unidade e proprietario so entram se forem DESTA planta. Id de
     // outra planta (cadastro divergente entre os dois bancos) vira texto em
-    // `faltando`, nunca uma solicitacao pendurada no ativo de outro cliente.
+    // `faltando`, nunca uma solicitacao pendurada no ativo de outro cliente. A
+    // planta do equipamento e a regra do formulario (SN-12): a da unidade, a da
+    // unidade do UC pai, e a coluna antiga so sem unidade — ela fica velha
+    // quando o UC muda de planta, e o NexON ainda a manda para o componente.
+    const plantaId = planta.id.trim();
     const [equipamento, unidade] = await Promise.all([
       dto.equipamento_id
         ? this.prisma.equipamentos.findFirst({
-            where: {
-              id: dto.equipamento_id,
-              deleted_at: null,
-              OR: [{ planta_id: planta.id }, { unidade: { planta_id: planta.id } }],
-            },
+            where: { id: dto.equipamento_id.trim(), deleted_at: null, ...equipamentoNasPlantas([plantaId]) },
             select: { id: true, nome: true, unidade_id: true },
           })
         : null,
       dto.unidade_id
         ? this.prisma.unidades.findFirst({
-            where: { id: dto.unidade_id, planta_id: planta.id, deleted_at: null },
+            where: { id: dto.unidade_id.trim(), planta_id: plantaId, deleted_at: null },
             select: { id: true },
           })
         : null,
     ]);
-    const proprietarioId =
-      dto.proprietario_id && dto.proprietario_id === planta.proprietario_id?.trim() ? planta.proprietario_id : null;
+    const donoDaPlanta = planta.proprietario_id?.trim() || null;
+    const proprietarioId = dto.proprietario_id?.trim() === donoDaPlanta ? donoDaPlanta : null;
 
     const { faltando, ...dados } = montarSolicitacao(dto, {
+      planta_id: plantaId,
       equipamento,
-      unidade_id: unidade?.id ?? (dto.unidade_id ? null : (equipamento?.unidade_id ?? null)),
+      // O equipamento achado e desta planta: a unidade dele tambem
+      unidade_id: unidade?.id ?? equipamento?.unidade_id ?? null,
       proprietario_id: proprietarioId,
       planta_nome: planta.nome,
     });
@@ -109,10 +135,14 @@ export class ChamadosNexonService {
     const numero = await this.solicitacoes.gerarNumeroSolicitacao();
 
     const criada = await this.prisma.$transaction(async (tx) => {
+      // Os ids do lugar sem o espaço do Char(26), como no formulário (SN-77): com
+      // ele, a busca pelo nome da instalação e o escopo perdiam a solicitação
       const s = await tx.solicitacoes_servico.create({
-        data: { ...dados, numero, status: StatusSolicitacaoServico.REGISTRADA },
+        data: { ...comOLugarAparado(dados), numero, status: StatusSolicitacaoServico.REGISTRADA },
         select: { id: true, numero: true },
       });
+      // Aberta avisa quem programa (SN-47), como a do formulário
+      await registrarNotificacao(tx, { evento: 'solicitacao.aberta', entidade: 'solicitacao_servico', entidadeId: s.id });
       await tx.historico_solicitacao_servico.create({
         data: {
           solicitacao_id: s.id,
@@ -125,7 +155,7 @@ export class ChamadosNexonService {
             nexon_numero: dto.numero,
             motivo: dto.motivo ?? null,
             prioridade: dados.prioridade,
-            planta_id: planta.id,
+            planta_id: plantaId,
             planta_nome: planta.nome,
             unidade_id: dto.unidade_id ?? null,
             equipamento_id: dto.equipamento_id ?? null,

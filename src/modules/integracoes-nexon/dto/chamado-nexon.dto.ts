@@ -1,4 +1,5 @@
-import { IsDateString, IsIn, IsInt, IsNotEmpty, IsOptional, IsString, MaxLength } from 'class-validator';
+import { IsIn, IsInt, IsNotEmpty, IsOptional, IsString, MaxLength } from 'class-validator';
+import { InstanteComFuso } from '@/common/decorators/instante';
 
 export const MOTIVOS_NEXON = ['FALHA', 'ALARME', 'CAMPO', 'OUTRO'] as const;
 export const PRIORIDADES_NEXON = ['BAIXA', 'MEDIA', 'ALTA', 'URGENTE'] as const;
@@ -24,8 +25,10 @@ export class ChamadoNexonDto {
   @MaxLength(255)
   titulo: string;
 
+  // Os tetos com folga sobre os do NexON (5000 e 1000): sem eles, só os 2 MB do corpo
   @IsNotEmpty()
   @IsString()
+  @MaxLength(10000)
   descricao: string;
 
   @IsOptional()
@@ -38,18 +41,22 @@ export class ChamadoNexonDto {
 
   @IsOptional()
   @IsString()
+  @MaxLength(64)
   equipamento_id?: string | null;
 
   @IsOptional()
   @IsString()
+  @MaxLength(64)
   unidade_id?: string | null;
 
   @IsNotEmpty()
   @IsString()
+  @MaxLength(64)
   planta_id: string;
 
   @IsOptional()
   @IsString()
+  @MaxLength(64)
   proprietario_id?: string | null;
 
   @IsOptional()
@@ -57,11 +64,13 @@ export class ChamadoNexonDto {
   @MaxLength(255)
   autor_nome?: string | null;
 
+  // Com o fuso: sem ele, o @IsDateString de antes lia "2026-10-20T10:00" no fuso do servidor (SN-74)
   @IsOptional()
-  @IsDateString()
+  @InstanteComFuso()
   aberto_em?: string | null;
 
   @IsOptional()
   @IsString()
+  @MaxLength(2000)
   observacao?: string | null;
 }
