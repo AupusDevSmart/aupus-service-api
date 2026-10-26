@@ -27,6 +27,8 @@ import { planoAHerdar, mapearAjustesParaCopia, aplicarDatasHerdadas } from './he
 import { ancoraDoInicio, primeirosVencimentos } from './primeiros-vencimentos';
 import type { PrimeirosVencimentosDto, PrimeirosVencimentosQueryDto } from './dto/primeiros-vencimentos.dto';
 import { regraDeDiasUteis } from '../agenda/dias-uteis';
+import { valoresDasInstrucoes } from '../instrucoes/valor-da-instrucao';
+import { valorDoPlano, type ValorDoPlano } from './valor-do-plano';
 
 /**
  * Plano como as consultas deste service o leem. As relacoes variam com o
@@ -37,7 +39,11 @@ type PlanoLido = planos_manutencao & {
   equipamento?: EquipamentoResumoDto | null;
   usuario_criador?: UsuarioResumoDto | null;
   usuario_atualizador?: UsuarioResumoDto | null;
-  tarefas?: Pick<tarefas, 'id' | 'tag' | 'nome' | 'ordem' | 'criticidade' | 'instrucao_id' | 'ativo'>[];
+  // frequencia e instrucao so vem na leitura do plano com as tarefas (buscarPorId)
+  tarefas?: (Pick<tarefas, 'id' | 'tag' | 'nome' | 'ordem' | 'criticidade' | 'instrucao_id' | 'ativo'> &
+    Partial<Pick<tarefas, 'frequencia' | 'frequencia_personalizada'>> & {
+      instrucao?: { codigo: string | null; nome: string } | null;
+    })[];
   _count?: { tarefas?: number; copias?: number };
 };
 
@@ -194,7 +200,8 @@ export class PlanosManutencaoService {
       ...(incluirTarefas && {
         tarefas: {
           where: { deleted_at: null },
-          orderBy: { ordem: 'asc' }
+          orderBy: { ordem: 'asc' },
+          include: { instrucao: { select: { codigo: true, nome: true } } }
         }
       })
     };
@@ -218,7 +225,13 @@ export class PlanosManutencaoService {
       await this.scopeService.assertEntityInScope('equipamento', plano.equipamento_id, user, PLANO_NAO_ENCONTRADO);
     }
 
-    return this.mapearParaResponse(plano);
+    // O valor de cada tarefa e o da instrucao dela, e o do plano e a soma (valor-do-plano.ts)
+    const tarefasDoPlano = (plano as PlanoLido).tarefas;
+    const valor = incluirTarefas && tarefasDoPlano
+      ? valorDoPlano(tarefasDoPlano, await valoresDasInstrucoes(this.prisma, tarefasDoPlano.map((t) => t.instrucao_id)))
+      : undefined;
+
+    return this.mapearParaResponse(plano, valor);
   }
 
   async buscarPorEquipamento(equipamentoId: string, user?: ScopedUser): Promise<PlanoManutencaoResponseDto> {
@@ -1145,7 +1158,7 @@ export class PlanosManutencaoService {
     return [orderBy, { id: 'asc' }];
   }
 
-  private mapearParaResponse(plano: PlanoLido): PlanoManutencaoResponseDto {
+  private mapearParaResponse(plano: PlanoLido, valor?: ValorDoPlano): PlanoManutencaoResponseDto {
     return {
       id: plano.id,
       categoria_id: plano.categoria_id?.trim() || plano.categoria_id,
@@ -1171,7 +1184,17 @@ export class PlanosManutencaoService {
         ordem: tarefa.ordem,
         criticidade: tarefa.criticidade,
         instrucao_id: tarefa.instrucao_id,
+        instrucao_codigo: tarefa.instrucao?.codigo ?? undefined,
+        instrucao_nome: tarefa.instrucao?.nome,
+        frequencia: tarefa.frequencia ?? undefined,
+        frequencia_personalizada: tarefa.frequencia_personalizada ?? undefined,
+        ativo: tarefa.ativo,
+        ...(valor && {
+          valor: valor.porTarefa.get(tarefa.id)?.valor ?? null,
+          valor_sem_preco: valor.porTarefa.get(tarefa.id)?.sem_preco ?? false,
+        }),
       })),
+      ...(valor && { valor_total: valor.total, tarefas_sem_preco: valor.tarefas_sem_preco }),
       total_tarefas: plano._count?.tarefas || plano.tarefas?.length || 0,
       tarefas_ativas: plano.tarefas?.filter((t) => t.ativo)?.length || 0,
       criticidade_media: plano.tarefas?.length > 0 ? 

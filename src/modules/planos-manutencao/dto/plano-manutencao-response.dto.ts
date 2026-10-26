@@ -27,6 +27,15 @@ export class TarefaResumoDto {
   criticidade?: number;
   instrucao_id?: string;
   instrucao_nome?: string;
+  /** Só na leitura do plano com as tarefas (`incluirTarefas`). */
+  instrucao_codigo?: string;
+  frequencia?: string;
+  frequencia_personalizada?: number;
+  ativo?: boolean;
+  /** O valor da instrução pelo cadastro; nulo quando a tarefa não tem instrução. */
+  valor?: number | null;
+  /** A instrução tem linha sem preço no cadastro: o valor está abaixo do custo. */
+  valor_sem_preco?: boolean;
 }
 
 export class CategoriaResumoDto {
@@ -67,4 +76,9 @@ export class PlanoManutencaoResponseDto {
   tarefas_ativas?: number;
   tempo_total_estimado?: number;
   criticidade_media?: number;
+
+  /** Só com `incluirTarefas`: soma do valor das tarefas ativas (ver `valor-do-plano.ts`). */
+  valor_total?: number;
+  /** Tarefas ativas cuja instrução tem linha sem preço: o total está abaixo do custo. */
+  tarefas_sem_preco?: number;
 }
