@@ -327,6 +327,31 @@ describe('Importação de equipamentos (banco real)', () => {
     expect(await uc()).toBeNull();
   });
 
+  // O BC 1 de 26/out/2026: modelo certo numa posição criada com outra categoria. A posição vale antes do modelo
+  it('plano de outra categoria que a da posição: erro no campo PLANO, dizendo as categorias e a posição', async () => {
+    const OUTRA = `${P}CATEGORIA0002`.padEnd(26, '0').slice(0, 26);
+    await prisma.categorias_equipamentos.upsert({ where: { id: OUTRA }, update: {}, create: { id: OUTRA, nome: 'Bomba Importação' } });
+    await importacao.importar(equipamentos, [ficha({ plano: null })], true, admin);
+    const id = (await uc())!.id.trim();
+    const posicao = await prisma.ativos_funcionais.create({ data: { nome: 'BC teste', categoria_id: OUTRA, unidade_id: UNIDADE } });
+    await prisma.equipamentos.update({ where: { id }, data: { ativo_funcional_id: posicao.id } });
+
+    try {
+      const r = await importacao.importar(equipamentos, [ficha({}, id)], false, admin);
+
+      expect(r.erros).toEqual([
+        expect.objectContaining({
+          campo: 'plano',
+          mensagem: expect.stringContaining('o plano é de "Inversor Importação", e o equipamento é de "Bomba Importação", a categoria da posição "BC teste"'),
+        }),
+      ]);
+    } finally {
+      await prisma.equipamentos.update({ where: { id }, data: { ativo_funcional_id: null } });
+      await prisma.ativos_funcionais.delete({ where: { id: posicao.id } });
+      await prisma.categorias_equipamentos.delete({ where: { id: OUTRA } });
+    }
+  });
+
   /**
    * SN-98 (decisão do usuário, 23/out/2026): o plano da coluna PLANO que não
    * existe é criado antes do equipamento — o template da CATEGORIA da aba, com as

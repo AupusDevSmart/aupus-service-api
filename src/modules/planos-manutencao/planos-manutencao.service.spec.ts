@@ -40,7 +40,7 @@ describe('PlanosManutencaoService', () => {
     },
     equipamentos: { findFirst: jest.fn(), findUnique: jest.fn() },
     tipos_equipamentos: { findUnique: jest.fn() },
-    categorias_equipamentos: { findFirst: jest.fn() },
+    categorias_equipamentos: { findFirst: jest.fn(), findMany: jest.fn() },
     $transaction: jest.fn(),
   };
 
@@ -247,15 +247,22 @@ describe('PlanosManutencaoService', () => {
       ).rejects.toThrow(BadRequestException);
     });
 
-    it('rejeita plano de outra categoria', async () => {
+    it('rejeita plano de outra categoria, dizendo as duas e de onde veio a do equipamento', async () => {
       prepararCenarioFeliz();
       mockPrismaService.tipos_equipamentos.findUnique.mockResolvedValue({
         categoria_id: CATEGORIA_TRAFO,
       });
+      mockPrismaService.categorias_equipamentos.findMany.mockResolvedValue([
+        { id: CATEGORIA_MOTOR, nome: 'Motor Elétrico' },
+        { id: CATEGORIA_TRAFO, nome: 'Transformador de Potência' },
+      ]);
 
-      await expect(
-        service.vincularEquipamento({ equipamento_id: EQUIPAMENTO_UC, plano_id: TEMPLATE_ID }),
-      ).rejects.toThrow(BadRequestException);
+      const erro = await service.vincularEquipamento({ equipamento_id: EQUIPAMENTO_UC, plano_id: TEMPLATE_ID }).catch((e: unknown) => e);
+
+      expect(erro).toBeInstanceOf(BadRequestException);
+      expect((erro as Error).message).toBe(
+        'O plano pertence a outra categoria de equipamento: o plano é de "Motor Elétrico", e o equipamento é de "Transformador de Potência", a categoria do modelo dele.',
+      );
     });
 
     it('rejeita equipamento sem modelo, que nao tem categoria', async () => {

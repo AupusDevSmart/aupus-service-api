@@ -401,8 +401,18 @@ export class EquipamentosImportacao implements CadastroImportavel<EquipamentoCom
     const criado = await this.equipamentos.create(equipamento as CreateEquipamentoDto);
     const id = criado.id.trim();
     await this.gravarComponentes(id, equipamento.unidade_id ?? null, componentes ?? []);
-    if (planoId) await this.planos.vincularEquipamento({ equipamento_id: id, plano_id: planoId, criado_por: usuario.id }, usuario);
+    if (planoId) await this.vincular(id, planoId, usuario);
     return { id };
+  }
+
+  /** O erro do vínculo é do campo PLANO: assim a prévia aponta a linha dele, e não a 1 da aba */
+  private async vincular(equipamentoId: string, planoId: string, usuario: UsuarioDaImportacao) {
+    try {
+      await this.planos.vincularEquipamento({ equipamento_id: equipamentoId, plano_id: planoId, criado_por: usuario.id }, usuario);
+    } catch (erro) {
+      if (erro instanceof BadRequestException) throw ErrosDaLinha.em('plano', erro.message);
+      throw erro;
+    }
   }
 
   async atualizar(atual: EquipamentoComListas, dto: object, usuario: UsuarioDaImportacao) {
@@ -411,9 +421,7 @@ export class EquipamentosImportacao implements CadastroImportavel<EquipamentoCom
       await this.equipamentos.update(atual.id.trim(), equipamento as UpdateEquipamentoDto);
     }
     await this.gravarComponentes(atual.id.trim(), atual.unidade_id?.trim() ?? null, componentes ?? []);
-    if (planoId) {
-      await this.planos.vincularEquipamento({ equipamento_id: atual.id.trim(), plano_id: planoId, criado_por: usuario.id }, usuario);
-    }
+    if (planoId) await this.vincular(atual.id.trim(), planoId, usuario);
   }
 
   /** Componente com ID atualiza (se mudou); sem ID cria nesta UC. Nenhum é apagado. */

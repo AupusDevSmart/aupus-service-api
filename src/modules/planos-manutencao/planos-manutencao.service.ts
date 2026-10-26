@@ -754,9 +754,37 @@ export class PlanosManutencaoService {
     }
 
     if (categoriaEquipamento !== template.categoria_id?.trim()) {
-      throw new BadRequestException('O plano pertence a outra categoria de equipamento');
+      throw new BadRequestException(await this.mensagemDeOutraCategoria(equipamentoId, categoriaEquipamento, template.categoria_id));
     }
     return { equipamento, template };
+  }
+
+  /**
+   * Quais categorias brigam, e de onde veio a do equipamento: a posição vale
+   * antes do modelo (`categoria-do-equipamento.ts`), e sem dizer isso a pessoa
+   * olha o modelo, vê a categoria certa e não entende (o BC 1 de 26/out/2026:
+   * modelo de banco de capacitores numa posição criada como bomba de combustível).
+   */
+  private async mensagemDeOutraCategoria(equipamentoId: string, doEquipamento: string, doPlano: string | null) {
+    const [categorias, equipamento] = await Promise.all([
+      this.prisma.categorias_equipamentos.findMany({
+        where: { id: { in: [doEquipamento, doPlano?.trim() ?? ''].flatMap((id) => [id, id.padEnd(26, ' ')]) } },
+        select: { id: true, nome: true },
+      }),
+      this.prisma.equipamentos.findFirst({
+        where: { id: equipamentoId.trim() },
+        select: { ativo_funcional: { select: { nome: true, categoria_id: true, deleted_at: true } } },
+      }),
+    ]);
+    const nome = (id: string | null) => categorias.find((c) => c.id.trim() === id?.trim())?.nome ?? 'sem categoria';
+    const posicao = equipamento?.ativo_funcional;
+    const daPosicao = posicao && !posicao.deleted_at && posicao.categoria_id?.trim() === doEquipamento;
+    return (
+      `O plano pertence a outra categoria de equipamento: o plano é de "${nome(doPlano)}", e o equipamento é de "${nome(doEquipamento)}"` +
+      (daPosicao
+        ? `, a categoria da posição "${posicao.nome}" (a da posição vale antes da do modelo; para mudar, transfira o equipamento para uma posição da categoria do plano).`
+        : ', a categoria do modelo dele.')
+    );
   }
 
   async vincularEquipamento(dto: VincularPlanoDto, user?: ScopedUser): Promise<VincularPlanoResponseDto> {
