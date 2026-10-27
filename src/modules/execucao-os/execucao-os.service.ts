@@ -53,7 +53,7 @@ import { SELECAO_DA_TAREFA, instrucoesDasLinhas, tarefasDasLinhas } from './tare
 import { gravarOutrosCustos } from './outros-custos';
 import { naturezaDoItem } from './natureza-do-custo';
 import { comOCustoRegistrado, resumoDoCusto } from './resumo-do-custo';
-import { conferirCodigo, gravarCodigoDeVerificacao, relatorioDaOS, somasDosAnexosSemSoma, type ConferenciaDoCodigo, type RelatorioDaOS } from './verificacao-da-os';
+import { conferirCodigo, gravarCodigoDeVerificacao, relatorioDaOS, semOsCustos, somasDosAnexosSemSoma, type ConferenciaDoCodigo, type RelatorioDaOS } from './verificacao-da-os';
 import { pessoasQuePodemAtuar } from '@/modules/programacao-os/pessoas-da-os';
 import type { PessoasDaOS } from './horas-da-execucao';
 import { fotosDosItens, gravacoesDoChecklist, leituraDoItem, pendenciaDaTarefa, travarItensDoChecklist, travarTarefa } from './itens-do-checklist';
@@ -1652,9 +1652,11 @@ export class ExecucaoOSService {
   }
 
   /** O conteúdo do PDF da OS (SN-62): o finalizado, com o código; antes de finalizar, o de agora, como prévia. */
-  async relatorio(id: string, user?: ScopedUser): Promise<RelatorioDaOS> {
+  async relatorio(id: string, user?: UsuarioDaOS): Promise<RelatorioDaOS> {
     if (user) await this.scopeService.assertEntityInScope('ordem_servico', id, user);
-    return relatorioDaOS(this.prisma, id);
+    const relatorio = await relatorioDaOS(this.prisma, id);
+    // Técnico de campo e cliente recebem o PDF sem os custos (SERV-9)
+    return user && !gerenciaAOS(user) ? semOsCustos(relatorio) : relatorio;
   }
 
   /** Confere um código de verificação: a OS dele, e se o conteúdo de agora ainda é o finalizado. */

@@ -45,8 +45,11 @@ export interface RelatorioDaOS {
   /** A OS ainda não foi finalizada: o documento é prévia, sem código */
   previa: boolean;
   conteudo: ConteudoDoPdf;
-  /** SN-93: o custo aberto, pela mesma conta do sheet e do custo real gravado */
-  custos: ResumoDoCusto;
+  /**
+   * SN-93: o custo aberto, pela mesma conta do sheet e do custo real gravado.
+   * Null para quem não gerencia a OS (SERV-9): ver `semOsCustos`
+   */
+  custos: ResumoDoCusto | null;
 }
 
 export interface ConferenciaDoCodigo {
@@ -178,6 +181,30 @@ export async function relatorioDaOS(prisma: Cliente, id: string): Promise<Relato
   const versao = os.status === 'FINALIZADA' ? 1 : VERSAO_DO_CONTEUDO;
   const conteudo = await conteudoDaOS(prisma, os.id, somaGravadaOuDoDisco, versao);
   return { ...base, codigo: null, previa: os.status !== 'FINALIZADA', ...(await paraOPdf(prisma, os.id, conteudo)) };
+}
+
+/**
+ * O relatório de quem não gerencia a OS — técnico de campo e cliente (SERV-9):
+ * sem dinheiro nenhum (custo real, orçamento, valor de cada tarefa, valor/hora
+ * de cada pessoa, custo unitário de cada material e os outros custos). As horas
+ * e as quantidades ficam: são o registro da execução. O código continua o da OS
+ * inteira — ele prova o registro gravado, não o documento entregue.
+ */
+export function semOsCustos(relatorio: RelatorioDaOS): RelatorioDaOS {
+  const { conteudo } = relatorio;
+  const { orcamento_previsto: _orcamento, custos_adicionais: _adicionais, ...os } = conteudo.os;
+  const { outros_custos: _outros, ...resto } = conteudo;
+  return {
+    ...relatorio,
+    custos: null,
+    conteudo: {
+      ...resto,
+      os: { ...os, custo_real: null },
+      tarefas: conteudo.tarefas.map(({ valor: _valor, valor_original: _original, ...tarefa }) => tarefa),
+      equipe: conteudo.equipe.map((pessoa) => ({ ...pessoa, custo_hora: null })),
+      materiais: conteudo.materiais.map((material) => ({ ...material, custo_unitario: null })),
+    },
+  };
 }
 
 /**
