@@ -164,7 +164,7 @@ describe('custo da OS por instrução e por natureza (banco real)', () => {
     const itens = await prisma.itens_orcamento_os.findMany({ where: { os_id: os.id } });
     const veiculo = itens.find((i) => i.natureza === 'VEICULO')!;
     const hospedagem = itens.find((i) => i.natureza === 'DESPESA_CAMPO')!;
-    return { osId: os.id, a, b, tecnico, veiculo, hospedagem };
+    return { osId: os.id, progId: prog.id, a, b, tecnico, veiculo, hospedagem };
   };
 
   const executar = (os: Awaited<ReturnType<typeof emExecucao>>, extra: Record<string, unknown> = {}) =>
@@ -313,6 +313,42 @@ describe('custo da OS por instrução e por natureza (banco real)', () => {
     expect(tecnico.conteudo.equipe[0]).toMatchObject({ custo_hora: null, horas_trabalhadas: 7 });
     expect(tecnico.codigo).toBe(relatorio.codigo);
     expect(tecnico.conteudo.tarefas.map((t) => t.equipamento)).toEqual(['Inversor 01', 'Inversor 01']);
+  });
+
+  it('o cliente não vê dinheiro da OS na tela; o técnico de campo e o planejador veem tudo (SERV-10)', async () => {
+    const os = await emExecucao();
+    await executar(os, { outros_custos: [{ id: os.veiculo.id, valor_real: 1402.5 }] });
+    const cliente = { id: 'c', role: 'proprietario', permissions: ['execucao_os.view', 'programacao_os.view', 'dashboard.view'] } as never;
+    const tecnico = { id: 't', role: 'operador', permissions: ['execucao_os.view', 'execucao_os.executar'] } as never;
+    const planejador = { id: 'p', role: 'analista', permissions: ['execucao_os.manage', 'programacao_os.manage'] } as never;
+
+    const completo = await execucoes.buscarPorId(os.osId);
+    expect(completo.custos).not.toBeNull();
+    expect(await execucoes.buscarPorId(os.osId, tecnico)).toEqual(completo);
+    expect(await execucoes.buscarPorId(os.osId, planejador)).toEqual(completo);
+
+    const doCliente = await execucoes.buscarPorId(os.osId, cliente);
+    expect(doCliente.custos).toBeNull();
+    expect(doCliente).toMatchObject({ custo_real: null, orcamento_previsto: null, custos_adicionais: null, itens_orcamento: [] });
+    expect(doCliente.tarefas_os!.every((t) => t.valor === null && t.valor_original === null)).toBe(true);
+    expect(doCliente.tecnicos.every((t) => t.custo_hora === null && t.custo_total === null)).toBe(true);
+    expect(doCliente.materiais.every((m) => m.custo_unitario === null && m.custo_total === null)).toBe(true);
+    // A programação que vem junto, e o R$ escrito na trilha
+    expect(JSON.stringify(doCliente)).not.toMatch(/R\$\s*\d/);
+    expect((doCliente.programacao as { orcamento_previsto?: unknown } | null)?.orcamento_previsto ?? null).toBeNull();
+    // O resto da OS fica: as horas e as tarefas são o registro da execução
+    expect(doCliente.tecnicos.map((t) => t.horas_trabalhadas)).toEqual(completo.tecnicos.map((t) => t.horas_trabalhadas));
+    expect(doCliente.tarefas_os!.map((t) => t.equipamento_nome)).toEqual(completo.tarefas_os!.map((t) => t.equipamento_nome));
+
+    const filtro = { search: completo.numero_os } as never;
+    const [daLista] = (await execucoes.listar(filtro, cliente)).data;
+    expect(daLista).toMatchObject({ numero_os: completo.numero_os, custo_real: null, orcamento_previsto: null });
+    expect((await execucoes.listar(filtro, tecnico)).data[0].custo_real).toBe(completo.custo_real);
+
+    const prog = await programacoes.buscarPorId(os.progId, cliente);
+    expect(prog).toMatchObject({ orcamento_previsto: null, itens_orcamento: [] });
+    expect(JSON.stringify(prog)).not.toMatch(/"valor(_original)?":\s*\d/);
+    expect((await programacoes.buscarPorId(os.progId, planejador)).orcamento_previsto).toEqual((await programacoes.buscarPorId(os.progId)).orcamento_previsto);
   });
 
   // A OS finalizada antes do SN-93 tem o conteúdo da versão 1: o código dela tem de continuar conferindo

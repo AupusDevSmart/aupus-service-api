@@ -75,6 +75,7 @@ import {
   valorDaLinha,
   vinculoDaOS,
 } from './instrucoes-da-programacao';
+import { semDinheiro, veOsCustos } from '../execucao-os/quem-ve-os-custos';
 import { congelamentoDasLinhas, nomesDosEquipamentos } from './congelamento-da-linha';
 import { naturezaDoItem, naturezaPeloPrefixo } from '../execucao-os/natureza-do-custo';
 import type { TarefaDaLinha } from '../execucao-os/tarefas-das-linhas';
@@ -158,7 +159,7 @@ export class ProgramacaoOSService {
     return programacaoDasPlantas(scope);
   }
 
-  async listar(filters: ProgramacaoFiltersDto, user?: ScopedUser): Promise<ListarProgramacoesResponseDto> {
+  async listar(filters: ProgramacaoFiltersDto, user?: ScopedUser & { permissions?: string[] }): Promise<ListarProgramacoesResponseDto> {
 
     const {
       page = 1,
@@ -287,10 +288,10 @@ export class ProgramacaoOSService {
       programacoes.map(programacao => programacao.id),
     );
 
+    // SERV-10: o cliente não vê orçamento nem o valor das instruções
+    const resposta = (programacao: (typeof programacoes)[number]) => this.mapearParaResponse(programacao, instalacoes.get(programacao.id) ?? []);
     return {
-      data: programacoes.map(programacao =>
-        this.mapearParaResponse(programacao, instalacoes.get(programacao.id) ?? []),
-      ),
+      data: programacoes.map((programacao) => (veOsCustos(user) ? resposta(programacao) : semDinheiro(resposta(programacao)))),
       pagination: {
         page,
         limit,
@@ -301,7 +302,7 @@ export class ProgramacaoOSService {
     };
   }
 
-  async buscarPorId(id: string, user?: ScopedUser): Promise<ProgramacaoDetalhesResponseDto> {
+  async buscarPorId(id: string, user?: ScopedUser & { permissions?: string[] }): Promise<ProgramacaoDetalhesResponseDto> {
     if (user) await this.scopeService.assertEntityInScope('programacao_os', id, user);
     const programacao = await this.prisma.programacoes_os.findFirst({
       where: {
@@ -356,10 +357,12 @@ export class ProgramacaoOSService {
 
     // A tarefa de cada linha e o valor do cadastro da linha de antes do SN-93 (`linhasParaAResposta`)
     const tarefas_programacao = await linhasParaAResposta(this.prisma, programacao.tarefas_programacao);
-    return this.mapearParaDetalhes({ ...programacao, tarefas_programacao }, reserva, instalacoes.get(programacao.id) ?? []);
+    const detalhes = this.mapearParaDetalhes({ ...programacao, tarefas_programacao }, reserva, instalacoes.get(programacao.id) ?? []);
+    // SERV-10: o cliente não vê orçamento nem o valor das instruções
+    return veOsCustos(user) ? detalhes : semDinheiro(detalhes);
   }
 
-  async buscarPorUnidade(unidadeId: string, filters?: ProgramacaoFiltersDto, user?: ScopedUser): Promise<ListarProgramacoesResponseDto> {
+  async buscarPorUnidade(unidadeId: string, filters?: ProgramacaoFiltersDto, user?: ScopedUser & { permissions?: string[] }): Promise<ListarProgramacoesResponseDto> {
     // Verificar se unidade existe e esta no escopo
     await this.verificarUnidadeExiste(unidadeId);
     if (user) await this.scopeService.assertEntityInScope('unidade', unidadeId, user);
