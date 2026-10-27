@@ -51,6 +51,7 @@ import { reais } from './custo-da-os';
 import { congelarValoresDasInstrucoes, custoRealDaOS, dadosDoCustoDaOS } from './dados-do-custo';
 import { SELECAO_DA_TAREFA, instrucoesDasLinhas, tarefasDasLinhas } from './tarefas-das-linhas';
 import { gravarOutrosCustos } from './outros-custos';
+import { semDinheiro, veOsCustos } from './quem-ve-os-custos';
 import { naturezaDoItem } from './natureza-do-custo';
 import { comOCustoRegistrado, resumoDoCusto } from './resumo-do-custo';
 import { conferirCodigo, gravarCodigoDeVerificacao, relatorioDaOS, semOsCustos, somasDosAnexosSemSoma, type ConferenciaDoCodigo, type RelatorioDaOS } from './verificacao-da-os';
@@ -217,7 +218,7 @@ export class ExecucaoOSService {
     return ordemDasPlantas(scope);
   }
 
-  async listar(filters: OSFiltersDto, user?: ScopedUser): Promise<ListarOSResponseDto> {
+  async listar(filters: OSFiltersDto, user?: UsuarioDaOS): Promise<ListarOSResponseDto> {
     const {
       page = 1,
       limit = 10,
@@ -423,10 +424,10 @@ export class ExecucaoOSService {
     // página inteira.
     const instalacoes = await instalacoesDasOrdens(this.prisma, ordens.map(ordem => ordem.id));
 
+    // SERV-10: o cliente não vê dinheiro da OS
+    const resposta = (ordem: (typeof ordens)[number]) => this.mapearParaResponse(ordem, instalacoes.get(ordem.id) ?? []);
     return {
-      data: ordens.map(ordem =>
-        this.mapearParaResponse(ordem, instalacoes.get(ordem.id) ?? []),
-      ),
+      data: ordens.map((ordem) => (veOsCustos(user) ? resposta(ordem) : semDinheiro(resposta(ordem)))),
       pagination: {
         page,
         limit,
@@ -437,7 +438,7 @@ export class ExecucaoOSService {
     };
   }
 
-  async buscarPorId(id: string, user?: ScopedUser): Promise<OrdemServicoDetalhesResponseDto> {
+  async buscarPorId(id: string, user?: UsuarioDaOS): Promise<OrdemServicoDetalhesResponseDto> {
     if (user) await this.scopeService.assertEntityInScope('ordem_servico', id, user);
     const os = await this.prisma.ordens_servico.findFirst({
       where: {
@@ -603,7 +604,9 @@ export class ExecucaoOSService {
 
     const instrucoesDaLinha = await instrucoesDasLinhas(this.prisma, os.tarefas_os);
     const tarefas_os = os.tarefas_os.map((t, i) => ({ ...t, instrucao_da_linha: instrucoesDaLinha[i] }));
-    return { ...this.mapearParaDetalhes({ ...os, tarefas_os }, instalacoes.get(os.id) ?? []), custos };
+    const detalhes = { ...this.mapearParaDetalhes({ ...os, tarefas_os }, instalacoes.get(os.id) ?? []), custos };
+    // SERV-10: o cliente não vê dinheiro da OS (sem o quadro de custos, os valores e o R$ da trilha)
+    return veOsCustos(user) ? detalhes : semDinheiro(detalhes);
   }
 
   /** A versão do conteúdo registrado na finalização (0 = sem conteúdo); o JSON inteiro não precisa sair do banco */

@@ -5,6 +5,7 @@ import { Prisma, PrismaService, PermissionScopeService, PlantaScope, ScopedUser 
 import { ordemDasPlantas } from '../../common/helpers/filtros-da-os';
 import type { QueryDashboardManutencaoDto } from './dto/query-dashboard-manutencao.dto';
 import { calcularConfiabilidade, frotaDoRecorte, type Confiabilidade, type Frota } from './confiabilidade';
+import { veOsCustos } from '../execucao-os/quem-ve-os-custos';
 import { custosDasOrdens, montarCusto, montarCustoPorOS, type CustosDoPainel } from './custo-do-painel';
 import { explicacoesDosGraficos } from './explicacoes-do-painel';
 import { passouDoPrazo, terminouNoPrazo } from '@/common/helpers/prazo-da-os';
@@ -25,7 +26,13 @@ import {
   type OrdensDoPeriodo,
 } from './recorte-do-painel';
 
-type UserCtx = ScopedUser | undefined;
+type UserCtx = (ScopedUser & { permissions?: string[] }) | undefined;
+
+/** Os blocos de dinheiro do painel saem nulos, e a legenda deles some (SERV-10) */
+const GRAFICOS_DE_CUSTO = new Set(['custo', 'custoPorOS', 'ofensores']);
+function semOsCustosDoPainel<T extends { graficos: { id: string }[] }>(blocos: T) {
+  return { ...blocos, custo: null, custoPorOS: null, ofensores: [], graficos: blocos.graficos.filter((g) => !GRAFICOS_DE_CUSTO.has(g.id)) };
+}
 
 const plural = (n: number, um: string, varios: string) => `${n} ${n === 1 ? um : varios}`;
 
@@ -142,12 +149,14 @@ export class DashboardManutencaoService {
       custosDasOrdens(this.prisma, ordens.filter((o) => STATUS_CONCLUIDO.includes(o.status))),
     ]);
 
+    const blocos = this.montarBlocos(ordens, anomalias, janela, { abertas: anomaliasAbertas, semOS: anomaliasSemOS }, frota, custos, Boolean(filtroDe(filtros.equipe)));
     return {
       atualizadoEm: new Date().toISOString(),
       meses: janela.meses.map((m) => m.rotulo),
       periodo: { desde: janela.desde.toISOString(), ate: janela.ate.toISOString() },
       opcoes: await this.montarOpcoes(scope, filtros),
-      ...this.montarBlocos(ordens, anomalias, janela, { abertas: anomaliasAbertas, semOS: anomaliasSemOS }, frota, custos, Boolean(filtroDe(filtros.equipe))),
+      // SERV-10: o cliente não vê dinheiro da OS — sem os gráficos de custo e os ofensores (que são por custo)
+      ...(veOsCustos(user) ? blocos : semOsCustosDoPainel(blocos)),
     };
   }
 
@@ -162,7 +171,8 @@ export class DashboardManutencaoService {
     const custos = await custosDasOrdens(this.prisma, ordens.filter((o) => STATUS_CONCLUIDO.includes(o.status)));
     return {
       periodo: { desde: janela.desde.toISOString(), ate: janela.ate.toISOString() },
-      ordens: ordensDaConta(ordens, janela, custos),
+      // SERV-10: o cliente recebe as OS sem o custo
+      ordens: ordensDaConta(ordens, janela, veOsCustos(user) ? custos : new Map()),
     };
   }
 

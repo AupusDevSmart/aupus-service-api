@@ -811,9 +811,9 @@ export class OrdemServicoDetalhesResponseDto extends OrdemServicoResponseDto {
   @ApiProperty({ description: 'Itens de orçamento da OS', type: [ItemOrcamentoOSResponseDto] })
   itens_orcamento: ItemOrcamentoOSResponseDto[];
 
-  /** SN-93: o custo aberto — por natureza, por instrução, previsto e real —, a mesma conta do PDF */
-  @ApiPropertyOptional({ description: 'Custo da OS por natureza e por instrução (SN-93)' })
-  custos?: ResumoDoCusto;
+  /** SN-93: o custo aberto — por natureza, por instrução, previsto e real —, a mesma conta do PDF. Null para o cliente (SERV-10) */
+  @ApiPropertyOptional({ description: 'Custo da OS por natureza e por instrução (SN-93); null para quem não vê custos (SERV-10)' })
+  custos?: ResumoDoCusto | null;
 
   @ApiProperty({ description: 'Checklist de atividades', type: [ChecklistAtividadeResponseDto] })
   checklist: ChecklistAtividadeResponseDto[];
