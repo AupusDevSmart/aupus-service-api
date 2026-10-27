@@ -297,6 +297,22 @@ describe('custo da OS por instrução e por natureza (banco real)', () => {
     expect([relatorio.custos.real, relatorio.custos.instrucoes_feitas_total]).toEqual([3148.5, 285]);
     // D3: o PDF mostra o valor/hora de cada pessoa
     expect(relatorio.conteudo.equipe[0]).toMatchObject({ custo_hora: 78, horas_trabalhadas: 7 });
+
+    // SERV-9: quem gerencia a OS (planejador para cima) recebe tudo; técnico de campo e cliente, nada de dinheiro
+    const planejador = await execucoes.relatorio(os.osId, { id: 'p', role: 'analista', permissions: ['execucao_os.manage'] } as never);
+    expect(planejador).toEqual(relatorio);
+    const tecnico = await execucoes.relatorio(os.osId, { id: 't', role: 'analista', permissions: ['execucao_os.executar'] } as never);
+    expect(tecnico.custos).toBeNull();
+    expect(tecnico.conteudo).not.toHaveProperty('outros_custos');
+    expect(tecnico.conteudo.os).toMatchObject({ custo_real: null });
+    expect(tecnico.conteudo.os).not.toHaveProperty('orcamento_previsto');
+    expect(tecnico.conteudo.os).not.toHaveProperty('custos_adicionais');
+    expect(tecnico.conteudo.tarefas.some((t) => 'valor' in t || 'valor_original' in t)).toBe(false);
+    expect(tecnico.conteudo.materiais.every((m) => m.custo_unitario === null)).toBe(true);
+    // As horas ficam: são o registro da execução; o código é o da OS inteira
+    expect(tecnico.conteudo.equipe[0]).toMatchObject({ custo_hora: null, horas_trabalhadas: 7 });
+    expect(tecnico.codigo).toBe(relatorio.codigo);
+    expect(tecnico.conteudo.tarefas.map((t) => t.equipamento)).toEqual(['Inversor 01', 'Inversor 01']);
   });
 
   // A OS finalizada antes do SN-93 tem o conteúdo da versão 1: o código dela tem de continuar conferindo
