@@ -21,7 +21,8 @@ import { Prisma, type solicitacoes_servico } from '@/core';
 import { StatusSolicitacaoServico } from '@/core';
 import { comDataNecessidadeNormalizada } from './data-necessidade';
 import { periodoDoFiltro } from '../../common/helpers/filtros-da-os';
-import { comAsRelacoes, comOLugarAparado, mudouOLugar, plantaDaSolicitacao } from './lugar-da-solicitacao';
+import { comAsRelacoes, comOLugarAparado, exigirQuemPediu, mudouOLugar, plantaDaSolicitacao } from './lugar-da-solicitacao';
+import { bdiPadrao } from './bdi-padrao';
 import { registrarNotificacao } from '../notificacoes/registrar-notificacao';
 
 /** A planta que a linha da lista mostra */
@@ -175,18 +176,26 @@ export class SolicitacoesServicoService {
         }
       }
 
-      // A planta e a coerência do lugar (unidade, equipamento), com o escopo (SN-57)
+      // A planta e a coerência do lugar (unidade, equipamento), com o escopo (SN-57).
+      // Nula quando a equipe cadastra só com o cliente em texto
       const planta_id = await plantaDaSolicitacao(this.prisma, this.scopeService, createDto, user);
+      // O cliente em texto é da equipe: quem tem escopo cadastra na planta dele, e o
+      // texto dele apareceria na lista da equipe como dono da solicitação
+      if (await this.temEscopo(user)) createDto.cliente_nome = null;
+      exigirQuemPediu(planta_id, createDto.cliente_nome);
 
       // Extrair campos que não são colunas da tabela antes de criar
       const { instrucoes_ids, tarefas_ids, ...camposDaTabela } = createDto;
       const createData = comOLugarAparado(comDataNecessidadeNormalizada(camposDaTabela));
+      createData.cliente_nome = createData.cliente_nome?.trim() || null;
 
       // Criar solicitação com solicitante_id e solicitante_nome preenchidos
       // Removido o include da planta para evitar erro com soft delete
       const solicitacao = await prisma.solicitacoes_servico.create({
         data: {
           ...createData,
+          // O BDI padrão da empresa (28/out/2026): a proposta nasce com ele e o ajusta no fechamento
+          ...(await bdiPadrao(prisma)),
           // A coluna e NOT NULL: "nao informado" e vazio
           local: createData.local ?? '',
           planta_id, // Usar o planta_id determinado
@@ -199,13 +208,10 @@ export class SolicitacoesServicoService {
       // Aberta avisa quem programa (SN-47), na mesma transação
       await registrarNotificacao(prisma, { evento: 'solicitacao.aberta', entidade: 'solicitacao_servico', entidadeId: solicitacao.id, atorId: usuarioId });
 
-      // Buscar a planta manualmente apenas se não estiver deletada
-      const planta = await prisma.plantas.findFirst({
-        where: {
-          id: planta_id.trim(), // Garantir que o ID está sem espaços
-          deleted_at: null
-        },
-      });
+      // Buscar a planta manualmente apenas se não estiver deletada (a solicitação sem planta não tem)
+      const planta = planta_id
+        ? await prisma.plantas.findFirst({ where: { id: planta_id.trim(), deleted_at: null } })
+        : null;
 
       // Associar tarefas se fornecidas
       if (tarefas_ids && tarefas_ids.length > 0) {
@@ -284,6 +290,8 @@ export class SolicitacoesServicoService {
         { numero: { contains: search, mode: 'insensitive' } },
         // O que a lista de origem da programação mostra e a busca não alcançava (SN-77)
         { solicitante_nome: { contains: search, mode: 'insensitive' } },
+        // A solicitação sem planta se acha pelo cliente em texto (28/out/2026)
+        { cliente_nome: { contains: search, mode: 'insensitive' } },
         { planta: { nome: { contains: search, mode: 'insensitive' } } },
         { unidade: { nome: { contains: search, mode: 'insensitive' } } },
       ];
@@ -384,6 +392,11 @@ export class SolicitacoesServicoService {
    */
   async garantirNoEscopo(id: string, user?: ScopedUser): Promise<void> {
     if (user) await this.scopeService.assertEntityInScope('solicitacao_servico', id, user);
+  }
+
+  /** Quem pede tem escopo por planta (o cliente, o técnico)? Sem usuário é chamada interna */
+  private async temEscopo(user?: ScopedUser): Promise<boolean> {
+    return Boolean(user) && this.scopeService.isScoped(await this.scopeService.getScope(user));
   }
 
   async findOne(id: string, user?: ScopedUser): Promise<SolicitacaoResponseDto> {
@@ -494,15 +507,28 @@ export class SolicitacoesServicoService {
     // a edição não conferia a planta nova, e o escopo de quem editava não valia
     const lugarAtual = await this.prisma.solicitacoes_servico.findUnique({
       where: { id },
-      select: { planta_id: true, unidade_id: true, equipamento_id: true },
+      select: { planta_id: true, unidade_id: true, equipamento_id: true, cliente_nome: true },
     });
     if (lugarAtual && mudouOLugar(updateDto, lugarAtual)) {
       const novo = {
-        planta_id: updateDto.planta_id !== undefined ? updateDto.planta_id : updateDto.unidade_id !== undefined ? undefined : lugarAtual.planta_id,
+        // A planta sai da unidade só quando vem uma unidade: limpar a instalação não leva a planta junto
+        planta_id: updateDto.planta_id !== undefined ? updateDto.planta_id : updateDto.unidade_id ? undefined : lugarAtual.planta_id,
         unidade_id: updateDto.unidade_id !== undefined ? updateDto.unidade_id : lugarAtual.unidade_id,
         equipamento_id: updateDto.equipamento_id !== undefined ? updateDto.equipamento_id : lugarAtual.equipamento_id,
       };
+      // Nula quando a equipe tira a planta (a solicitação fica com o cliente em texto)
       updateDto.planta_id = await plantaDaSolicitacao(this.prisma, this.scopeService, novo, user);
+    }
+    if (updateDto.cliente_nome !== undefined) {
+      // O cliente em texto é da equipe (como no criar): de quem tem escopo, não muda
+      if (await this.temEscopo(user)) delete updateDto.cliente_nome;
+      else updateDto.cliente_nome = updateDto.cliente_nome?.trim() || null;
+    }
+    if (lugarAtual) {
+      exigirQuemPediu(
+        updateDto.planta_id !== undefined ? updateDto.planta_id : lugarAtual.planta_id,
+        updateDto.cliente_nome !== undefined ? updateDto.cliente_nome : lugarAtual.cliente_nome,
+      );
     }
 
     // Extrair instrucoes_ids e tarefas_ids antes de passar para o Prisma (não são

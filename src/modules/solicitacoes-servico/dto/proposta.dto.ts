@@ -4,6 +4,7 @@ import { applyDecorators } from '@nestjs/common';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { BooleanoDoTexto } from '@/common/decorators/booleano';
 import { CasasDecimais, VazioEhNulo } from '@/common/decorators/numero';
+import { TIPOS_DE_DESCONTO, type TipoDeDesconto } from '../desconto-da-proposta';
 
 /**
  * O corpo das escritas da proposta (SN-94). Até aqui as rotas recebiam um tipo
@@ -124,8 +125,8 @@ const Percentual = () =>
   );
 
 /**
- * Os componentes do BDI. Sem chamador na tela de propósito (o BDI fica no
- * padrão); é por aqui que um BDI diferente se ajusta se voltar a ser pedido.
+ * As condições da proposta: os componentes do BDI da solicitação (ajustados no
+ * fechamento; a nova nasce com o padrão da empresa) e o desconto (28/out/2026).
  */
 export class CondicoesDaPropostaDto {
   @ApiPropertyOptional({ description: 'O regime: o REIDI desonera PIS e COFINS', enum: ['SEM_REIDI', 'COM_REIDI'] })
@@ -142,4 +143,46 @@ export class CondicoesDaPropostaDto {
   @Percentual() bdi_cofins?: number | null;
   @Percentual() bdi_cprb?: number | null;
   @Percentual() bdi_issqn?: number | null;
+
+  /** Ausente não muda o gravado; null tira o desconto */
+  @ApiPropertyOptional({ description: 'O desconto, sobre o total inteiro: PERCENTUAL ou VALOR (null tira)', enum: TIPOS_DE_DESCONTO, nullable: true })
+  @IsOptional()
+  @IsIn([...TIPOS_DE_DESCONTO])
+  desconto_tipo?: TipoDeDesconto | null;
+
+  @ApiPropertyOptional({ description: 'O percentual (até 100) ou os reais do desconto', nullable: true })
+  @IsOptional()
+  @VazioEhNulo()
+  @IsNumber()
+  @CasasDecimais(2)
+  @Min(0)
+  @Max(TETO_DO_PRECO)
+  desconto_valor?: number | null;
+}
+
+/** Um componente do BDI padrão: obrigatório, em porcentagem (Decimal(6, 3)) */
+const PercentualObrigatorio = () =>
+  applyDecorators(
+    ApiProperty({ description: 'Percentual (0 a 100)' }),
+    VazioEhNulo(),
+    IsNumber(),
+    CasasDecimais(3),
+    Min(0),
+    Max(100),
+  );
+
+/**
+ * O BDI padrão da empresa (28/out/2026): os nove componentes, todos. A
+ * solicitação nova copia daqui; a que existe fica com o seu.
+ */
+export class BdiPadraoDto {
+  @PercentualObrigatorio() bdi_administracao_central: number;
+  @PercentualObrigatorio() bdi_seguro_garantia: number;
+  @PercentualObrigatorio() bdi_taxa_risco: number;
+  @PercentualObrigatorio() bdi_despesas_financeiras: number;
+  @PercentualObrigatorio() bdi_lucro: number;
+  @PercentualObrigatorio() bdi_pis: number;
+  @PercentualObrigatorio() bdi_cofins: number;
+  @PercentualObrigatorio() bdi_cprb: number;
+  @PercentualObrigatorio() bdi_issqn: number;
 }

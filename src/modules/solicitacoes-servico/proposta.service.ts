@@ -3,7 +3,9 @@ import { BadRequestException, ConflictException, Injectable, NotFoundException }
 import { PrismaService } from '@/core';
 import { Prisma } from '@prisma/client';
 import { valoresDasInstrucoes } from '../instrucoes/valor-da-instrucao';
-import type { CondicoesDaPropostaDto } from './dto/proposta.dto';
+import type { BdiPadraoDto, CondicoesDaPropostaDto } from './dto/proposta.dto';
+import { BDI_GOINFRA, CAMPOS_DO_BDI, TETO_DO_BDI, bdiDaFormula, bdiPadrao, componentesDe, percentualDoBdi, type ComponentesDoBdi } from './bdi-padrao';
+import { descontoDaProposta } from './desconto-da-proposta';
 
 /**
  * A proposta comercial de uma solicitação de serviço.
@@ -25,9 +27,11 @@ import type { CondicoesDaPropostaDto } from './dto/proposta.dto';
  * hora de gerar. Escopo é descrição do serviço, não preço — e quem corrige uma
  * instrução quer a correção valendo.
  */
-/** Os tetos das colunas dos totais: `bdi_percentual` Decimal(6, 3) e os totais Decimal(14, 2) */
-const TETO_DO_BDI = 999.999;
+/** O teto das colunas dos totais, Decimal(14, 2); o do `bdi_percentual` é o `TETO_DO_BDI` */
 const TETO_DO_TOTAL = 999_999_999_999.99;
+
+/** "R$ 1.234,56", para a mensagem de erro */
+const reais = (valor: number) => valor.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
 @Injectable()
 export class PropostaService {
@@ -148,47 +152,6 @@ export class PropostaService {
   // CÁLCULO
   // ============================================================
 
-  /** Os nove componentes, em fração (5,00% vira 0,05). */
-  private componentesBdi(s: {
-    bdi_administracao_central?: Prisma.Decimal | null;
-    bdi_seguro_garantia?: Prisma.Decimal | null;
-    bdi_taxa_risco?: Prisma.Decimal | null;
-    bdi_despesas_financeiras?: Prisma.Decimal | null;
-    bdi_lucro?: Prisma.Decimal | null;
-    bdi_pis?: Prisma.Decimal | null;
-    bdi_cofins?: Prisma.Decimal | null;
-    bdi_cprb?: Prisma.Decimal | null;
-    bdi_issqn?: Prisma.Decimal | null;
-  }) {
-    const f = (v: Prisma.Decimal | null | undefined) => this.num(v) / 100;
-    return {
-      ac: f(s.bdi_administracao_central),
-      sg: f(s.bdi_seguro_garantia),
-      r: f(s.bdi_taxa_risco),
-      df: f(s.bdi_despesas_financeiras),
-      l: f(s.bdi_lucro),
-      i: f(s.bdi_pis) + f(s.bdi_cofins) + f(s.bdi_cprb) + f(s.bdi_issqn),
-    };
-  }
-
-  /**
-   * O BDI, pela fórmula do acórdão 2.622/2013 do TCU.
-   *
-   *   BDI = [ (1+AC+SG+R) × (1+DF) × (1+L) / (1-I) ] - 1
-   *
-   * Com a tabela GOINFRA sem REIDI (AC 5, SG 0,5, R 0, DF 0,5, L 5, I 14,65)
-   * o resultado é 0,3044 — os 30,44% da planilha de referência.
-   */
-  private calcularBdi(componentes: ReturnType<typeof this.componentesBdi>): number {
-    const { ac, sg, r, df, l, i } = componentes;
-
-    // Guarda contra I >= 100%, que faria a divisão explodir. Não é cenário
-    // real, mas o campo é editável e um dígito a mais derrubaria a conta.
-    if (i >= 1) return 0;
-
-    return ((1 + ac + sg + r) * (1 + df) * (1 + l)) / (1 - i) - 1;
-  }
-
   /**
    * Recalcula e GRAVA os totais.
    *
@@ -206,6 +169,9 @@ export class PropostaService {
    * O FD fica fora do imposto porque o cliente paga o fornecedor direto: o
    * dinheiro não passa pela empresa, então não há o que tributar. Ele volta
    * para a conta depois, e recebe margem como o resto.
+   *
+   * O desconto (28/out/2026) sai do total inteiro, o FD junto: `total_geral` é
+   * o total com ele, e `total_desconto` os reais descontados.
    */
   async recalcular(solicitacaoId: string, tx?: Prisma.TransactionClient) {
     const db = tx ?? this.prisma;
@@ -224,6 +190,8 @@ export class PropostaService {
           bdi_cofins: true,
           bdi_cprb: true,
           bdi_issqn: true,
+          desconto_tipo: true,
+          desconto_valor: true,
         },
       }),
       db.solicitacoes_itens.findMany({
@@ -260,18 +228,16 @@ export class PropostaService {
     // lucro. Entra no total como repasse puro.
     const baseDoBdi = custoItens + custoComum;
 
-    const componentes = this.componentesBdi(solicitacao);
-    // Os impostos com 100% ou mais: a fórmula divide por (1 - I), e o BDI saía zero calado
-    if (componentes.i >= 1) {
-      throw new BadRequestException('Os impostos do BDI (PIS, COFINS, CPRB e ISSQN) somam 100% ou mais: a conta do BDI não fecha.');
-    }
-    const bdi = this.calcularBdi(componentes);
+    // Os impostos com 100% ou mais são 400 (a fórmula divide por 1 - I, e o BDI saía zero calado)
+    const bdi = bdiDaFormula(componentesDe(solicitacao));
     const totalBdi = this.centavos(baseDoBdi * bdi);
-    const totalGeral = this.centavos(baseDoBdi + totalBdi + custoFD);
-    const bdiPercentual = Math.round(bdi * 100 * 1000) / 1000;
+    const totalSemDesconto = this.centavos(baseDoBdi + totalBdi + custoFD);
+    const desconto = descontoDaProposta(solicitacao.desconto_tipo, this.num(solicitacao.desconto_valor), totalSemDesconto);
+    const totalGeral = this.centavos(totalSemDesconto - desconto.aplicado);
+    const bdiPercentual = percentualDoBdi(bdi);
 
     // O que as colunas guardam (Decimal(6, 3) e Decimal(14, 2)): passou disso, o banco recusava com 500
-    if (bdiPercentual > TETO_DO_BDI || Math.max(totalCusto, totalBdi, totalGeral) > TETO_DO_TOTAL) {
+    if (bdiPercentual > TETO_DO_BDI || Math.max(totalCusto, totalBdi, totalSemDesconto) > TETO_DO_TOTAL) {
       throw new BadRequestException(
         'A proposta passa do que se guarda (BDI até 999,999% e total até R$ 999.999.999.999,99): confira os percentuais do BDI e os valores.',
       );
@@ -286,10 +252,11 @@ export class PropostaService {
         // proposta grande em dezenas de reais.
         bdi_percentual: bdiPercentual,
         total_geral: totalGeral,
+        total_desconto: solicitacao.desconto_tipo ? desconto.aplicado : null,
       },
     });
 
-    return { totalCusto, totalBdi, totalGeral, custoFD, bdi };
+    return { totalCusto, totalBdi, totalSemDesconto, totalGeral, custoFD, bdi, desconto };
   }
 
   // ============================================================
@@ -339,6 +306,9 @@ export class PropostaService {
           total_custo: true,
           total_bdi: true,
           total_geral: true,
+          desconto_tipo: true,
+          desconto_valor: true,
+          total_desconto: true,
         },
       }),
       this.instrucoesSemPreco(solicitacaoId),
@@ -378,6 +348,10 @@ export class PropostaService {
       total_custo: this.num(solicitacao.total_custo),
       total_bdi: this.num(solicitacao.total_bdi),
       total_geral: this.num(solicitacao.total_geral),
+      /** O desconto (28/out/2026): o tipo e o digitado; `total_desconto` são os reais descontados (até o total) */
+      desconto_tipo: solicitacao.desconto_tipo,
+      desconto_valor: solicitacao.desconto_valor === null ? null : this.num(solicitacao.desconto_valor),
+      total_desconto: this.num(solicitacao.total_desconto),
     };
   }
 
@@ -453,7 +427,7 @@ export class PropostaService {
   }
 
   /**
-   * Os componentes do BDI. Recalcula em seguida.
+   * Os componentes do BDI e o desconto. Recalcula em seguida.
    *
    * O REIDI (Regime Especial de Incentivos para o Desenvolvimento da
    * Infraestrutura) desonera PIS e COFINS. Trocar o regime zera os dois — ou
@@ -463,21 +437,9 @@ export class PropostaService {
     solicitacaoId: string,
     dados: CondicoesDaPropostaDto,
   ) {
-    const numericos = [
-      'bdi_administracao_central',
-      'bdi_seguro_garantia',
-      'bdi_taxa_risco',
-      'bdi_despesas_financeiras',
-      'bdi_lucro',
-      'bdi_pis',
-      'bdi_cofins',
-      'bdi_cprb',
-      'bdi_issqn',
-    ] as const;
+    const data: Record<string, number | string | null> = {};
 
-    const data: Record<string, number | string> = {};
-
-    for (const campo of numericos) {
+    for (const campo of CAMPOS_DO_BDI) {
       // Vazio chega null (`VazioEhNulo`): não muda o gravado
       const valor = dados[campo];
       if (valor !== undefined && valor !== null) data[campo] = valor;
@@ -492,6 +454,19 @@ export class PropostaService {
       if (data.bdi_cofins === undefined) data.bdi_cofins = dados.bdi_regime === 'COM_REIDI' ? 0 : 3.0;
     }
 
+    // O desconto: o tipo null tira; o tipo pede o valor (o que veio ou o gravado)
+    const mexeNoDesconto = dados.desconto_tipo !== undefined || dados.desconto_valor !== undefined;
+    if (dados.desconto_tipo === null) {
+      data.desconto_tipo = null;
+      data.desconto_valor = null;
+    } else if (dados.desconto_tipo) {
+      // Dar o tipo pede o valor: o gravado é do outro tipo (12,5% viraria R$ 12,50)
+      data.desconto_tipo = dados.desconto_tipo;
+      data.desconto_valor = dados.desconto_valor ?? null;
+    } else if (dados.desconto_valor !== undefined) {
+      data.desconto_valor = dados.desconto_valor;
+    }
+
     // Numa transação: o BDI que estoura a conta é 400 no `recalcular`, e antes o update já tinha
     // gravado o percentual ruim, que travava toda escrita seguinte da proposta
     await this.prisma.$transaction(async (tx) => {
@@ -499,9 +474,63 @@ export class PropostaService {
       if (Object.keys(data).length > 0) {
         await tx.solicitacoes_servico.update({ where: { id: solicitacaoId }, data });
       }
-      await this.recalcular(solicitacaoId, tx);
+      const conta = await this.recalcular(solicitacaoId, tx);
+      if (mexeNoDesconto) await this.conferirDesconto(tx, solicitacaoId, conta.totalSemDesconto);
     });
     return this.obter(solicitacaoId);
+  }
+
+  /**
+   * O desconto que se acabou de gravar fecha com o total (dentro da transação:
+   * recusado, nada fica). Depois, se o total cai abaixo dele, o aplicado para no
+   * total (`descontoDaProposta`), mas quem o digita não grava um maior.
+   */
+  private async conferirDesconto(tx: Prisma.TransactionClient, solicitacaoId: string, totalSemDesconto: number): Promise<void> {
+    const { desconto_tipo: tipo, desconto_valor } = await tx.solicitacoes_servico.findUniqueOrThrow({
+      where: { id: solicitacaoId },
+      select: { desconto_tipo: true, desconto_valor: true },
+    });
+    const valor = desconto_valor === null ? null : this.num(desconto_valor);
+    // O valor sem o tipo ficaria guardado e voltaria calado quando alguém escolhesse o tipo
+    if (!tipo) {
+      if (valor !== null) throw new BadRequestException('Diga se o desconto é em percentual ou em reais.');
+      return;
+    }
+    if (valor === null) throw new BadRequestException('Diga o valor do desconto (o percentual ou os reais).');
+    if (tipo === 'PERCENTUAL' && valor > 100) throw new BadRequestException('O desconto em percentual vai até 100%.');
+    if (tipo === 'VALOR' && valor > totalSemDesconto) {
+      throw new BadRequestException(`O desconto (${reais(valor)}) passa do total da proposta (${reais(totalSemDesconto)}).`);
+    }
+  }
+
+  // ============================================================
+  // BDI PADRÃO
+  // ============================================================
+
+  /** O BDI padrão da empresa, com o percentual que dá: o que a solicitação nova copia */
+  async obterBdiPadrao(): Promise<ComponentesDoBdi & { bdi_percentual: number }> {
+    const componentes = await bdiPadrao(this.prisma);
+    return { ...componentes, bdi_percentual: percentualDoBdi(bdiDaFormula(componentes)) };
+  }
+
+  /**
+   * Troca o BDI padrão (28/out/2026). Vale para a solicitação nova: a que existe
+   * fica com o seu, porque a proposta é documento e pode já ter ido ao cliente.
+   */
+  async salvarBdiPadrao(dados: BdiPadraoDto, usuarioId?: string): Promise<ComponentesDoBdi & { bdi_percentual: number }> {
+    const componentes = componentesDe(dados);
+    // Antes de gravar: os impostos de 100% (400) e o BDI que não cabe na coluna
+    const percentual = percentualDoBdi(bdiDaFormula(componentes));
+    if (percentual > TETO_DO_BDI) {
+      throw new BadRequestException('O BDI passa do que se guarda (até 999,999%): confira os percentuais.');
+    }
+    const quem = { updated_by: usuarioId?.trim() || null, updated_at: new Date() };
+    await this.prisma.bdi_padrao.upsert({
+      where: { id: 1 },
+      create: { id: 1, ...BDI_GOINFRA, ...componentes, ...quem },
+      update: { ...componentes, ...quem },
+    });
+    return this.obterBdiPadrao();
   }
 
   /**

@@ -27,7 +27,7 @@ export async function plantaDaSolicitacao(
   escopo: PermissionScopeService,
   lugar: LugarDaSolicitacao,
   user?: ScopedUser,
-): Promise<string> {
+): Promise<string | null> {
   let plantaId = lugar.planta_id?.trim() || undefined;
   const unidadeId = lugar.unidade_id?.trim();
   const equipamentoId = lugar.equipamento_id?.trim();
@@ -42,7 +42,14 @@ export async function plantaDaSolicitacao(
     plantaId = plantaId || daUnidade;
   }
 
-  if (!plantaId) throw new BadRequestException('É necessário informar planta_id ou unidade_id');
+  if (!plantaId) {
+    // Sem planta (28/out/2026): a equipe cadastra a solicitação só com o cliente em
+    // texto, e a planta se escolhe ao programar. Quem tem escopo por planta (o
+    // cliente, o técnico) escolhe a dele: sem ela, nem ele veria o que abriu
+    if (equipamentoId) throw new BadRequestException('É necessário informar a planta ou a instalação do equipamento.');
+    if (escopo.isScoped(await escopo.getScope(user))) throw new BadRequestException('Escolha a planta da solicitação.');
+    return null;
+  }
 
   const plantaNaoEncontrada = `Planta com ID ${plantaId} não encontrada ou foi deletada`;
   if (user) await escopo.assertPlantaInScope(plantaId, user, plantaNaoEncontrada);
@@ -57,6 +64,16 @@ export async function plantaDaSolicitacao(
   }
 
   return plantaId;
+}
+
+/**
+ * A solicitação diz de quem é: pela planta ou, sem ela, pelo nome do cliente
+ * (28/out/2026). Sem os dois, a lista e o PDF da proposta sairiam sem dono.
+ */
+export function exigirQuemPediu(plantaId: string | null | undefined, clienteNome: string | null | undefined): void {
+  if (!plantaId?.trim() && !clienteNome?.trim()) {
+    throw new BadRequestException('Sem planta, informe o nome do cliente: a solicitação precisa dizer de quem é.');
+  }
 }
 
 /** A edição mexeu no lugar? Só aí ele é conferido: dado antigo incoerente não trava a edição de outro campo. */

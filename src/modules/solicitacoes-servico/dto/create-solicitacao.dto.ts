@@ -56,25 +56,35 @@ export class CreateSolicitacaoDto {
   origem?: OrigemSolicitacao;
 
   // Localização
-  @ApiPropertyOptional({ description: 'ID da planta' })
+  @ApiPropertyOptional({ description: 'ID da planta (opcional para a equipe: sem ela, informe cliente_nome)', nullable: true })
   @IsOptional()
   @IsString()
-  planta_id?: string;
+  planta_id?: string | null;
 
   @ApiPropertyOptional({ description: 'ID da unidade' })
   @IsOptional()
   @IsString()
-  unidade_id?: string;
+  unidade_id?: string | null;
 
   @ApiPropertyOptional({ description: 'ID do proprietário' })
   @IsOptional()
   @IsString()
-  proprietario_id?: string;
+  proprietario_id?: string | null;
 
   @ApiPropertyOptional({ description: 'ID do equipamento' })
   @IsOptional()
   @IsString()
   equipamento_id?: string;
+
+  /**
+   * Quem pediu, quando não há planta cadastrada (28/out/2026): a planta é
+   * opcional para a equipe, e a solicitação sem planta tem de dizer de quem é.
+   */
+  @ApiPropertyOptional({ description: 'Nome do cliente, para a solicitação sem planta', maxLength: 255, nullable: true })
+  @IsOptional()
+  @IsString()
+  @MaxLength(255)
+  cliente_nome?: string | null;
 
   /**
    * Opcional. A coluna e NOT NULL no banco: "nao informado" vira string vazia

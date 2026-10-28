@@ -91,8 +91,14 @@ export const AJUSTES_DA_PROGRAMACAO_DA_SOLICITACAO = [
   'justificativa',
 ] as const;
 
+/**
+ * O lugar, só para a solicitação sem planta (28/out/2026): a planta e a
+ * instalação se escolhem ao programar. A que tem planta não é sobrescrita (SN-40).
+ */
+export const LUGAR_DA_SOLICITACAO_SEM_PLANTA = ['planta_id', 'unidade_id'] as const;
+
 export class AjustesDaProgramacaoDaSolicitacaoDto extends PartialType(
-  PickType(CreateProgramacaoDto, AJUSTES_DA_PROGRAMACAO_DA_SOLICITACAO),
+  PickType(CreateProgramacaoDto, [...AJUSTES_DA_PROGRAMACAO_DA_SOLICITACAO, ...LUGAR_DA_SOLICITACAO_SEM_PLANTA] as const),
 ) {}
 
 export class CreateProgramacaoTarefasDto {

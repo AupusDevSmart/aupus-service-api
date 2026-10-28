@@ -2660,9 +2660,13 @@ model solicitacoes_servico {
   prioridade                PrioridadeSolicitacao    @default(MEDIA)
   status                    StatusSolicitacaoServico @default(REGISTRADA)
   origem                    OrigemSolicitacao        @default(PORTAL)
-  planta_id                 String
+  /// Opcional (28/out/2026): sem planta, quem pediu fica em `cliente_nome`, e a
+  /// planta e a instalação se escolhem ao programar (gravadas de volta aqui)
+  planta_id                 String?
   unidade_id                String?
   proprietario_id           String?
+  /// Quem pediu, quando a solicitação não tem planta cadastrada (lista e PDF da proposta)
+  cliente_nome              String?                  @db.VarChar(255)
   area                      String?
   local_especifico          String?
   equipamento_id            String?
@@ -2762,7 +2766,15 @@ model solicitacoes_servico {
   total_bdi                 Decimal?                 @db.Decimal(14, 2)
 
   total_custo Decimal? @db.Decimal(14, 2)
+  /// O total da proposta, já com o desconto
   total_geral Decimal? @db.Decimal(14, 2)
+
+  /// O desconto da proposta (28/out/2026), sobre o total inteiro (o faturamento
+  /// direto junto): PERCENTUAL ou VALOR; `desconto_valor` é o digitado (o
+  /// percentual ou os reais) e `total_desconto`, os reais descontados.
+  desconto_tipo  String?  @db.VarChar(10)
+  desconto_valor Decimal? @db.Decimal(14, 2)
+  total_desconto Decimal? @db.Decimal(14, 2)
 
   /// OBSOLETOS: substituídos pelo BDI, que já traz lucro (L) e impostos (I).
   /// Ninguém mais lê nem escreve nestas colunas. Ficam porque removê-las exige
@@ -2783,7 +2795,8 @@ model solicitacoes_servico {
   subinstrucoes           solicitacoes_subinstrucoes[]
   outros_custos           solicitacoes_outros_custos[]
   equipamento             equipamentos?                     @relation(fields: [equipamento_id], references: [id])
-  planta                  plantas                           @relation(fields: [planta_id], references: [id])
+  /// RESTRICT como no banco: o padrão do Prisma para relação opcional é SetNull, e o diff pediria trocar a FK
+  planta                  plantas?                          @relation(fields: [planta_id], references: [id], onDelete: Restrict)
   unidade                 unidades?                         @relation(fields: [unidade_id], references: [id])
   proprietario            usuarios?                         @relation("solicitacoes_proprietario", fields: [proprietario_id], references: [id])
   solicitante             usuarios?                         @relation("solicitacoes_solicitante", fields: [solicitante_id], references: [id])
@@ -3835,4 +3848,23 @@ model sincronizacao_auditoria {
 model sincronizacao_no {
   travar Boolean @id @default(true)
   origem String  @db.VarChar(20)
+}
+
+/// O BDI padrão da empresa (28/out/2026): uma linha só (id 1), com os nove
+/// componentes da fórmula do TCU. A solicitação nova copia daqui para os seus
+/// `bdi_*`; trocar o padrão não reescreve proposta já feita. Nasce com a tabela
+/// GOINFRA sem REIDI (30,44%). Tem CHECK (id = 1) no banco: prisma/sql/2026-10-28-bdi-padrao-e-desconto.sql
+model bdi_padrao {
+  id                        Int       @id @default(1) @db.SmallInt
+  bdi_administracao_central Decimal   @default(5.000) @db.Decimal(6, 3)
+  bdi_seguro_garantia       Decimal   @default(0.500) @db.Decimal(6, 3)
+  bdi_taxa_risco            Decimal   @default(0.000) @db.Decimal(6, 3)
+  bdi_despesas_financeiras  Decimal   @default(0.500) @db.Decimal(6, 3)
+  bdi_lucro                 Decimal   @default(5.000) @db.Decimal(6, 3)
+  bdi_pis                   Decimal   @default(0.650) @db.Decimal(6, 3)
+  bdi_cofins                Decimal   @default(3.000) @db.Decimal(6, 3)
+  bdi_cprb                  Decimal   @default(4.500) @db.Decimal(6, 3)
+  bdi_issqn                 Decimal   @default(6.500) @db.Decimal(6, 3)
+  updated_by                String?   @db.Char(26)
+  updated_at                DateTime? @db.Timestamptz(3)
 }

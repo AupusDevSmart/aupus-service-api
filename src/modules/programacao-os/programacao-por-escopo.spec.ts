@@ -164,7 +164,10 @@ describe('programação no escopo da planta (banco real)', () => {
       const pipe = new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true, transform: true });
       const corpo = (valor: object) => pipe.transform(valor, { type: 'body', metatype });
       await expect(corpo({ solicitacao_servico_id: 'outra' })).rejects.toBeInstanceOf(BadRequestException);
-      await expect(corpo({ planta_id: PLANTA_B })).rejects.toBeInstanceOf(BadRequestException);
+      // A planta e a instalação passam desde 28/out/2026: valem só para a solicitação sem
+      // planta, que as escolhe ao programar (a que tem planta não muda: o teste abaixo)
+      await expect(corpo({ planta_id: PLANTA_B })).resolves.toEqual({ planta_id: PLANTA_B });
+      await expect(corpo({ planta_id: 'curto' })).rejects.toBeInstanceOf(BadRequestException);
       await expect(corpo({ prioridade: 'QUALQUER' })).rejects.toBeInstanceOf(BadRequestException);
       await expect(corpo({ descricao: 'ajustada', prioridade: PrioridadeOS.ALTA })).resolves.toEqual({ descricao: 'ajustada', prioridade: PrioridadeOS.ALTA });
     });

@@ -210,6 +210,9 @@ const JORNADAS: [string, string, string[]][] = [
   ['excluir o próprio comentário na OS', 'DELETE /execucao-os/:id/comentarios/:comentarioId', EXECUTAM],
   ['editar solicitação', 'PATCH /solicitacoes-servico/:id', PLANEJAM],
   ['programar a partir da solicitação', 'POST /solicitacoes-servico/:id/gerar-programacao-os', PLANEJAM],
+  // O BDI padrão (28/out/2026): a margem da empresa, só quem monta proposta lê e troca
+  ['ler o BDI padrão', 'GET /solicitacoes-servico/bdi-padrao', PLANEJAM],
+  ['trocar o BDI padrão', 'PUT /solicitacoes-servico/bdi-padrao', PLANEJAM],
   ['ver anomalias', 'GET /anomalias', TODOS],
   ['registrar anomalia', 'POST /anomalias', EXECUTAM],
   ['ver os anexos da anomalia', 'GET /anomalias/:id/anexos', TODOS],

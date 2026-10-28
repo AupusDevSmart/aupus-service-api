@@ -76,6 +76,7 @@ import {
   vinculoDaOS,
 } from './instrucoes-da-programacao';
 import { semDinheiro, veOsCustos } from '../execucao-os/quem-ve-os-custos';
+import { lugarParaASolicitacaoSemPlanta } from './lugar-da-solicitacao-programada';
 import { congelamentoDasLinhas, nomesDosEquipamentos } from './congelamento-da-linha';
 import { naturezaDoItem, naturezaPeloPrefixo } from '../execucao-os/natureza-do-custo';
 import type { TarefaDaLinha } from '../execucao-os/tarefas-das-linhas';
@@ -401,6 +402,7 @@ export class ProgramacaoOSService {
     // resolvida: conferir só a informada deixava programar a anomalia de outra
     // planta omitindo o campo.
     const onde = { ...createDto, equipamentos_das_tarefas: await equipamentosDasTarefas(this.prisma, createDto.tarefas_ids) };
+    await this.solicitacaoDaOrigemNoEscopo(onde, user);
     createDto.planta_id = await plantaDaProgramacao(this.prisma, onde);
     if (user) await this.scopeService.assertPlantaInScope(createDto.planta_id, user, naoEncontradoDaOrigem(onde));
     await this.escalarPessoas(createDto, createDto.planta_id);
@@ -470,6 +472,9 @@ export class ProgramacaoOSService {
           criado_por_id: usuarioId,
         },
       });
+
+      // A solicitação sem planta ganha a planta e a instalação escolhidas aqui (28/out/2026)
+      await lugarParaASolicitacaoSemPlanta(prisma, programacao.solicitacao_servico_id, createDto.planta_id, createDto.unidade_id);
 
       // Criar tarefas associadas
       if (createDto.tarefas_ids && createDto.tarefas_ids.length > 0) {
@@ -713,6 +718,10 @@ export class ProgramacaoOSService {
       if (valoresAjustados.length) {
         await this.registrarHistorico(prisma, id, 'VALOR_DA_INSTRUCAO', 'Sistema', usuarioId, `Valor ajustado nesta programação: ${valoresAjustados.join('; ')}.`);
       }
+
+      // A origem trocada para uma solicitação sem planta ganha a planta e a instalação daqui,
+      // como no criar: programada, ela não se edita mais e ficaria sem planta para sempre
+      await lugarParaASolicitacaoSemPlanta(prisma, programacaoAtualizada.solicitacao_servico_id, programacaoAtualizada.planta_id, _unidadeId);
 
       await this.trocarOrigem(
         prisma,
@@ -1060,7 +1069,9 @@ export class ProgramacaoOSService {
       // Antes seguia como veio e o Prisma recusava (500).
       prioridade: solicitacao.prioridade === 'URGENTE' ? PrioridadeOS.CRITICA : (solicitacao.prioridade as PrioridadeOS),
       origem: 'SOLICITACAO_SERVICO',
-      planta_id: solicitacao.planta_id,
+      // A solicitação sem planta recebe a escolhida aqui (gravada de volta nela, no criar)
+      planta_id: solicitacao.planta_id ?? dto?.planta_id,
+      unidade_id: solicitacao.planta_id ? (solicitacao.unidade_id ?? undefined) : dto?.unidade_id,
       equipamento_id: solicitacao.equipamento_id,
       solicitacao_servico_id: solicitacao.id,
       tempo_estimado: solicitacao.tempo_estimado ? Number(solicitacao.tempo_estimado) : ESTIMATIVA_PADRAO.tempo_estimado,
@@ -1538,6 +1549,17 @@ export class ProgramacaoOSService {
   }
 
   /**
+   * A solicitação de origem no escopo de quem programa (28/out/2026). A sem planta
+   * não entra como fonte em `plantaDaProgramacao`, e só a planta informada seria
+   * conferida: quem tem escopo adotaria a solicitação de outro (e o write-back
+   * gravaria a planta dele nela). Fora do escopo é 404, como a que não existe.
+   */
+  private async solicitacaoDaOrigemNoEscopo(onde: Parameters<typeof origemDaProgramacao>[0], user?: ScopedUser): Promise<void> {
+    const { solicitacaoId } = origemDaProgramacao(onde);
+    if (user && solicitacaoId) await this.scopeService.assertEntityInScope('solicitacao_servico', solicitacaoId, user);
+  }
+
+  /**
    * Na edição a planta acompanha a origem. Só recalcula quando a edição mexe na
    * planta ou na origem; o que não veio no payload vale como está gravado, e as
    * tarefas, se não vieram, são as do vínculo (equipamento congelado). A planta
@@ -1573,6 +1595,7 @@ export class ProgramacaoOSService {
       equipamento_id: dto.equipamento_id !== undefined ? dto.equipamento_id : atual.equipamento_id,
       equipamentos_das_tarefas: equipamentos,
     };
+    await this.solicitacaoDaOrigemNoEscopo(onde, user);
     dto.planta_id = await plantaDaProgramacao(this.prisma, onde);
     if (user) await this.scopeService.assertPlantaInScope(dto.planta_id, user, naoEncontradoDaOrigem(onde));
   }

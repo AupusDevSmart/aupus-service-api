@@ -317,7 +317,7 @@ export class PermissionScopeService {
         );
       }
       case 'solicitacao_servico': {
-        // solicitacoes_servico.planta_id eh non-nullable; sem fallback necessario.
+        // Sem planta (a equipe cadastra só com o cliente em texto): null, e quem tem escopo não a vê
         const row = await this.prisma.solicitacoes_servico.findFirst({
           where: { id, deleted_at: null },
           select: { planta_id: true },

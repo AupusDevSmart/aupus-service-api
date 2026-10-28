@@ -3,6 +3,7 @@ import { Prisma, PrismaService, StatusSolicitacaoServico } from '@/core';
 import { equipamentoNasPlantas } from '@/core/modules/auth/planta-dos-equipamentos';
 import { SolicitacoesServicoService } from '../solicitacoes-servico/solicitacoes-servico.service';
 import { comOLugarAparado } from '../solicitacoes-servico/lugar-da-solicitacao';
+import { bdiPadrao } from '../solicitacoes-servico/bdi-padrao';
 import { registrarNotificacao } from '../notificacoes/registrar-notificacao';
 import { ChamadoNexonDto } from './dto/chamado-nexon.dto';
 import { montarSolicitacao } from './chamados-nexon';
@@ -138,7 +139,8 @@ export class ChamadosNexonService {
       // Os ids do lugar sem o espaço do Char(26), como no formulário (SN-77): com
       // ele, a busca pelo nome da instalação e o escopo perdiam a solicitação
       const s = await tx.solicitacoes_servico.create({
-        data: { ...comOLugarAparado(dados), numero, status: StatusSolicitacaoServico.REGISTRADA },
+        // Com o BDI padrão da empresa, como a do formulário (28/out/2026)
+        data: { ...comOLugarAparado(dados), ...(await bdiPadrao(tx)), numero, status: StatusSolicitacaoServico.REGISTRADA },
         select: { id: true, numero: true },
       });
       // Aberta avisa quem programa (SN-47), como a do formulário

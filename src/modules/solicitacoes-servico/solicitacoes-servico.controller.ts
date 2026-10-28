@@ -19,6 +19,7 @@ import {
   ApiOperation,
   ApiResponse,
   ApiParam,
+  ApiBody,
 } from '@nestjs/swagger';
 import { Permissions, ScopedUser, StatusSolicitacaoServico } from '@/core';
 import { SolicitacoesServicoService } from './solicitacoes-servico.service';
@@ -31,6 +32,7 @@ import {
   ListarSolicitacoesResponseDto,
   SolicitacaoStatsDto,
   GerarProgramacaoOSDto,
+  BdiPadraoDto,
   CondicoesDaPropostaDto,
   SalvarItensDaPropostaDto,
   SalvarOutrosCustosDaPropostaDto,
@@ -90,6 +92,25 @@ export class SolicitacoesServicoController {
   })
   async getStats(@Request() req?: RequisicaoAutenticada): Promise<SolicitacaoStatsDto> {
     return this.solicitacoesService.getStats(req?.user);
+  }
+
+  // O BDI padrão da empresa (28/out/2026): a solicitação nova copia daqui, e
+  // cada uma ajusta o seu no fechamento. Antes do ':id', que o capturaria.
+  // Só quem monta proposta (o lucro e a administração são a margem da empresa:
+  // o cliente, que tem solicitacoes.create, não lê)
+  @Get('bdi-padrao')
+  @Permissions('solicitacoes.manage')
+  @ApiOperation({ summary: 'O BDI padrão da empresa (os nove componentes e o percentual)' })
+  async obterBdiPadrao() {
+    return this.propostaService.obterBdiPadrao();
+  }
+
+  @Put('bdi-padrao')
+  @Permissions('solicitacoes.manage')
+  @ApiOperation({ summary: 'Trocar o BDI padrão: vale para as solicitações novas' })
+  @ApiBody({ type: BdiPadraoDto })
+  async salvarBdiPadrao(@Body() body: BdiPadraoDto, @Request() req?: RequisicaoAutenticada) {
+    return this.propostaService.salvarBdiPadrao(body, req?.user?.id);
   }
 
   @Get(':id')
