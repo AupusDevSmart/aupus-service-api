@@ -24,7 +24,8 @@
  *   npx ts-node -r tsconfig-paths/register scripts/db/converter-propostas-registradas.ts --aplicar
  *
  * Depois do SQL `2026-10-29-proposta-imposto-e-margem.sql` e com o código novo no
- * ar: cada uma pela mesma conta e a mesma trava da tela, com uma linha no histórico.
+ * ar: cada uma pela mesma conta e a mesma trava da tela. A linha do histórico é a
+ * do recálculo (a mesma da tela): o script não grava outra.
  * A que falha (um teto, a trava que não veio em 5 s) é listada e o resto segue.
  */
 import { PrismaClient } from '@prisma/client';
@@ -75,9 +76,6 @@ async function main() {
         const texto = `de R$ ${reais(travada.total_geral)} (${deOnde}) para R$ ${reais(conta.totalGeral)} (imposto e margem)${aviso}`;
         linhas.push(`${s.numero.trim()}: ${texto}`);
         if (!aplicar) throw new Previa();
-        await tx.historico_solicitacao_servico.create({
-          data: { solicitacao_id: s.id, acao: 'PROPOSTA_CONVERTIDA', usuario_nome: 'Sistema', observacoes: `Proposta passada para a conta de imposto e margem: ${texto}.` },
-        });
       });
     } catch (erro) {
       if (erro instanceof Previa) continue;

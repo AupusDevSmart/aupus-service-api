@@ -15,6 +15,7 @@ const numero = (valor: Prisma.Decimal | number | null | undefined): number => {
   return Number.isFinite(n) ? n : 0;
 };
 const ouNulo = (valor: Prisma.Decimal | number | null | undefined) => (valor === null || valor === undefined ? null : numero(valor));
+const reais = (valor: number) => `R$ ${valor.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
 /** Uma linha de logística como a conta e a tela a leem (os Decimal em número) */
 export function linhaDeLogisticaLida(l: {
@@ -94,25 +95,23 @@ export async function contaGravada(db: Pick<Db, 'solicitacoes_servico' | 'solici
  * calada), e a solicitação que a API antiga criou na janela do deploy (o banco
  * já dava 'IMPOSTO_MARGEM' de padrão, sem os percentuais) ganha os padrões em vez
  * de ficar com imposto e margem zero (preço igual ao custo).
+ *
+ * Devolve o total do BDI quando a proposta saiu dele (o histórico diz de quanto
+ * para quanto), e nulo quando já estava na conta nova.
  */
-async function paraAContaNova(db: Db, solicitacaoId: string): Promise<void> {
+async function paraAContaNova(db: Db, solicitacaoId: string): Promise<number | null> {
   const atual = await db.solicitacoes_servico.findUniqueOrThrow({
     where: { id: solicitacaoId },
-    select: { conta_da_proposta: true, imposto_percentual: true, margem_percentual: true, adm_servicos_percentual: true, adm_fd_percentual: true },
+    select: { conta_da_proposta: true, total_geral: true, imposto_percentual: true, margem_percentual: true, adm_servicos_percentual: true, adm_fd_percentual: true },
   });
   const vazios = (['imposto_percentual', 'margem_percentual', 'adm_servicos_percentual', 'adm_fd_percentual'] as const).filter((c) => atual[c] === null);
-  if (atual.conta_da_proposta === 'IMPOSTO_MARGEM' && vazios.length === 0) return;
+  if (atual.conta_da_proposta === 'IMPOSTO_MARGEM' && vazios.length === 0) return null;
   const padroes = colunasDosPercentuais(await padroesDaProposta(db));
   await db.solicitacoes_servico.update({
     where: { id: solicitacaoId },
     data: { conta_da_proposta: 'IMPOSTO_MARGEM', ...Object.fromEntries(vazios.map((c) => [c, padroes[c]])) },
   });
-  // A troca de conta muda o total: fica no histórico, como a do script de conversão
-  if (atual.conta_da_proposta !== 'IMPOSTO_MARGEM') {
-    await db.historico_solicitacao_servico.create({
-      data: { solicitacao_id: solicitacaoId, acao: 'PROPOSTA_CONVERTIDA', usuario_nome: 'Sistema', observacoes: 'Proposta passada da conta do BDI para a de imposto e margem.' },
-    });
-  }
+  return atual.conta_da_proposta === 'IMPOSTO_MARGEM' ? null : numero(atual.total_geral);
 }
 
 /**
@@ -121,7 +120,7 @@ async function paraAContaNova(db: Db, solicitacaoId: string): Promise<void> {
  * e daqui a seis meses, mesmo que o catálogo e os padrões tenham mudado.
  */
 export async function recalcularProposta(db: Db, solicitacaoId: string): Promise<ContaDaProposta> {
-  await paraAContaNova(db, solicitacaoId);
+  const totalDoBdi = await paraAContaNova(db, solicitacaoId);
   const conta = (await contaGravada(db, solicitacaoId))!;
 
   if (Math.max(conta.totalGeralSemDesconto, conta.custoServicos + conta.fd) > TETO_DO_TOTAL) {
@@ -147,5 +146,18 @@ export async function recalcularProposta(db: Db, solicitacaoId: string): Promise
       bdi_percentual: null,
     },
   });
+  // A troca de conta muda o total: fica no histórico, um registro só (a tela e o
+  // script de conversão passam por aqui; o script gravava o seu também, e a
+  // conversão de produção saiu com dois)
+  if (totalDoBdi !== null) {
+    await db.historico_solicitacao_servico.create({
+      data: {
+        solicitacao_id: solicitacaoId,
+        acao: 'PROPOSTA_CONVERTIDA',
+        usuario_nome: 'Sistema',
+        observacoes: `Proposta passada da conta do BDI para a de imposto e margem: de ${reais(totalDoBdi)} para ${reais(conta.totalGeral)}.`,
+      },
+    });
+  }
   return conta;
 }

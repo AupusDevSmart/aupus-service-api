@@ -264,10 +264,12 @@ describe('proposta por imposto e margem (banco real)', () => {
     await controller.salvarOutrosCustos(registrada, await corpo(SalvarOutrosCustosDaPropostaDto, { custos: [] }), comoPlanejador);
     const convertida = await gravada(registrada);
     expect([convertida.conta_da_proposta, Number(convertida.imposto_percentual), convertida.bdi_percentual]).toEqual(['IMPOSTO_MARGEM', 15, null]);
-    // A troca de conta fica no histórico
-    expect(await prisma.historico_solicitacao_servico.count({ where: { solicitacao_id: registrada, acao: 'PROPOSTA_CONVERTIDA' } })).toBe(1);
     // 15.384,62 dos serviços + a administração de 5% com o imposto (500 ÷ 0,85)
     expect(Number(convertida.total_geral)).toBe(15972.86);
+    // A troca de conta fica no histórico, uma vez, de quanto para quanto; a próxima escrita não grava outra
+    await controller.salvarOutrosCustos(registrada, await corpo(SalvarOutrosCustosDaPropostaDto, { custos: [] }), comoPlanejador);
+    const convertidas = await prisma.historico_solicitacao_servico.findMany({ where: { solicitacao_id: registrada, acao: 'PROPOSTA_CONVERTIDA' }, select: { observacoes: true } });
+    expect(convertidas.map((h) => h.observacoes)).toEqual(['Proposta passada da conta do BDI para a de imposto e margem: de R$ 13.043,80 para R$ 15.972,86.']);
   });
 
   it('revisar trava a proposta; reabrir a devolve; não aprovada guarda o motivo; cada um só do status certo', async () => {
