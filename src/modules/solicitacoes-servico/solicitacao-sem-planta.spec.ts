@@ -85,6 +85,27 @@ describe('solicitação sem planta (banco real)', () => {
     await expect(solicitacoes.create(pedido({ planta_id: PLANTA }), DONO, cliente)).resolves.toMatchObject({ planta_id: PLANTA });
   });
 
+  // Revisão de segurança (28/out/2026): pelo corpo do POST o técnico virava "dono" e lia a proposta
+  it('quem não monta proposta não escolhe o dono nem o custo: o dono é o da planta, e a proposta é dele', async () => {
+    const tecnicoComPermissoes = { ...tecnico, permissions: ['solicitacoes.view', 'solicitacoes.create', 'execucao_os.executar'] };
+    const criada = await solicitacoes.create(
+      pedido({ planta_id: PLANTA, proprietario_id: TECNICO, custo_estimado: 999 }),
+      TECNICO,
+      tecnicoComPermissoes as never,
+    );
+    const gravada = await prisma.solicitacoes_servico.findUniqueOrThrow({ where: { id: criada.id }, select: { proprietario_id: true, custo_estimado: true } });
+    expect([gravada.proprietario_id?.trim(), gravada.custo_estimado]).toEqual([DONO, null]);
+    expect(await solicitacoes.nivelDaPropostaPara(criada.id, tecnicoComPermissoes as never)).toBe('nenhuma');
+    expect(await solicitacoes.nivelDaPropostaPara(criada.id, { ...cliente, permissions: ['solicitacoes.view'] } as never)).toBe('do_cliente');
+    // Na lista e no detalhe, o dono (pela planta) lê os totais; o técnico, não
+    await prisma.solicitacoes_servico.update({ where: { id: criada.id }, data: { total_geral: 1504.38, bdi_lucro: 5 } });
+    type ComDinheiro = { total_geral?: unknown; bdi_lucro?: unknown };
+    const doDono = (await solicitacoes.findOne(criada.id, { ...cliente, permissions: ['solicitacoes.view'] } as never)) as unknown as ComDinheiro;
+    expect([Number(doDono.total_geral), doDono.bdi_lucro]).toEqual([1504.38, null]);
+    const doTecnico = (await solicitacoes.findOne(criada.id, tecnicoComPermissoes as never)) as unknown as ComDinheiro;
+    expect(doTecnico.total_geral).toBeNull();
+  });
+
   it('o cliente em texto é da equipe: o de quem tem escopo não grava (nem no criar, nem no editar)', async () => {
     const criada = await solicitacoes.create(pedido({ planta_id: PLANTA, cliente_nome: 'Outra Empresa' }), DONO, cliente);
     expect(await lugar(criada.id)).toMatchObject({ cliente_nome: null });

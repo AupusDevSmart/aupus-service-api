@@ -1,4 +1,5 @@
 // src/modules/instrucoes/instrucoes.controller.ts
+import { precosPara } from '../execucao-os/quem-ve-os-custos';
 import {
   Controller,
   Get,
@@ -87,8 +88,10 @@ export class InstrucoesController {
   @ApiParam({ name: 'id', description: 'ID da instrução' })
   @ApiResponse({ status: HttpStatus.OK, description: 'Instrução encontrada', type: InstrucaoResponseDto })
   @ApiResponse({ status: HttpStatus.NOT_FOUND, description: 'Instrução não encontrada' })
-  async buscarPorId(@Param('id') id: string): Promise<InstrucaoResponseDto> {
-    return this.instrucoesService.buscarPorId(id);
+  async buscarPorId(@Param('id') id: string, @CurrentUser() user?: ScopedUser): Promise<InstrucaoResponseDto> {
+    // O preço de cada linha e o custo só para quem vê custos: o cliente e o técnico leem a
+    // instrução (os passos, os recursos e as quantidades) sem valor (28/out/2026)
+    return precosPara(user, await this.instrucoesService.buscarPorId(id));
   }
 
   @Put(':id')

@@ -51,7 +51,7 @@ import { reais } from './custo-da-os';
 import { congelarValoresDasInstrucoes, custoRealDaOS, dadosDoCustoDaOS } from './dados-do-custo';
 import { SELECAO_DA_TAREFA, instrucoesDasLinhas, tarefasDasLinhas } from './tarefas-das-linhas';
 import { gravarOutrosCustos } from './outros-custos';
-import { semDinheiro, veOsCustos } from './quem-ve-os-custos';
+import { dinheiroPara, ordemPermitida } from './quem-ve-os-custos';
 import { naturezaDoItem } from './natureza-do-custo';
 import { comOCustoRegistrado, resumoDoCusto } from './resumo-do-custo';
 import { conferirCodigo, gravarCodigoDeVerificacao, relatorioDaOS, semOsCustos, somasDosAnexosSemSoma, type ConferenciaDoCodigo, type RelatorioDaOS } from './verificacao-da-os';
@@ -347,7 +347,7 @@ export class ExecucaoOSService {
       },
       // Desempate pelo id: com o mesmo criado_em, a ordem entre páginas não era
       // garantida, e a exportação (que lê todas) perdia ou repetia OS
-      orderBy: [{ [sortBy]: sortOrder }, { id: 'asc' }],
+      orderBy: [{ [ordemPermitida(sortBy, user)]: sortOrder }, { id: 'asc' }],
       skip: (page - 1) * limit,
       take: limit,
     });
@@ -427,7 +427,8 @@ export class ExecucaoOSService {
     // SERV-10: o cliente não vê dinheiro da OS
     const resposta = (ordem: (typeof ordens)[number]) => this.mapearParaResponse(ordem, instalacoes.get(ordem.id) ?? []);
     return {
-      data: ordens.map((ordem) => (veOsCustos(user) ? resposta(ordem) : semDinheiro(resposta(ordem)))),
+      // SERV-10 e o técnico (28/out/2026): só quem gerencia vê dinheiro; quem executa, as despesas de campo
+      data: ordens.map((ordem) => dinheiroPara(user, resposta(ordem))),
       pagination: {
         page,
         limit,
@@ -605,8 +606,8 @@ export class ExecucaoOSService {
     const instrucoesDaLinha = await instrucoesDasLinhas(this.prisma, os.tarefas_os);
     const tarefas_os = os.tarefas_os.map((t, i) => ({ ...t, instrucao_da_linha: instrucoesDaLinha[i] }));
     const detalhes = { ...this.mapearParaDetalhes({ ...os, tarefas_os }, instalacoes.get(os.id) ?? []), custos };
-    // SERV-10: o cliente não vê dinheiro da OS (sem o quadro de custos, os valores e o R$ da trilha)
-    return veOsCustos(user) ? detalhes : semDinheiro(detalhes);
+    // Cliente (SERV-10) e técnico (28/out/2026) sem dinheiro; quem executa recebe as despesas de campo
+    return dinheiroPara(user, detalhes);
   }
 
   /** A versão do conteúdo registrado na finalização (0 = sem conteúdo); o JSON inteiro não precisa sair do banco */

@@ -75,7 +75,7 @@ import {
   valorDaLinha,
   vinculoDaOS,
 } from './instrucoes-da-programacao';
-import { semDinheiro, veOsCustos } from '../execucao-os/quem-ve-os-custos';
+import { dinheiroPara } from '../execucao-os/quem-ve-os-custos';
 import { lugarParaASolicitacaoSemPlanta } from './lugar-da-solicitacao-programada';
 import { congelamentoDasLinhas, nomesDosEquipamentos } from './congelamento-da-linha';
 import { naturezaDoItem, naturezaPeloPrefixo } from '../execucao-os/natureza-do-custo';
@@ -289,10 +289,10 @@ export class ProgramacaoOSService {
       programacoes.map(programacao => programacao.id),
     );
 
-    // SERV-10: o cliente não vê orçamento nem o valor das instruções
+    // Cliente (SERV-10) e técnico (28/out/2026) não veem orçamento nem o valor das instruções
     const resposta = (programacao: (typeof programacoes)[number]) => this.mapearParaResponse(programacao, instalacoes.get(programacao.id) ?? []);
     return {
-      data: programacoes.map((programacao) => (veOsCustos(user) ? resposta(programacao) : semDinheiro(resposta(programacao)))),
+      data: programacoes.map((programacao) => dinheiroPara(user, resposta(programacao))),
       pagination: {
         page,
         limit,
@@ -346,10 +346,12 @@ export class ProgramacaoOSService {
     if (programacao.reserva_id) {
       const reservaIdLimpo = programacao.reserva_id.trim();
 
+      // Só o que o cartão da reserva mostra: o cadastro inteiro levava valor de aquisição,
+      // chassi, RENAVAM e seguro a quem só lê a programação (o detalhe da OS já fazia assim)
       reserva = await this.prisma.reserva_veiculo.findUnique({
         where: { id: reservaIdLimpo },
         include: {
-          veiculo: true,
+          veiculo: { select: { id: true, nome: true, placa: true, marca: true, modelo: true, tipo: true, capacidade_passageiros: true } },
         },
       });
     }
@@ -359,8 +361,8 @@ export class ProgramacaoOSService {
     // A tarefa de cada linha e o valor do cadastro da linha de antes do SN-93 (`linhasParaAResposta`)
     const tarefas_programacao = await linhasParaAResposta(this.prisma, programacao.tarefas_programacao);
     const detalhes = this.mapearParaDetalhes({ ...programacao, tarefas_programacao }, reserva, instalacoes.get(programacao.id) ?? []);
-    // SERV-10: o cliente não vê orçamento nem o valor das instruções
-    return veOsCustos(user) ? detalhes : semDinheiro(detalhes);
+    // Cliente (SERV-10) e técnico (28/out/2026) não veem orçamento nem o valor das instruções
+    return dinheiroPara(user, detalhes);
   }
 
   async buscarPorUnidade(unidadeId: string, filters?: ProgramacaoFiltersDto, user?: ScopedUser & { permissions?: string[] }): Promise<ListarProgramacoesResponseDto> {

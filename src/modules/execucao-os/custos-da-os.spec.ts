@@ -153,8 +153,8 @@ describe('custo da OS por instrução e por natureza (banco real)', () => {
   });
 
   /** Programada, aprovada e iniciada; a instrução A feita */
-  const emExecucao = async () => {
-    const prog = await programar();
+  const emExecucao = async (extra: Record<string, unknown> = {}) => {
+    const prog = await programar(extra);
     await programacoes.aprovar(prog.id, {});
     const os = await prisma.ordens_servico.findUniqueOrThrow({ where: { programacao_id: prog.id } });
     await execucoes.iniciar(os.id, {} as never);
@@ -315,8 +315,8 @@ describe('custo da OS por instrução e por natureza (banco real)', () => {
     expect(tecnico.conteudo.tarefas.map((t) => t.equipamento)).toEqual(['Inversor 01', 'Inversor 01']);
   });
 
-  it('o cliente não vê dinheiro da OS na tela; o técnico de campo e o planejador veem tudo (SERV-10)', async () => {
-    const os = await emExecucao();
+  it('o cliente não vê dinheiro da OS na tela (SERV-10); o técnico, só as despesas de campo (28/out/2026); o planejador, tudo', async () => {
+    const os = await emExecucao({ materiais: [{ descricao: 'Conector MC4', quantidade_planejada: 4, unidade: 'un', custo_unitario: 12.5 }] });
     await executar(os, { outros_custos: [{ id: os.veiculo.id, valor_real: 1402.5 }] });
     const cliente = { id: 'c', role: 'proprietario', permissions: ['execucao_os.view', 'programacao_os.view', 'dashboard.view'] } as never;
     const tecnico = { id: 't', role: 'operador', permissions: ['execucao_os.view', 'execucao_os.executar'] } as never;
@@ -324,15 +324,27 @@ describe('custo da OS por instrução e por natureza (banco real)', () => {
 
     const completo = await execucoes.buscarPorId(os.osId);
     expect(completo.custos).not.toBeNull();
-    expect(await execucoes.buscarPorId(os.osId, tecnico)).toEqual(completo);
     expect(await execucoes.buscarPorId(os.osId, planejador)).toEqual(completo);
+
+    // O técnico confere as despesas de campo no Executar (o previsto e o real): só elas vêm, com
+    // valor. A picape (VEICULO) é custo da empresa e sai; a hospedagem (DESPESA_CAMPO) fica
+    const doTecnico = await execucoes.buscarPorId(os.osId, tecnico);
+    expect(doTecnico.itens_orcamento).toEqual(completo.itens_orcamento.filter((i) => i.natureza === 'DESPESA_CAMPO' || i.nao_previsto));
+    expect(doTecnico.itens_orcamento.map((i) => [i.natureza, Number(i.valor)])).toEqual([['DESPESA_CAMPO', 1380]]);
+    expect(doTecnico).toMatchObject({ custos: null, custo_real: null, orcamento_previsto: null });
+    expect(doTecnico.tarefas_os!.every((t) => t.valor === null && t.valor_original === null)).toBe(true);
+    // O valor da hora dele e dos colegas (salário) e o custo do material saem
+    expect(doTecnico.tecnicos.every((t) => t.custo_hora === null && t.custo_total === null)).toBe(true);
+    expect(completo.materiais.map((m) => Number(m.custo_unitario))).toEqual([12.5]);
+    expect(doTecnico.materiais.map((m) => [m.descricao, m.custo_unitario, m.custo_total])).toEqual([['Conector MC4', null, null]]);
+    expect(doTecnico.tecnicos.map((t) => t.horas_trabalhadas)).toEqual(completo.tecnicos.map((t) => t.horas_trabalhadas));
 
     const doCliente = await execucoes.buscarPorId(os.osId, cliente);
     expect(doCliente.custos).toBeNull();
     expect(doCliente).toMatchObject({ custo_real: null, orcamento_previsto: null, custos_adicionais: null, itens_orcamento: [] });
     expect(doCliente.tarefas_os!.every((t) => t.valor === null && t.valor_original === null)).toBe(true);
     expect(doCliente.tecnicos.every((t) => t.custo_hora === null && t.custo_total === null)).toBe(true);
-    expect(doCliente.materiais.every((m) => m.custo_unitario === null && m.custo_total === null)).toBe(true);
+    expect(doCliente.materiais.map((m) => [m.custo_unitario, m.custo_total])).toEqual([[null, null]]);
     // A programação que vem junto, e o R$ escrito na trilha
     expect(JSON.stringify(doCliente)).not.toMatch(/R\$\s*\d/);
     expect((doCliente.programacao as { orcamento_previsto?: unknown } | null)?.orcamento_previsto ?? null).toBeNull();
@@ -343,10 +355,15 @@ describe('custo da OS por instrução e por natureza (banco real)', () => {
     const filtro = { search: completo.numero_os } as never;
     const [daLista] = (await execucoes.listar(filtro, cliente)).data;
     expect(daLista).toMatchObject({ numero_os: completo.numero_os, custo_real: null, orcamento_previsto: null });
-    expect((await execucoes.listar(filtro, tecnico)).data[0].custo_real).toBe(completo.custo_real);
+    expect((await execucoes.listar(filtro, tecnico)).data[0].custo_real).toBeNull();
+    expect((await execucoes.listar(filtro, planejador)).data[0].custo_real).toBe(completo.custo_real);
 
     const prog = await programacoes.buscarPorId(os.progId, cliente);
     expect(prog).toMatchObject({ orcamento_previsto: null, itens_orcamento: [] });
+    // A programação do técnico: as despesas previstas ficam, o orçamento sai
+    const progDoTecnico = await programacoes.buscarPorId(os.progId, tecnico);
+    expect(progDoTecnico.orcamento_previsto).toBeNull();
+    expect(progDoTecnico.itens_orcamento.map((i) => i.natureza)).toEqual(['DESPESA_CAMPO']);
     expect(JSON.stringify(prog)).not.toMatch(/"valor(_original)?":\s*\d/);
     expect((await programacoes.buscarPorId(os.progId, planejador)).orcamento_previsto).toEqual((await programacoes.buscarPorId(os.progId)).orcamento_previsto);
   });

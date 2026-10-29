@@ -1,4 +1,5 @@
 // src/modules/planos-manutencao/planos-manutencao.service.ts
+import { veOsCustos } from '../execucao-os/quem-ve-os-custos';
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { PrismaService, PermissionScopeService, ScopedUser } from '@/core';
 import { equipamentoNasPlantas, plantaDeCadaEquipamento } from '@/core/modules/auth/planta-dos-equipamentos';
@@ -225,9 +226,10 @@ export class PlanosManutencaoService {
       await this.scopeService.assertEntityInScope('equipamento', plano.equipamento_id, user, PLANO_NAO_ENCONTRADO);
     }
 
-    // O valor de cada tarefa e o da instrucao dela, e o do plano e a soma (valor-do-plano.ts)
+    // O valor de cada tarefa e o da instrucao dela, e o do plano e a soma (valor-do-plano.ts).
+    // Só para quem vê custos: o cliente e o técnico leem o plano sem valor (28/out/2026)
     const tarefasDoPlano = (plano as PlanoLido).tarefas;
-    const valor = incluirTarefas && tarefasDoPlano
+    const valor = incluirTarefas && tarefasDoPlano && veOsCustos(user)
       ? valorDoPlano(tarefasDoPlano, await valoresDasInstrucoes(this.prisma, tarefasDoPlano.map((t) => t.instrucao_id)))
       : undefined;
 

@@ -24,6 +24,7 @@ import {
 import { Permissions, ScopedUser, StatusSolicitacaoServico } from '@/core';
 import { SolicitacoesServicoService } from './solicitacoes-servico.service';
 import { PropostaService } from './proposta.service';
+import { propostaPara } from './dinheiro-da-solicitacao';
 import {
   CreateSolicitacaoDto,
   UpdateSolicitacaoDto,
@@ -329,8 +330,10 @@ export class SolicitacoesServicoController {
   @Get(':id/proposta')
   @ApiOperation({ summary: 'Itens, custos e totais da proposta' })
   async obterProposta(@Param('id') id: string, @Request() req?: RequisicaoAutenticada) {
-    await this.solicitacoesService.garantirNoEscopo(id, req?.user);
-    return this.propostaService.obter(id);
+    // O cliente dono lê a proposta como no PDF dele (sem a composição do BDI); quem não
+    // monta proposta nem é o dono (o técnico) não lê dinheiro nenhum (28/out/2026)
+    const nivel = await this.solicitacoesService.nivelDaPropostaPara(id, req?.user);
+    return propostaPara(nivel, await this.propostaService.obter(id));
   }
 
   @Put(':id/proposta/itens')

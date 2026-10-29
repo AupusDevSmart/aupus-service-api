@@ -211,7 +211,7 @@ describe('painel de manutenção pelos filtros (banco real)', () => {
     expect(custo.adicionais.reduce((s, v) => s + v, 0)).toBeCloseTo(1, 6);
   });
 
-  it('o cliente não vê dinheiro: sem os gráficos de custo, os ofensores e o custo de cada OS (SERV-10)', async () => {
+  it('o cliente e o técnico não veem dinheiro: sem os gráficos de custo, os ofensores e o custo de cada OS', async () => {
     const doDono = await ler({ periodo: 'mes' }, donoA);
     expect(kpi(doDono, 'os_concluida')).toBe('2');
     expect([doDono.custo, doDono.custoPorOS, doDono.ofensores]).toEqual([null, null, []]);
@@ -219,9 +219,11 @@ describe('painel de manutenção pelos filtros (banco real)', () => {
     const { ordens } = await painel.getOrdensDaConta({ periodo: 'mes' } as QueryDashboardManutencaoDto, donoA);
     expect(ordens.length).toBeGreaterThan(0);
     expect(ordens.every((o) => o.custo === null)).toBe(true);
-    // O técnico de campo (executa a OS) continua vendo
+    // O técnico de campo também não vê (28/out/2026); quem gerencia a OS, sim
     const tecnico = { ...donoA, permissions: ['execucao_os.executar'] };
-    expect((await ler({ periodo: 'mes' }, tecnico)).custo).not.toBeNull();
+    expect((await ler({ periodo: 'mes' }, tecnico)).custo).toBeNull();
+    const gerente = { ...donoA, permissions: ['execucao_os.manage'] };
+    expect((await ler({ periodo: 'mes' }, gerente)).custo).not.toBeNull();
   });
 
   it('equipe: o filtro conta só a dela, e o combo só traz as do escopo', async () => {

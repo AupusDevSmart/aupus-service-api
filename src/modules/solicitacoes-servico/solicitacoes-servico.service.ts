@@ -23,10 +23,12 @@ import { comDataNecessidadeNormalizada } from './data-necessidade';
 import { periodoDoFiltro } from '../../common/helpers/filtros-da-os';
 import { comAsRelacoes, comOLugarAparado, exigirQuemPediu, mudouOLugar, plantaDaSolicitacao } from './lugar-da-solicitacao';
 import { bdiPadrao } from './bdi-padrao';
+import { nivelDaProposta, solicitacaoPara, type NivelDaProposta } from './dinheiro-da-solicitacao';
 import { registrarNotificacao } from '../notificacoes/registrar-notificacao';
 
 /** A planta que a linha da lista mostra */
-interface PlantaDaLinha { id: string; nome: string; cidade: string; uf: string }
+/** A planta da linha; o dono decide quanto da proposta quem pede vê (dinheiro-da-solicitacao.ts) */
+interface PlantaDaLinha { id: string; nome: string; cidade: string; uf: string; proprietario_id: string | null }
 
 @Injectable()
 export class SolicitacoesServicoService {
@@ -183,6 +185,13 @@ export class SolicitacoesServicoService {
       // texto dele apareceria na lista da equipe como dono da solicitação
       if (await this.temEscopo(user)) createDto.cliente_nome = null;
       exigirQuemPediu(planta_id, createDto.cliente_nome);
+      // Quem não monta proposta (o cliente, o técnico) não escolhe o dono nem o custo: o dono é o
+      // da planta (pelo corpo, o técnico virava "dono" e lia a proposta) e o custo é da equipe
+      const montaProposta = !user || Boolean((user as { permissions?: string[] }).permissions?.includes('solicitacoes.manage'));
+      if (!montaProposta) {
+        createDto.custo_estimado = undefined;
+        createDto.proprietario_id = planta_id ? await this.donoDaPlanta(planta_id) : null;
+      }
 
       // Extrair campos que não são colunas da tabela antes de criar
       const { instrucoes_ids, tarefas_ids, ...camposDaTabela } = createDto;
@@ -222,8 +231,10 @@ export class SolicitacoesServicoService {
       if (instrucoes_ids && instrucoes_ids.length > 0) {
         await this.associarInstrucoes(prisma, solicitacao.id, instrucoes_ids);
         // Copia recursos e etapas para a proposta, com o preco do catalogo
-        // congelado no momento do vinculo.
-        await this.propostaService.materializarDeInstrucoes(solicitacao.id, prisma);
+        // congelado no momento do vinculo. So para quem monta proposta: a do
+        // cliente ou do tecnico nasce sem preco (ele leria o custo do catalogo), e o
+        // planejador a monta ao abrir a edicao
+        if (montaProposta) await this.propostaService.materializarDeInstrucoes(solicitacao.id, prisma);
       }
 
       // A planta e as relações por consulta própria: o include perdia o id antigo (comAsRelacoes)
@@ -246,7 +257,7 @@ export class SolicitacoesServicoService {
       );
 
       this.logger.log(`Solicitação ${numero} criada com sucesso`);
-      return this.mapToResponseDto(solicitacaoCompleta);
+      return solicitacaoPara(user, this.mapToResponseDto(solicitacaoCompleta));
     });
   }
 
@@ -360,7 +371,7 @@ export class SolicitacoesServicoService {
     const [plantas, comRelacoes] = await Promise.all([
       idsDePlanta.length
         ? this.prisma.$queryRaw<PlantaDaLinha[]>`
-            SELECT id, nome, cidade, uf FROM plantas
+            SELECT id, nome, cidade, uf, TRIM(proprietario_id) AS proprietario_id FROM plantas
             WHERE TRIM(id) = ANY(${idsDePlanta}) AND deleted_at IS NULL`
         : Promise.resolve<PlantaDaLinha[]>([]),
       comAsRelacoes(this.prisma, solicitacoes),
@@ -372,7 +383,8 @@ export class SolicitacoesServicoService {
     }));
 
     return {
-      data: solicitacoesCompletas.map(s => this.mapToResponseDto(s)),
+      // O dinheiro da proposta pelo nível de quem pede (dinheiro-da-solicitacao.ts, 28/out/2026)
+      data: solicitacoesCompletas.map(s => solicitacaoPara(user, this.mapToResponseDto(s))),
       pagination: {
         page,
         limit,
@@ -392,6 +404,19 @@ export class SolicitacoesServicoService {
    */
   async garantirNoEscopo(id: string, user?: ScopedUser): Promise<void> {
     if (user) await this.scopeService.assertEntityInScope('solicitacao_servico', id, user);
+  }
+
+  /** Quanto da proposta quem pede vê: no escopo dele (404 fora), e pelo dono da solicitação */
+  async nivelDaPropostaPara(id: string, user?: ScopedUser): Promise<NivelDaProposta> {
+    await this.garantirNoEscopo(id, user);
+    const solicitacao = await this.prisma.solicitacoes_servico.findFirst({ where: { id }, select: { planta_id: true } });
+    return nivelDaProposta(user, solicitacao?.planta_id ? await this.donoDaPlanta(solicitacao.planta_id) : null);
+  }
+
+  /** O dono atual da planta (a consulta pelo id aparado: o include perdia o id antigo) */
+  private async donoDaPlanta(plantaId: string): Promise<string | null> {
+    const planta = await this.prisma.plantas.findFirst({ where: { id: plantaId.trim() }, select: { proprietario_id: true } });
+    return planta?.proprietario_id?.trim() || null;
   }
 
   /** Quem pede tem escopo por planta (o cliente, o técnico)? Sem usuário é chamada interna */
@@ -449,7 +474,7 @@ export class SolicitacoesServicoService {
     let planta = null;
     if (solicitacao.planta_id) {
       const plantaResult = await this.prisma.$queryRaw`
-        SELECT id, nome, cidade, uf, cnpj
+        SELECT id, nome, cidade, uf, cnpj, TRIM(proprietario_id) AS proprietario_id
         FROM plantas
         WHERE TRIM(id) = TRIM(${solicitacao.planta_id})
           AND deleted_at IS NULL
@@ -482,7 +507,7 @@ export class SolicitacoesServicoService {
       instrucoes: instrucoes
     };
 
-    return this.mapToResponseDto(solicitacaoCompleta);
+    return solicitacaoPara(user, this.mapToResponseDto(solicitacaoCompleta));
   }
 
   /**
@@ -594,7 +619,7 @@ export class SolicitacoesServicoService {
         'Solicitação atualizada',
       );
 
-      return this.mapToResponseDto(solicitacaoCompleta);
+      return solicitacaoPara(user, this.mapToResponseDto(solicitacaoCompleta));
     });
   }
 
