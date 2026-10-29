@@ -21,7 +21,7 @@ type Tx = Prisma.TransactionClient;
  *   reserva      -> cancelada
  *   tarefas      -> ancora avanca para o ciclo cancelado
  *   programacao  -> CANCELADA
- *   origem       -> REGISTRADA (pode ser programada de novo)
+ *   origem       -> REGISTRADA (anomalia) / PROPOSTA_REVISADA (solicitação): pode ser programada de novo
  */
 export async function cancelarOS(
   tx: Tx,

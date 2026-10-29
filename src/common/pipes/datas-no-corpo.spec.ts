@@ -21,6 +21,7 @@ import { UpdateFerramentaDto } from '../../modules/ferramentas/dto/update-ferram
 import { UpdateManutencaoDto } from '../../modules/ferramentas/dto/update-manutencao.dto';
 import { AjusteDeDataDto } from '../../modules/planos-manutencao/dto/herdar-plano.dto';
 import { CreateProgramacaoDto } from '../../modules/programacao-os/dto/create-programacao.dto';
+import { CondicoesDaPropostaDto } from '../../modules/solicitacoes-servico/dto/proposta.dto';
 import { CreateReservaDto } from '../../modules/reservas/dto/create-reserva.dto';
 import { QueryReservasDto } from '../../modules/reservas/dto/query-reservas.dto';
 import { UpdateReservaDto } from '../../modules/reservas/dto/update-reserva.dto';
@@ -119,6 +120,8 @@ const CAMPOS: Array<[Dto, string, Forma, Record<string, unknown>?]> = [
   [CreateVeiculoDto, 'proximaRevisao', 'data'],
   [CreateVeiculoDto, 'ultimaRevisao', 'data'],
   [UpdateVeiculoDto, 'vencimentoSeguro', 'data'],
+  // A validade da proposta (29/out/2026)
+  [CondicoesDaPropostaDto, 'validade_proposta', 'data'],
   // Os que eram só @IsString
   [QueryReservasDto, 'dataInicio', 'dia'],
   [QueryReservasDto, 'dataFim', 'dia'],

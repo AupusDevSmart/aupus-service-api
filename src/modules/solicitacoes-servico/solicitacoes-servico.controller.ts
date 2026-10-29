@@ -11,6 +11,7 @@ import {
   HttpStatus,
   HttpCode,
   Request,
+  BadRequestException,
   ConflictException,
   NotImplementedException,
 } from '@nestjs/common';
@@ -25,6 +26,7 @@ import { Permissions, ScopedUser, StatusSolicitacaoServico } from '@/core';
 import { SolicitacoesServicoService } from './solicitacoes-servico.service';
 import { PropostaService } from './proposta.service';
 import { propostaPara } from './dinheiro-da-solicitacao';
+import { TABELAS_DE_LOGISTICA, type TabelaDeLogistica } from './conta-da-proposta';
 import {
   CreateSolicitacaoDto,
   UpdateSolicitacaoDto,
@@ -33,9 +35,12 @@ import {
   ListarSolicitacoesResponseDto,
   SolicitacaoStatsDto,
   GerarProgramacaoOSDto,
-  BdiPadraoDto,
   CondicoesDaPropostaDto,
+  NaoAprovadaDto,
+  PadroesDaPropostaDto,
+  ReabrirPropostaDto,
   SalvarItensDaPropostaDto,
+  SalvarLogisticaDaPropostaDto,
   SalvarOutrosCustosDaPropostaDto,
 } from './dto';
 
@@ -95,23 +100,23 @@ export class SolicitacoesServicoController {
     return this.solicitacoesService.getStats(req?.user);
   }
 
-  // O BDI padrão da empresa (28/out/2026): a solicitação nova copia daqui, e
-  // cada uma ajusta o seu no fechamento. Antes do ':id', que o capturaria.
-  // Só quem monta proposta (o lucro e a administração são a margem da empresa:
+  // Os percentuais padrão da proposta (29/out/2026, no lugar do BDI padrão): a
+  // solicitação nova copia daqui, e cada uma ajusta os seus no fechamento. Antes
+  // do ':id', que o capturaria. Só quem monta proposta (a margem é da empresa:
   // o cliente, que tem solicitacoes.create, não lê)
-  @Get('bdi-padrao')
+  @Get('padroes-da-proposta')
   @Permissions('solicitacoes.manage')
-  @ApiOperation({ summary: 'O BDI padrão da empresa (os nove componentes e o percentual)' })
-  async obterBdiPadrao() {
-    return this.propostaService.obterBdiPadrao();
+  @ApiOperation({ summary: 'Os percentuais padrão da proposta (imposto, margem e administração)' })
+  async obterPadroesDaProposta() {
+    return this.propostaService.obterPadroes();
   }
 
-  @Put('bdi-padrao')
+  @Put('padroes-da-proposta')
   @Permissions('solicitacoes.manage')
-  @ApiOperation({ summary: 'Trocar o BDI padrão: vale para as solicitações novas' })
-  @ApiBody({ type: BdiPadraoDto })
-  async salvarBdiPadrao(@Body() body: BdiPadraoDto, @Request() req?: RequisicaoAutenticada) {
-    return this.propostaService.salvarBdiPadrao(body, req?.user?.id);
+  @ApiOperation({ summary: 'Trocar os percentuais padrão: valem para as solicitações novas' })
+  @ApiBody({ type: PadroesDaPropostaDto })
+  async salvarPadroesDaProposta(@Body() body: PadroesDaPropostaDto, @Request() req?: RequisicaoAutenticada) {
+    return this.propostaService.salvarPadroes(body, req?.user?.id);
   }
 
   @Get(':id')
@@ -199,7 +204,7 @@ export class SolicitacoesServicoController {
   })
   @ApiResponse({
     status: HttpStatus.CONFLICT,
-    description: 'Apenas solicitações registradas podem gerar OS',
+    description: 'Apenas solicitações com a proposta revisada podem gerar OS',
   })
   async gerarProgramacaoOS(
     @Param('id') id: string,
@@ -211,8 +216,8 @@ export class SolicitacoesServicoController {
     // Verificar se a solicitação está aprovada
     const solicitacao = await this.solicitacoesService.findOne(id, req?.user);
 
-    if (solicitacao.status !== 'REGISTRADA') {
-      throw new ConflictException('Apenas solicitações registradas podem gerar OS');
+    if (solicitacao.status !== 'PROPOSTA_REVISADA') {
+      throw new ConflictException('Apenas solicitações com a proposta revisada podem gerar OS');
     }
 
     if (solicitacao.programacao_os_id) {
@@ -228,6 +233,19 @@ export class SolicitacoesServicoController {
       status: solicitacao.status,
       ...dto,
     };
+  }
+
+  /**
+   * O que a programação herda da proposta revisada (29/out/2026): o valor de cada
+   * instrução, a logística e os adicionais como outros custos, e o veículo. A tela
+   * de programação preenche com isto; o `from-solicitacao` aplica sozinho. É custo:
+   * só quem programa (vê os custos da OS).
+   */
+  @Get(':id/para-programar')
+  @Permissions('programacao_os.manage')
+  @ApiOperation({ summary: 'O que a programação herda da proposta revisada' })
+  async paraProgramar(@Param('id') id: string, @Request() req?: RequisicaoAutenticada) {
+    return this.solicitacoesService.paraProgramar(id, req?.user);
   }
 
   @Get(':id/programacao-os')
@@ -356,12 +374,27 @@ export class SolicitacoesServicoController {
     return this.propostaService.salvarOutrosCustos(id, body.custos);
   }
 
+  @Put(':id/proposta/logistica/:tabela')
+  @Permissions('solicitacoes.manage')
+  @ApiOperation({ summary: 'Substitui uma tabela de logística (frete, deslocamento ou diaria)' })
+  @ApiParam({ name: 'tabela', enum: ['frete', 'deslocamento', 'diaria'] })
+  async salvarLogistica(
+    @Param('id') id: string,
+    @Param('tabela') tabela: string,
+    @Body() body: SalvarLogisticaDaPropostaDto,
+    @Request() req?: RequisicaoAutenticada,
+  ) {
+    const daRota = tabela?.toUpperCase() as TabelaDeLogistica;
+    if (!TABELAS_DE_LOGISTICA.includes(daRota)) throw new BadRequestException('A tabela é frete, deslocamento ou diaria.');
+    await this.solicitacoesService.garantirNoEscopo(id, req?.user);
+    return this.propostaService.salvarLogistica(id, daRota, body.linhas);
+  }
+
   @Put(':id/proposta/condicoes')
   @Permissions('solicitacoes.manage')
   @ApiOperation({
-    summary: 'Componentes do BDI',
-    description:
-      'Aceita bdi_regime e os nove percentuais. Recalcula os totais em seguida.',
+    summary: 'Percentuais, planejamento, validade, condições comerciais e desconto',
+    description: 'Percentual vazio não muda o gravado; o planejamento vazio apaga. Recalcula os totais em seguida.',
   })
   async salvarCondicoes(@Param('id') id: string, @Body() body: CondicoesDaPropostaDto, @Request() req?: RequisicaoAutenticada) {
     await this.solicitacoesService.garantirNoEscopo(id, req?.user);
@@ -379,5 +412,35 @@ export class SolicitacoesServicoController {
   async recarregarProposta(@Param('id') id: string, @Request() req?: RequisicaoAutenticada) {
     await this.solicitacoesService.garantirNoEscopo(id, req?.user);
     return this.propostaService.recarregar(id);
+  }
+
+  // Revisão da proposta (29/out/2026): só a revisada se programa. Quem monta a
+  // proposta também revisa (decisão do usuário): sem alçada, sem burocracia.
+
+  @Post(':id/proposta/revisar')
+  @Permissions('solicitacoes.manage')
+  @ApiOperation({ summary: 'Revisar a proposta: trava a edição e libera a programação' })
+  async revisarProposta(@Param('id') id: string, @Request() req?: RequisicaoAutenticada): Promise<SolicitacaoResponseDto> {
+    await this.solicitacoesService.garantirNoEscopo(id, req?.user);
+    await this.propostaService.revisar(id, req?.user?.id);
+    return this.solicitacoesService.findOne(id, req?.user);
+  }
+
+  @Post(':id/proposta/reabrir')
+  @Permissions('solicitacoes.manage')
+  @ApiOperation({ summary: 'Reabrir a proposta revisada ou não aprovada para edição' })
+  async reabrirProposta(@Param('id') id: string, @Body() body: ReabrirPropostaDto, @Request() req?: RequisicaoAutenticada): Promise<SolicitacaoResponseDto> {
+    await this.solicitacoesService.garantirNoEscopo(id, req?.user);
+    await this.propostaService.reabrir(id, req?.user?.id, body?.motivo);
+    return this.solicitacoesService.findOne(id, req?.user);
+  }
+
+  @Post(':id/proposta/nao-aprovada')
+  @Permissions('solicitacoes.manage')
+  @ApiOperation({ summary: 'Marcar a proposta como não aprovada pelo cliente, com o motivo' })
+  async propostaNaoAprovada(@Param('id') id: string, @Body() body: NaoAprovadaDto, @Request() req?: RequisicaoAutenticada): Promise<SolicitacaoResponseDto> {
+    await this.solicitacoesService.garantirNoEscopo(id, req?.user);
+    await this.propostaService.naoAprovada(id, body.motivo, req?.user?.id);
+    return this.solicitacoesService.findOne(id, req?.user);
   }
 }

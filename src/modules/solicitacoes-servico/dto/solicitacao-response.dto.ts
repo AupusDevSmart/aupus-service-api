@@ -188,11 +188,17 @@ export class SolicitacaoStatsDto {
   @ApiProperty({ description: 'Solicitações registradas' })
   registradas: number;
 
+  @ApiProperty({ description: 'Solicitações com a proposta revisada (prontas para programar)' })
+  revisadas: number;
+
   @ApiProperty({ description: 'Solicitações programadas' })
   programadas: number;
 
   @ApiProperty({ description: 'Solicitações finalizadas' })
   finalizadas: number;
+
+  @ApiProperty({ description: 'Solicitações com a proposta não aprovada' })
+  nao_aprovadas: number;
 
   @ApiProperty({ description: 'Por prioridade' })
   porPrioridade: {

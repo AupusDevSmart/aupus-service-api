@@ -8,3 +8,4 @@ export * from './update-status-instrucao.dto';
 export * from './instrucao-response.dto';
 export * from './dashboard-instrucoes.dto';
 export * from './anexo-instrucao-response.dto';
+export * from './associar-solicitacao.dto';

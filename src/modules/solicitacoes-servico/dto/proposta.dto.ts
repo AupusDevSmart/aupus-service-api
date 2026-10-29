@@ -1,16 +1,17 @@
-import { ArrayMaxSize, IsArray, IsBoolean, IsIn, IsNumber, IsObject, IsOptional, IsString, Matches, Max, MaxLength, Min, ValidateNested } from 'class-validator';
+import { ArrayMaxSize, IsArray, IsBoolean, IsIn, IsInt, IsNumber, IsObject, IsOptional, IsString, Matches, Max, MaxLength, Min, ValidateNested } from 'class-validator';
 import { Type } from 'class-transformer';
 import { applyDecorators } from '@nestjs/common';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { BooleanoDoTexto } from '@/common/decorators/booleano';
 import { CasasDecimais, VazioEhNulo } from '@/common/decorators/numero';
+import { DiaComoData } from '@/common/decorators/dia-de-calendario';
 import { TIPOS_DE_DESCONTO, type TipoDeDesconto } from '../desconto-da-proposta';
 
 /**
  * O corpo das escritas da proposta (SN-94). Até aqui as rotas recebiam um tipo
  * solto: sem o `whitelist`, qualquer campo passava, e um texto acima da coluna
  * ou um número fora do Decimal virava 500 no banco. Os tetos são os das colunas
- * (`solicitacoes_itens`, `solicitacoes_outros_custos`, os `bdi_*` da solicitação).
+ * (`solicitacoes_itens`, `solicitacoes_outros_custos`, `solicitacoes_logistica`, os percentuais da solicitação).
  */
 
 const TEXTO_COM_CONTEUDO = /\S/;
@@ -112,7 +113,7 @@ export class SalvarOutrosCustosDaPropostaDto {
   custos: OutroCustoDaPropostaDto[];
 }
 
-/** Um componente do BDI, em porcentagem (Decimal(6, 3)); vazio não muda o gravado */
+/** Um percentual da proposta (Decimal(6, 3)); vazio não muda o gravado */
 const Percentual = () =>
   applyDecorators(
     ApiPropertyOptional({ description: 'Percentual (0 a 100)', nullable: true }),
@@ -124,25 +125,50 @@ const Percentual = () =>
     VazioEhNulo(),
   );
 
+/** Um número opcional da proposta, com casas e teto da coluna; null apaga o gravado */
+const NumeroOpcional = (casas: number, teto: number, descricao: string) =>
+  applyDecorators(
+    ApiPropertyOptional({ description: descricao, nullable: true }),
+    IsOptional(),
+    VazioEhNulo(),
+    IsNumber(),
+    CasasDecimais(casas),
+    Min(0),
+    Max(teto),
+  );
+
+/** Um inteiro opcional (pessoas, noites); null apaga o gravado */
+const InteiroOpcional = (descricao: string) =>
+  applyDecorators(ApiPropertyOptional({ description: descricao, nullable: true }), IsOptional(), VazioEhNulo(), IsInt(), Min(0), Max(999));
+
 /**
- * As condições da proposta: os componentes do BDI da solicitação (ajustados no
- * fechamento; a nova nasce com o padrão da empresa) e o desconto (28/out/2026).
+ * As condições da proposta (29/out/2026): os percentuais (imposto, margem e
+ * administração, copiados dos padrões ao criar e ajustáveis só nela), o
+ * planejamento que a conta usa (km, dias, pessoas, noites), a validade, as
+ * condições comerciais e o desconto.
  */
 export class CondicoesDaPropostaDto {
-  @ApiPropertyOptional({ description: 'O regime: o REIDI desonera PIS e COFINS', enum: ['SEM_REIDI', 'COM_REIDI'] })
-  @IsOptional()
-  @IsIn(['SEM_REIDI', 'COM_REIDI'])
-  bdi_regime?: 'SEM_REIDI' | 'COM_REIDI';
+  @Percentual() imposto_percentual?: number | null;
+  @Percentual() margem_percentual?: number | null;
+  @Percentual() adm_servicos_percentual?: number | null;
+  @Percentual() adm_fd_percentual?: number | null;
 
-  @Percentual() bdi_administracao_central?: number | null;
-  @Percentual() bdi_seguro_garantia?: number | null;
-  @Percentual() bdi_taxa_risco?: number | null;
-  @Percentual() bdi_despesas_financeiras?: number | null;
-  @Percentual() bdi_lucro?: number | null;
-  @Percentual() bdi_pis?: number | null;
-  @Percentual() bdi_cofins?: number | null;
-  @Percentual() bdi_cprb?: number | null;
-  @Percentual() bdi_issqn?: number | null;
+  @NumeroOpcional(2, 99_999_999.99, 'A distância de ida, em km') distancia_km?: number | null;
+  @NumeroOpcional(2, 99_999_999.99, 'A distância de ida e volta, em km') distancia_ida_volta_km?: number | null;
+  @NumeroOpcional(2, 9_999.99, 'Os dias previstos de execução') dias_previstos?: number | null;
+  @InteiroOpcional('As pessoas mobilizadas') pessoas_previstas?: number | null;
+  @InteiroOpcional('As noites fora') noites_fora?: number | null;
+
+  @ApiPropertyOptional({ description: 'A validade da proposta (AAAA-MM-DD); vazio apaga', nullable: true })
+  @IsOptional()
+  @DiaComoData()
+  validade_proposta?: Date | null;
+
+  @ApiPropertyOptional({ description: 'As condições comerciais (pagamento, exclusões, garantias)', maxLength: 4000, nullable: true })
+  @IsOptional()
+  @IsString()
+  @MaxLength(4000)
+  condicoes_comerciais?: string | null;
 
   /** Ausente não muda o gravado; null tira o desconto */
   @ApiPropertyOptional({ description: 'O desconto, sobre o total inteiro: PERCENTUAL ou VALOR (null tira)', enum: TIPOS_DE_DESCONTO, nullable: true })
@@ -160,29 +186,76 @@ export class CondicoesDaPropostaDto {
   desconto_valor?: number | null;
 }
 
-/** Um componente do BDI padrão: obrigatório, em porcentagem (Decimal(6, 3)) */
+/** Um percentual padrão: obrigatório, de 0 a 100 */
 const PercentualObrigatorio = () =>
-  applyDecorators(
-    ApiProperty({ description: 'Percentual (0 a 100)' }),
-    VazioEhNulo(),
-    IsNumber(),
-    CasasDecimais(3),
-    Min(0),
-    Max(100),
-  );
+  applyDecorators(ApiProperty({ description: 'Percentual (0 a 100)' }), VazioEhNulo(), IsNumber(), CasasDecimais(3), Min(0), Max(100));
 
 /**
- * O BDI padrão da empresa (28/out/2026): os nove componentes, todos. A
- * solicitação nova copia daqui; a que existe fica com o seu.
+ * Os percentuais padrão da proposta (29/out/2026): a solicitação nova os copia;
+ * a que existe fica com os seus.
  */
-export class BdiPadraoDto {
-  @PercentualObrigatorio() bdi_administracao_central: number;
-  @PercentualObrigatorio() bdi_seguro_garantia: number;
-  @PercentualObrigatorio() bdi_taxa_risco: number;
-  @PercentualObrigatorio() bdi_despesas_financeiras: number;
-  @PercentualObrigatorio() bdi_lucro: number;
-  @PercentualObrigatorio() bdi_pis: number;
-  @PercentualObrigatorio() bdi_cofins: number;
-  @PercentualObrigatorio() bdi_cprb: number;
-  @PercentualObrigatorio() bdi_issqn: number;
+export class PadroesDaPropostaDto {
+  @PercentualObrigatorio() imposto_percentual: number;
+  @PercentualObrigatorio() margem_percentual: number;
+  @PercentualObrigatorio() adm_servicos_percentual: number;
+  @PercentualObrigatorio() adm_fd_percentual: number;
+}
+
+/**
+ * Uma linha de frete, deslocamento ou diária (29/out/2026). Cada tabela usa as
+ * suas colunas (`conta-da-proposta.ts`); a que não se aplica fica vazia.
+ */
+export class LinhaDeLogisticaDto {
+  @ApiPropertyOptional({ description: 'Desativada fica na proposta, com o custo fora da conta' })
+  @IsOptional()
+  @BooleanoDoTexto()
+  @IsBoolean()
+  ativo?: boolean;
+
+  @ApiPropertyOptional({ description: 'O recurso de onde o valor veio (copiado)', nullable: true })
+  @IsOptional()
+  @IsString()
+  @MaxLength(26)
+  recurso_id?: string | null;
+
+  @ApiProperty({ description: 'O que é a linha', maxLength: 200 })
+  @IsString()
+  @Matches(TEXTO_COM_CONTEUDO, { message: 'Diga o que é cada linha de frete, deslocamento ou diária.' })
+  @MaxLength(200)
+  descricao: string;
+
+  @NumeroOpcional(3, TETO_DA_QUANTIDADE, 'Diária: a quantidade; frete: as viagens') quantidade?: number | null;
+  @NumeroOpcional(2, TETO_DO_PRECO, 'Diária: o valor; deslocamento: a diária do veículo') valor_unitario?: number | null;
+  @NumeroOpcional(2, 9_999.99, 'Deslocamento: os dias') dias?: number | null;
+  @NumeroOpcional(2, 99_999_999.99, 'Frete: km por viagem; deslocamento: km totais') km?: number | null;
+  @NumeroOpcional(4, 9_999_999_999.9999, 'O valor do km') valor_km?: number | null;
+  @NumeroOpcional(2, TETO_DO_PRECO, 'Frete: o valor fixo') valor_fixo?: number | null;
+}
+
+export class SalvarLogisticaDaPropostaDto {
+  @ApiProperty({ description: 'A lista inteira da tabela (o estado final)', type: [LinhaDeLogisticaDto] })
+  @IsArray()
+  @ArrayMaxSize(200)
+  @IsObject({ each: true })
+  @ValidateNested({ each: true })
+  @Type(() => LinhaDeLogisticaDto)
+  linhas: LinhaDeLogisticaDto[];
+}
+
+/** O motivo de a proposta não ter sido aprovada (29/out/2026): obrigatório, vai para o histórico */
+export class NaoAprovadaDto {
+  @ApiProperty({ description: 'Por que o cliente não aprovou', maxLength: 1000 })
+  @IsString()
+  @Matches(TEXTO_COM_CONTEUDO, { message: 'Diga por que a proposta não foi aprovada.' })
+  @MaxLength(1000)
+  motivo: string;
+}
+
+/** Reabrir a proposta revisada ou não aprovada; o motivo, se vier, vai para o histórico */
+export class ReabrirPropostaDto {
+  @ApiPropertyOptional({ description: 'Por que a proposta volta à edição', maxLength: 1000, nullable: true })
+  @IsOptional()
+  @IsString()
+  @MaxLength(1000)
+  motivo?: string | null;
 }

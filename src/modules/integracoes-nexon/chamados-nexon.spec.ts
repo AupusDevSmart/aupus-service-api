@@ -143,8 +143,8 @@ describe('ChamadosNexonService', () => {
       plantas: { findFirst: jest.fn().mockResolvedValue({ id: 'PL1', nome: 'Fazenda X', proprietario_id: 'US1' }) },
       equipamentos: { findFirst: jest.fn().mockResolvedValue({ id: 'EQ1', nome: 'Inversor 01', unidade_id: 'UN1' }) },
       unidades: { findFirst: jest.fn().mockResolvedValue({ id: 'UN1' }) },
-      // Sem a linha do BDI padrão, o GOINFRA (28/out/2026)
-      bdi_padrao: { findUnique: jest.fn().mockResolvedValue(null) },
+      // Sem a linha dos padrões da proposta, os da spec (29/out/2026)
+      padroes_da_proposta: { findUnique: jest.fn().mockResolvedValue(null) },
       $transaction: jest.fn(),
     };
     prisma.$transaction.mockImplementation((fn: (tx: typeof prisma) => unknown) => fn(prisma));
@@ -172,9 +172,10 @@ describe('ChamadosNexonService', () => {
       nexon_chamado_id: 'chm_1',
       numero: '2026-0005',
       status: 'REGISTRADA',
-      // O BDI padrão da empresa, como a do formulário (28/out/2026); sem a linha, o GOINFRA
-      bdi_lucro: 5,
-      bdi_issqn: 6.5,
+      // Os percentuais padrão da proposta, como a do formulário (29/out/2026); sem a linha, os da spec
+      conta_da_proposta: 'IMPOSTO_MARGEM',
+      imposto_percentual: 15,
+      margem_percentual: 20,
     });
     const h = prisma.historico_solicitacao_servico.create.mock.calls[0][0].data;
     expect(h.acao).toBe('RECEBIDA_NEXON');

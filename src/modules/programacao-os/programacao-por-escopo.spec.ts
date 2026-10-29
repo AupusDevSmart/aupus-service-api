@@ -155,7 +155,7 @@ describe('programação no escopo da planta (banco real)', () => {
   describe('from-solicitacao', () => {
     const solicitacao = (lado: string, plantaId: string) =>
       prisma.solicitacoes_servico.create({
-        data: { numero: `${PREFIXO}-${lado}`, titulo: `${PREFIXO} ${lado}`, descricao: 'x', tipo: 'INSPECAO', planta_id: plantaId, solicitante_nome: 'x', local: 'x' },
+        data: { numero: `${PREFIXO}-${lado}`, titulo: `${PREFIXO} ${lado}`, descricao: 'x', tipo: 'INSPECAO', planta_id: plantaId, solicitante_nome: 'x', local: 'x', status: 'PROPOSTA_REVISADA' },
       });
 
     it('a rota tem DTO em classe: o ValidationPipe recusa campo de fora e valor inválido', async () => {

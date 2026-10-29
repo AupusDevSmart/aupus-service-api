@@ -120,6 +120,11 @@ export const EVENTOS = {
     grupo: NA_ORIGEM, nome: 'Solicitação aberta', acao: true, permissao: 'programacao_os.manage', envolvidos: [],
     titulo: (r) => `${r.rotulo} aberta`,
   },
+  // A proposta revisada (29/out/2026) está pronta para programar: avisa quem programa
+  'solicitacao.proposta_revisada': {
+    grupo: NA_ORIGEM, nome: 'Proposta revisada', acao: true, permissao: 'programacao_os.manage', envolvidos: [],
+    titulo: (r) => `${r.rotulo}: proposta revisada, pronta para programar`,
+  },
   'solicitacao.programada': {
     grupo: NA_ORIGEM, nome: 'Solicitação programada', acao: false, envolvidos: ['criador', 'cliente'],
     titulo: (r) => `${r.rotulo} programada`,

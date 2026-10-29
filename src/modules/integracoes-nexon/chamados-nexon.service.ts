@@ -3,7 +3,7 @@ import { Prisma, PrismaService, StatusSolicitacaoServico } from '@/core';
 import { equipamentoNasPlantas } from '@/core/modules/auth/planta-dos-equipamentos';
 import { SolicitacoesServicoService } from '../solicitacoes-servico/solicitacoes-servico.service';
 import { comOLugarAparado } from '../solicitacoes-servico/lugar-da-solicitacao';
-import { bdiPadrao } from '../solicitacoes-servico/bdi-padrao';
+import { colunasDosPercentuais, padroesDaProposta } from '../solicitacoes-servico/padroes-da-proposta';
 import { registrarNotificacao } from '../notificacoes/registrar-notificacao';
 import { ChamadoNexonDto } from './dto/chamado-nexon.dto';
 import { montarSolicitacao } from './chamados-nexon';
@@ -77,7 +77,13 @@ export class ChamadosNexonService {
     dto: ChamadoNexonDto,
     existente: { id: string; numero: string; status: StatusSolicitacaoServico; deleted_at: Date | null },
   ) {
-    const fechada = existente.deleted_at ? 'excluída' : existente.status === StatusSolicitacaoServico.FINALIZADA ? 'finalizada' : null;
+    const fechada = existente.deleted_at
+      ? 'excluída'
+      : existente.status === StatusSolicitacaoServico.FINALIZADA
+        ? 'finalizada'
+        : existente.status === StatusSolicitacaoServico.NAO_APROVADA
+          ? 'com a proposta não aprovada'
+          : null;
     if (fechada) {
       throw new ConflictException(
         `O chamado #${dto.numero} já virou a solicitação ${existente.numero}, ${fechada} no Smart Service. Abra um chamado novo no NexON.`,
@@ -140,7 +146,7 @@ export class ChamadosNexonService {
       // ele, a busca pelo nome da instalação e o escopo perdiam a solicitação
       const s = await tx.solicitacoes_servico.create({
         // Com o BDI padrão da empresa, como a do formulário (28/out/2026)
-        data: { ...comOLugarAparado(dados), ...(await bdiPadrao(tx)), numero, status: StatusSolicitacaoServico.REGISTRADA },
+        data: { ...comOLugarAparado(dados), conta_da_proposta: 'IMPOSTO_MARGEM', ...colunasDosPercentuais(await padroesDaProposta(tx)), numero, status: StatusSolicitacaoServico.REGISTRADA },
         select: { id: true, numero: true },
       });
       // Aberta avisa quem programa (SN-47), como a do formulário

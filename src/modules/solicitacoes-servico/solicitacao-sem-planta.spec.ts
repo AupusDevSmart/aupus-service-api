@@ -15,7 +15,8 @@ import { ProgramacaoOSService } from '../programacao-os/programacao-os.service';
 describe('solicitação sem planta (banco real)', () => {
   const prisma = new PrismaService();
   const escopo = new PermissionScopeService(prisma);
-  const solicitacoes = new SolicitacoesServicoService(prisma, escopo, new PropostaService(prisma));
+  const propostas = new PropostaService(prisma);
+  const solicitacoes = new SolicitacoesServicoService(prisma, escopo, propostas);
   const programacoes = new ProgramacaoOSService(prisma, escopo);
 
   const ID = (s: string) => `testesemplanta${s}`.padEnd(26, '0').slice(0, 26);
@@ -137,6 +138,12 @@ describe('solicitação sem planta (banco real)', () => {
     expect(await lugar(criada.id)).toMatchObject({ planta_id: PLANTA, unidade_id: UNIDADE });
   });
 
+  /** Só a proposta revisada se programa (29/out/2026) */
+  const revisada = async (campos: Record<string, unknown>) => {
+    const criada = await solicitacoes.create(pedido(campos), PLANEJADOR);
+    await propostas.revisar(criada.id.trim(), PLANEJADOR);
+    return criada;
+  };
   const programar = (solicitacaoId: string, campos: Record<string, unknown> = {}) =>
     programacoes.criar(
       { descricao: `${PREFIXO} programação`, condicoes: 'FUNCIONANDO', tipo: 'CORRETIVA', prioridade: 'MEDIA', origem: 'SOLICITACAO_SERVICO', solicitacao_servico_id: solicitacaoId, ...campos } as never,
@@ -144,7 +151,7 @@ describe('solicitação sem planta (banco real)', () => {
     );
 
   it('programar sem escolher a planta é 400; escolhendo, a solicitação recebe a planta e a instalação', async () => {
-    const criada = await solicitacoes.create(pedido({ cliente_nome: 'Padaria' }), PLANEJADOR);
+    const criada = await revisada({ cliente_nome: 'Padaria' });
     await expect(programar(criada.id)).rejects.toThrow(/Toda programação precisa de planta/);
 
     const programacao = await programar(criada.id, { planta_id: PLANTA, unidade_id: UNIDADE });
@@ -164,7 +171,7 @@ describe('solicitação sem planta (banco real)', () => {
   });
 
   it('a solicitação que já tem planta não é mexida, e outra planta na programação é 400', async () => {
-    const criada = await solicitacoes.create(pedido({ planta_id: PLANTA, unidade_id: UNIDADE }), PLANEJADOR);
+    const criada = await revisada({ planta_id: PLANTA, unidade_id: UNIDADE });
     await expect(programar(criada.id, { planta_id: OUTRA_PLANTA })).rejects.toThrow(/não é a mesma/);
     await programar(criada.id, { unidade_id: UNIDADE_DA_OUTRA });
     expect(await lugar(criada.id)).toMatchObject({ planta_id: PLANTA, unidade_id: UNIDADE });
@@ -194,15 +201,15 @@ describe('solicitação sem planta (banco real)', () => {
   });
 
   it('a edição da programação que troca a origem para uma solicitação sem planta grava a planta nela', async () => {
-    const comPlanta = await solicitacoes.create(pedido({ planta_id: PLANTA, unidade_id: UNIDADE }), PLANEJADOR);
-    const semPlanta = await solicitacoes.create(pedido({ cliente_nome: 'Mercado' }), PLANEJADOR);
+    const comPlanta = await revisada({ planta_id: PLANTA, unidade_id: UNIDADE });
+    const semPlanta = await revisada({ cliente_nome: 'Mercado' });
     const programacao = await programar(comPlanta.id);
     await programacoes.atualizar(programacao.id, { solicitacao_servico_id: semPlanta.id, unidade_id: UNIDADE } as never, PLANEJADOR);
     expect(await lugar(semPlanta.id)).toMatchObject({ planta_id: PLANTA, unidade_id: UNIDADE, proprietario_id: DONO });
   });
 
   it('a rota de programar a partir da solicitação também recebe a planta e a instalação', async () => {
-    const criada = await solicitacoes.create(pedido({ cliente_nome: 'Padaria' }), PLANEJADOR);
+    const criada = await revisada({ cliente_nome: 'Padaria' });
     await programacoes.criarDeSolicitacao(criada.id, { planta_id: PLANTA, unidade_id: UNIDADE } as never, PLANEJADOR);
     expect(await lugar(criada.id)).toMatchObject({ planta_id: PLANTA, unidade_id: UNIDADE });
   });

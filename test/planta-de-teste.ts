@@ -45,7 +45,8 @@ const PREFIXO_DA_SOLICITACAO = 'SS-TESTE-';
 let solicitacoesCriadas = 0;
 
 /**
- * Uma solicitação REGISTRADA nova na planta, como origem da programação: espalhar
+ * Uma solicitação nova na planta, com a proposta revisada (só ela se programa,
+ * 29/out/2026), como origem da programação: espalhar
  * no DTO (`{ ...(await solicitacaoDeTeste(prisma, plantaId)) }`). Quem a usa apaga
  * com `apagarSolicitacoesDeTeste` antes de apagar a planta.
  */
@@ -60,6 +61,7 @@ export async function solicitacaoDeTeste(prisma: PrismaService, plantaId: string
       planta_id: plantaId,
       solicitante_nome: 'Solicitante do teste',
       local: 'x',
+      status: 'PROPOSTA_REVISADA',
     },
     select: { id: true },
   });

@@ -248,8 +248,13 @@ export interface SolicitacaoDoSeed {
   instrucoes: string[];
   /** Prazo pedido pelo cliente, em dias depois da solicitação */
   prazoDias: number;
-  /** finalizada: vira OS e fecha; programada: programação aprovada, OS por fazer; aberta: proposta em elaboração */
-  desfecho: 'finalizada' | 'programada' | 'aberta';
+  /**
+   * finalizada: vira OS e fecha; programada: programação aprovada, OS por fazer; aberta: proposta em
+   * elaboração; revisada: proposta revisada, pronta para programar; nao_aprovada: o cliente recusou
+   */
+  desfecho: 'finalizada' | 'programada' | 'aberta' | 'revisada' | 'nao_aprovada';
+  /** Por que o cliente não aprovou (desfecho nao_aprovada) */
+  motivoDaRecusa?: string;
   comentarioDoCliente?: string;
   respostaDaEquipe?: string;
   notaInterna?: string;
@@ -315,14 +320,15 @@ export const SOLICITACOES: SolicitacaoDoSeed[] = [
   {
     diasAtras: 8, planta: 'fazenda', unidade: 'Usina fotovoltaica de autoconsumo',
     titulo: 'Estudo para ampliar a usina de autoconsumo', descricao: 'Avaliar a ampliação da usina em 400 kW, com o impacto na subestação.',
-    tipo: 'CONSULTORIA', prioridade: 'BAIXA', justificativa: 'Os pivôs novos aumentaram o consumo em 30%.', instrucoes: ['SRV-05'], prazoDias: 60, desfecho: 'aberta',
+    tipo: 'CONSULTORIA', prioridade: 'BAIXA', justificativa: 'Os pivôs novos aumentaram o consumo em 30%.', instrucoes: ['SRV-05'], prazoDias: 60, desfecho: 'nao_aprovada',
+    motivoDaRecusa: 'O cliente adiou a ampliação da usina para a safra do ano que vem.',
     comentarioDoCliente: 'Queremos saber também se o transformador principal aguenta.',
     notaInterna: 'Pedir a fatura dos últimos 12 meses e a memória de cálculo do transformador.',
   },
   {
     diasAtras: 4, planta: 'hospital', unidade: 'Quadros elétricos', equipamento: 'QGBT normal',
     titulo: 'Tomadas dedicadas para os novos equipamentos de imagem', descricao: 'Circuitos dedicados para o tomógrafo e a ressonância que chegam em dezembro.',
-    tipo: 'INSTALACAO', prioridade: 'URGENTE', justificativa: 'Os equipamentos chegam com data marcada de instalação pelo fabricante.', instrucoes: ['SRV-03'], prazoDias: 40, desfecho: 'aberta',
+    tipo: 'INSTALACAO', prioridade: 'URGENTE', justificativa: 'Os equipamentos chegam com data marcada de instalação pelo fabricante.', instrucoes: ['SRV-03'], prazoDias: 40, desfecho: 'revisada',
   },
   {
     diasAtras: 1, planta: 'laticinio', unidade: 'Utilidades',

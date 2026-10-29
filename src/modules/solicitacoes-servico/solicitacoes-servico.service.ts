@@ -22,7 +22,8 @@ import { StatusSolicitacaoServico } from '@/core';
 import { comDataNecessidadeNormalizada } from './data-necessidade';
 import { periodoDoFiltro } from '../../common/helpers/filtros-da-os';
 import { comAsRelacoes, comOLugarAparado, exigirQuemPediu, mudouOLugar, plantaDaSolicitacao } from './lugar-da-solicitacao';
-import { bdiPadrao } from './bdi-padrao';
+import { colunasDosPercentuais, padroesDaProposta } from './padroes-da-proposta';
+import { herancaDaProposta, type HerancaDaProposta } from './heranca-da-proposta';
 import { nivelDaProposta, solicitacaoPara, type NivelDaProposta } from './dinheiro-da-solicitacao';
 import { registrarNotificacao } from '../notificacoes/registrar-notificacao';
 
@@ -203,8 +204,9 @@ export class SolicitacoesServicoService {
       const solicitacao = await prisma.solicitacoes_servico.create({
         data: {
           ...createData,
-          // O BDI padrão da empresa (28/out/2026): a proposta nasce com ele e o ajusta no fechamento
-          ...(await bdiPadrao(prisma)),
+          // Os percentuais padrão (29/out/2026): a proposta nasce com eles e os ajusta no fechamento
+          conta_da_proposta: 'IMPOSTO_MARGEM',
+          ...colunasDosPercentuais(await padroesDaProposta(prisma)),
           // A coluna e NOT NULL: "nao informado" e vazio
           local: createData.local ?? '',
           planta_id, // Usar o planta_id determinado
@@ -411,6 +413,14 @@ export class SolicitacoesServicoService {
     await this.garantirNoEscopo(id, user);
     const solicitacao = await this.prisma.solicitacoes_servico.findFirst({ where: { id }, select: { planta_id: true } });
     return nivelDaProposta(user, solicitacao?.planta_id ? await this.donoDaPlanta(solicitacao.planta_id) : null);
+  }
+
+  /** O que a programação herda da proposta revisada (29/out/2026), no escopo de quem pede */
+  async paraProgramar(id: string, user?: ScopedUser): Promise<HerancaDaProposta> {
+    await this.garantirNoEscopo(id, user);
+    const solicitacao = await this.prisma.solicitacoes_servico.findFirst({ where: { id, deleted_at: null }, select: { id: true } });
+    if (!solicitacao) throw new NotFoundException('Solicitação não encontrada');
+    return herancaDaProposta(this.prisma, solicitacao.id);
   }
 
   /** O dono atual da planta (a consulta pelo id aparado: o include perdia o id antigo) */
@@ -654,15 +664,19 @@ export class SolicitacoesServicoService {
     const [
       total,
       registradas,
+      revisadas,
       programadas,
       finalizadas,
+      naoAprovadas,
       porPrioridade,
       porTipo,
     ] = await Promise.all([
       this.prisma.solicitacoes_servico.count({ where: base }),
       this.prisma.solicitacoes_servico.count({ where: { ...base, status: StatusSolicitacaoServico.REGISTRADA } }),
+      this.prisma.solicitacoes_servico.count({ where: { ...base, status: StatusSolicitacaoServico.PROPOSTA_REVISADA } }),
       this.prisma.solicitacoes_servico.count({ where: { ...base, status: StatusSolicitacaoServico.PROGRAMADA } }),
       this.prisma.solicitacoes_servico.count({ where: { ...base, status: StatusSolicitacaoServico.FINALIZADA } }),
+      this.prisma.solicitacoes_servico.count({ where: { ...base, status: StatusSolicitacaoServico.NAO_APROVADA } }),
       this.prisma.solicitacoes_servico.groupBy({ by: ['prioridade'], where: base, _count: true }),
       this.prisma.solicitacoes_servico.groupBy({ by: ['tipo'], where: base, _count: true }),
     ]);
@@ -680,8 +694,10 @@ export class SolicitacoesServicoService {
     return {
       total,
       registradas,
+      revisadas,
       programadas,
       finalizadas,
+      nao_aprovadas: naoAprovadas,
       porPrioridade: prioridadeMap,
       porTipo: tipoMap,
     };

@@ -7,8 +7,8 @@ import { PropostaService } from './proposta.service';
 import { CondicoesDaPropostaDto, SalvarItensDaPropostaDto, SalvarOutrosCustosDaPropostaDto } from './dto/proposta.dto';
 
 /**
- * As escritas da proposta (SN-94). As quatro rotas (itens, outros custos, BDI e
- * recarregar) não conferiam o escopo: quem tinha `solicitacoes.manage` numa
+ * As escritas da proposta (SN-94). As quatro rotas (itens, outros custos,
+ * condições e recarregar) não conferiam o escopo: quem tinha `solicitacoes.manage` numa
  * planta reescrevia a proposta de outra pelo id. E o corpo era um tipo solto,
  * sem DTO: campo a mais passava, e texto acima da coluna ou número fora do
  * Decimal virava 500 no banco.
@@ -65,11 +65,11 @@ describe('corpo das escritas da proposta (DTO)', () => {
     ).resolves.toMatchObject({ custos: [{ faturamento_direto: false }] });
   });
 
-  it('BDI: regime fora da lista e percentual acima de 100 são 400; vazio é null (não muda o gravado)', async () => {
-    await recusa(CondicoesDaPropostaDto, { bdi_regime: 'OUTRO' });
-    await recusa(CondicoesDaPropostaDto, { bdi_lucro: 101 });
-    await recusa(CondicoesDaPropostaDto, { bdi_lucro: 5, bdi_extra: 1 });
-    await expect(corpo(CondicoesDaPropostaDto, { bdi_lucro: '' })).resolves.toMatchObject({ bdi_lucro: null });
+  it('percentuais: acima de 100 e campo a mais são 400 (o BDI saiu em 29/out/2026); vazio é null (não muda o gravado)', async () => {
+    await recusa(CondicoesDaPropostaDto, { bdi_regime: 'SEM_REIDI' });
+    await recusa(CondicoesDaPropostaDto, { margem_percentual: 101 });
+    await recusa(CondicoesDaPropostaDto, { margem_percentual: 5, margem_extra: 1 });
+    await expect(corpo(CondicoesDaPropostaDto, { margem_percentual: '' })).resolves.toMatchObject({ margem_percentual: null });
   });
 });
 
@@ -106,8 +106,8 @@ describe('escritas da proposta no escopo da planta (banco real)', () => {
       data: { id, nome: `${PREFIXO} ${id}`, cnpj, localizacao: 'x', horario_funcionamento: '08-18', logradouro: 'Rua', cidade: 'Goiânia', uf: 'GO', cep: '74000-000', proprietario_id: dono },
     });
   const itensDaA = () => prisma.solicitacoes_itens.findMany({ where: { solicitacao_id: solicitacaoA }, orderBy: { ordem: 'asc' } });
-  const bdiDaA = () =>
-    prisma.solicitacoes_servico.findUniqueOrThrow({ where: { id: solicitacaoA }, select: { bdi_pis: true, bdi_issqn: true, bdi_percentual: true } });
+  const percentuaisDaA = () =>
+    prisma.solicitacoes_servico.findUniqueOrThrow({ where: { id: solicitacaoA }, select: { imposto_percentual: true, margem_percentual: true, total_geral: true } });
   let sequencia = 0;
   const novaSolicitacao = async (status: 'REGISTRADA' | 'PROGRAMADA' = 'REGISTRADA') => {
     sequencia += 1;
@@ -147,9 +147,10 @@ describe('escritas da proposta no escopo da planta (banco real)', () => {
 
   it('o técnico de outra planta é recusado nas quatro (404, como o que não existe) e nada muda', async () => {
     const antes = await itensDaA();
+    const margemAntes = (await percentuaisDaA()).margem_percentual;
     const itens = await corpo(SalvarItensDaPropostaDto, { itens: [] });
     const custos = await corpo(SalvarOutrosCustosDaPropostaDto, { custos: [{ descricao: 'Intruso', valor: 1 }] });
-    const condicoes = await corpo(CondicoesDaPropostaDto, { bdi_lucro: 50 });
+    const condicoes = await corpo(CondicoesDaPropostaDto, { margem_percentual: 50 });
     for (const escrita of [
       controller.salvarItensDaProposta(solicitacaoA, itens, comoTecnicoB),
       controller.salvarOutrosCustos(solicitacaoA, custos, comoTecnicoB),
@@ -160,28 +161,24 @@ describe('escritas da proposta no escopo da planta (banco real)', () => {
     }
     expect(await itensDaA()).toEqual(antes);
     expect(await prisma.solicitacoes_outros_custos.count({ where: { solicitacao_id: solicitacaoA } })).toBe(0);
-    const { bdi_lucro } = await prisma.solicitacoes_servico.findUniqueOrThrow({ where: { id: solicitacaoA }, select: { bdi_lucro: true } });
-    expect(Number(bdi_lucro)).toBe(5);
+    expect((await percentuaisDaA()).margem_percentual).toEqual(margemAntes);
   });
 
   it('a solicitação que não existe é 404, também com itens (antes, erro de chave estrangeira: 500)', async () => {
     const inexistente = ID('naoexiste');
     const itens = await corpo(SalvarItensDaPropostaDto, { itens: [itemDaTela] });
     const custos = await corpo(SalvarOutrosCustosDaPropostaDto, { custos: [{ descricao: 'Hospedagem', valor: 10 }] });
-    const condicoes = await corpo(CondicoesDaPropostaDto, { bdi_lucro: 6 });
+    const condicoes = await corpo(CondicoesDaPropostaDto, { margem_percentual: 6 });
     await expect(controller.salvarItensDaProposta(inexistente, itens, comoAdmin)).rejects.toBeInstanceOf(NotFoundException);
     await expect(controller.salvarOutrosCustos(inexistente, custos, comoAdmin)).rejects.toBeInstanceOf(NotFoundException);
     await expect(controller.salvarCondicoes(inexistente, condicoes, comoAdmin)).rejects.toBeInstanceOf(NotFoundException);
   });
 
-  it('BDI: o campo vazio não muda o gravado; o regime com REIDI zera PIS e COFINS', async () => {
-    const vazio = await corpo(CondicoesDaPropostaDto, { bdi_lucro: '', bdi_regime: 'COM_REIDI' });
-    await controller.salvarCondicoes(solicitacaoA, vazio, comoCliente);
-    const gravada = await prisma.solicitacoes_servico.findUniqueOrThrow({
-      where: { id: solicitacaoA },
-      select: { bdi_lucro: true, bdi_pis: true, bdi_cofins: true, bdi_regime: true },
-    });
-    expect([Number(gravada.bdi_lucro), Number(gravada.bdi_pis), Number(gravada.bdi_cofins), gravada.bdi_regime]).toEqual([5, 0, 0, 'COM_REIDI']);
+  it('percentuais: o campo vazio não muda o gravado', async () => {
+    await controller.salvarCondicoes(solicitacaoA, await corpo(CondicoesDaPropostaDto, { imposto_percentual: 15, margem_percentual: 20 }), comoCliente);
+    await controller.salvarCondicoes(solicitacaoA, await corpo(CondicoesDaPropostaDto, { margem_percentual: '', imposto_percentual: 12 }), comoCliente);
+    const gravada = await percentuaisDaA();
+    expect([Number(gravada.imposto_percentual), Number(gravada.margem_percentual)]).toEqual([12, 20]);
   });
 
   it('a solicitação programada tem a proposta que o cliente aceitou: escrever é 409', async () => {
@@ -192,17 +189,13 @@ describe('escritas da proposta no escopo da planta (banco real)', () => {
     expect(await prisma.solicitacoes_itens.count({ where: { solicitacao_id: programada } })).toBe(0);
   });
 
-  it('BDI que não cabe na coluna, ou impostos com 100%, é 400 e nada fica gravado (antes, 500 com o percentual ruim salvo)', async () => {
-    const antes = await bdiDaA();
-    // PIS 85,35%: o BDI dava 17.027%, e a coluna guarda até 999,999
-    await expect(controller.salvarCondicoes(solicitacaoA, await corpo(CondicoesDaPropostaDto, { bdi_pis: 85.35 }), comoCliente)).rejects.toBeInstanceOf(
-      BadRequestException,
-    );
-    // Os impostos somando 100% ou mais: a fórmula divide por (1 - I), e o BDI saía zero calado
-    await expect(controller.salvarCondicoes(solicitacaoA, await corpo(CondicoesDaPropostaDto, { bdi_issqn: 100 }), comoCliente)).rejects.toThrow(
+  it('imposto e margem com 100% ou mais é 400 e nada fica gravado (o percentual ruim travaria as escritas seguintes)', async () => {
+    const antes = await percentuaisDaA();
+    // A conta divide por (1 - (imposto + margem))
+    await expect(controller.salvarCondicoes(solicitacaoA, await corpo(CondicoesDaPropostaDto, { margem_percentual: 88 }), comoCliente)).rejects.toThrow(
       /somam 100% ou mais/,
     );
-    expect(await bdiDaA()).toEqual(antes);
+    expect(await percentuaisDaA()).toEqual(antes);
     // E a proposta segue gravável
     await expect(controller.salvarItensDaProposta(solicitacaoA, await corpo(SalvarItensDaPropostaDto, { itens: [itemDaTela] }), comoCliente)).resolves.toBeDefined();
   });

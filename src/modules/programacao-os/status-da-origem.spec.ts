@@ -7,9 +7,10 @@ import { ProgramacaoOSService } from './programacao-os.service';
  * O status da origem (anomalia, solicitacao) acompanha a programacao e a OS,
  * contra Postgres de verdade.
  *
- * A lista de origem da tela so oferece o que esta REGISTRADA. Entao todo
- * caminho que encerra uma programacao sem resolver o problema precisa devolver
- * a origem para REGISTRADA — senao ela some da lista e nunca mais pode ser
+ * A lista de origem da tela so oferece o que esta pronto para programar: a
+ * anomalia REGISTRADA e a solicitacao com a proposta revisada (29/out/2026). Entao
+ * todo caminho que encerra uma programacao sem resolver o problema precisa
+ * devolver a origem para la — senao ela some da lista e nunca mais pode ser
  * programada. E todo caminho que abre uma programacao precisa tira-la de la,
  * senao a mesma anomalia ganha duas OS.
  *
@@ -56,6 +57,8 @@ describe('status da origem acompanha programacao e OS (banco real)', () => {
         planta_id: ID_PLANTA,
         solicitante_nome: 'Teste',
         local: 'Local de teste',
+        // Só a proposta revisada se programa (29/out/2026)
+        status: 'PROPOSTA_REVISADA',
       },
     });
     return criada.id.trim();
@@ -294,7 +297,7 @@ describe('status da origem acompanha programacao e OS (banco real)', () => {
 
     const solicitacao = (id: string) => prisma.solicitacoes_servico.findUnique({ where: { id } });
 
-    it('criar pelo formulario programa a solicitacao, e cancelar devolve para REGISTRADA', async () => {
+    it('criar pelo formulario programa a solicitacao, e cancelar a devolve com a proposta revisada', async () => {
       const solId = await novaSolicitacao('cancelar');
       const prog = await programarSolicitacao(solId);
 
@@ -305,8 +308,14 @@ describe('status da origem acompanha programacao e OS (banco real)', () => {
       await programacoes.cancelar(prog.id, { motivo_cancelamento: 'teste' });
 
       sol = await solicitacao(solId);
-      expect(sol?.status).toBe('REGISTRADA');
+      expect(sol?.status).toBe('PROPOSTA_REVISADA');
       expect(sol?.programacao_os_id).toBeNull();
+    });
+
+    it('a solicitacao com a proposta por revisar nao se programa', async () => {
+      const solId = await novaSolicitacao('por-revisar');
+      await prisma.solicitacoes_servico.update({ where: { id: solId }, data: { status: 'REGISTRADA' } });
+      await expect(programarSolicitacao(solId)).rejects.toThrow(/ainda não foi revisada/);
     });
 
     it('nao deixa programar uma solicitacao que ja tem programacao em aberto', async () => {
@@ -325,7 +334,7 @@ describe('status da origem acompanha programacao e OS (banco real)', () => {
       await execucoes.cancelar(os!.id, { motivo_cancelamento: 'teste' } as never);
 
       const sol = await solicitacao(solId);
-      expect(sol?.status).toBe('REGISTRADA');
+      expect(sol?.status).toBe('PROPOSTA_REVISADA');
       expect(sol?.programacao_os_id).toBeNull();
     });
   });

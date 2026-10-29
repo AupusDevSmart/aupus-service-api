@@ -152,20 +152,48 @@ function solicitacao(c: Cenario, linha: LinhaDoTempo, sol: SolicitacaoDoSeed, i:
       });
     }
 
-    // A equipe fecha a proposta: deslocamento, diárias de quem vai longe e o regime do BDI
+    // A equipe fecha a proposta (29/out/2026): as instruções com o valor do catálogo, o km, o
+    // deslocamento, as diárias de quem dorme fora e a validade; imposto e margem são os padrões
     linha.marcar(as(somarDias(quando, 1), '10:30'), `proposta ${id}`, async () => {
       const distancia = planta.dados.distanciaKm;
-      await c.s.propostas.salvarOutrosCustos(id, [
-        { descricao: `Deslocamento (${distancia} km ida e volta)`, valor: Math.round(distancia * 2.35 * 100) / 100 },
-        ...(distancia > 300 ? [{ descricao: 'Diárias de alimentação e hospedagem da equipe', valor: 1240 }] : []),
+      const longe = distancia > 300;
+      await c.s.propostas.recarregar(id);
+      await c.s.propostas.salvarLogistica(id, 'DESLOCAMENTO', [
+        { descricao: 'Picape da equipe', dias: longe ? 2 : 1, valor_unitario: 180, km: distancia * 2, valor_km: 1.35 },
       ]);
-      await c.s.propostas.salvarCondicoes(id, { bdi_regime: 'SEM_REIDI' });
+      if (longe) {
+        await c.s.propostas.salvarLogistica(id, 'DIARIA', [
+          { descricao: 'Almoço', quantidade: 4, valor_unitario: 45 },
+          { descricao: 'Pernoite', quantidade: 2, valor_unitario: 220 },
+        ]);
+      }
+      await c.s.propostas.salvarCondicoes(id, {
+        distancia_km: distancia,
+        distancia_ida_volta_km: distancia * 2,
+        dias_previstos: longe ? 2 : 1,
+        pessoas_previstas: 2,
+        noites_fora: longe ? 1 : 0,
+        validade_proposta: new Date(`${diaDe(somarDias(quando, 31))}T00:00:00.000Z`),
+        condicoes_comerciais: 'Pagamento em 30 dias da entrega do relatório.',
+      });
       if (sol.respostaDaEquipe) await c.s.comentarios.comentar('solicitacao_servico', id, { comentario: sol.respostaDaEquipe }, equipe.usuario);
       if (sol.notaInterna) await c.s.comentarios.comentar('solicitacao_servico', id, { comentario: sol.notaInterna, interno: true }, equipe.usuario);
     });
     if (sol.desfecho === 'aberta') return;
 
-    // Aceita a proposta, vira programação; a OS vai no meio do prazo pedido
+    // A equipe revisa a proposta (29/out/2026): só a revisada se programa
+    linha.marcar(as(somarDias(quando, 2), '16:00'), `revisar proposta ${id}`, async () => {
+      await c.s.propostas.revisar(id, equipe.id);
+    });
+    if (sol.desfecho === 'revisada') return;
+    if (sol.desfecho === 'nao_aprovada') {
+      linha.marcar(as(somarDias(quando, 3), '11:00'), `proposta não aprovada ${id}`, async () => {
+        await c.s.propostas.naoAprovada(id, sol.motivoDaRecusa ?? 'O cliente não aprovou a proposta.', equipe.id);
+      });
+      return;
+    }
+
+    // O cliente aceita, vira programação; a OS vai no meio do prazo pedido
     linha.marcar(as(somarDias(quando, 3), '09:00'), `programar serviço ${id}`, async () => {
       const programacao = await c.s.programacoes.criarDeSolicitacao(id, {}, equipe.id, equipe.usuario);
       const agora = c.relogio.passoEmCurso()!;

@@ -71,6 +71,9 @@ const CAMPOS_DE_PRECO = new Set(['preco_proprio', 'preco_base', 'preco_cadastro'
 /** "R$ 1.234,56" no texto da trilha ("R$ 120,00/h informado", "de R$ 80,00 para R$ 95,00") */
 const REAIS_NO_TEXTO = /R\$\s*-?\d[\d.]*(?:,\d+)?/g;
 
+/** O texto com os reais trocados por "R$ —" (a trilha para quem não vê o dinheiro) */
+export const semReaisNoTexto = (texto: string) => texto.replace(REAIS_NO_TEXTO, 'R$ —');
+
 const ehObjetoSimples = (v: unknown): v is Record<string, unknown> =>
   typeof v === 'object' && v !== null && (Object.getPrototypeOf(v) === Object.prototype || Object.getPrototypeOf(v) === null);
 

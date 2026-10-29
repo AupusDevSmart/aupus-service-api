@@ -210,9 +210,15 @@ const JORNADAS: [string, string, string[]][] = [
   ['excluir o próprio comentário na OS', 'DELETE /execucao-os/:id/comentarios/:comentarioId', EXECUTAM],
   ['editar solicitação', 'PATCH /solicitacoes-servico/:id', PLANEJAM],
   ['programar a partir da solicitação', 'POST /solicitacoes-servico/:id/gerar-programacao-os', PLANEJAM],
-  // O BDI padrão (28/out/2026): a margem da empresa, só quem monta proposta lê e troca
-  ['ler o BDI padrão', 'GET /solicitacoes-servico/bdi-padrao', PLANEJAM],
-  ['trocar o BDI padrão', 'PUT /solicitacoes-servico/bdi-padrao', PLANEJAM],
+  // Os padrões da proposta (29/out/2026, no lugar do BDI padrão): a margem da empresa, só quem monta proposta
+  ['ler os padrões da proposta', 'GET /solicitacoes-servico/padroes-da-proposta', PLANEJAM],
+  ['trocar os padrões da proposta', 'PUT /solicitacoes-servico/padroes-da-proposta', PLANEJAM],
+  // A proposta nova (29/out/2026): a logística e a revisão, de quem monta proposta; a herança, de quem programa
+  ['tabela de frete, deslocamento ou diárias da proposta', 'PUT /solicitacoes-servico/:id/proposta/logistica/:tabela', PLANEJAM],
+  ['revisar a proposta', 'POST /solicitacoes-servico/:id/proposta/revisar', PLANEJAM],
+  ['reabrir a proposta', 'POST /solicitacoes-servico/:id/proposta/reabrir', PLANEJAM],
+  ['proposta não aprovada', 'POST /solicitacoes-servico/:id/proposta/nao-aprovada', PLANEJAM],
+  ['o que a programação herda da proposta', 'GET /solicitacoes-servico/:id/para-programar', PLANEJAM],
   ['ver anomalias', 'GET /anomalias', TODOS],
   ['registrar anomalia', 'POST /anomalias', EXECUTAM],
   ['ver os anexos da anomalia', 'GET /anomalias/:id/anexos', TODOS],

@@ -2776,6 +2776,41 @@ model solicitacoes_servico {
   desconto_valor Decimal? @db.Decimal(14, 2)
   total_desconto Decimal? @db.Decimal(14, 2)
 
+  /// ----------------------------------------------------------------------
+  /// A conta por imposto e margem (29/out/2026), que substitui o BDI. As que
+  /// existiam ficam em 'BDI' (documento); as novas e as convertidas, em
+  /// 'IMPOSTO_MARGEM'. Conta em `conta-da-proposta.ts`:
+  ///   preço dos serviços = custo dos serviços ÷ (1 − (imposto + margem))
+  ///   preço da adm       = (adm% × custo dos serviços + adm FD% × FD) ÷ (1 − imposto)
+  ///   total Aupus        = preço dos serviços + preço da adm − desconto
+  ///   total_geral        = total Aupus + FD (o investimento global)
+  /// ----------------------------------------------------------------------
+  conta_da_proposta       String    @default("IMPOSTO_MARGEM") @db.VarChar(20)
+  /// A distância de ida, em km; a de ida e volta é sugerida como o dobro, editável
+  distancia_km            Decimal?  @db.Decimal(10, 2)
+  distancia_ida_volta_km  Decimal?  @db.Decimal(10, 2)
+  /// O planejamento que a conta usa: dias (sugeridos pelas horas dos passos ÷ 8), pessoas e noites fora
+  dias_previstos          Decimal?  @db.Decimal(6, 2)
+  pessoas_previstas       Int?      @db.SmallInt
+  noites_fora             Int?      @db.SmallInt
+  /// Os percentuais da proposta, copiados dos padrões ao criar
+  imposto_percentual      Decimal?  @db.Decimal(6, 3)
+  margem_percentual       Decimal?  @db.Decimal(6, 3)
+  adm_servicos_percentual Decimal?  @db.Decimal(6, 3)
+  adm_fd_percentual       Decimal?  @db.Decimal(6, 3)
+  validade_proposta       DateTime? @db.Date
+  condicoes_comerciais    String?
+  /// O custo dos serviços da Aupus (instruções, logística e custos adicionais fora o FD)
+  total_servicos          Decimal?  @db.Decimal(14, 2)
+  total_fd                Decimal?  @db.Decimal(14, 2)
+  /// O preço da administração (com o imposto dela)
+  total_administracao     Decimal?  @db.Decimal(14, 2)
+  /// O faturamento da Aupus, já com o desconto
+  total_aupus             Decimal?  @db.Decimal(14, 2)
+  valor_imposto           Decimal?  @db.Decimal(14, 2)
+  /// (total Aupus − imposto − custo dos serviços) ÷ total Aupus, em %
+  margem_efetiva          Decimal?  @db.Decimal(7, 3)
+
   /// OBSOLETOS: substituídos pelo BDI, que já traz lucro (L) e impostos (I).
   /// Ninguém mais lê nem escreve nestas colunas. Ficam porque removê-las exige
   /// migração destrutiva num banco compartilhado com o iot_nexon — e porque
@@ -2794,6 +2829,7 @@ model solicitacoes_servico {
   itens                   solicitacoes_itens[]
   subinstrucoes           solicitacoes_subinstrucoes[]
   outros_custos           solicitacoes_outros_custos[]
+  logistica               solicitacoes_logistica[]
   equipamento             equipamentos?                     @relation(fields: [equipamento_id], references: [id])
   /// RESTRICT como no banco: o padrão do Prisma para relação opcional é SetNull, e o diff pediria trocar a FK
   planta                  plantas?                          @relation(fields: [planta_id], references: [id], onDelete: Restrict)
@@ -3431,10 +3467,14 @@ enum TipoAnexoOS {
   @@map("tipo_anexo_os")
 }
 
+/// PROPOSTA_REVISADA: a proposta foi revisada e está travada; só ela se programa.
+/// NAO_APROVADA: a que não fechou (encerrada sem OS). Ambos de 29/out/2026.
 enum StatusSolicitacaoServico {
   REGISTRADA
+  PROPOSTA_REVISADA
   PROGRAMADA
   FINALIZADA
+  NAO_APROVADA
 }
 
 enum TipoSolicitacaoServico {
@@ -3867,4 +3907,46 @@ model bdi_padrao {
   bdi_issqn                 Decimal   @default(6.500) @db.Decimal(6, 3)
   updated_by                String?   @db.Char(26)
   updated_at                DateTime? @db.Timestamptz(3)
+}
+
+/// As linhas de frete, deslocamento e diárias da proposta (29/out/2026). A
+/// coluna `tabela` diz qual; cada uma usa as suas colunas (`conta-da-proposta.ts`):
+///   FRETE:        km por viagem × quantidade (viagens) × valor_km + valor_fixo
+///   DESLOCAMENTO: dias × valor_unitario (a diária do veículo) + km × valor_km
+///   DIARIA:       quantidade × valor_unitario (café, almoço, jantar, pernoite)
+/// O valor vem do recurso (`recurso_id`), copiado: editar aqui não muda o cadastro.
+/// A linha desativada (`ativo` falso) fica, com o custo fora da conta.
+model solicitacoes_logistica {
+  id             String               @id @default(cuid()) @db.VarChar(26)
+  solicitacao_id String
+  tabela         String               @db.VarChar(20)
+  ativo          Boolean              @default(true)
+  recurso_id     String?              @db.Char(26)
+  descricao      String               @db.VarChar(200)
+  quantidade     Decimal?             @db.Decimal(10, 3)
+  valor_unitario Decimal?             @db.Decimal(14, 2)
+  dias           Decimal?             @db.Decimal(6, 2)
+  km             Decimal?             @db.Decimal(10, 2)
+  valor_km       Decimal?             @db.Decimal(14, 4)
+  valor_fixo     Decimal?             @db.Decimal(14, 2)
+  total          Decimal              @default(0) @db.Decimal(14, 2)
+  ordem          Int                  @default(1) @db.SmallInt
+  created_at     DateTime             @default(now()) @db.Timestamp(0)
+  updated_at     DateTime             @default(now()) @updatedAt @db.Timestamp(0)
+  solicitacao    solicitacoes_servico @relation(fields: [solicitacao_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([solicitacao_id])
+  @@map("solicitacoes_logistica")
+}
+
+/// Os percentuais padrão da proposta (29/out/2026): uma linha só (id 1, CHECK no
+/// banco). A solicitação nova copia daqui; trocar não reescreve proposta feita.
+model padroes_da_proposta {
+  id                      Int       @id @default(1) @db.SmallInt
+  imposto_percentual      Decimal   @default(15.000) @db.Decimal(6, 3)
+  margem_percentual       Decimal   @default(20.000) @db.Decimal(6, 3)
+  adm_servicos_percentual Decimal   @default(5.000) @db.Decimal(6, 3)
+  adm_fd_percentual       Decimal   @default(2.000) @db.Decimal(6, 3)
+  updated_by              String?   @db.Char(26)
+  updated_at              DateTime? @db.Timestamptz(3)
 }

@@ -1,11 +1,15 @@
 // src/modules/solicitacoes-servico/proposta.service.ts
 import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '@/core';
-import { Prisma } from '@prisma/client';
+import { Prisma, type StatusSolicitacaoServico } from '@prisma/client';
+import { nomeDoAutor } from '@/common/helpers/status-da-origem';
 import { valoresDasInstrucoes } from '../instrucoes/valor-da-instrucao';
-import type { BdiPadraoDto, CondicoesDaPropostaDto } from './dto/proposta.dto';
-import { BDI_GOINFRA, CAMPOS_DO_BDI, TETO_DO_BDI, bdiDaFormula, bdiPadrao, componentesDe, percentualDoBdi, type ComponentesDoBdi } from './bdi-padrao';
-import { descontoDaProposta } from './desconto-da-proposta';
+import { variantesDeIds } from '../tarefas/ids';
+import { registrarNotificacao } from '../notificacoes/registrar-notificacao';
+import type { CondicoesDaPropostaDto, LinhaDeLogisticaDto, PadroesDaPropostaDto } from './dto/proposta.dto';
+import { totalDaLinha, type ContaDaProposta, type TabelaDeLogistica } from './conta-da-proposta';
+import { colunasDosPercentuais, padroesDaProposta, percentuaisDe } from './padroes-da-proposta';
+import { contaGravada, linhaDeLogisticaLida, recalcularProposta } from './recalculo-da-proposta';
 
 /**
  * A proposta comercial de uma solicitação de serviço.
@@ -26,12 +30,26 @@ import { descontoDaProposta } from './desconto-da-proposta';
  * O escopo (as etapas) NÃO é copiado: o PDF lê as sub-instruções ao vivo na
  * hora de gerar. Escopo é descrição do serviço, não preço — e quem corrige uma
  * instrução quer a correção valendo.
+ *
+ * A conta (29/out/2026) é por imposto e margem (`conta-da-proposta.ts`), com o
+ * frete, o deslocamento e as diárias em tabelas da proposta. A de antes, pelo
+ * BDI, fica nas propostas programadas e finalizadas, como documento.
  */
-/** O teto das colunas dos totais, Decimal(14, 2); o do `bdi_percentual` é o `TETO_DO_BDI` */
+/** O teto das colunas dos totais, Decimal(14, 2) */
 const TETO_DO_TOTAL = 999_999_999_999.99;
 
 /** "R$ 1.234,56", para a mensagem de erro */
 const reais = (valor: number) => valor.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+
+/** As horas de uma jornada: a sugestão de dias é a soma das horas dos passos ÷ 8 (a spec) */
+const HORAS_POR_DIA = 8;
+
+const PERCENTUAIS = ['imposto_percentual', 'margem_percentual', 'adm_servicos_percentual', 'adm_fd_percentual'] as const;
+const PLANEJAMENTO = ['distancia_km', 'distancia_ida_volta_km', 'dias_previstos', 'pessoas_previstas', 'noites_fora'] as const;
+
+/** A proposta que voltou à edição: o que a revisão e a recusa gravaram sai junto */
+const SEM_REVISAO = { aprovado_por_id: null, aprovado_por_nome: null, data_aprovacao: null } as const;
+const SEM_RECUSA = { rejeitado_por_id: null, data_rejeicao: null, motivo_rejeicao: null } as const;
 
 @Injectable()
 export class PropostaService {
@@ -44,29 +62,38 @@ export class PropostaService {
     return Number.isFinite(n) ? n : 0;
   }
 
+  private numOuNulo(valor: Prisma.Decimal | number | null | undefined): number | null {
+    return valor === null || valor === undefined ? null : this.num(valor);
+  }
+
   /**
-   * Trava a solicitação para escrever a proposta (SN-94), dentro da transação da escrita:
-   * - a que não existe é 404 (a lista de itens numa que não existe dava erro de chave
-   *   estrangeira, 500; o BDI, registro não encontrado no update);
-   * - só a REGISTRADA se edita (409), como o PATCH da solicitação e a tela, que só abre a
-   *   edição nela: a programada tem a proposta que o cliente aceitou;
-   * - o FOR UPDATE enfileira duas gravações da mesma proposta. Sem ele, as duas apagavam a
-   *   lista antiga, cada uma inseria a sua, e a proposta saía com as linhas em dobro.
+   * O status da solicitação, travada (FOR UPDATE) dentro da transação de quem a
+   * muda: duas gravações da mesma proposta se enfileiram. Sem a trava, as duas
+   * apagavam a lista antiga, cada uma inseria a sua, e a proposta saía com as
+   * linhas em dobro. A que não existe é 404.
    */
-  private async travarParaEditar(tx: Prisma.TransactionClient, solicitacaoId: string): Promise<void> {
-    const [solicitacao] = await tx.$queryRaw<{ status: string }[]>`
+  private async travar(tx: Prisma.TransactionClient, solicitacaoId: string): Promise<StatusSolicitacaoServico> {
+    const [solicitacao] = await tx.$queryRaw<{ status: StatusSolicitacaoServico }[]>`
       SELECT status::text AS status FROM solicitacoes_servico
        WHERE id = ${solicitacaoId} AND deleted_at IS NULL
        FOR UPDATE`;
     if (!solicitacao) throw new NotFoundException('Solicitação não encontrada');
-    if (solicitacao.status !== 'REGISTRADA') {
-      throw new ConflictException('A proposta só se edita com a solicitação registrada: depois de programada, é a que o cliente aceitou.');
-    }
+    return solicitacao.status;
   }
 
-  /** Centavos. Somar float sem arredondar acumula erro e o total não fecha. */
-  private centavos(valor: number): number {
-    return Math.round(valor * 100) / 100;
+  /**
+   * Trava a solicitação para escrever a proposta (SN-94). Só a REGISTRADA se
+   * edita (409), como o PATCH da solicitação e a tela: a revisada se reabre
+   * antes (29/out/2026), e a programada tem a proposta que o cliente aceitou.
+   */
+  private async travarParaEditar(tx: Prisma.TransactionClient, solicitacaoId: string): Promise<void> {
+    const status = await this.travar(tx, solicitacaoId);
+    if (status === 'PROPOSTA_REVISADA' || status === 'NAO_APROVADA') {
+      throw new ConflictException('A proposta já foi revisada: reabra-a para editar.');
+    }
+    if (status !== 'REGISTRADA') {
+      throw new ConflictException('A proposta só se edita com a solicitação registrada: depois de programada, é a que o cliente aceitou.');
+    }
   }
 
   // ============================================================
@@ -153,110 +180,12 @@ export class PropostaService {
   // ============================================================
 
   /**
-   * Recalcula e GRAVA os totais.
-   *
-   * Gravar, e não calcular na leitura, porque a tela, a listagem e o PDF
-   * precisam do mesmo número — e daqui a seis meses, mesmo que o catálogo e a
-   * alíquota tenham mudado.
-   *
-   * A fórmula acordada é margem, alíquota por dentro e faturamento direto fora
-   * do imposto:
-   *
-   *   tributavel  = custo dos itens + outros custos que NÃO são FD
-   *   com_imposto = tributavel / (1 - aliquota)     <- por dentro
-   *   total_geral = (com_imposto + custos FD) * (1 + lucro)
-   *
-   * O FD fica fora do imposto porque o cliente paga o fornecedor direto: o
-   * dinheiro não passa pela empresa, então não há o que tributar. Ele volta
-   * para a conta depois, e recebe margem como o resto.
-   *
-   * O desconto (28/out/2026) sai do total inteiro, o FD junto: `total_geral` é
-   * o total com ele, e `total_desconto` os reais descontados.
+   * Recalcula e GRAVA os totais, pela conta de imposto e margem
+   * (`recalculo-da-proposta.ts`). A proposta do BDI que chega aqui (só a
+   * REGISTRADA se edita) passa para a conta nova, com os percentuais padrão.
    */
-  async recalcular(solicitacaoId: string, tx?: Prisma.TransactionClient) {
-    const db = tx ?? this.prisma;
-
-    const [solicitacao, itens, outros] = await Promise.all([
-      db.solicitacoes_servico.findFirst({
-        where: { id: solicitacaoId },
-        select: {
-          id: true,
-          bdi_administracao_central: true,
-          bdi_seguro_garantia: true,
-          bdi_taxa_risco: true,
-          bdi_despesas_financeiras: true,
-          bdi_lucro: true,
-          bdi_pis: true,
-          bdi_cofins: true,
-          bdi_cprb: true,
-          bdi_issqn: true,
-          desconto_tipo: true,
-          desconto_valor: true,
-        },
-      }),
-      db.solicitacoes_itens.findMany({
-        where: { solicitacao_id: solicitacaoId },
-        select: { quantidade: true, preco_unitario: true },
-      }),
-      db.solicitacoes_outros_custos.findMany({
-        where: { solicitacao_id: solicitacaoId },
-        select: { valor: true, faturamento_direto: true },
-      }),
-    ]);
-
-    if (!solicitacao) throw new NotFoundException('Solicitação não encontrada');
-
-    const custoItens = itens.reduce(
-      (soma, i) => soma + this.num(i.quantidade) * this.num(i.preco_unitario),
-      0,
-    );
-
-    const custoFD = outros
-      .filter((o) => o.faturamento_direto)
-      .reduce((soma, o) => soma + this.num(o.valor), 0);
-
-    const custoComum = outros
-      .filter((o) => !o.faturamento_direto)
-      .reduce((soma, o) => soma + this.num(o.valor), 0);
-
-    const totalCusto = this.centavos(custoItens + custoComum + custoFD);
-
-    // O faturamento direto NÃO recebe BDI.
-    //
-    // É dinheiro que o cliente paga direto ao fornecedor: não passa pela
-    // empresa, então não tem administração central, não tem imposto e não tem
-    // lucro. Entra no total como repasse puro.
-    const baseDoBdi = custoItens + custoComum;
-
-    // Os impostos com 100% ou mais são 400 (a fórmula divide por 1 - I, e o BDI saía zero calado)
-    const bdi = bdiDaFormula(componentesDe(solicitacao));
-    const totalBdi = this.centavos(baseDoBdi * bdi);
-    const totalSemDesconto = this.centavos(baseDoBdi + totalBdi + custoFD);
-    const desconto = descontoDaProposta(solicitacao.desconto_tipo, this.num(solicitacao.desconto_valor), totalSemDesconto);
-    const totalGeral = this.centavos(totalSemDesconto - desconto.aplicado);
-    const bdiPercentual = percentualDoBdi(bdi);
-
-    // O que as colunas guardam (Decimal(6, 3) e Decimal(14, 2)): passou disso, o banco recusava com 500
-    if (bdiPercentual > TETO_DO_BDI || Math.max(totalCusto, totalBdi, totalSemDesconto) > TETO_DO_TOTAL) {
-      throw new BadRequestException(
-        'A proposta passa do que se guarda (BDI até 999,999% e total até R$ 999.999.999.999,99): confira os percentuais do BDI e os valores.',
-      );
-    }
-
-    await db.solicitacoes_servico.update({
-      where: { id: solicitacaoId },
-      data: {
-        total_custo: totalCusto,
-        total_bdi: totalBdi,
-        // Três casas: 30,44% arredondado para 30,4% já move o total de uma
-        // proposta grande em dezenas de reais.
-        bdi_percentual: bdiPercentual,
-        total_geral: totalGeral,
-        total_desconto: solicitacao.desconto_tipo ? desconto.aplicado : null,
-      },
-    });
-
-    return { totalCusto, totalBdi, totalSemDesconto, totalGeral, custoFD, bdi, desconto };
+  async recalcular(solicitacaoId: string, tx?: Prisma.TransactionClient): Promise<ContaDaProposta> {
+    return recalcularProposta(tx ?? this.prisma, solicitacaoId);
   }
 
   // ============================================================
@@ -269,18 +198,38 @@ export class PropostaService {
    * completo e a proposta saía abaixo do custo.
    */
   private async instrucoesSemPreco(solicitacaoId: string): Promise<string[]> {
-    const vinculos = await this.prisma.solicitacoes_instrucoes.findMany({
-      where: { solicitacao_id: solicitacaoId },
-      select: { instrucao_id: true },
-    });
-    const ids = vinculos.map((v) => v.instrucao_id.trim());
+    const ids = await this.idsDasInstrucoes(solicitacaoId);
     if (!ids.length) return [];
     const valores = await valoresDasInstrucoes(this.prisma, ids);
     return ids.filter((id) => valores.get(id)?.semPreco);
   }
 
+  private async idsDasInstrucoes(solicitacaoId: string): Promise<string[]> {
+    const vinculos = await this.prisma.solicitacoes_instrucoes.findMany({
+      where: { solicitacao_id: solicitacaoId },
+      select: { instrucao_id: true },
+    });
+    return vinculos.map((v) => v.instrucao_id.trim());
+  }
+
+  /**
+   * Os dias que a spec sugere: as horas dos passos das instruções, em sequência
+   * (sem inventar simultaneidade), em jornadas de 8 h, arredondado para cima
+   * (6h20 dá 1 dia; 9 h, 2). Nulo sem hora nenhuma: a pessoa digita os dias.
+   */
+  private async diasSugeridos(solicitacaoId: string): Promise<number | null> {
+    const ids = await this.idsDasInstrucoes(solicitacaoId);
+    if (!ids.length) return null;
+    const { _sum } = await this.prisma.sub_instrucoes.aggregate({
+      where: { instrucao_id: { in: ids } },
+      _sum: { duracao_horas: true },
+    });
+    const horas = this.num(_sum.duracao_horas);
+    return horas > 0 ? Math.ceil(horas / HORAS_POR_DIA) : null;
+  }
+
   async obter(solicitacaoId: string) {
-    const [itens, outros, solicitacao, instrucoesSemPreco] = await Promise.all([
+    const [itens, outros, logistica, solicitacao, instrucoesSemPreco, diasSugeridos] = await Promise.all([
       this.prisma.solicitacoes_itens.findMany({
         where: { solicitacao_id: solicitacaoId },
         orderBy: { ordem: 'asc' },
@@ -289,9 +238,37 @@ export class PropostaService {
         where: { solicitacao_id: solicitacaoId },
         orderBy: { ordem: 'asc' },
       }),
+      this.prisma.solicitacoes_logistica.findMany({
+        where: { solicitacao_id: solicitacaoId },
+        orderBy: [{ tabela: 'asc' }, { ordem: 'asc' }],
+      }),
       this.prisma.solicitacoes_servico.findFirst({
         where: { id: solicitacaoId },
         select: {
+          conta_da_proposta: true,
+          distancia_km: true,
+          distancia_ida_volta_km: true,
+          dias_previstos: true,
+          pessoas_previstas: true,
+          noites_fora: true,
+          imposto_percentual: true,
+          margem_percentual: true,
+          adm_servicos_percentual: true,
+          adm_fd_percentual: true,
+          validade_proposta: true,
+          condicoes_comerciais: true,
+          total_custo: true,
+          total_servicos: true,
+          total_fd: true,
+          total_administracao: true,
+          total_aupus: true,
+          valor_imposto: true,
+          margem_efetiva: true,
+          total_geral: true,
+          desconto_tipo: true,
+          desconto_valor: true,
+          total_desconto: true,
+          // A conta de antes (as propostas programadas e finalizadas, como documento)
           bdi_regime: true,
           bdi_administracao_central: true,
           bdi_seguro_garantia: true,
@@ -303,22 +280,25 @@ export class PropostaService {
           bdi_cprb: true,
           bdi_issqn: true,
           bdi_percentual: true,
-          total_custo: true,
           total_bdi: true,
-          total_geral: true,
-          desconto_tipo: true,
-          desconto_valor: true,
-          total_desconto: true,
         },
       }),
       this.instrucoesSemPreco(solicitacaoId),
+      this.diasSugeridos(solicitacaoId),
     ]);
 
     if (!solicitacao) throw new NotFoundException('Solicitação não encontrada');
+    const s = solicitacao;
+    // A conta nova, sem gravar: o preço de venda de cada linha (a tela e o PDF do cliente)
+    const conta = s.conta_da_proposta === 'IMPOSTO_MARGEM' ? await contaGravada(this.prisma, solicitacaoId) : null;
 
     return {
-      itens,
+      /** IMPOSTO_MARGEM (29/out/2026) ou BDI (a proposta de antes, como documento) */
+      conta_da_proposta: s.conta_da_proposta,
+      // `valor_venda`: o preço da linha na proposta (a parte dela no preço dos serviços)
+      itens: itens.map((item, i) => ({ ...item, valor_venda: conta ? (conta.venda.instrucoes[i] ?? 0) : null })),
       outros_custos: outros,
+      logistica: logistica.map(linhaDeLogisticaLida),
       /** As instruções cujo valor sugerido conta como zero alguma linha sem preço no cadastro */
       instrucoes_sem_preco: instrucoesSemPreco,
       /**
@@ -329,29 +309,65 @@ export class PropostaService {
        * aquele lê `proposta.subinstrucoes.length` sem proteção, e o backend
        * sobe primeiro — quem estivesse com a tela aberta veria a seção da
        * proposta virar tela branca até recarregar.
-       *
-       * Pode sair depois que o front novo estiver em produção há tempo
-       * suficiente para ninguém mais ter o antigo carregado.
        */
       subinstrucoes: [] as never[],
-      bdi_regime: solicitacao.bdi_regime,
-      bdi_administracao_central: this.num(solicitacao.bdi_administracao_central),
-      bdi_seguro_garantia: this.num(solicitacao.bdi_seguro_garantia),
-      bdi_taxa_risco: this.num(solicitacao.bdi_taxa_risco),
-      bdi_despesas_financeiras: this.num(solicitacao.bdi_despesas_financeiras),
-      bdi_lucro: this.num(solicitacao.bdi_lucro),
-      bdi_pis: this.num(solicitacao.bdi_pis),
-      bdi_cofins: this.num(solicitacao.bdi_cofins),
-      bdi_cprb: this.num(solicitacao.bdi_cprb),
-      bdi_issqn: this.num(solicitacao.bdi_issqn),
-      bdi_percentual: this.num(solicitacao.bdi_percentual),
-      total_custo: this.num(solicitacao.total_custo),
-      total_bdi: this.num(solicitacao.total_bdi),
-      total_geral: this.num(solicitacao.total_geral),
-      /** O desconto (28/out/2026): o tipo e o digitado; `total_desconto` são os reais descontados (até o total) */
-      desconto_tipo: solicitacao.desconto_tipo,
-      desconto_valor: solicitacao.desconto_valor === null ? null : this.num(solicitacao.desconto_valor),
-      total_desconto: this.num(solicitacao.total_desconto),
+      // O planejamento
+      distancia_km: this.numOuNulo(s.distancia_km),
+      distancia_ida_volta_km: this.numOuNulo(s.distancia_ida_volta_km),
+      dias_previstos: this.numOuNulo(s.dias_previstos),
+      dias_sugeridos: diasSugeridos,
+      pessoas_previstas: s.pessoas_previstas,
+      noites_fora: s.noites_fora,
+      // Os percentuais da proposta
+      imposto_percentual: this.numOuNulo(s.imposto_percentual),
+      margem_percentual: this.numOuNulo(s.margem_percentual),
+      adm_servicos_percentual: this.numOuNulo(s.adm_servicos_percentual),
+      adm_fd_percentual: this.numOuNulo(s.adm_fd_percentual),
+      validade_proposta: s.validade_proposta ? s.validade_proposta.toISOString().slice(0, 10) : null,
+      condicoes_comerciais: s.condicoes_comerciais,
+      // Os totais gravados
+      total_custo: this.num(s.total_custo),
+      total_servicos: this.numOuNulo(s.total_servicos),
+      total_fd: this.numOuNulo(s.total_fd),
+      total_administracao: this.numOuNulo(s.total_administracao),
+      total_aupus: this.numOuNulo(s.total_aupus),
+      valor_imposto: this.numOuNulo(s.valor_imposto),
+      // A da conta ao vivo: a gravada vira nula fora do teto da coluna (o desconto que zera a Aupus), e o aviso sumia
+      margem_efetiva: conta ? conta.margemEfetiva : this.numOuNulo(s.margem_efetiva),
+      total_geral: this.num(s.total_geral),
+      /** O desconto: o tipo e o digitado; `total_desconto` são os reais descontados (até o faturamento da Aupus) */
+      desconto_tipo: s.desconto_tipo,
+      desconto_valor: this.numOuNulo(s.desconto_valor),
+      total_desconto: this.num(s.total_desconto),
+      /** A memória da conta nova (o fechamento da tela): interna, nula na de antes */
+      fechamento: conta
+        ? {
+            custo_instrucoes: conta.custoInstrucoes,
+            custo_logistica: conta.custoLogistica,
+            custo_adicionais: conta.custoAdicionais,
+            custo_servicos: conta.custoServicos,
+            preco_servicos: conta.precoServicos,
+            administracao: conta.administracao,
+            preco_administracao: conta.precoAdministracao,
+            total_aupus_sem_desconto: conta.totalAupusSemDesconto,
+            total_geral_sem_desconto: conta.totalGeralSemDesconto,
+            desconto_pedido: conta.desconto.pedido,
+          }
+        : null,
+      /** O preço de venda da logística e dos adicionais, uma linha cada no PDF */
+      venda: conta ? { logistica: conta.venda.logistica, adicionais: conta.venda.adicionais } : null,
+      bdi_regime: s.bdi_regime,
+      bdi_administracao_central: this.num(s.bdi_administracao_central),
+      bdi_seguro_garantia: this.num(s.bdi_seguro_garantia),
+      bdi_taxa_risco: this.num(s.bdi_taxa_risco),
+      bdi_despesas_financeiras: this.num(s.bdi_despesas_financeiras),
+      bdi_lucro: this.num(s.bdi_lucro),
+      bdi_pis: this.num(s.bdi_pis),
+      bdi_cofins: this.num(s.bdi_cofins),
+      bdi_cprb: this.num(s.bdi_cprb),
+      bdi_issqn: this.num(s.bdi_issqn),
+      bdi_percentual: this.numOuNulo(s.bdi_percentual),
+      total_bdi: this.numOuNulo(s.total_bdi),
     };
   }
 
@@ -427,32 +443,59 @@ export class PropostaService {
   }
 
   /**
-   * Os componentes do BDI e o desconto. Recalcula em seguida.
-   *
-   * O REIDI (Regime Especial de Incentivos para o Desenvolvimento da
-   * Infraestrutura) desonera PIS e COFINS. Trocar o regime zera os dois — ou
-   * os devolve ao padrão —, e a pessoa ainda pode ajustar cada um depois.
+   * Substitui uma tabela de logística inteira (frete, deslocamento ou diárias,
+   * 29/out/2026). O total de cada linha é calculado aqui, pela tabela dela: o
+   * que o front manda são as colunas, nunca o total.
    */
-  async salvarCondicoes(
-    solicitacaoId: string,
-    dados: CondicoesDaPropostaDto,
-  ) {
-    const data: Record<string, number | string | null> = {};
+  async salvarLogistica(solicitacaoId: string, tabela: TabelaDeLogistica, linhas: LinhaDeLogisticaDto[]) {
+    const data = linhas.map((l, indice) => {
+      const total = totalDaLinha({ ...l, tabela });
+      if (total > TETO_DO_TOTAL) {
+        throw new BadRequestException(`A linha ${indice + 1} passa do que se guarda (até R$ 999.999.999.999,99): confira os valores.`);
+      }
+      return {
+        solicitacao_id: solicitacaoId,
+        tabela,
+        ativo: l.ativo ?? true,
+        recurso_id: l.recurso_id?.trim() || null,
+        descricao: l.descricao.trim(),
+        quantidade: l.quantidade ?? null,
+        valor_unitario: l.valor_unitario ?? null,
+        dias: l.dias ?? null,
+        km: l.km ?? null,
+        valor_km: l.valor_km ?? null,
+        valor_fixo: l.valor_fixo ?? null,
+        total,
+        ordem: indice + 1,
+      };
+    });
 
-    for (const campo of CAMPOS_DO_BDI) {
-      // Vazio chega null (`VazioEhNulo`): não muda o gravado
+    await this.prisma.$transaction(async (tx) => {
+      await this.travarParaEditar(tx, solicitacaoId);
+      await tx.solicitacoes_logistica.deleteMany({ where: { solicitacao_id: solicitacaoId, tabela } });
+      if (data.length > 0) await tx.solicitacoes_logistica.createMany({ data });
+      await this.recalcular(solicitacaoId, tx);
+    });
+    return this.obter(solicitacaoId);
+  }
+
+  /**
+   * As condições (29/out/2026): os percentuais da proposta, o planejamento, a
+   * validade, as condições comerciais e o desconto. Recalcula em seguida.
+   * Percentual vazio não muda o gravado; o planejamento vazio apaga.
+   */
+  async salvarCondicoes(solicitacaoId: string, dados: CondicoesDaPropostaDto) {
+    const data: Prisma.solicitacoes_servicoUpdateInput = {};
+
+    for (const campo of PERCENTUAIS) {
       const valor = dados[campo];
       if (valor !== undefined && valor !== null) data[campo] = valor;
     }
-
-    if (dados.bdi_regime === 'COM_REIDI' || dados.bdi_regime === 'SEM_REIDI') {
-      data.bdi_regime = dados.bdi_regime;
-
-      // Só mexe em PIS e COFINS se o próprio pedido não os trouxe: quem manda
-      // regime E percentual está dizendo exatamente o que quer.
-      if (data.bdi_pis === undefined) data.bdi_pis = dados.bdi_regime === 'COM_REIDI' ? 0 : 0.65;
-      if (data.bdi_cofins === undefined) data.bdi_cofins = dados.bdi_regime === 'COM_REIDI' ? 0 : 3.0;
+    for (const campo of PLANEJAMENTO) {
+      if (dados[campo] !== undefined) data[campo] = dados[campo];
     }
+    if (dados.validade_proposta !== undefined) data.validade_proposta = dados.validade_proposta;
+    if (dados.condicoes_comerciais !== undefined) data.condicoes_comerciais = dados.condicoes_comerciais?.trim() || null;
 
     // O desconto: o tipo null tira; o tipo pede o valor (o que veio ou o gravado)
     const mexeNoDesconto = dados.desconto_tipo !== undefined || dados.desconto_valor !== undefined;
@@ -467,30 +510,32 @@ export class PropostaService {
       data.desconto_valor = dados.desconto_valor;
     }
 
-    // Numa transação: o BDI que estoura a conta é 400 no `recalcular`, e antes o update já tinha
-    // gravado o percentual ruim, que travava toda escrita seguinte da proposta
+    // Numa transação: o imposto e a margem que somam 100% são 400 no `recalcular`, e o
+    // percentual ruim não pode ficar gravado (travaria toda escrita seguinte da proposta)
     await this.prisma.$transaction(async (tx) => {
       await this.travarParaEditar(tx, solicitacaoId);
       if (Object.keys(data).length > 0) {
         await tx.solicitacoes_servico.update({ where: { id: solicitacaoId }, data });
       }
       const conta = await this.recalcular(solicitacaoId, tx);
-      if (mexeNoDesconto) await this.conferirDesconto(tx, solicitacaoId, conta.totalSemDesconto);
+      if (mexeNoDesconto) await this.conferirDesconto(tx, solicitacaoId, conta);
     });
     return this.obter(solicitacaoId);
   }
 
   /**
-   * O desconto que se acabou de gravar fecha com o total (dentro da transação:
-   * recusado, nada fica). Depois, se o total cai abaixo dele, o aplicado para no
-   * total (`descontoDaProposta`), mas quem o digita não grava um maior.
+   * O desconto que se acabou de gravar fecha com a conta (dentro da transação:
+   * recusado, nada fica). Ele é pedido sobre o total inteiro e sai do
+   * faturamento da Aupus (o faturamento direto é nota do fornecedor): quem o
+   * digita não grava um maior que esse faturamento. Se depois a conta cai abaixo
+   * dele, o aplicado para no faturamento, e a tela mostra o pedido e o aplicado.
    */
-  private async conferirDesconto(tx: Prisma.TransactionClient, solicitacaoId: string, totalSemDesconto: number): Promise<void> {
+  private async conferirDesconto(tx: Prisma.TransactionClient, solicitacaoId: string, conta: ContaDaProposta): Promise<void> {
     const { desconto_tipo: tipo, desconto_valor } = await tx.solicitacoes_servico.findUniqueOrThrow({
       where: { id: solicitacaoId },
       select: { desconto_tipo: true, desconto_valor: true },
     });
-    const valor = desconto_valor === null ? null : this.num(desconto_valor);
+    const valor = this.numOuNulo(desconto_valor);
     // O valor sem o tipo ficaria guardado e voltaria calado quando alguém escolhesse o tipo
     if (!tipo) {
       if (valor !== null) throw new BadRequestException('Diga se o desconto é em percentual ou em reais.');
@@ -498,39 +543,11 @@ export class PropostaService {
     }
     if (valor === null) throw new BadRequestException('Diga o valor do desconto (o percentual ou os reais).');
     if (tipo === 'PERCENTUAL' && valor > 100) throw new BadRequestException('O desconto em percentual vai até 100%.');
-    if (tipo === 'VALOR' && valor > totalSemDesconto) {
-      throw new BadRequestException(`O desconto (${reais(valor)}) passa do total da proposta (${reais(totalSemDesconto)}).`);
+    if (conta.desconto.pedido > conta.totalAupusSemDesconto) {
+      throw new BadRequestException(
+        `O desconto (${reais(conta.desconto.pedido)}) passa do faturamento da Aupus (${reais(conta.totalAupusSemDesconto)}): o faturamento direto é pago ao fornecedor.`,
+      );
     }
-  }
-
-  // ============================================================
-  // BDI PADRÃO
-  // ============================================================
-
-  /** O BDI padrão da empresa, com o percentual que dá: o que a solicitação nova copia */
-  async obterBdiPadrao(): Promise<ComponentesDoBdi & { bdi_percentual: number }> {
-    const componentes = await bdiPadrao(this.prisma);
-    return { ...componentes, bdi_percentual: percentualDoBdi(bdiDaFormula(componentes)) };
-  }
-
-  /**
-   * Troca o BDI padrão (28/out/2026). Vale para a solicitação nova: a que existe
-   * fica com o seu, porque a proposta é documento e pode já ter ido ao cliente.
-   */
-  async salvarBdiPadrao(dados: BdiPadraoDto, usuarioId?: string): Promise<ComponentesDoBdi & { bdi_percentual: number }> {
-    const componentes = componentesDe(dados);
-    // Antes de gravar: os impostos de 100% (400) e o BDI que não cabe na coluna
-    const percentual = percentualDoBdi(bdiDaFormula(componentes));
-    if (percentual > TETO_DO_BDI) {
-      throw new BadRequestException('O BDI passa do que se guarda (até 999,999%): confira os percentuais.');
-    }
-    const quem = { updated_by: usuarioId?.trim() || null, updated_at: new Date() };
-    await this.prisma.bdi_padrao.upsert({
-      where: { id: 1 },
-      create: { id: 1, ...BDI_GOINFRA, ...componentes, ...quem },
-      update: { ...componentes, ...quem },
-    });
-    return this.obterBdiPadrao();
   }
 
   /**
@@ -544,5 +561,170 @@ export class PropostaService {
       await this.materializarDeInstrucoes(solicitacaoId, tx);
     });
     return this.obter(solicitacaoId);
+  }
+
+  // ============================================================
+  // PADRÕES
+  // ============================================================
+
+  /** Os percentuais padrão da proposta: o que a solicitação nova copia */
+  async obterPadroes() {
+    return colunasDosPercentuais(await padroesDaProposta(this.prisma));
+  }
+
+  /**
+   * Troca os padrões (29/out/2026). Valem para a solicitação nova: a que existe
+   * fica com os seus, porque a proposta é documento e pode já ter ido ao cliente.
+   */
+  async salvarPadroes(dados: PadroesDaPropostaDto, usuarioId?: string) {
+    const percentuais = percentuaisDe(dados);
+    if (percentuais.imposto + percentuais.margem >= 100) {
+      throw new BadRequestException('O imposto e a margem somam 100% ou mais: o preço não fecha.');
+    }
+    const quem = { updated_by: usuarioId?.trim() || null, updated_at: new Date() };
+    await this.prisma.padroes_da_proposta.upsert({
+      where: { id: 1 },
+      create: { id: 1, ...colunasDosPercentuais(percentuais), ...quem },
+      update: { ...colunasDosPercentuais(percentuais), ...quem },
+    });
+    return this.obterPadroes();
+  }
+
+  // ============================================================
+  // REVISÃO (29/out/2026)
+  //
+  //   REGISTRADA --revisar--> PROPOSTA_REVISADA --programar--> PROGRAMADA
+  //       ^                       |
+  //       +------- reabrir -------+   (e da NAO_APROVADA)
+  //   REGISTRADA ou PROPOSTA_REVISADA --não aprovada--> NAO_APROVADA
+  //
+  // Só a revisada se programa: a programação herda dela as instruções, os
+  // valores e a logística. Revisar trava a proposta; reabrir a devolve à edição.
+  // ============================================================
+
+  /** REGISTRADA -> PROPOSTA_REVISADA, com quem revisou e quando */
+  async revisar(solicitacaoId: string, usuarioId?: string): Promise<void> {
+    await this.prisma.$transaction(async (tx) => {
+      const status = await this.travar(tx, solicitacaoId);
+      if (status !== 'REGISTRADA') throw new ConflictException(this.naoSeMuda(status, 'revisar'));
+      await this.semProgramacaoAberta(tx, solicitacaoId, 'revisar');
+      // A do BDI não se revisa calada: a conversão mudaria o total que a pessoa viu na tela
+      const { conta_da_proposta } = await tx.solicitacoes_servico.findUniqueOrThrow({ where: { id: solicitacaoId }, select: { conta_da_proposta: true } });
+      if (conta_da_proposta !== 'IMPOSTO_MARGEM') {
+        throw new ConflictException('A proposta está na conta antiga (BDI): passe-a para imposto e margem e confira os valores antes de revisar.');
+      }
+      await this.mesmasInstrucoes(tx, solicitacaoId);
+      // Os totais da revisão são os da conta de agora
+      await this.recalcular(solicitacaoId, tx);
+      const autor = await nomeDoAutor(tx, usuarioId);
+      await tx.solicitacoes_servico.update({
+        where: { id: solicitacaoId },
+        data: { status: 'PROPOSTA_REVISADA', aprovado_por_id: usuarioId?.trim() || null, aprovado_por_nome: autor, data_aprovacao: new Date(), ...SEM_RECUSA },
+      });
+      await this.historico(tx, solicitacaoId, { acao: 'PROPOSTA_REVISADA', autor, usuarioId, observacoes: 'Proposta revisada', de: status, para: 'PROPOSTA_REVISADA' });
+      await registrarNotificacao(tx, { evento: 'solicitacao.proposta_revisada', entidade: 'solicitacao_servico', entidadeId: solicitacaoId, atorId: usuarioId });
+    });
+  }
+
+  /** PROPOSTA_REVISADA ou NAO_APROVADA -> REGISTRADA: a proposta volta à edição */
+  async reabrir(solicitacaoId: string, usuarioId?: string, motivo?: string | null): Promise<void> {
+    await this.prisma.$transaction(async (tx) => {
+      const status = await this.travar(tx, solicitacaoId);
+      if (status !== 'PROPOSTA_REVISADA' && status !== 'NAO_APROVADA') throw new ConflictException(this.naoSeMuda(status, 'reabrir'));
+      const autor = await nomeDoAutor(tx, usuarioId);
+      await tx.solicitacoes_servico.update({ where: { id: solicitacaoId }, data: { status: 'REGISTRADA', ...SEM_REVISAO, ...SEM_RECUSA } });
+      await this.historico(tx, solicitacaoId, { acao: 'PROPOSTA_REABERTA', autor, usuarioId, observacoes: motivo?.trim() || 'Proposta reaberta', de: status, para: 'REGISTRADA' });
+    });
+  }
+
+  /** REGISTRADA ou PROPOSTA_REVISADA -> NAO_APROVADA: o cliente não aceitou, com o motivo */
+  async naoAprovada(solicitacaoId: string, motivo: string, usuarioId?: string): Promise<void> {
+    await this.prisma.$transaction(async (tx) => {
+      const status = await this.travar(tx, solicitacaoId);
+      if (status !== 'REGISTRADA' && status !== 'PROPOSTA_REVISADA') throw new ConflictException(this.naoSeMuda(status, 'recusar'));
+      await this.semProgramacaoAberta(tx, solicitacaoId, 'recusar');
+      const autor = await nomeDoAutor(tx, usuarioId);
+      await tx.solicitacoes_servico.update({
+        where: { id: solicitacaoId },
+        data: { status: 'NAO_APROVADA', rejeitado_por_id: usuarioId?.trim() || null, data_rejeicao: new Date(), motivo_rejeicao: motivo.trim() },
+      });
+      await this.historico(tx, solicitacaoId, { acao: 'PROPOSTA_NAO_APROVADA', autor, usuarioId, observacoes: motivo.trim(), de: status, para: 'NAO_APROVADA' });
+    });
+  }
+
+  /**
+   * A solicitação com programação em aberto não se revisa nem se recusa: a de antes
+   * desta regra pode estar REGISTRADA com uma programação pendente (o `aprovar` só a
+   * leva a PROGRAMADA depois), e revisá-la abriria uma segunda OS; recusá-la deixaria
+   * a OS seguir para uma proposta não aprovada.
+   */
+  private async semProgramacaoAberta(tx: Prisma.TransactionClient, solicitacaoId: string, acao: 'revisar' | 'recusar'): Promise<void> {
+    const ids = variantesDeIds([solicitacaoId]);
+    const aberta = await tx.programacoes_os.findFirst({
+      where: {
+        deletado_em: null,
+        status: { in: ['PENDENTE', 'APROVADA'] },
+        OR: [{ solicitacao_servico_id: { in: ids } }, ...ids.map((id) => ({ dados_origem: { path: ['solicitacaoServicoId'], equals: id } }))],
+      },
+      select: { codigo: true },
+    });
+    if (aberta) {
+      const oQue = acao === 'revisar' ? 'revisar' : 'marcar como não aprovada';
+      throw new ConflictException(`A solicitação já tem a programação ${aberta.codigo.trim()} em aberto: cancele-a antes de ${oQue} a proposta.`);
+    }
+  }
+
+  /**
+   * A proposta revisada tem uma linha para cada instrução vinculada, e só elas: a
+   * linha nasce quando a tela vincula, e o vínculo só quando o formulário salva —
+   * cancelado o formulário, sobrava a linha de uma instrução que a programação não
+   * recebe (o preço aceito incluía um serviço que não seria feito), ou o contrário.
+   */
+  private async mesmasInstrucoes(tx: Prisma.TransactionClient, solicitacaoId: string): Promise<void> {
+    const [vinculos, itens] = await Promise.all([
+      tx.solicitacoes_instrucoes.findMany({ where: { solicitacao_id: solicitacaoId, instrucao: { deleted_at: null } }, select: { instrucao_id: true } }),
+      tx.solicitacoes_itens.findMany({ where: { solicitacao_id: solicitacaoId, instrucao_id: { not: null }, recurso_id: null }, select: { instrucao_id: true, descricao: true } }),
+    ]);
+    const vinculadas = new Set(vinculos.map((v) => v.instrucao_id.trim()));
+    const naProposta = new Set(itens.map((i) => i.instrucao_id!.trim()));
+    const semLinha = [...vinculadas].filter((id) => !naProposta.has(id));
+    const semVinculo = itens.filter((i) => !vinculadas.has(i.instrucao_id!.trim())).map((i) => i.descricao.trim());
+    if (semLinha.length > 0 || semVinculo.length > 0) {
+      const partes = [
+        semVinculo.length > 0 && `com valor na proposta e sem vínculo: ${semVinculo.join(', ')}`,
+        semLinha.length > 0 && `${semLinha.length} vinculada(s) sem valor na proposta`,
+      ].filter(Boolean);
+      throw new ConflictException(`As instruções da proposta não batem com as vinculadas (${partes.join('; ')}): abra a edição, confira e salve antes de revisar.`);
+    }
+  }
+
+  private naoSeMuda(status: StatusSolicitacaoServico, acao: 'revisar' | 'reabrir' | 'recusar'): string {
+    const ondeEsta: Record<StatusSolicitacaoServico, string> = {
+      REGISTRADA: 'ainda está em edição',
+      PROPOSTA_REVISADA: 'já foi revisada',
+      PROGRAMADA: 'já foi programada: cancele a programação antes',
+      FINALIZADA: 'já foi finalizada',
+      NAO_APROVADA: 'foi marcada como não aprovada: reabra-a antes',
+    };
+    const oQue = { revisar: 'Não dá para revisar', reabrir: 'Não dá para reabrir', recusar: 'Não dá para marcar como não aprovada' }[acao];
+    return `${oQue}: a proposta ${ondeEsta[status]}.`;
+  }
+
+  private async historico(
+    tx: Prisma.TransactionClient,
+    solicitacaoId: string,
+    e: { acao: string; autor: string; usuarioId?: string; observacoes: string; de: StatusSolicitacaoServico; para: StatusSolicitacaoServico },
+  ): Promise<void> {
+    await tx.historico_solicitacao_servico.create({
+      data: {
+        solicitacao_id: solicitacaoId,
+        acao: e.acao,
+        usuario_nome: e.autor,
+        usuario_id: e.usuarioId?.trim() || null,
+        observacoes: e.observacoes,
+        status_anterior: e.de,
+        status_novo: e.para,
+      },
+    });
   }
 }

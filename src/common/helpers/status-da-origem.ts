@@ -1,5 +1,5 @@
 import { ConflictException, NotFoundException } from '@nestjs/common';
-import { Prisma } from '@prisma/client';
+import { Prisma, type StatusSolicitacaoServico } from '@prisma/client';
 import { registrarNotificacao } from '../../modules/notificacoes/registrar-notificacao';
 
 /**
@@ -8,11 +8,16 @@ import { registrarNotificacao } from '../../modules/notificacoes/registrar-notif
  * transacao de quem mudou a programacao ou a OS.
  *
  *   programacao criada (ou origem trocada na edicao) -> PROGRAMADA
- *   programacao cancelada/excluida, OS cancelada     -> REGISTRADA
+ *   programacao cancelada/excluida, OS cancelada     -> REGISTRADA (anomalia)
+ *                                                       PROPOSTA_REVISADA (solicitacao)
  *   OS finalizada                                     -> FINALIZADA
  *
+ * A solicitacao so se programa com a proposta revisada (29/out/2026): a
+ * programacao herda dela as instrucoes, os valores e a logistica. Desprogramada,
+ * volta para la, com a proposta que ja tinha sido revisada.
+ *
  * Por que isso importa: a lista de origem da tela so oferece o que esta
- * REGISTRADA. Caminho que encerra a programacao sem devolver a origem a tira da
+ * pronto para programar. Caminho que encerra a programacao sem devolver a origem a tira da
  * lista para sempre — nunca mais da para programa-la. Caminho que abre a
  * programacao sem tira-la de la deixa a mesma anomalia ganhar duas OS.
  *
@@ -65,12 +70,13 @@ export async function nomeDoAutor(tx: Tx, usuarioId?: string | null): Promise<st
 }
 
 /**
- * REGISTRADA -> PROGRAMADA.
+ * REGISTRADA (anomalia) ou PROPOSTA_REVISADA (solicitacao) -> PROGRAMADA.
  *
  * `exigirRegistrada` recusa a origem que ja esta programada ou finalizada —
- * e o que impede duas programacoes em aberto para a mesma anomalia. A
- * aprovacao passa `false`: ali a origem ja deveria estar PROGRAMADA desde a
- * criacao, e so programacoes anteriores a esta regra chegam REGISTRADAS.
+ * e o que impede duas programacoes em aberto para a mesma anomalia — e a
+ * solicitacao com a proposta por revisar. A aprovacao passa `false`: ali a
+ * origem ja deveria estar PROGRAMADA desde a criacao, e so programacoes
+ * anteriores a esta regra chegam sem ela (a solicitacao, ainda REGISTRADA).
  */
 export async function programarOrigem(
   tx: Tx,
@@ -111,12 +117,21 @@ export async function programarOrigem(
   }
 
   if (origem.solicitacaoId) {
-    const { count } = await tx.solicitacoes_servico.updateMany({
-      where: { id: origem.solicitacaoId, status: 'REGISTRADA', deleted_at: null },
-      data: { status: 'PROGRAMADA', programacao_os_id: contexto.programacaoId },
-    });
+    const prontas: StatusSolicitacaoServico[] = exigir ? ['PROPOSTA_REVISADA'] : ['PROPOSTA_REVISADA', 'REGISTRADA'];
+    // Travada (como as escritas da proposta): revisar, reabrir ou recusar no meio esperam esta transação
+    const [travada] = await tx.$queryRaw<{ status: StatusSolicitacaoServico }[]>`
+      SELECT status::text AS status FROM solicitacoes_servico
+       WHERE id = ${origem.solicitacaoId} AND deleted_at IS NULL
+       FOR UPDATE`;
+    const antes = travada && prontas.includes(travada.status) ? travada : null;
+    const { count } = antes
+      ? await tx.solicitacoes_servico.updateMany({
+          where: { id: origem.solicitacaoId, status: antes.status, deleted_at: null },
+          data: { status: 'PROGRAMADA', programacao_os_id: contexto.programacaoId },
+        })
+      : { count: 0 };
 
-    if (count > 0) {
+    if (antes && count > 0) {
       await tx.historico_solicitacao_servico.create({
         data: {
           solicitacao_id: origem.solicitacaoId,
@@ -124,7 +139,7 @@ export async function programarOrigem(
           usuario_nome: autor,
           usuario_id: contexto.usuarioId ?? null,
           observacoes: `Programação ${contexto.codigo} criada`,
-          status_anterior: 'REGISTRADA',
+          status_anterior: antes.status,
           status_novo: 'PROGRAMADA',
         },
       });
@@ -135,16 +150,21 @@ export async function programarOrigem(
         select: { status: true },
       });
       if (!atual) throw new NotFoundException('Solicitação de serviço não encontrada');
-      throw new ConflictException(
-        `A solicitação já está ${atual.status.toLowerCase()}: cancele a programação existente antes de criar outra`,
-      );
+      throw new ConflictException(conflitoDaSolicitacao(atual.status));
     }
   }
 }
 
+/** Por que a solicitacao nao se programa: a proposta por revisar ou a programacao que ja existe */
+function conflitoDaSolicitacao(status: StatusSolicitacaoServico): string {
+  if (status === 'REGISTRADA') return 'A proposta da solicitação ainda não foi revisada: revise-a antes de programar.';
+  if (status === 'NAO_APROVADA') return 'A proposta da solicitação não foi aprovada: reabra-a e revise-a antes de programar.';
+  return `A solicitação já está ${status.toLowerCase()}: cancele a programação existente antes de criar outra`;
+}
+
 /**
- * PROGRAMADA -> REGISTRADA. Idempotente: origem que ja voltou, ou que foi
- * finalizada, fica como esta.
+ * PROGRAMADA -> REGISTRADA (anomalia) ou PROPOSTA_REVISADA (solicitacao).
+ * Idempotente: origem que ja voltou, ou que foi finalizada, fica como esta.
  */
 export async function liberarOrigem(
   tx: Tx,
@@ -176,18 +196,18 @@ export async function liberarOrigem(
   if (origem.solicitacaoId) {
     const { count } = await tx.solicitacoes_servico.updateMany({
       where: { id: origem.solicitacaoId, status: 'PROGRAMADA' },
-      data: { status: 'REGISTRADA', programacao_os_id: null },
+      data: { status: 'PROPOSTA_REVISADA', programacao_os_id: null },
     });
     if (count > 0) {
       await tx.historico_solicitacao_servico.create({
         data: {
           solicitacao_id: origem.solicitacaoId,
-          acao: 'RETORNO_REGISTRADA',
+          acao: 'RETORNO_PROPOSTA_REVISADA',
           usuario_nome: autor,
           usuario_id: contexto.usuarioId ?? null,
           observacoes: contexto.motivo,
           status_anterior: 'PROGRAMADA',
-          status_novo: 'REGISTRADA',
+          status_novo: 'PROPOSTA_REVISADA',
         },
       });
       await registrarNotificacao(tx, { evento: 'solicitacao.reaberta', entidade: 'solicitacao_servico', entidadeId: origem.solicitacaoId, atorId: contexto.usuarioId });

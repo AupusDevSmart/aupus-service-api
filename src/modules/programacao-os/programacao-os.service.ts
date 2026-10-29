@@ -77,6 +77,7 @@ import {
 } from './instrucoes-da-programacao';
 import { dinheiroPara } from '../execucao-os/quem-ve-os-custos';
 import { lugarParaASolicitacaoSemPlanta } from './lugar-da-solicitacao-programada';
+import { comAHerancaDaProposta } from './heranca-na-programacao';
 import { congelamentoDasLinhas, nomesDosEquipamentos } from './congelamento-da-linha';
 import { naturezaDoItem, naturezaPeloPrefixo } from '../execucao-os/natureza-do-custo';
 import type { TarefaDaLinha } from '../execucao-os/tarefas-das-linhas';
@@ -408,6 +409,8 @@ export class ProgramacaoOSService {
     createDto.planta_id = await plantaDaProgramacao(this.prisma, onde);
     if (user) await this.scopeService.assertPlantaInScope(createDto.planta_id, user, naoEncontradoDaOrigem(onde));
     await this.escalarPessoas(createDto, createDto.planta_id);
+    // A da solicitação recebe o que a proposta revisada diz: valores, logística e veículo (29/out/2026)
+    createDto = await comAHerancaDaProposta(this.prisma, createDto);
 
     // Calcular custo total dos materiais e técnicos
     const orcamento_previsto = this.calcularOrcamentoPrevisto(createDto);
@@ -1050,8 +1053,12 @@ export class ProgramacaoOSService {
     // O escopo antes do status, como na anomalia (SN-57)
     if (user) await this.scopeService.assertEntityInScope('solicitacao_servico', solicitacao.id, user);
 
-    if (solicitacao.status !== 'REGISTRADA') {
-      throw new ConflictException('Apenas solicitações registradas podem gerar programação');
+    // Só a proposta revisada se programa (29/out/2026); o resto, a mensagem do `programarOrigem`
+    if (solicitacao.status === 'REGISTRADA') {
+      throw new ConflictException('A proposta da solicitação ainda não foi revisada: revise-a antes de programar.');
+    }
+    if (solicitacao.status !== 'PROPOSTA_REVISADA') {
+      throw new ConflictException('Apenas solicitações com a proposta revisada podem gerar programação');
     }
 
     // Só os ajustes da lista: o que vem da solicitação (ela mesma, a planta, a
@@ -1092,7 +1099,8 @@ export class ProgramacaoOSService {
       ...ajustes,
     };
 
-    // criar() ja passa a solicitacao para PROGRAMADA, com vinculo e historico
+    // criar() ja passa a solicitacao para PROGRAMADA, com vinculo e historico, e aplica o que a
+    // proposta revisada diz (comAHerancaDaProposta)
     const programacao = await this.criar(createDto, usuarioId, user);
 
     this.logger.log(`Programação ${programacao.codigo} criada a partir da solicitação ${solicitacao.numero}`);

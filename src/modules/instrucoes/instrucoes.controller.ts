@@ -29,7 +29,8 @@ import {
   UpdateStatusInstrucaoDto,
   InstrucaoResponseDto,
   DashboardInstrucoesDto,
-  AnexoInstrucaoDetalhesDto
+  AnexoInstrucaoDetalhesDto,
+  AssociarSolicitacaoDto,
 } from './dto';
 import { cabecalhosDoDownload } from '@/common/upload/tipo-do-arquivo';
 
@@ -206,7 +207,7 @@ export class InstrucoesController {
   @ApiResponse({ status: HttpStatus.NOT_FOUND, description: 'Instrução ou solicitação não encontrada' })
   async associarSolicitacao(
     @Param('id') id: string,
-    @Body() body: { solicitacao_id: string; observacoes?: string },
+    @Body() body: AssociarSolicitacaoDto,
     @CurrentUser() user?: ScopedUser,
   ) {
     return this.instrucoesService.associarSolicitacao(id, body.solicitacao_id, body.observacoes, user);
@@ -229,9 +230,10 @@ export class InstrucoesController {
   @ApiResponse({ status: HttpStatus.NO_CONTENT, description: 'Associação removida' })
   async desassociarSolicitacao(
     @Param('id') id: string,
-    @Param('solicitacaoId') solicitacaoId: string
+    @Param('solicitacaoId') solicitacaoId: string,
+    @CurrentUser() user?: ScopedUser,
   ): Promise<void> {
-    return this.instrucoesService.desassociarSolicitacao(id, solicitacaoId);
+    return this.instrucoesService.desassociarSolicitacao(id, solicitacaoId, user);
   }
 
   // ==========================================

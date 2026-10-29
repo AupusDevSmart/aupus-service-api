@@ -390,24 +390,42 @@ export class InstrucoesService {
   // Associações com solicitações de serviço
   // ==========================================
 
+  /**
+   * A solicitação cujas instruções se mudam por aqui: no escopo de quem pede (fora
+   * dele, 404) e com a proposta em edição (29/out/2026). Antes valia em qualquer
+   * status e de qualquer planta: a instrução entrava na solicitação revisada ou
+   * programada sem passar pela proposta, e a programação herdava o que ninguém revisou.
+   * Travada (`FOR UPDATE`, como as escritas da proposta) na transação de quem vincula:
+   * a revisão no meio espera, e não entra numa revisada a instrução que ninguém revisou.
+   */
+  private async solicitacaoEmEdicao(tx: Prisma.TransactionClient, solicitacaoId: string, user?: ScopedUser): Promise<void> {
+    if (user) await this.scopeService.assertEntityInScope('solicitacao_servico', solicitacaoId, user);
+    const [solicitacao] = await tx.$queryRaw<{ status: string }[]>`
+      SELECT status::text AS status FROM solicitacoes_servico
+       WHERE id = ${solicitacaoId} AND deleted_at IS NULL
+       FOR UPDATE`;
+    if (!solicitacao) {
+      throw new NotFoundException('Solicitação de serviço não encontrada');
+    }
+    if (solicitacao.status !== 'REGISTRADA') {
+      throw new ConflictException('A proposta da solicitação já foi revisada: reabra-a para mudar as instruções.');
+    }
+  }
+
   // O autor sai do token, como na associação com anomalia (SN-40).
   async associarSolicitacao(instrucaoId: string, solicitacaoId: string, observacoes?: string, user?: ScopedUser): Promise<solicitacoes_instrucoes> {
     await this.verificarInstrucaoExiste(instrucaoId);
 
-    const solicitacao = await this.prisma.solicitacoes_servico.findFirst({
-      where: { id: solicitacaoId, deleted_at: null }
-    });
-    if (!solicitacao) {
-      throw new NotFoundException('Solicitação de serviço não encontrada');
-    }
-
-    return this.prisma.solicitacoes_instrucoes.create({
-      data: {
-        solicitacao_id: solicitacaoId,
-        instrucao_id: instrucaoId,
-        observacoes,
-        created_by: user?.id?.trim() ?? null
-      }
+    return this.prisma.$transaction(async (tx) => {
+      await this.solicitacaoEmEdicao(tx, solicitacaoId, user);
+      return tx.solicitacoes_instrucoes.create({
+        data: {
+          solicitacao_id: solicitacaoId,
+          instrucao_id: instrucaoId,
+          observacoes,
+          created_by: user?.id?.trim() ?? null
+        }
+      });
     });
   }
 
@@ -440,17 +458,20 @@ export class InstrucoesService {
     return associacoes;
   }
 
-  async desassociarSolicitacao(instrucaoId: string, solicitacaoId: string): Promise<void> {
-    const associacao = await this.prisma.solicitacoes_instrucoes.findFirst({
-      where: { instrucao_id: instrucaoId, solicitacao_id: solicitacaoId }
-    });
+  async desassociarSolicitacao(instrucaoId: string, solicitacaoId: string, user?: ScopedUser): Promise<void> {
+    await this.prisma.$transaction(async (tx) => {
+      await this.solicitacaoEmEdicao(tx, solicitacaoId, user);
+      const associacao = await tx.solicitacoes_instrucoes.findFirst({
+        where: { instrucao_id: instrucaoId, solicitacao_id: solicitacaoId }
+      });
 
-    if (!associacao) {
-      throw new NotFoundException('Associação não encontrada');
-    }
+      if (!associacao) {
+        throw new NotFoundException('Associação não encontrada');
+      }
 
-    await this.prisma.solicitacoes_instrucoes.delete({
-      where: { id: associacao.id }
+      await tx.solicitacoes_instrucoes.delete({
+        where: { id: associacao.id }
+      });
     });
   }
 
