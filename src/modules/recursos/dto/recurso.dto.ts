@@ -1,5 +1,7 @@
 // src/modules/recursos/dto/recurso.dto.ts
 import {
+  ArrayMaxSize,
+  IsArray,
   IsEnum,
   IsIn,
   IsNotEmpty,
@@ -165,6 +167,11 @@ export class QueryRecursosDto {
   @IsBoolean()
   apenas_ativos?: boolean;
 
+  @ApiPropertyOptional({ description: 'ATIVO ou INATIVO (o filtro da tela, 30/out/2026). Sem isso, vêm todos.', enum: ['ATIVO', 'INATIVO'] })
+  @IsOptional()
+  @IsIn(['ATIVO', 'INATIVO'], { message: 'Situação inválida: ATIVO ou INATIVO' })
+  situacao?: 'ATIVO' | 'INATIVO';
+
   @ApiPropertyOptional({ default: 1 })
   @IsOptional()
   @Type(() => Number)
@@ -179,4 +186,52 @@ export class QueryRecursosDto {
   @Min(1)
   @Max(100)
   limit?: number;
+}
+
+/**
+ * Excluir vários de uma vez (30/out/2026, pedido do stakeholder: "excluir todos os
+ * inativos de uma vez pela tela"). Ou os selecionados (`ids`), ou todos os inativos
+ * do filtro da tela (`inativos`, com a categoria e a busca dela) — um dos dois.
+ * Só exclui com `previa: false`; sem isso, diz o que sairia e o que ficaria (em uso).
+ */
+export class ExcluirRecursosEmLoteDto {
+  @ApiPropertyOptional({ description: 'Os recursos selecionados (até 500)', type: [String] })
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(500, { message: 'No máximo 500 recursos por vez' })
+  @IsString({ each: true })
+  @MaxLength(26, { each: true })
+  ids?: string[];
+
+  @ApiPropertyOptional({ description: 'Todos os inativos do filtro (a categoria e a busca abaixo), em todas as páginas' })
+  @IsOptional()
+  @BooleanoDoTexto()
+  @IsBoolean()
+  inativos?: boolean;
+
+  @ApiPropertyOptional({ enum: CategoriaRecurso, description: 'Com `inativos`: só os da categoria' })
+  @IsOptional()
+  @IsEnum(CategoriaRecurso, { message: 'Categoria inválida' })
+  categoria?: CategoriaRecurso;
+
+  @ApiPropertyOptional({ description: 'Com `inativos`: só os com o nome que contém isto' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(255)
+  @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
+  search?: string;
+
+  @ApiPropertyOptional({ description: 'false exclui; sem isso (ou true), só diz o que sairia e o que ficaria' })
+  @IsOptional()
+  @BooleanoDoTexto()
+  @IsBoolean()
+  previa?: boolean;
+
+  @ApiPropertyOptional({ description: 'Ao excluir: quantos a prévia disse que saem (outra quantidade hoje = 409)' })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  @Max(1_000_000)
+  esperados?: number;
 }

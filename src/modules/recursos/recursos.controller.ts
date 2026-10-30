@@ -14,7 +14,7 @@ import {
 import { ApiTags, ApiOperation, ApiResponse, ApiParam } from '@nestjs/swagger';
 import { Permissions } from '@/core';
 import { RecursosService } from './recursos.service';
-import { CreateRecursoDto, UpdateRecursoDto, QueryRecursosDto } from './dto/recurso.dto';
+import { CreateRecursoDto, UpdateRecursoDto, QueryRecursosDto, ExcluirRecursosEmLoteDto } from './dto/recurso.dto';
 
 /**
  * Duas permissões que já existem, em vez de uma nova: `recursos.manage` é a da
@@ -75,6 +75,19 @@ export class RecursosController {
   @ApiParam({ name: 'id' })
   atualizar(@Param('id') id: string, @Body() dto: UpdateRecursoDto) {
     return this.recursosService.atualizar(id, dto);
+  }
+
+  @Post('excluir-em-lote')
+  @HttpCode(HttpStatus.OK)
+  @Permissions('recursos.manage')
+  @ApiOperation({
+    summary: 'Excluir vários recursos',
+    description:
+      'Os selecionados (`ids`) ou todos os inativos do filtro (`inativos`, com `categoria` e `search`). ' +
+      'O que alguma instrução usa fica e volta em `em_uso`. Com `previa`, só diz o que sairia.',
+  })
+  excluirEmLote(@Body() dto: ExcluirRecursosEmLoteDto) {
+    return this.recursosService.excluirEmLote(dto);
   }
 
   @Delete(':id')

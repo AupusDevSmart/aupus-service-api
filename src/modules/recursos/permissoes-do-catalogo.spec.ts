@@ -27,6 +27,7 @@ describe('Catálogo de recursos e maquinários — permissões', () => {
     ['recursos: cadastrar', RecursosController, 'criar', true],
     ['recursos: alterar', RecursosController, 'atualizar', false],
     ['recursos: remover', RecursosController, 'remover', false],
+    ['recursos: excluir em lote', RecursosController, 'excluirEmLote', false],
     ['maquinários: listar', MaquinariosController, 'listar', true],
     ['maquinários: cadastrar', MaquinariosController, 'criar', true],
     ['maquinários: alterar', MaquinariosController, 'atualizar', false],
