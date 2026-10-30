@@ -14,7 +14,8 @@ import {
   SalvarLogisticaDaPropostaDto,
   SalvarOutrosCustosDaPropostaDto,
 } from './dto/proposta.dto';
-import { PADROES_DA_SPEC, colunasDosPercentuais } from './padroes-da-proposta';
+import { PADROES_DA_SPEC, colunasDaLogistica, colunasDosPercentuais } from './padroes-da-proposta';
+import { PADROES_DA_LOGISTICA } from './planejamento-da-proposta';
 
 /**
  * A proposta por imposto e margem (29/out/2026), que substitui o BDI:
@@ -103,12 +104,10 @@ describe('proposta por imposto e margem (banco real)', () => {
     await prisma.plantas.deleteMany({ where: { id: PLANTA } });
     await prisma.usuarios.deleteMany({ where: { id: { in: [DONO, PLANEJADOR, OUTRO] } } });
   };
-  const voltarAosDaSpec = () =>
-    prisma.padroes_da_proposta.upsert({
-      where: { id: 1 },
-      create: { id: 1, ...colunasDosPercentuais(PADROES_DA_SPEC) },
-      update: colunasDosPercentuais(PADROES_DA_SPEC),
-    });
+  // Sem pessoas supostas (30/out/2026): este spec é da conta, e as 2 pessoas padrão poriam o
+  // almoço automático em toda proposta com horas (a logística automática tem spec próprio)
+  const padroesDoSpec = { ...colunasDosPercentuais(PADROES_DA_SPEC), ...colunasDaLogistica({ ...PADROES_DA_LOGISTICA, pessoasPadrao: 0 }) };
+  const voltarAosDaSpec = () => prisma.padroes_da_proposta.upsert({ where: { id: 1 }, create: { id: 1, ...padroesDoSpec }, update: padroesDoSpec });
 
   let instrucao = '';
   beforeAll(async () => {
@@ -162,7 +161,7 @@ describe('proposta por imposto e margem (banco real)', () => {
   };
 
   it('a solicitação nova nasce com a conta nova e os padrões; trocar os padrões não mexe na que já existe', async () => {
-    expect(await controller.obterPadroesDaProposta()).toEqual({ imposto_percentual: 15, margem_percentual: 20, adm_servicos_percentual: 5, adm_fd_percentual: 2 });
+    expect(await controller.obterPadroesDaProposta()).toMatchObject({ imposto_percentual: 15, margem_percentual: 20, adm_servicos_percentual: 5, adm_fd_percentual: 2 });
     const antiga = await novaSolicitacao();
     await controller.salvarPadroesDaProposta(await corpo(PadroesDaPropostaDto, { imposto_percentual: 12, margem_percentual: 25, adm_servicos_percentual: 4, adm_fd_percentual: 1 }), comoPlanejador);
     const nova = await novaSolicitacao();
@@ -327,7 +326,8 @@ describe('proposta por imposto e margem (banco real)', () => {
       ],
       necessita_veiculo: true,
       sem_vinculo: [],
-      dias_previstos: null,
+      // A revisão congela os dias calculados (30/out/2026): 9 h de passos em jornadas de 8 h
+      dias_previstos: 2,
       pessoas_previstas: null,
     });
 

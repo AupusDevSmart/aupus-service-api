@@ -8,8 +8,10 @@ import { variantesDeIds } from '../tarefas/ids';
 import { registrarNotificacao } from '../notificacoes/registrar-notificacao';
 import type { CondicoesDaPropostaDto, LinhaDeLogisticaDto, PadroesDaPropostaDto } from './dto/proposta.dto';
 import { totalDaLinha, type ContaDaProposta, type TabelaDeLogistica } from './conta-da-proposta';
-import { colunasDosPercentuais, padroesDaProposta, percentuaisDe } from './padroes-da-proposta';
+import { colunasDaLogistica, colunasDosPercentuais, padroesDaLogistica, padroesDaProposta, percentuaisDe } from './padroes-da-proposta';
 import { contaGravada, linhaDeLogisticaLida, recalcularProposta } from './recalculo-da-proposta';
+import { planejamentoDaSolicitacao, sincronizarLogistica } from './logistica-automatica';
+import { TABELA_DA_CHAVE } from './planejamento-da-proposta';
 
 /**
  * A proposta comercial de uma solicitação de serviço.
@@ -41,11 +43,21 @@ const TETO_DO_TOTAL = 999_999_999_999.99;
 /** "R$ 1.234,56", para a mensagem de erro */
 const reais = (valor: number) => valor.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
-/** As horas de uma jornada: a sugestão de dias é a soma das horas dos passos ÷ 8 (a spec) */
-const HORAS_POR_DIA = 8;
-
 const PERCENTUAIS = ['imposto_percentual', 'margem_percentual', 'adm_servicos_percentual', 'adm_fd_percentual'] as const;
-const PLANEJAMENTO = ['distancia_km', 'distancia_ida_volta_km', 'dias_previstos', 'pessoas_previstas', 'noites_fora'] as const;
+// A ida e volta não está aqui (30/out/2026): é o dobro da ida, gravado com ela
+const PLANEJAMENTO = ['distancia_km', 'deslocamento_interno_km', 'dias_previstos', 'pessoas_previstas', 'noites_fora'] as const;
+const LOGISTICA_PADRAO = [
+  'valor_km',
+  'horas_por_100_km',
+  'interno_percentual',
+  'cafe_valor',
+  'almoco_valor',
+  'jantar_valor',
+  'pernoite_valor',
+  'pessoas_por_veiculo',
+  'bate_volta_horas',
+  'pessoas_padrao',
+] as const;
 
 /** A proposta que voltou à edição: o que a revisão e a recusa gravaram sai junto */
 const SEM_REVISAO = { aprovado_por_id: null, aprovado_por_nome: null, data_aprovacao: null } as const;
@@ -212,24 +224,8 @@ export class PropostaService {
     return vinculos.map((v) => v.instrucao_id.trim());
   }
 
-  /**
-   * Os dias que a spec sugere: as horas dos passos das instruções, em sequência
-   * (sem inventar simultaneidade), em jornadas de 8 h, arredondado para cima
-   * (6h20 dá 1 dia; 9 h, 2). Nulo sem hora nenhuma: a pessoa digita os dias.
-   */
-  private async diasSugeridos(solicitacaoId: string): Promise<number | null> {
-    const ids = await this.idsDasInstrucoes(solicitacaoId);
-    if (!ids.length) return null;
-    const { _sum } = await this.prisma.sub_instrucoes.aggregate({
-      where: { instrucao_id: { in: ids } },
-      _sum: { duracao_horas: true },
-    });
-    const horas = this.num(_sum.duracao_horas);
-    return horas > 0 ? Math.ceil(horas / HORAS_POR_DIA) : null;
-  }
-
   async obter(solicitacaoId: string) {
-    const [itens, outros, logistica, solicitacao, instrucoesSemPreco, diasSugeridos] = await Promise.all([
+    const [itens, outros, logistica, solicitacao, instrucoesSemPreco, { calculado, automatica, horasPorInstrucao }] = await Promise.all([
       this.prisma.solicitacoes_itens.findMany({
         where: { solicitacao_id: solicitacaoId },
         orderBy: { ordem: 'asc' },
@@ -248,6 +244,7 @@ export class PropostaService {
           conta_da_proposta: true,
           distancia_km: true,
           distancia_ida_volta_km: true,
+          deslocamento_interno_km: true,
           dias_previstos: true,
           pessoas_previstas: true,
           noites_fora: true,
@@ -284,7 +281,7 @@ export class PropostaService {
         },
       }),
       this.instrucoesSemPreco(solicitacaoId),
-      this.diasSugeridos(solicitacaoId),
+      planejamentoDaSolicitacao(this.prisma, solicitacaoId),
     ]);
 
     if (!solicitacao) throw new NotFoundException('Solicitação não encontrada');
@@ -311,13 +308,34 @@ export class PropostaService {
        * proposta virar tela branca até recarregar.
        */
       subinstrucoes: [] as never[],
-      // O planejamento
+      // O planejamento: o digitado (vazio vale o calculado)
       distancia_km: this.numOuNulo(s.distancia_km),
       distancia_ida_volta_km: this.numOuNulo(s.distancia_ida_volta_km),
+      deslocamento_interno_km: this.numOuNulo(s.deslocamento_interno_km),
       dias_previstos: this.numOuNulo(s.dias_previstos),
-      dias_sugeridos: diasSugeridos,
+      dias_sugeridos: calculado.diasSugeridos,
       pessoas_previstas: s.pessoas_previstas,
       noites_fora: s.noites_fora,
+      /** O que se calcula do planejamento (30/out/2026): o que vale em cada campo vazio, a viagem e os veículos */
+      /** As linhas automáticas acompanham o planejamento (a de antes, com a logística digitada, nasce desligada) */
+      logistica_automatica: automatica,
+      planejamento_calculado: {
+        /** As horas dos passos das instruções (total e de cada uma): a tela mostra a conta dos dias */
+        horas_dos_passos: calculado.horasDosPassos,
+        horas_por_instrucao: horasPorInstrucao,
+        pessoas: calculado.pessoas,
+        ida_e_volta_km: calculado.idaEVoltaKm,
+        interno_km: calculado.internoKm,
+        interno_sugerido_km: calculado.internoSugeridoKm,
+        horas_por_trecho: calculado.horasPorTrecho,
+        bate_volta: calculado.bateVolta,
+        dias_sugeridos: calculado.diasSugeridos,
+        dias: calculado.dias,
+        noites_sugeridas: calculado.noitesSugeridas,
+        noites: calculado.noites,
+        veiculos: calculado.veiculos,
+        km_por_veiculo: calculado.kmPorVeiculo,
+      },
       // Os percentuais da proposta
       imposto_percentual: this.numOuNulo(s.imposto_percentual),
       margem_percentual: this.numOuNulo(s.margem_percentual),
@@ -448,6 +466,17 @@ export class PropostaService {
    * que o front manda são as colunas, nunca o total.
    */
   async salvarLogistica(solicitacaoId: string, tabela: TabelaDeLogistica, linhas: LinhaDeLogisticaDto[]) {
+    // A linha automática é uma por chave, na tabela dela (o índice único recusaria com 500)
+    const chaves = linhas.map((l) => l.automatica).filter((c): c is NonNullable<typeof c> => Boolean(c));
+    if (chaves.some((c) => TABELA_DA_CHAVE[c] !== tabela)) {
+      throw new BadRequestException('Linha automática fora da tabela dela: recarregue a proposta.');
+    }
+    if (new Set(chaves).size !== chaves.length) {
+      throw new BadRequestException('Linha automática repetida: recarregue a proposta.');
+    }
+    // A tela de antes deste deploy não manda a chave: gravaria as automáticas como digitadas,
+    // e a sincronização as recriaria ao lado (a logística em dobro a cada salvar)
+    const daTelaAntiga = linhas.length > 0 && linhas.every((l) => !('automatica' in l));
     const data = linhas.map((l, indice) => {
       const total = totalDaLinha({ ...l, tabela });
       if (total > TETO_DO_TOTAL) {
@@ -466,12 +495,17 @@ export class PropostaService {
         valor_km: l.valor_km ?? null,
         valor_fixo: l.valor_fixo ?? null,
         total,
+        automatica: l.automatica ?? null,
+        ajustada: Boolean(l.automatica && l.ajustada),
         ordem: indice + 1,
       };
     });
 
     await this.prisma.$transaction(async (tx) => {
       await this.travarParaEditar(tx, solicitacaoId);
+      if (daTelaAntiga && (await tx.solicitacoes_logistica.count({ where: { solicitacao_id: solicitacaoId, tabela, automatica: { not: null } } })) > 0) {
+        throw new ConflictException('A tela está desatualizada: recarregue a página (F5) antes de salvar.');
+      }
       await tx.solicitacoes_logistica.deleteMany({ where: { solicitacao_id: solicitacaoId, tabela } });
       if (data.length > 0) await tx.solicitacoes_logistica.createMany({ data });
       await this.recalcular(solicitacaoId, tx);
@@ -494,6 +528,11 @@ export class PropostaService {
     for (const campo of PLANEJAMENTO) {
       if (dados[campo] !== undefined) data[campo] = dados[campo];
     }
+    // O km de ida é o de volta (30/out/2026): a ida e volta acompanha a ida
+    if (dados.distancia_km !== undefined) {
+      data.distancia_ida_volta_km = dados.distancia_km === null ? null : Math.round(dados.distancia_km * 2 * 100) / 100;
+    }
+    if (dados.logistica_automatica !== undefined) data.logistica_automatica = dados.logistica_automatica;
     if (dados.validade_proposta !== undefined) data.validade_proposta = dados.validade_proposta;
     if (dados.condicoes_comerciais !== undefined) data.condicoes_comerciais = dados.condicoes_comerciais?.trim() || null;
 
@@ -567,9 +606,10 @@ export class PropostaService {
   // PADRÕES
   // ============================================================
 
-  /** Os percentuais padrão da proposta: o que a solicitação nova copia */
+  /** Os padrões da proposta: os percentuais (que a solicitação nova copia) e os da logística automática */
   async obterPadroes() {
-    return colunasDosPercentuais(await padroesDaProposta(this.prisma));
+    const [percentuais, logistica] = await Promise.all([padroesDaProposta(this.prisma), padroesDaLogistica(this.prisma)]);
+    return { ...colunasDosPercentuais(percentuais), ...colunasDaLogistica(logistica) };
   }
 
   /**
@@ -582,10 +622,14 @@ export class PropostaService {
       throw new BadRequestException('O imposto e a margem somam 100% ou mais: o preço não fecha.');
     }
     const quem = { updated_by: usuarioId?.trim() || null, updated_at: new Date() };
+    // O padrão da logística ausente fica o gravado (a tela de antes do deploy só manda os percentuais)
+    const logistica: Partial<Record<(typeof LOGISTICA_PADRAO)[number], number>> = Object.fromEntries(
+      LOGISTICA_PADRAO.filter((c) => dados[c] !== undefined && dados[c] !== null).map((c) => [c, dados[c] as number]),
+    );
     await this.prisma.padroes_da_proposta.upsert({
       where: { id: 1 },
-      create: { id: 1, ...colunasDosPercentuais(percentuais), ...quem },
-      update: { ...colunasDosPercentuais(percentuais), ...quem },
+      create: { id: 1, ...colunasDosPercentuais(percentuais), ...logistica, ...quem },
+      update: { ...colunasDosPercentuais(percentuais), ...logistica, ...quem },
     });
     return this.obterPadroes();
   }
@@ -604,6 +648,20 @@ export class PropostaService {
 
   /** REGISTRADA -> PROPOSTA_REVISADA, com quem revisou e quando */
   async revisar(solicitacaoId: string, usuarioId?: string): Promise<void> {
+    // A logística automática segue os padrões e as horas das instruções de hoje: se ela mudou
+    // desde a última edição, a revisão não fecha um total que ninguém viu. Acerta e grava, e
+    // pede para conferir (como a proposta do BDI, que não se revisa calada)
+    const mudou = await this.prisma.$transaction(async (tx) => {
+      if ((await this.travar(tx, solicitacaoId)) !== 'REGISTRADA') return false;
+      const { conta_da_proposta } = await tx.solicitacoes_servico.findUniqueOrThrow({ where: { id: solicitacaoId }, select: { conta_da_proposta: true } });
+      if (conta_da_proposta !== 'IMPOSTO_MARGEM' || !(await sincronizarLogistica(tx, solicitacaoId))) return false;
+      await recalcularProposta(tx, solicitacaoId, { sincronizar: false });
+      return true;
+    });
+    if (mudou) {
+      throw new ConflictException('A logística automática mudou desde a última edição (os padrões ou as horas das instruções): confira os valores da proposta e revise de novo.');
+    }
+
     await this.prisma.$transaction(async (tx) => {
       const status = await this.travar(tx, solicitacaoId);
       if (status !== 'REGISTRADA') throw new ConflictException(this.naoSeMuda(status, 'revisar'));
@@ -614,8 +672,9 @@ export class PropostaService {
         throw new ConflictException('A proposta está na conta antiga (BDI): passe-a para imposto e margem e confira os valores antes de revisar.');
       }
       await this.mesmasInstrucoes(tx, solicitacaoId);
-      // Os totais da revisão são os da conta de agora
-      await this.recalcular(solicitacaoId, tx);
+      // Os totais da revisão são os da conta de agora, com as linhas que a pessoa viu
+      await recalcularProposta(tx, solicitacaoId, { sincronizar: false });
+      await this.congelarPlanejamento(tx, solicitacaoId);
       const autor = await nomeDoAutor(tx, usuarioId);
       await tx.solicitacoes_servico.update({
         where: { id: solicitacaoId },
@@ -624,6 +683,28 @@ export class PropostaService {
       await this.historico(tx, solicitacaoId, { acao: 'PROPOSTA_REVISADA', autor, usuarioId, observacoes: 'Proposta revisada', de: status, para: 'PROPOSTA_REVISADA' });
       await registrarNotificacao(tx, { evento: 'solicitacao.proposta_revisada', entidade: 'solicitacao_servico', entidadeId: solicitacaoId, atorId: usuarioId });
     });
+  }
+
+  /**
+   * O planejamento que precificou a proposta fica gravado na revisão (30/out/2026): o
+   * campo vazio valia o calculado com os padrões e as horas de hoje, e o PDF e a
+   * programação da proposta revisada mudariam com os de amanhã. Reaberta, ela segue
+   * com estes números digitados (apagar o campo volta ao calculado).
+   */
+  private async congelarPlanejamento(tx: Prisma.TransactionClient, solicitacaoId: string): Promise<void> {
+    const [{ calculado }, s] = await Promise.all([
+      planejamentoDaSolicitacao(tx, solicitacaoId),
+      tx.solicitacoes_servico.findUniqueOrThrow({
+        where: { id: solicitacaoId },
+        select: { dias_previstos: true, noites_fora: true, pessoas_previstas: true, deslocamento_interno_km: true, distancia_km: true },
+      }),
+    ]);
+    const data: Prisma.solicitacoes_servicoUpdateInput = {};
+    if (s.dias_previstos === null && calculado.dias !== null) data.dias_previstos = calculado.dias;
+    if (s.noites_fora === null && calculado.noites !== null) data.noites_fora = calculado.noites;
+    if (s.pessoas_previstas === null && calculado.pessoas !== null) data.pessoas_previstas = calculado.pessoas;
+    if (s.deslocamento_interno_km === null && s.distancia_km !== null && calculado.internoKm !== null) data.deslocamento_interno_km = calculado.internoKm;
+    if (Object.keys(data).length > 0) await tx.solicitacoes_servico.update({ where: { id: solicitacaoId }, data });
   }
 
   /** PROPOSTA_REVISADA ou NAO_APROVADA -> REGISTRADA: a proposta volta à edição */

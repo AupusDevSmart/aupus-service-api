@@ -6,6 +6,7 @@ import { BooleanoDoTexto } from '@/common/decorators/booleano';
 import { CasasDecimais, VazioEhNulo } from '@/common/decorators/numero';
 import { DiaComoData } from '@/common/decorators/dia-de-calendario';
 import { TIPOS_DE_DESCONTO, type TipoDeDesconto } from '../desconto-da-proposta';
+import { CHAVES_AUTOMATICAS, type ChaveAutomatica } from '../planejamento-da-proposta';
 
 /**
  * O corpo das escritas da proposta (SN-94). Até aqui as rotas recebiam um tipo
@@ -153,8 +154,18 @@ export class CondicoesDaPropostaDto {
   @Percentual() adm_servicos_percentual?: number | null;
   @Percentual() adm_fd_percentual?: number | null;
 
-  @NumeroOpcional(2, 99_999_999.99, 'A distância de ida, em km') distancia_km?: number | null;
-  @NumeroOpcional(2, 99_999_999.99, 'A distância de ida e volta, em km') distancia_ida_volta_km?: number | null;
+  // Tetos de distância de verdade: a ida e volta (o dobro) e o km dos veículos cabem nas colunas
+  @NumeroOpcional(2, 99_999.99, 'A distância de ida, em km (a ida e volta é o dobro)') distancia_km?: number | null;
+  /** Obsoleto (30/out/2026): a ida e volta é o dobro da ida, gravado pelo servidor; aceito só para a tela de antes do deploy */
+  @NumeroOpcional(2, 99_999_999.99, 'Obsoleto: o servidor grava o dobro da ida') distancia_ida_volta_km?: number | null;
+  @NumeroOpcional(2, 99_999.99, 'O km rodado na obra; vazio = o padrão (% da ida e volta)') deslocamento_interno_km?: number | null;
+
+  /** Ligar a logística automática numa proposta de antes, que tinha a logística digitada */
+  @ApiPropertyOptional({ description: 'As linhas de km e refeições acompanham o planejamento' })
+  @IsOptional()
+  @BooleanoDoTexto()
+  @IsBoolean()
+  logistica_automatica?: boolean;
   @NumeroOpcional(2, 9_999.99, 'Os dias previstos de execução') dias_previstos?: number | null;
   @InteiroOpcional('As pessoas mobilizadas') pessoas_previstas?: number | null;
   @InteiroOpcional('As noites fora') noites_fora?: number | null;
@@ -199,6 +210,30 @@ export class PadroesDaPropostaDto {
   @PercentualObrigatorio() margem_percentual: number;
   @PercentualObrigatorio() adm_servicos_percentual: number;
   @PercentualObrigatorio() adm_fd_percentual: number;
+
+  // A logística automática (30/out/2026). Ausente não muda o gravado (a tela de antes do deploy só manda os percentuais)
+  @NumeroOpcional(4, 9_999.9999, 'R$ por km rodado') valor_km?: number | null;
+  @NumeroOpcional(2, 24, 'Horas de estrada a cada 100 km') horas_por_100_km?: number | null;
+  @NumeroOpcional(3, 100, 'O deslocamento interno quando vazio: % da ida e volta') interno_percentual?: number | null;
+  @NumeroOpcional(2, 999_999.99, 'Café da manhã, por pessoa') cafe_valor?: number | null;
+  @NumeroOpcional(2, 999_999.99, 'Almoço, por pessoa') almoco_valor?: number | null;
+  @NumeroOpcional(2, 999_999.99, 'Jantar, por pessoa') jantar_valor?: number | null;
+  @NumeroOpcional(2, 999_999.99, 'Pernoite, por pessoa e noite') pernoite_valor?: number | null;
+  @ApiPropertyOptional({ description: 'Pessoas por veículo (1 a 50)' })
+  @IsOptional()
+  @VazioEhNulo()
+  @IsInt()
+  @Min(1)
+  @Max(50)
+  pessoas_por_veiculo?: number | null;
+  @NumeroOpcional(2, 24, 'Até quantas horas de ida a equipe volta no mesmo dia') bate_volta_horas?: number | null;
+  @ApiPropertyOptional({ description: 'As pessoas quando a proposta não diz (0 a 999; 0 = não supor)' })
+  @IsOptional()
+  @VazioEhNulo()
+  @IsInt()
+  @Min(0)
+  @Max(999)
+  pessoas_padrao?: number | null;
 }
 
 /**
@@ -224,12 +259,24 @@ export class LinhaDeLogisticaDto {
   @MaxLength(200)
   descricao: string;
 
-  @NumeroOpcional(3, TETO_DA_QUANTIDADE, 'Diária: a quantidade; frete: as viagens') quantidade?: number | null;
+  @NumeroOpcional(3, TETO_DA_QUANTIDADE, 'Diária: a quantidade; frete: as viagens; deslocamento: os veículos (vazio = 1)') quantidade?: number | null;
   @NumeroOpcional(2, TETO_DO_PRECO, 'Diária: o valor; deslocamento: a diária do veículo') valor_unitario?: number | null;
   @NumeroOpcional(2, 9_999.99, 'Deslocamento: os dias') dias?: number | null;
   @NumeroOpcional(2, 99_999_999.99, 'Frete: km por viagem; deslocamento: km totais') km?: number | null;
   @NumeroOpcional(4, 9_999_999_999.9999, 'O valor do km') valor_km?: number | null;
   @NumeroOpcional(2, TETO_DO_PRECO, 'Frete: o valor fixo') valor_fixo?: number | null;
+
+  /** A linha que o planejamento calcula (30/out/2026): o servidor acerta as quantidades dela */
+  @ApiPropertyOptional({ description: 'A chave da linha automática; nula na digitada', enum: CHAVES_AUTOMATICAS, nullable: true })
+  @IsOptional()
+  @IsIn([...CHAVES_AUTOMATICAS])
+  automatica?: ChaveAutomatica | null;
+
+  @ApiPropertyOptional({ description: 'A automática ajustada à mão: deixa de acompanhar o planejamento' })
+  @IsOptional()
+  @BooleanoDoTexto()
+  @IsBoolean()
+  ajustada?: boolean;
 }
 
 export class SalvarLogisticaDaPropostaDto {

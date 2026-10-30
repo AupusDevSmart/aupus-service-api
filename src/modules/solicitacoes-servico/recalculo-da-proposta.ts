@@ -2,6 +2,7 @@ import { BadRequestException, NotFoundException } from '@nestjs/common';
 import type { Prisma } from '@prisma/client';
 import { contaDaProposta, type ContaDaProposta } from './conta-da-proposta';
 import { colunasDosPercentuais, padroesDaProposta, percentuaisDe } from './padroes-da-proposta';
+import { sincronizarLogistica } from './logistica-automatica';
 
 type Db = Prisma.TransactionClient;
 
@@ -31,6 +32,8 @@ export function linhaDeLogisticaLida(l: {
   valor_km: Prisma.Decimal | null;
   valor_fixo: Prisma.Decimal | null;
   total: Prisma.Decimal;
+  automatica?: string | null;
+  ajustada?: boolean;
   ordem: number;
 }) {
   return {
@@ -46,6 +49,9 @@ export function linhaDeLogisticaLida(l: {
     valor_km: ouNulo(l.valor_km),
     valor_fixo: ouNulo(l.valor_fixo),
     total: numero(l.total),
+    /** A linha que o planejamento calcula (30/out/2026) e se a pessoa a ajustou à mão */
+    automatica: l.automatica?.trim() || null,
+    ajustada: l.ajustada ?? false,
     ordem: l.ordem,
   };
 }
@@ -119,8 +125,11 @@ async function paraAContaNova(db: Db, solicitacaoId: string): Promise<number | n
  * calcular na leitura, porque a tela, a lista e o PDF precisam do mesmo número —
  * e daqui a seis meses, mesmo que o catálogo e os padrões tenham mudado.
  */
-export async function recalcularProposta(db: Db, solicitacaoId: string): Promise<ContaDaProposta> {
+export async function recalcularProposta(db: Db, solicitacaoId: string, { sincronizar = true }: { sincronizar?: boolean } = {}): Promise<ContaDaProposta> {
   const totalDoBdi = await paraAContaNova(db, solicitacaoId);
+  // As linhas automáticas da logística seguem o planejamento (30/out/2026) antes da conta;
+  // a revisão não sincroniza: fecha o que a pessoa viu
+  if (sincronizar) await sincronizarLogistica(db, solicitacaoId);
   const conta = (await contaGravada(db, solicitacaoId))!;
 
   if (Math.max(conta.totalGeralSemDesconto, conta.custoServicos + conta.fd) > TETO_DO_TOTAL) {

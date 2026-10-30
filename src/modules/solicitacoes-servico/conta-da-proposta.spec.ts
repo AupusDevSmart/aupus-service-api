@@ -88,6 +88,9 @@ describe('a conta da proposta', () => {
   it('o total de cada linha de logística pela tabela dela', () => {
     expect(totalDaLinha({ tabela: 'FRETE', km: 120, quantidade: 2, valor_km: 2.5, valor_fixo: 80 })).toBe(680);
     expect(totalDaLinha({ tabela: 'DESLOCAMENTO', dias: 3, valor_unitario: 200, km: 240, valor_km: 2 })).toBe(1080);
+    // Os veículos (30/out/2026): vazio é um (a linha de antes), dois dobram, zero zera
+    expect(totalDaLinha({ tabela: 'DESLOCAMENTO', quantidade: 2, dias: 3, valor_unitario: 200, km: 240, valor_km: 2 })).toBe(2160);
+    expect(totalDaLinha({ tabela: 'DESLOCAMENTO', quantidade: 0, km: 240, valor_km: 2 })).toBe(0);
     expect(totalDaLinha({ tabela: 'DIARIA', quantidade: 6, valor_unitario: 45 })).toBe(270);
     // Campo vazio é zero (a linha ainda sendo preenchida)
     expect(totalDaLinha({ tabela: 'FRETE', km: 100 })).toBe(0);

@@ -56,8 +56,11 @@ const DA_CONTA_NOVA = [
   'total_custo',
   'distancia_km',
   'distancia_ida_volta_km',
+  'deslocamento_interno_km',
   'pessoas_previstas',
   'noites_fora',
+  'planejamento_calculado',
+  'logistica_automatica',
 ];
 
 /** Os totais da proposta e o custo estimado: o que o PDF do cliente mostra */

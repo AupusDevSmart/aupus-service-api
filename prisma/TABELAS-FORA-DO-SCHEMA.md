@@ -50,6 +50,14 @@ criados pelo mesmo caminho.
 Nao ha razao tecnica para a diferenca; e acidente. Enquanto durar, o diff trata
 irmaos de formas opostas: preserva um e propoe dropar os outros dois.
 
+## Indice fora do schema: `solicitacoes_logistica_automatica_key`
+
+Criado por `prisma/sql/2026-10-30-logistica-automatica.sql`: `CREATE UNIQUE INDEX ... ON
+solicitacoes_logistica (solicitacao_id, automatica) WHERE automatica IS NOT NULL` — uma linha
+automatica so por chave (KM, CAFE, ALMOCO, JANTAR, PERNOITE) em cada solicitacao; duas "Almoco"
+somariam o almoco duas vezes. O Prisma nao modela indice parcial, entao o `migrate diff` vai
+propor `DROP INDEX solicitacoes_logistica_automatica_key` — **remover essa linha** do diff.
+
 ## Indice fora do schema: `usuarios_email_lower_unique`
 
 Criado por `prisma/sql/2026-10-16-contato-padronizado.sql` (SN-46): `CREATE UNIQUE INDEX

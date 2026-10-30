@@ -152,27 +152,14 @@ function solicitacao(c: Cenario, linha: LinhaDoTempo, sol: SolicitacaoDoSeed, i:
       });
     }
 
-    // A equipe fecha a proposta (29/out/2026): as instruções com o valor do catálogo, o km, o
-    // deslocamento, as diárias de quem dorme fora e a validade; imposto e margem são os padrões
+    // A equipe fecha a proposta: as instruções com o valor do catálogo, o km, a equipe e a
+    // validade; imposto e margem são os padrões. O resto é a logística automática (30/out/2026):
+    // dias e noites pela viagem, o veículo pelo km, as refeições e o pernoite de quem dorme fora
     linha.marcar(as(somarDias(quando, 1), '10:30'), `proposta ${id}`, async () => {
-      const distancia = planta.dados.distanciaKm;
-      const longe = distancia > 300;
       await c.s.propostas.recarregar(id);
-      await c.s.propostas.salvarLogistica(id, 'DESLOCAMENTO', [
-        { descricao: 'Picape da equipe', dias: longe ? 2 : 1, valor_unitario: 180, km: distancia * 2, valor_km: 1.35 },
-      ]);
-      if (longe) {
-        await c.s.propostas.salvarLogistica(id, 'DIARIA', [
-          { descricao: 'Almoço', quantidade: 4, valor_unitario: 45 },
-          { descricao: 'Pernoite', quantidade: 2, valor_unitario: 220 },
-        ]);
-      }
       await c.s.propostas.salvarCondicoes(id, {
-        distancia_km: distancia,
-        distancia_ida_volta_km: distancia * 2,
-        dias_previstos: longe ? 2 : 1,
+        distancia_km: planta.dados.distanciaKm,
         pessoas_previstas: 2,
-        noites_fora: longe ? 1 : 0,
         validade_proposta: new Date(`${diaDe(somarDias(quando, 31))}T00:00:00.000Z`),
         condicoes_comerciais: 'Pagamento em 30 dias da entrega do relatório.',
       });
