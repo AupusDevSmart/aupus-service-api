@@ -1,6 +1,8 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { Transform } from 'class-transformer';
 import { IsString, IsNotEmpty, IsEnum, IsNumber, IsOptional, Min, Max, Matches, IsBoolean } from 'class-validator';
+import { TextoOpcional } from '@/common/decorators/texto';
+import { VazioEhNulo } from '@/common/decorators/numero';
 
 // Normaliza '' e null para undefined antes das demais validacoes. Necessario
 // porque @IsOptional() do class-validator so pula validacao se for null
@@ -53,6 +55,12 @@ export enum TipoUnidadeEnergia {
   CARGA_E_GERACAO = 'Carga e Geração',
 }
 
+/*
+ * Só o nome e a planta são obrigatórios (05/nov/2026): a equipe nem sempre tem
+ * a cidade, as coordenadas ou a potência da instalação, e deixava de cadastrar.
+ * O que vier é conferido; o vazio grava "sem valor" (null), que também apaga o
+ * campo na edição. A obrigatoriedade volta aos poucos.
+ */
 export class CreateUnidadeDto {
   @ApiProperty({
     description: 'ID da planta à qual a unidade pertence',
@@ -85,9 +93,10 @@ export class CreateUnidadeDto {
     enum: TipoUnidade,
     example: TipoUnidade.GERACAO,
   })
+  @TextoOpcional()
+  @IsOptional()
   @IsEnum(TipoUnidade, { message: 'Tipo de unidade inválido' })
-  @IsNotEmpty({ message: 'Tipo da unidade é obrigatório' })
-  tipo: TipoUnidade;
+  tipo?: TipoUnidade | null;
 
   @ApiProperty({
     description: 'Estado (UF)',
@@ -95,18 +104,20 @@ export class CreateUnidadeDto {
     minLength: 2,
     maxLength: 2,
   })
+  @TextoOpcional()
+  @IsOptional()
   @IsString()
-  @IsNotEmpty({ message: 'Estado é obrigatório' })
   @Matches(/^[A-Z]{2}$/, { message: 'Estado deve conter 2 letras maiúsculas' })
-  estado: string;
+  estado?: string | null;
 
   @ApiProperty({
     description: 'Cidade',
     example: 'São Paulo',
   })
+  @TextoOpcional()
+  @IsOptional()
   @IsString()
-  @IsNotEmpty({ message: 'Cidade é obrigatória' })
-  cidade: string;
+  cidade?: string | null;
 
   @ApiProperty({
     description: 'Latitude (coordenada geográfica)',
@@ -114,10 +125,12 @@ export class CreateUnidadeDto {
     minimum: -90,
     maximum: 90,
   })
+  @VazioEhNulo()
+  @IsOptional()
   @IsNumber({}, { message: 'Latitude deve ser um número' })
   @Min(-90, { message: 'Latitude mínima é -90' })
   @Max(90, { message: 'Latitude máxima é 90' })
-  latitude: number;
+  latitude?: number | null;
 
   @ApiProperty({
     description: 'Longitude (coordenada geográfica)',
@@ -125,22 +138,24 @@ export class CreateUnidadeDto {
     minimum: -180,
     maximum: 180,
   })
+  @VazioEhNulo()
+  @IsOptional()
   @IsNumber({}, { message: 'Longitude deve ser um número' })
   @Min(-180, { message: 'Longitude mínima é -180' })
   @Max(180, { message: 'Longitude máxima é 180' })
-  longitude: number;
+  longitude?: number | null;
 
   @ApiProperty({
     description: 'Potência em kW',
     example: 1000.5,
     minimum: 0,
     required: false,
-    default: 0,
   })
+  @VazioEhNulo()
   @IsNumber({}, { message: 'Potência deve ser um número' })
   @Min(0, { message: 'Potência não pode ser negativa' })
   @IsOptional()
-  potencia?: number;
+  potencia?: number | null;
 
   @ApiProperty({
     description: 'Pontos de medição (array de strings em formato JSON)',

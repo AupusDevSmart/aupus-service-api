@@ -41,47 +41,47 @@ export class PlantasService {
     const { endereco, proprietarioId, cnpj, numero_uc, ...plantaData } = createPlantaDto;
 
     try {
-      // 1. Verificar se o proprietário existe
-      const proprietario = await this.prisma.usuarios.findUnique({
-        where: {
-          id: proprietarioId,
-          is_active: true,
-          deleted_at: null
-        },
-        select: {
-          id: true,
-          nome: true,
-          cpf_cnpj: true
+      // 1. O proprietário, quando informado, tem de existir (desde 05/nov/2026 a planta pode nascer sem)
+      if (proprietarioId) {
+        const proprietario = await this.prisma.usuarios.findUnique({
+          where: {
+            id: proprietarioId,
+            is_active: true,
+            deleted_at: null
+          },
+          select: { id: true }
+        });
+
+        if (!proprietario) {
+          throw new NotFoundException(`Proprietário com ID ${proprietarioId} não encontrado ou inativo`);
         }
-      });
-
-      if (!proprietario) {
-        throw new NotFoundException(`Proprietário com ID ${proprietarioId} não encontrado ou inativo`);
       }
 
-      // 2. Verificar se CNPJ já existe
-      const existingPlanta = await this.prisma.plantas.findUnique({
-        where: { cnpj }
-      });
+      // 2. O CNPJ, quando informado, não se repete (sem CNPJ, quantas plantas forem)
+      if (cnpj) {
+        const existingPlanta = await this.prisma.plantas.findUnique({
+          where: { cnpj }
+        });
 
-      if (existingPlanta) {
-        throw new ConflictException(`Já existe uma planta cadastrada com o CNPJ ${cnpj}`);
+        if (existingPlanta) {
+          throw new ConflictException(`Já existe uma planta cadastrada com o CNPJ ${cnpj}`);
+        }
       }
 
-      // 3. Criar a planta
+      // 3. Criar a planta; o que não veio fica sem valor
       const novaPlanta = await this.prisma.plantas.create({
         data: {
           nome: plantaData.nome,
-          cnpj,
-          localizacao: plantaData.localizacao,
-          horario_funcionamento: plantaData.horarioFuncionamento,
+          cnpj: cnpj ?? null,
+          localizacao: plantaData.localizacao ?? null,
+          horario_funcionamento: plantaData.horarioFuncionamento ?? null,
           numero_uc: numero_uc || null, // ✅ Adicionar numero_uc
-          logradouro: endereco.logradouro,
-          bairro: endereco.bairro,
-          cidade: endereco.cidade,
-          uf: endereco.uf,
-          cep: endereco.cep,
-          proprietario_id: proprietarioId,
+          logradouro: endereco?.logradouro ?? null,
+          bairro: endereco?.bairro ?? null,
+          cidade: endereco?.cidade ?? null,
+          uf: endereco?.uf ?? null,
+          cep: endereco?.cep ?? null,
+          proprietario_id: proprietarioId ?? null,
         },
         include: {
           proprietario: {
@@ -298,7 +298,8 @@ export class PlantasService {
       }
 
       // 2. Se há mudança de proprietário, verificar se ele existe
-      if (proprietarioId && proprietarioId !== plantaExistente.proprietario_id) {
+      // Aparados: o id de 25 caracteres no Char(26) sempre parecia outro dono, e a planta de dono inativo não se editava
+      if (proprietarioId && proprietarioId.trim() !== plantaExistente.proprietario_id?.trim()) {
         const proprietario = await this.prisma.usuarios.findUnique({
           where: {
             id: proprietarioId,
@@ -521,9 +522,10 @@ export class PlantasService {
         tipo: unidade.tipo,
         estado: unidade.estado,
         cidade: unidade.cidade,
-        latitude: unidade.latitude.toString(),
-        longitude: unidade.longitude.toString(),
-        potencia: unidade.potencia.toString(),
+        // Opcionais desde 05/nov/2026: a instalação sem coordenada derrubava a lista inteira
+        latitude: unidade.latitude == null ? null : unidade.latitude.toString(),
+        longitude: unidade.longitude == null ? null : unidade.longitude.toString(),
+        potencia: unidade.potencia == null ? null : unidade.potencia.toString(),
         status: unidade.status,
         totalEquipamentos: unidade._count.equipamentos,
         createdAt: unidade.created_at,

@@ -78,6 +78,7 @@ import {
 import { dinheiroPara } from '../execucao-os/quem-ve-os-custos';
 import { lugarParaASolicitacaoSemPlanta } from './lugar-da-solicitacao-programada';
 import { comAHerancaDaProposta } from './heranca-na-programacao';
+import { instrucoesDoPedido, pedidoTrazPlanejado, planejadoDasInstrucoes } from './planejado-das-instrucoes';
 import { congelamentoDasLinhas, nomesDosEquipamentos } from './congelamento-da-linha';
 import { naturezaDoItem, naturezaPeloPrefixo } from '../execucao-os/natureza-do-custo';
 import type { TarefaDaLinha } from '../execucao-os/tarefas-das-linhas';
@@ -409,6 +410,12 @@ export class ProgramacaoOSService {
     createDto.planta_id = await plantaDaProgramacao(this.prisma, onde);
     if (user) await this.scopeService.assertPlantaInScope(createDto.planta_id, user, naoEncontradoDaOrigem(onde));
     await this.escalarPessoas(createDto, createDto.planta_id);
+    // Sem o planejado no pedido (o cron e as rotas from-*), o das instruções: materiais, equipe,
+    // ferramentas e outros custos. Só a tela fazia essa conta, e o resto nascia sem nada (05/nov/2026).
+    // Antes da herança, que acrescenta os outros custos da proposta
+    if (!pedidoTrazPlanejado(createDto)) {
+      createDto = { ...createDto, ...(await planejadoDasInstrucoes(this.prisma, await instrucoesDoPedido(this.prisma, createDto))) };
+    }
     // A da solicitação recebe o que a proposta revisada diz: valores, logística e veículo (29/out/2026)
     createDto = await comAHerancaDaProposta(this.prisma, createDto);
 

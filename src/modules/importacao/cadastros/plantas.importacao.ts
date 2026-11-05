@@ -92,11 +92,16 @@ export class PlantasImportacao implements CadastroImportavel<PlantaComUnidades> 
     const { proprietario, proprietario_ref, endereco, unidades: linhas, ...planta } = dados;
     const resultado: Record<string, unknown> = { ...planta };
 
-    if (proprietario !== undefined || !atual) {
+    const semDono =
+      proprietario === null || (typeof proprietario === 'string' && proprietario.trim() === '') || (!atual && proprietario === undefined);
+    if (semDono) {
+      // O proprietário é opcional desde 05/nov/2026: a célula vazia é "sem proprietário"
+      if (!atual || atual.proprietario_id !== null) resultado.proprietarioId = null;
+    } else if (proprietario !== undefined || !atual) {
       const candidatos = await this.plantas.findProprietarios();
       // O dono de hoje entra mesmo se deixou de ser "proprietário" no papel:
       // reimportar sem mexer não pode dar erro.
-      if (atual && !candidatos.some((c) => c.id.trim() === atual.proprietario_id.trim())) {
+      if (atual?.proprietario_id && !candidatos.some((c) => c.id.trim() === atual.proprietario_id!.trim())) {
         const dono = await this.prisma.usuarios.findUnique({ where: { id: atual.proprietario_id }, select: { id: true, nome: true } });
         if (dono) candidatos.push(dono as (typeof candidatos)[number]);
       }
@@ -134,8 +139,9 @@ export class PlantasImportacao implements CadastroImportavel<PlantaComUnidades> 
     );
     // A unidade nova herda UF e cidade da planta, como o formulário faz.
     const endereco = (planta.endereco ?? {}) as Record<string, unknown>;
-    const uf = (endereco.uf as string | undefined) ?? atual?.uf ?? null;
-    const cidade = (endereco.cidade as string | undefined) ?? atual?.cidade ?? null;
+    // O que a própria linha apagou (null) não volta a valer pelo gravado
+    const uf = endereco && 'uf' in endereco ? ((endereco.uf as string | null) ?? null) : (atual?.uf ?? null);
+    const cidade = endereco && 'cidade' in endereco ? ((endereco.cidade as string | null) ?? null) : (atual?.cidade ?? null);
 
     const erros: ErroDeCampo[] = [];
     const resolvidas = linhas.map((linha, i) => {
@@ -212,7 +218,7 @@ export class PlantasImportacao implements CadastroImportavel<PlantaComUnidades> 
     if (!this.escopo.isScoped(escopo)) return;
 
     // A mesma regra do formulário (SN-75)
-    const problema = problemaNoDono(usuario, planta.proprietarioId, atual ? atual.proprietario_id : null);
+    const problema = problemaNoDono(usuario, planta.proprietarioId, atual ? atual.proprietario_id : undefined);
     if (problema) throw ErrosDaLinha.em('proprietario', problema);
   }
 
@@ -251,7 +257,7 @@ export class PlantasImportacao implements CadastroImportavel<PlantaComUnidades> 
       numero_uc: p.numero_uc,
       horario_funcionamento: p.horario_funcionamento,
       localizacao: p.localizacao,
-      proprietario_id: p.proprietario_id.trim(),
+      proprietario_id: p.proprietario_id?.trim() ?? null,
       endereco: [p.logradouro, p.bairro, p.cidade, p.uf, p.cep],
       unidades: doPlanta
         .map((u) => [

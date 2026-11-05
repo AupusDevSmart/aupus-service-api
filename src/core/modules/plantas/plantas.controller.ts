@@ -43,7 +43,7 @@ export class PlantasController {
   /** O cliente só cadastra planta em nome próprio (SN-75, a regra da planilha: dono-da-planta.ts) */
   private async conferirDono(user: ScopedUser, novoDono: string | null | undefined, plantaId?: string) {
     if (user?.role !== 'proprietario') return;
-    const donoAtual = plantaId ? await this.plantasService.proprietarioDe(plantaId) : null;
+    const donoAtual = plantaId ? await this.plantasService.proprietarioDe(plantaId) : undefined;
     const problema = problemaNoDono(user, novoDono, donoAtual);
     if (problema) throw new ForbiddenException(problema);
   }

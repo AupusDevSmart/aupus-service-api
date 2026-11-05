@@ -86,7 +86,8 @@ export class UnidadesService {
         planta_id: plantaIdTrimmed,
         pontos_medicao: pontos_medicao ? pontos_medicao : null,
         concessionaria_id: concessionariaIdTrimmed || null,
-        potencia: unidadeData.potencia ?? 0,
+        // Sem potência informada fica sem valor: zero se leria como "não gera nem consome"
+        potencia: unidadeData.potencia ?? null,
         status: 'ativo',
       };
 
@@ -625,7 +626,7 @@ export class UnidadesService {
           id: unidade.id,
           nome: unidade.nome,
           tipo: unidade.tipo,
-          potencia: Number(unidade.potencia),
+          potencia: unidade.potencia == null ? null : Number(unidade.potencia),
         },
         totais: {
           equipamentos: totalEquipamentos,
@@ -673,9 +674,10 @@ export class UnidadesService {
       tipo: unidadeDb.tipo as TipoUnidade,
       estado: unidadeDb.estado,
       cidade: unidadeDb.cidade,
-      latitude: Number(unidadeDb.latitude),
-      longitude: Number(unidadeDb.longitude),
-      potencia: Number(unidadeDb.potencia),
+      // Sem valor continua sem valor: Number(null) é 0, e a instalação ia parar em 0,0 no mapa
+      latitude: unidadeDb.latitude == null ? null : Number(unidadeDb.latitude),
+      longitude: unidadeDb.longitude == null ? null : Number(unidadeDb.longitude),
+      potencia: unidadeDb.potencia == null ? null : Number(unidadeDb.potencia),
       status: unidadeDb.status as StatusUnidade,
       pontosMedicao: (unidadeDb.pontos_medicao as string[]) || [],
       irrigante: unidadeDb.irrigante,
