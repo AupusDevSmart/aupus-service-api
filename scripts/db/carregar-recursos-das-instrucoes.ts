@@ -7,15 +7,19 @@
  * servidor também não: as programações nasciam com as instruções, mas sem
  * nenhum recurso delas, e a OS aprovada herdava o vazio.
  *
- * Só mexe no que está VAZIO — as quatro listas sem nenhuma linha —, para não
- * dobrar o que alguém já planejou à mão:
- *   - programação PENDENTE ou APROVADA: grava as quatro listas e o orçamento previsto;
- *   - OS PENDENTE, EM_EXECUCAO ou PAUSADA dessa programação: grava as mesmas
- *     listas (a cópia que a aprovação faria) e o mesmo orçamento previsto.
+ * Só acrescenta: entra cada recurso das instruções que a lista ainda não tem com
+ * a mesma descrição (material, especialidade, ferramenta, outro custo), e nada
+ * do que já existe é trocado ou apagado — o que alguém planejou à mão fica, e o
+ * que a proposta trouxe (frete, veículo, diárias) também. Rodar de novo não dobra.
+ *   - programação PENDENTE ou APROVADA: grava o que falta e soma o custo dele ao
+ *     orçamento previsto (o previsto de antes fica, com os ajustes que tiver);
+ *   - OS PENDENTE, EM_EXECUCAO ou PAUSADA dessa programação: o mesmo na OS.
  * Fica de fora, e aparece no relatório: programação FINALIZADA/CANCELADA, OS
  * EXECUTADA/AUDITADA (o custo real já foi apurado com o que havia),
- * FINALIZADA (o conteúdo é selado pelo código de verificação) e CANCELADA, e
- * lista que já tem alguma linha.
+ * FINALIZADA (o conteúdo é selado pelo código de verificação) e CANCELADA.
+ *
+ * (Até 06/nov/2026 a regra era "só as quatro listas vazias", e a programação da
+ * solicitação ficava de fora: ela nasce com os outros custos da proposta.)
  *
  * Filtra pela descrição EXATA (sem caixa, sem espaço nas pontas). A prévia
  * também conta as que só CONTÊM o texto, para conferir se o filtro pegou todas.
@@ -119,25 +123,54 @@ async function gravarNaOS(tx: Prisma.TransactionClient, osId: string, p: Planeja
     });
 }
 
-async function listasDaProgramacao(tx: Prisma.TransactionClient, id: string) {
-  const [m, f, t, i] = await Promise.all([
-    tx.materiais_programacao_os.count({ where: { programacao_id: id } }),
-    tx.ferramentas_programacao_os.count({ where: { programacao_id: id } }),
-    tx.tecnicos_programacao_os.count({ where: { programacao_id: id } }),
-    tx.itens_orcamento_programacao_os.count({ where: { programacao_id: id } }),
-  ]);
-  return m + f + t + i;
+/** O que já está planejado, pela descrição (sem caixa, sem espaço nas pontas) de cada lista */
+interface JaPlanejado {
+  materiais: Set<string>;
+  tecnicos: Set<string>;
+  ferramentas: Set<string>;
+  itens: Set<string>;
 }
 
-async function listasDaOS(tx: Prisma.TransactionClient, id: string) {
-  const [m, f, t, i] = await Promise.all([
-    tx.materiais_os.count({ where: { os_id: id } }),
-    tx.ferramentas_os.count({ where: { os_id: id } }),
-    tx.tecnicos_os.count({ where: { os_id: id } }),
-    tx.itens_orcamento_os.count({ where: { os_id: id } }),
+const chave = (texto: string | null | undefined) => (texto ?? '').trim().toLowerCase();
+const conjunto = (linhas: { descricao?: string | null; especialidade?: string | null }[]) =>
+  new Set(linhas.map((l) => chave(l.descricao ?? l.especialidade)));
+
+/**
+ * O planejado das instruções menos o que a lista já tem com a mesma descrição.
+ * A programação da solicitação nasce com os outros custos da proposta (frete,
+ * veículo, diárias); eles não são recurso de instrução e não impedem a carga.
+ */
+const oQueFalta = (p: PlanejadoDasInstrucoes, ja: JaPlanejado): PlanejadoDasInstrucoes => ({
+  materiais: p.materiais.filter((m) => !ja.materiais.has(chave(m.descricao))),
+  tecnicos: p.tecnicos.filter((t) => !ja.tecnicos.has(chave(t.especialidade))),
+  ferramentas: p.ferramentas.filter((f) => !ja.ferramentas.has(chave(f.descricao))),
+  itens_orcamento: p.itens_orcamento.filter((i) => !ja.itens.has(chave(i.descricao))),
+});
+
+async function listasDaProgramacao(tx: Prisma.TransactionClient, id: string): Promise<JaPlanejado> {
+  const onde = { where: { programacao_id: id } };
+  const [m, t, f, i] = await Promise.all([
+    tx.materiais_programacao_os.findMany({ ...onde, select: { descricao: true } }),
+    tx.tecnicos_programacao_os.findMany({ ...onde, select: { especialidade: true } }),
+    tx.ferramentas_programacao_os.findMany({ ...onde, select: { descricao: true } }),
+    tx.itens_orcamento_programacao_os.findMany({ ...onde, select: { descricao: true } }),
   ]);
-  return m + f + t + i;
+  return { materiais: conjunto(m), tecnicos: conjunto(t), ferramentas: conjunto(f), itens: conjunto(i) };
 }
+
+async function listasDaOS(tx: Prisma.TransactionClient, id: string): Promise<JaPlanejado> {
+  const onde = { where: { os_id: id } };
+  const [m, t, f, i] = await Promise.all([
+    tx.materiais_os.findMany({ ...onde, select: { descricao: true } }),
+    tx.tecnicos_os.findMany({ ...onde, select: { especialidade: true } }),
+    tx.ferramentas_os.findMany({ ...onde, select: { descricao: true } }),
+    tx.itens_orcamento_os.findMany({ ...onde, select: { descricao: true } }),
+  ]);
+  return { materiais: conjunto(m), tecnicos: conjunto(t), ferramentas: conjunto(f), itens: conjunto(i) };
+}
+
+/** O previsto de antes (com o que a proposta trouxe e qualquer ajuste) mais o que entrou agora */
+const somarAoPrevisto = (antes: Prisma.Decimal | null, entrou: PlanejadoDasInstrucoes) => centavos(Number(antes ?? 0) + orcamentoDe(entrou));
 
 async function main() {
   if (!descricao) throw new Error('Informe --descricao "<texto exato da programação>"');
@@ -145,7 +178,7 @@ async function main() {
 
   const programacoes = await prisma.programacoes_os.findMany({
     where: { deletado_em: null, descricao: { contains: descricao, mode: 'insensitive' } },
-    select: { id: true, codigo: true, descricao: true, status: true },
+    select: { id: true, codigo: true, descricao: true, status: true, orcamento_previsto: true },
     orderBy: { codigo: 'asc' },
   });
   const exatas = programacoes.filter((p) => p.descricao.trim().toLowerCase() === descricao.toLowerCase());
@@ -175,25 +208,25 @@ async function main() {
           contagem.puladas += 1;
           return;
         }
-        const orcamento = orcamentoDe(planejado);
-
         // A programação
+        const falta = oQueFalta(planejado, await listasDaProgramacao(tx, prog.id));
         if (!PROGRAMACAO_ALTERAVEL.includes(prog.status)) {
           console.log(`${codigo}: programação ${prog.status} — fica como está`);
-        } else if ((await listasDaProgramacao(tx, prog.id)) > 0) {
-          console.log(`${codigo}: programação já tem recursos planejados — fica como está`);
+        } else if (vazio(falta)) {
+          console.log(`${codigo}: programação já tem os recursos das instruções — fica como está`);
         } else {
-          console.log(`${codigo}: programação recebe ${resumo(planejado)}`);
+          const previsto = somarAoPrevisto(prog.orcamento_previsto, falta);
+          console.log(`${codigo}: programação recebe ${resumo(falta)}; previsto de R$ ${Number(prog.orcamento_previsto ?? 0).toFixed(2)} para R$ ${previsto.toFixed(2)}`);
           contagem.programacoes += 1;
           if (aplicar) {
-            await gravarNaProgramacao(tx, prog.id, planejado);
-            await tx.programacoes_os.update({ where: { id: prog.id }, data: { orcamento_previsto: orcamento } });
+            await gravarNaProgramacao(tx, prog.id, falta);
+            await tx.programacoes_os.update({ where: { id: prog.id }, data: { orcamento_previsto: previsto } });
             await tx.historico_programacao_os.create({
               data: {
                 programacao_id: prog.id,
                 acao: 'RECURSOS_DAS_INSTRUCOES',
                 usuario: 'Sistema',
-                observacoes: `Recursos das instruções carregados (não vinham ao programar): ${resumo(planejado)}.`,
+                observacoes: `Recursos das instruções carregados (não vinham ao programar): ${resumo(falta)}.`,
               },
             });
           }
@@ -202,7 +235,7 @@ async function main() {
         // A OS dessa programação
         const ordens = await tx.ordens_servico.findMany({
           where: { programacao_id: prog.id, deletado_em: null },
-          select: { id: true, numero_os: true, status: true },
+          select: { id: true, numero_os: true, status: true, orcamento_previsto: true },
         });
         for (const os of ordens) {
           const numero = os.numero_os.trim();
@@ -212,21 +245,25 @@ async function main() {
           }
           const status = await travarOSAlteravel(tx, os.id, 'gravar');
           if (!OS_ALTERAVEL.includes(status)) continue;
-          if ((await listasDaOS(tx, os.id)) > 0) {
-            console.log(`  OS ${numero}: já tem recursos planejados — fica como está`);
+          const faltaNaOS = oQueFalta(planejado, await listasDaOS(tx, os.id));
+          if (vazio(faltaNaOS)) {
+            console.log(`  OS ${numero}: já tem os recursos das instruções — fica como está`);
             continue;
           }
-          console.log(`  OS ${numero} [${status}]: recebe ${resumo(planejado)}`);
+          const previstoDaOS = somarAoPrevisto(os.orcamento_previsto, faltaNaOS);
+          console.log(
+            `  OS ${numero} [${status}]: recebe ${resumo(faltaNaOS)}; previsto de R$ ${Number(os.orcamento_previsto ?? 0).toFixed(2)} para R$ ${previstoDaOS.toFixed(2)}`,
+          );
           contagem.os += 1;
           if (!aplicar) continue;
-          await gravarNaOS(tx, os.id, planejado);
-          await tx.ordens_servico.update({ where: { id: os.id }, data: { orcamento_previsto: orcamento } });
+          await gravarNaOS(tx, os.id, faltaNaOS);
+          await tx.ordens_servico.update({ where: { id: os.id }, data: { orcamento_previsto: previstoDaOS } });
           await tx.historico_os.create({
             data: {
               os_id: os.id,
               acao: 'RECURSOS_DAS_INSTRUCOES',
               usuario: 'Sistema',
-              observacoes: `Recursos das instruções carregados (não vinham da programação): ${resumo(planejado)}.`,
+              observacoes: `Recursos das instruções carregados (não vinham da programação): ${resumo(faltaNaOS)}.`,
             },
           });
         }
