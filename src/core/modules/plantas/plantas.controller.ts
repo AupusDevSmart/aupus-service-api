@@ -13,6 +13,7 @@ import {
   ValidationPipe,
   ForbiddenException,
 } from '@nestjs/common';
+import { ConfirmacaoDaExclusaoDto } from '../sincronizacao/confirmacao-da-exclusao.dto';
 import {
   ApiTags,
   ApiOperation,
@@ -336,13 +337,17 @@ export class PlantasController {
     status: HttpStatus.CONFLICT,
     description: 'Planta possui dependências que impedem a exclusão'
   })
-  async remove(@Param('id') id: string): Promise<{ message: string; deletedUnits?: number; deletedEquipments?: number }> {
+  async remove(
+    @Param('id') id: string,
+    // A planta compartilhada com o NexON só sai com a confirmação da tela (409 sem ela, 10/11/2026)
+    @Query() confirmacao: ConfirmacaoDaExclusaoDto,
+  ): Promise<{ message: string; deletedUnits?: number; deletedEquipments?: number }> {
     // Fazer trim do ID para garantir que não há espaços
     const plantaId = id.trim();
     this.logger.log(`🗑️ [DELETE PLANTA] Deletando planta ${plantaId}`);
 
     try {
-      const result = await this.plantasService.remove(plantaId);
+      const result = await this.plantasService.remove(plantaId, confirmacao.confirmarCompartilhado === true);
 
       this.logger.log(`✅ [DELETE PLANTA] Planta ${plantaId} deletada com sucesso`);
       if (result.deletedUnits) {

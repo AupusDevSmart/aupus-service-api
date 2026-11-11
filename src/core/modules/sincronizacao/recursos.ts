@@ -18,6 +18,11 @@ export function ehRecurso(v: string): v is Recurso {
  */
 const NUNCA_VIAJAM: Record<Recurso, string[]> = {
   usuarios: [
+    // A exclusao NUNCA viaja no upsert (10/11/2026): o editado e apagado antes da entrega
+    // mandava `deleted_at` no upsert, o outro lado apagava pela versao, e o aviso que vinha
+    // depois achava o registro "ja apagado" — a exclusao atravessava calada, como em 26/10.
+    // Exclusao e o evento `delete`, que vira aviso. Barrado na saida e na entrada.
+    'deleted_at',
     // Credencial nao se replica. Nunca.
     'senha',
     'remember_token',
@@ -37,9 +42,10 @@ const NUNCA_VIAJAM: Record<Recurso, string[]> = {
     'created_by',
     'deleted_by',
   ],
-  plantas: [],
-  unidades: [],
+  plantas: ['deleted_at'],
+  unidades: ['deleted_at'],
   equipamentos: [
+    'deleted_at',
     // Existem so no Service. O receptor ja descarta o que nao reconhece, mas
     // nao mandar e mais honesto do que mandar para ser jogado fora.
     'ativo_funcional_id',

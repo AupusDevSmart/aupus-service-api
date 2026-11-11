@@ -14,6 +14,7 @@ import { QueryTarefasDto } from '../../modules/tarefas/dto/query-tarefas.dto';
 import { QueryVeiculosDto } from '../../modules/veiculos/dto/query-veiculos.dto';
 import { OSFiltersDto } from '../../modules/execucao-os/dto/os-filters.dto';
 import { ListarNotificacoesDto } from '../../modules/notificacoes/notificacoes.dto';
+import { ConfirmacaoDaExclusaoDto } from '../../core/modules/sincronizacao/confirmacao-da-exclusao.dto';
 
 /**
  * Booleano na query string, com o pipe do configurar-app (achado no SN-59).
@@ -51,6 +52,7 @@ const CAMPOS: Array<[new () => object, string]> = [
   [QueryVeiculosDto, 'apenasDisponiveis'],
   [OSFiltersDto, 'atrasadas'],
   [ListarNotificacoesDto, 'somenteNaoLidas'],
+  [ConfirmacaoDaExclusaoDto, 'confirmarCompartilhado'],
 ];
 
 describe('booleano na query string', () => {

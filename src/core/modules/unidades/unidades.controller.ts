@@ -15,6 +15,7 @@ import {
   UseInterceptors,
   UploadedFile,
 } from '@nestjs/common';
+import { ConfirmacaoDaExclusaoDto } from '../sincronizacao/confirmacao-da-exclusao.dto';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { Response } from 'express';
 import * as path from 'path';
@@ -372,11 +373,15 @@ export class UnidadesController {
     status: HttpStatus.BAD_REQUEST,
     description: 'Não é possível remover unidade com equipamentos vinculados',
   })
-  async remove(@Param('id') id: string) {
+  async remove(
+    @Param('id') id: string,
+    // A instalação compartilhada com o NexON só sai com a confirmação da tela (409 sem ela, 10/11/2026)
+    @Query() confirmacao: ConfirmacaoDaExclusaoDto,
+  ) {
     this.logger.log(`🗑️  [DELETE UNIDADE] Removendo: ${id}`);
 
     try {
-      const result = await this.unidadesService.remove(id);
+      const result = await this.unidadesService.remove(id, confirmacao.confirmarCompartilhado === true);
       this.logger.log(`✅ [DELETE UNIDADE] ${result.message}`);
       return result;
     } catch (error) {
